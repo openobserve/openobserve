@@ -6,7 +6,7 @@
       dense
       borderless
       :label="label"
-      @focus="showOptions = true"
+      @focus="onFocus"
       @blur="hideOptions"
       v-bind="$attrs"
       style="width: 100%"
@@ -97,6 +97,13 @@ export default defineComponent({
       showOptions.value = false;
     };
 
+    const onFocus = () => {
+      showOptions.value = true;
+      // Show all options when focusing (pass empty string to reset filter)
+      // This allows users to see and select from all available options
+      fieldsFilterFn("");
+    };
+
     // when any item is selected, replace it with the value and hide the options
     const selectOption = (option) => {
       emit("update:modelValue", props.valueReplaceFn(option?.value));
@@ -113,6 +120,7 @@ export default defineComponent({
       fieldsFilterFn,
       fieldsFilteredOptions,
       hideOptions,
+      onFocus,
       selectOption,
       store,
       onModelValueChanged,

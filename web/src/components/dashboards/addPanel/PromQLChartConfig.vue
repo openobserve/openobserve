@@ -260,8 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Column Filters -->
       <template
         v-if="
-          promqlTableMode === 'all' ||
-          promqlTableMode === 'single_with_metadata'
+          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
@@ -382,8 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Sticky Columns -->
       <template
         v-if="
-          promqlTableMode === 'all' ||
-          promqlTableMode === 'single_with_metadata'
+          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
@@ -621,8 +619,8 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "TimeSeries", value: "single" },
-      { label: "TimeSeries with Metadata", value: "single_with_metadata" },
+      { label: "Time series", value: "single" },
+      { label: "Expanded Time series", value: "expanded_timeseries" },
       { label: "Aggregate", value: "all" },
     ];
 
@@ -874,6 +872,11 @@ export default defineComponent({
   :deep(.q-field__label) {
     padding-top: 4px;
     padding-bottom: 4px;
+  }
+
+  // Prevent capitalization for column filter fields
+  :deep(.q-field__native > :first-child) {
+    text-transform: none !important;
   }
 }
 </style>

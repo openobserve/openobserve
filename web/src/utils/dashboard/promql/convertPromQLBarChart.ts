@@ -90,8 +90,9 @@ export class BarConverter implements PromQLChartConverter {
 
         queryData.series.forEach((seriesData) => {
           const data = queryData.timestamps.map(([ts]) => {
-            const value = parseFloat(seriesData.data[ts] ?? "0");
-            return value;
+            const dataValue = seriesData.data[ts];
+            // Return '-' for missing values instead of 0 to show blank in stacked charts
+            return dataValue != null ? parseFloat(dataValue) : '-';
           });
 
           // Get numeric values for color calculation
@@ -222,6 +223,14 @@ export class BarConverter implements PromQLChartConverter {
           xAxis: buildCategoryXAxis(categories, panelSchema),
           yAxis: buildValueAxis(panelSchema),
         };
+
+    if (isHorizontal) {
+      axisConfig.yAxis.axisLabel = {
+        ...axisConfig.yAxis.axisLabel,
+        overflow: "truncate",
+        width: config.axis_width || 150,
+      };
+    }
 
     return {
       series,

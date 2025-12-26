@@ -766,7 +766,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
       bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label dense label-slot borderless hide-bottom-space> -->
       <div
-        v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+        v-if="
+          promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'
+        "
         class="q-py-md showLabelOnTop"
         style="font-weight: 600"
       >
@@ -965,7 +967,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="space"></div>
 
       <CommonAutoComplete
-        v-if="promqlMode"
+        v-if="promqlMode && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'maps'"
         :label="t('common.legend')"
         v-model="
           dashboardPanelData.data.queries[
@@ -1675,6 +1677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OverrideConfig
       v-if="dashboardPanelData.data.type == 'table'"
       :dashboardPanelData="dashboardPanelData"
+      :panelData="panelData"
     />
     <div class="space"></div>
 

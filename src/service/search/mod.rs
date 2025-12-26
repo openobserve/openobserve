@@ -44,6 +44,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
+    cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
@@ -57,12 +58,15 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::sql::visitor::group_by::get_group_by_fields,
-    config::META_ORG_ID,
-    config::meta::search::CardinalityLevel,
-    config::meta::search::generate_aggregation_search_interval,
-    config::meta::self_reporting::usage::USAGE_STREAM,
-    config::utils::sql::is_simple_aggregate_query,
-    infra::client::grpc::make_grpc_search_client,
+    config::{
+        META_ORG_ID,
+        meta::{
+            search::{CardinalityLevel, generate_aggregation_search_interval},
+            self_reporting::usage::USAGE_STREAM,
+        },
+        utils::sql::is_simple_aggregate_query,
+    },
+    infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
         search::{
@@ -81,12 +85,9 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        utils::{
-            functions::{get_all_transform_keys, init_vrl_runtime},
-            stream::get_settings_max_query_range,
-        },
+    common::utils::{
+        functions::{get_all_transform_keys, init_vrl_runtime},
+        stream::get_settings_max_query_range,
     },
     handler::grpc::request::search::Searcher,
     service::search::{
@@ -815,7 +816,7 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -1167,7 +1168,8 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+
+    let mut nodes = match get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("query_status: no querier node online");
@@ -1302,7 +1304,7 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("cancel_query: no querier node online");

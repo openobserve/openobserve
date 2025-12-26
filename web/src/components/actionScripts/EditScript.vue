@@ -585,7 +585,7 @@ import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
@@ -947,7 +947,10 @@ const validateActionScriptData = async () => {
   if (formData.value.execution_details === "repeat") {
     try {
       cronError.value = "";
-      cronParser.parseExpression(frequency.value.cron);
+      CronExpressionParser.parse(frequency.value.cron, {
+        currentDate: new Date(),
+        utc: true,
+      });
       validateFrequency(frequency.value.cron);
     } catch (err) {
       cronError.value = "Invalid cron expression!";

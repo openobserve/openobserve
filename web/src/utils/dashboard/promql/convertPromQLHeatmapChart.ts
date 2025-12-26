@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  TOOLTIP_SCROLL_STYLE,
+} from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
-import { getColorPalette } from "../colorPalette";
 
 /**
  * Converter for heatmap charts
@@ -29,7 +32,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
 
@@ -58,20 +61,26 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
-    const xAxisData = processedData[0]?.timestamps.map(([, formatted]) => formatted) || [];
-
-    // Get color range from configuration or use theme-based palette
-    let colorRange: string[];
-    if (config.color_range && Array.isArray(config.color_range) && config.color_range.length > 0) {
-      colorRange = config.color_range;
-    } else if (config.color?.fixedColor && Array.isArray(config.color.fixedColor) && config.color.fixedColor.length > 0) {
-      colorRange = config.color.fixedColor;
-    } else {
-      // Use theme-based color palette
-      const themePalette = getColorPalette(store.state.theme);
-      // Select a subset of colors for heatmap gradient
-      colorRange = [themePalette[10], themePalette[5], themePalette[0]]; // Cool to warm gradient
-    }
+    // Format timestamps to extract time portion (consistent with bar charts)
+    const xAxisData =
+      processedData[0]?.timestamps.map(([, formatted]) => {
+        // formatted can be Date object or ISO string
+        let timeString: string;
+        if (formatted instanceof Date) {
+          // Format as HH:MM:SS
+          const hours = String(formatted.getHours()).padStart(2, "0");
+          const minutes = String(formatted.getMinutes()).padStart(2, "0");
+          const seconds = String(formatted.getSeconds()).padStart(2, "0");
+          timeString = `${hours}:${minutes}:${seconds}`;
+        } else {
+          // ISO string - extract time portion
+          const dateStr = formatted.toString();
+          // Try to extract time (HH:MM:SS) from datetime string
+          const timeMatch = dateStr.match(/(\d{2}:\d{2}:\d{2})/);
+          timeString = timeMatch ? timeMatch[1] : dateStr;
+        }
+        return timeString;
+      }) || [];
 
     return {
       series: [
@@ -79,18 +88,23 @@ export class HeatmapConverter implements PromQLChartConverter {
           type: "heatmap",
           data,
           label: {
-            show: config.show_label === true,
-            // Add unit formatting to labels if shown
+            show: true,
+            fontSize: 12,
             formatter: (params: any) => {
-              const value = params.data[2]; // Value is at index 2 in [x, y, value]
-              return formatUnitValue(
-                getUnitValue(
-                  value,
-                  config?.unit,
-                  config?.unit_custom,
-                  config?.decimals
-                )
-              );
+              try {
+                return (
+                  formatUnitValue(
+                    getUnitValue(
+                      params?.value?.[2],
+                      config?.unit,
+                      config?.unit_custom,
+                      config?.decimals,
+                    ),
+                  ) || params?.value?.[2]
+                );
+              } catch (error) {
+                return params?.value?.[2]?.toString() ?? "";
+              }
             },
           },
           emphasis: {
@@ -101,66 +115,69 @@ export class HeatmapConverter implements PromQLChartConverter {
           },
         },
       ],
-      xAxis: {
-        type: "category",
-        data: xAxisData,
-        splitArea: {
-          show: true,
+      xAxis: [
+        {
+          type: "category",
+          data: xAxisData,
+          splitArea: {
+            show: true,
+          },
         },
-        axisLabel: {
-          rotate: config.axis_label_rotate || 0,
-          interval: config.axis_label_interval || "auto",
-        },
-      },
+      ],
       yAxis: {
         type: "category",
         data: seriesNames,
         splitArea: {
           show: true,
         },
+        axisLabel: {
+          overflow: "truncate",
+          width: config.axis_width || 150,
+        },
       },
       visualMap: {
-        min: config.min_value ?? minValue,
-        max: config.max_value ?? maxValue,
+        min: 0,
+        max: maxValue,
         calculable: true,
-        orient: config.visual_map_orient || "horizontal",
-        left: config.visual_map_position || "center",
-        bottom: "0%",
-        inRange: {
-          color: colorRange,
-        },
-        // Add unit formatting to visual map labels
-        formatter: (value: number) => {
-          return formatUnitValue(
-            getUnitValue(
-              value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals
-            )
-          );
-        },
+        orient: "horizontal",
+        left: "center",
       },
       tooltip: {
         position: "top",
+        confine: true,
+        textStyle: {
+          color: store.state.theme === "dark" ? "#fff" : "#000",
+          fontSize: 12,
+        },
+        enterable: true,
+        backgroundColor:
+          store.state.theme === "dark"
+            ? "rgba(0,0,0,1)"
+            : "rgba(255,255,255,1)",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
-          const [timeIndex, seriesIndex, value] = params.data;
-          // Format value with units
-          const formattedValue = formatUnitValue(
-            getUnitValue(
-              value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals
-            )
-          );
-          return `${seriesNames[seriesIndex]}<br/>${xAxisData[timeIndex]}: <strong>${formattedValue}</strong>`;
+          try {
+            const seriesName =
+              seriesNames[params?.value[1]] || params?.seriesName;
+            const value =
+              formatUnitValue(
+                getUnitValue(
+                  params?.value?.[2],
+                  config?.unit,
+                  config?.unit_custom,
+                  config?.decimals,
+                ),
+              ) || params?.value?.[2];
+            return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
+          } catch (error) {
+            return "";
+          }
         },
       },
       grid: {
         left: "3%",
-        right: config.visual_map_orient === "vertical" ? "15%" : "4%",
-        bottom: config.visual_map_orient === "horizontal" ? "15%" : "3%",
+        right: "4%",
+        bottom: 60,
         containLabel: true,
       },
     };

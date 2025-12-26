@@ -1277,7 +1277,7 @@ import {
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar, copyToClipboard } from "quasar";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
@@ -1733,9 +1733,12 @@ const updateFrequency = async () => {
 
 function convertCronToMinutes(cronExpression: string) {
   cronJobError.value = "";
-  // Parse the cron expression using cron-parser
+  // Parse the cron expression using cron-parser v5
   try {
-    const interval = cronParser.parseExpression(cronExpression);
+    const interval = CronExpressionParser.parse(cronExpression, {
+      currentDate: new Date(),
+      utc: true,
+    });
     // Get the first and second execution times
     const firstExecution = interval.next();
     const secondExecution = interval.next();

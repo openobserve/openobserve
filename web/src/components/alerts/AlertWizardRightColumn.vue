@@ -206,18 +206,6 @@ export default defineComponent({
       }
     });
 
-    // Watch for Query step with custom tab - auto-expand preview if collapsed
-    watch(
-      () => [props.wizardStep, props.selectedTab],
-      ([step, tab]) => {
-        // Step 2 is Query step, and tab is "custom"
-        if (step === 2 && tab === "custom" && !expandState.preview) {
-          expandState.preview = true;
-          saveExpandState();
-        }
-      },
-      { immediate: true }
-    );
 
     // Expose refreshData method from PreviewAlert
     const refreshData = () => {

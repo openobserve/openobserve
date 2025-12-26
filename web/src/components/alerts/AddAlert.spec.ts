@@ -27,7 +27,7 @@ import { detectConditionsVersion } from "@/utils/alerts/alertDataTransforms";
 import PreviewAlert from "@/components/alerts/PreviewAlert.vue";
 
 import i18n from "@/locales";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 
 import { useLocalOrganization } from "@/utils/zincutils";
 
@@ -524,10 +524,14 @@ describe("AddAlert Component", () => {
       });
     });
     describe('getParser', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         wrapper.vm.sqlQueryErrorMsg = "";
+        // Initialize parser manually by importing and setting it
+        const useParserModule = await import("@/composables/useParser");
+        const { sqlParser } = useParserModule.default();
+        wrapper.vm.parser = await sqlParser();
       });
-    
+
 
       it('returns false and sets error for query with *', async() => {
         const result = wrapper.vm.getParser("SELECT * FROM INDEX_NAME");
@@ -649,7 +653,7 @@ describe("AddAlert Component", () => {
         }));
       });
       it('fails when invalid cron expression is passed', () => {
-        cronParser.parseExpression = vi.fn().mockImplementation(() => {
+        CronExpressionParser.parse = vi.fn().mockImplementation(() => {
           throw new Error('Invalid cron');
         });
 
@@ -666,7 +670,7 @@ describe("AddAlert Component", () => {
         expect(result).toBe(false); // function returns false when cron is invalid
       });
       it('passes when valid cron expression is provided', () => {
-        cronParser.parseExpression = vi.fn().mockImplementation(() => {
+        CronExpressionParser.parse = vi.fn().mockImplementation(() => {
           return {
               next: vi.fn(),
           }

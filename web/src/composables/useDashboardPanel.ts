@@ -197,6 +197,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
     showFieldList: true,
+    hiddenQueries: [],
   },
   meta: {
     parsedQuery: "",
@@ -349,6 +350,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     () => dashboardPanelData.data.queryType == "promql",
   );
 
+  // Watch queryType and toggle off VRL functions when switching to PromQL
+  watch(
+    () => dashboardPanelData.data.queryType,
+    (newQueryType) => {
+      if (newQueryType === "promql") {
+        dashboardPanelData.layout.vrlFunctionToggle = false;
+      }
+    },
+  );
+
   const selectedStreamFieldsBasedOnUserDefinedSchema = computed(() => {
     if (
       store.state.zoConfig.user_defined_schemas_enabled &&
@@ -375,7 +386,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         true,
       );
     } catch (e: any) {
-      console.error("Error while loading stream fields", e);
       return { name: streamName, schema: [], settings: {} };
     }
   }
@@ -1118,6 +1128,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const resetAggregationFunction = () => {
+    // Skip resetting fields for PromQL mode to preserve the query
+    if (dashboardPanelData.data.queryType === "promql") {
+      return;
+    }
+
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         dashboardPanelData.data.queries[
@@ -1809,6 +1824,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == false
     ) {
+      dashboardPanelData.meta.stream.customQueryFields = [];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(
@@ -3036,7 +3053,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.promql.labelValuesMap = new Map();
       }
     } catch (error) {
-      console.error("Error fetching PromQL labels:", error);
       dashboardPanelData.meta.promql.availableLabels = [];
       dashboardPanelData.meta.promql.labelValuesMap = new Map();
     } finally {

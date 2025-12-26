@@ -420,8 +420,9 @@ export default defineComponent({
 
     // Handle native DOM contextmenu event for alert creation
     // This handles right-clicks anywhere on the chart (including empty space)
-    const handleNativeContextMenu = (event: MouseEvent) => {
+    const handleNativeContextMenu = async (event: MouseEvent) => {
       // Get chart type from the first series
+      await nextTick();
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
       // Only handle contextmenu for bar and line charts

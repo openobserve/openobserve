@@ -19,180 +19,183 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="overflow-y: auto" class="scroll">
     <div class="tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs">
       <div
-      class="flex items-center q-pa-sm card-container"
-      :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
-    >
-      <div
-        class="flex items-center q-table__title"
-        :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+        class="flex items-center q-pa-sm card-container"
+        :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
       >
-        <span>
-          {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
-        </span>
-        <div>
-          <q-input
-            data-test="dashboard-panel-name"
-            v-model="dashboardPanelData.data.title"
-            :label="t('panel.name') + '*'"
-            class="q-ml-xl dynamic-input"
-            dense
-            borderless
-            :style="inputStyle"
-          />
+        <div
+          class="flex items-center q-table__title"
+          :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+        >
+          <span>
+            {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
+          </span>
+          <div>
+            <q-input
+              data-test="dashboard-panel-name"
+              v-model="dashboardPanelData.data.title"
+              :label="t('panel.name') + '*'"
+              class="q-ml-xl dynamic-input"
+              dense
+              borderless
+              :style="inputStyle"
+            />
+          </div>
         </div>
-      </div>
-      <div class="flex q-gutter-sm">
-        <q-btn
-          outline
-          padding="xs sm"
-          class="q-mr-sm tw-h-[36px] el-border"
-          no-caps
-          label="Dashboard Tutorial"
-          @click="showTutorial"
-          data-test="dashboard-panel-tutorial-btn"
-        ></q-btn>
-        <q-btn
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          outline
-          padding="sm"
-          class="q-mr-sm tw-h-[36px] el-border"
-          no-caps
-          icon="info_outline"
-          @click="showViewPanel = true"
-          data-test="dashboard-panel-data-view-query-inspector-btn"
-        >
-          <q-tooltip anchor="center left" self="center right"
-            >Query Inspector
-          </q-tooltip>
-        </q-btn>
-        <DateTimePickerDashboard
-          v-if="selectedDate"
-          v-model="selectedDate"
-          ref="dateTimePickerRef"
-          :disable="disable"
-          class="tw-h-[36px]"
-          @hide="setTimeForVariables"
-        />
-        <q-btn
-          outline
-          color="red"
-          no-caps
-          flat
-          class="o2-secondary-button tw-h-[36px] q-ml-md"
-          style="color: red !important"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          :label="t('panel.discard')"
-          @click="goBackToDashboardList"
-          data-test="dashboard-panel-discard"
-        />
-        <q-btn
-          class="o2-secondary-button tw-h-[36px] q-ml-md"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('panel.save')"
-          data-test="dashboard-panel-save"
-          @click.stop="savePanelData.execute()"
-          :loading="savePanelData.isLoading.value"
-        />
-        <template
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-        >
+        <div class="flex q-gutter-sm">
           <q-btn
-            v-if="config.isEnterprise === 'false'"
-            data-test="dashboard-apply"
-            class="tw-h-[36px] q-ml-md o2-primary-button"
+            outline
+            padding="xs sm"
+            class="q-mr-sm tw-h-[36px] el-border"
+            no-caps
+            label="Dashboard Tutorial"
+            @click="showTutorial"
+            data-test="dashboard-panel-tutorial-btn"
+          ></q-btn>
+          <q-btn
+            v-if="
+              !['html', 'markdown', 'custom_chart'].includes(
+                dashboardPanelData.data.type,
+              )
+            "
+            outline
+            padding="sm"
+            class="q-mr-sm tw-h-[36px] el-border"
+            no-caps
+            icon="info_outline"
+            @click="showViewPanel = true"
+            data-test="dashboard-panel-data-view-query-inspector-btn"
+          >
+            <q-tooltip anchor="center left" self="center right"
+              >Query Inspector
+            </q-tooltip>
+          </q-btn>
+          <DateTimePickerDashboard
+            v-if="selectedDate"
+            v-model="selectedDate"
+            ref="dateTimePickerRef"
+            :disable="disable"
+            class="tw-h-[36px]"
+            @hide="setTimeForVariables"
+          />
+          <q-btn
+            outline
+            color="red"
+            no-caps
+            flat
+            class="o2-secondary-button tw-h-[36px] q-ml-md"
+            style="color: red !important"
             :class="
               store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            :label="t('panel.discard')"
+            @click="goBackToDashboardList"
+            data-test="dashboard-panel-discard"
+          />
+          <q-btn
+            class="o2-secondary-button tw-h-[36px] q-ml-md"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
             "
             no-caps
             flat
-            dense
-            :loading="searchRequestTraceIds.length > 0"
-            :disable="searchRequestTraceIds.length > 0"
-            :label="t('panel.apply')"
-            @click="() => runQuery(false)"
+            :label="t('panel.save')"
+            data-test="dashboard-panel-save"
+            @click.stop="savePanelData.execute()"
+            :loading="savePanelData.isLoading.value"
           />
-          <q-btn-group
-            v-if="config.isEnterprise === 'true'"
-            class="tw-h-[36px] q-ml-md o2-primary-button"
-            style="padding-left: 0px !important ; padding-right: 0px !important"
-            :class="
-              store.state.theme === 'dark'
-                ? searchRequestTraceIds.length > 0
-                  ? 'o2-negative-button-dark'
-                  : 'o2-secondary-button-dark'
-                : searchRequestTraceIds.length > 0
-                  ? 'o2-negative-button-light'
-                  : 'o2-secondary-button-light'
-            "
+          <template
+            v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           >
             <q-btn
-              :data-test="
-                searchRequestTraceIds.length > 0
-                  ? 'dashboard-cancel'
-                  : 'dashboard-apply'
+              v-if="config.isEnterprise === 'false'"
+              data-test="dashboard-apply"
+              class="tw-h-[36px] q-ml-md o2-primary-button"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
               "
               no-caps
-              :label="
-                searchRequestTraceIds.length > 0
-                  ? t('panel.cancel')
-                  : t('panel.apply')
-              "
-              @click="onApplyBtnClick"
-            />
-
-            <q-btn-dropdown
-              class="text-bold no-border tw-px-0"
-              no-caps
-              auto-close
-              dropdown-icon="keyboard_arrow_down"
+              flat
+              dense
+              :loading="searchRequestTraceIds.length > 0"
               :disable="searchRequestTraceIds.length > 0"
+              :label="t('panel.apply')"
+              @click="() => runQuery(false)"
+            />
+            <q-btn-group
+              v-if="config.isEnterprise === 'true'"
+              class="tw-h-[36px] q-ml-md o2-primary-button"
+              style="
+                padding-left: 0px !important ;
+                padding-right: 0px !important;
+              "
+              :class="
+                store.state.theme === 'dark'
+                  ? searchRequestTraceIds.length > 0
+                    ? 'o2-negative-button-dark'
+                    : 'o2-secondary-button-dark'
+                  : searchRequestTraceIds.length > 0
+                    ? 'o2-negative-button-light'
+                    : 'o2-secondary-button-light'
+              "
             >
-              <q-list>
-                <q-item
-                  clickable
-                  @click="runQuery(true)"
-                  :disable="searchRequestTraceIds.length > 0"
-                >
-                  <q-item-section avatar>
-                    <q-icon
-                      size="xs"
-                      name="refresh"
-                      style="align-items: baseline; padding: 0px"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label
-                      style="
-                        font-size: 12px;
-                        align-items: baseline;
-                        padding: 0px;
-                      "
-                      >Refresh Cache & Apply</q-item-label
-                    >
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-btn-dropdown>
-          </q-btn-group>
-        </template>
+              <q-btn
+                :data-test="
+                  searchRequestTraceIds.length > 0
+                    ? 'dashboard-cancel'
+                    : 'dashboard-apply'
+                "
+                no-caps
+                :label="
+                  searchRequestTraceIds.length > 0
+                    ? t('panel.cancel')
+                    : t('panel.apply')
+                "
+                @click="onApplyBtnClick"
+              />
+
+              <q-btn-dropdown
+                class="text-bold no-border tw-px-0"
+                no-caps
+                auto-close
+                dropdown-icon="keyboard_arrow_down"
+                :disable="searchRequestTraceIds.length > 0"
+              >
+                <q-list>
+                  <q-item
+                    clickable
+                    @click="runQuery(true)"
+                    :disable="searchRequestTraceIds.length > 0"
+                  >
+                    <q-item-section avatar>
+                      <q-icon
+                        size="xs"
+                        name="refresh"
+                        style="align-items: baseline; padding: 0px"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label
+                        style="
+                          font-size: 12px;
+                          align-items: baseline;
+                          padding: 0px;
+                        "
+                        >Refresh Cache & Apply</q-item-label
+                      >
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+            </q-btn-group>
+          </template>
+        </div>
       </div>
-    </div>
     </div>
     <div>
       <div class="row" style="overflow-y: auto">
@@ -300,7 +303,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="layout-panel-container col">
                     <DashboardQueryBuilder
                       :dashboardData="currentDashboardData.data"
-                      @custom-chart-template-selected="handleCustomChartTemplateSelected"
+                      @custom-chart-template-selected="
+                        handleCustomChartTemplateSelected
+                      "
                     />
                     <q-separator />
                     <VariablesValueSelector
@@ -426,7 +431,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :variablesData="updatedVariablesData"
                         :allowAnnotationsAdd="editMode"
                         :width="6"
-                      :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                        :showLegendsButton="true"
                         @error="handleChartApiError"
                         @updated:data-zoom="onDataZoom"
                         @updated:vrlFunctionFieldList="
@@ -493,7 +499,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="flex: 1; min-height: 0"
               :initialVariableValues="updatedVariablesData"
             />
-            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+            <DashboardErrorsComponent
+              :errors="errorData"
+              class="tw-flex-shrink-0"
+            />
           </div>
         </div>
         <div
@@ -517,7 +526,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="flex: 1; min-height: 0"
               :initialVariableValues="updatedVariablesData"
             />
-            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+            <DashboardErrorsComponent
+              :errors="errorData"
+              class="tw-flex-shrink-0"
+            />
           </div>
         </div>
         <div
@@ -603,8 +615,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 99px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column;">
-                  <div style="height: 500px; flex-shrink: 0; overflow: hidden;">
+                <div
+                  class="col scroll"
+                  style="height: 100%; display: flex; flex-direction: column"
+                >
+                  <div style="height: 500px; flex-shrink: 0; overflow: hidden">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -612,13 +627,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="layoutSplitterUpdated"
                     >
                       <template #before>
-                        <div style="position: relative; width: 100%; height: 100%;">
+                        <div
+                          style="position: relative; width: 100%; height: 100%"
+                        >
                           <CustomChartEditor
                             v-model="dashboardPanelData.data.customChartContent"
-                            style="width: 100%; height: 100%;"
+                            style="width: 100%; height: 100%"
                           />
                           <!-- Custom Chart Type Selector Button overlaid on Editor -->
-                          <div style="position: absolute; bottom: 10px; right: 10px; z-index: 10;">
+                          <div
+                            style="
+                              position: absolute;
+                              bottom: 10px;
+                              right: 10px;
+                              z-index: 10;
+                            "
+                          >
                             <q-btn
                               unelevated
                               color="primary"
@@ -665,7 +689,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="updatedVariablesData"
                           :width="6"
-                        :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                          :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+                          :showLegendsButton="true"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           @updated:vrlFunctionFieldList="
@@ -873,13 +898,13 @@ export default defineComponent({
       // Extract chart and replaceQuery option from the selection
       const chart = selection.chart || selection; // Support both old and new format
       const replaceQuery = selection.replaceQuery ?? false; // Default to false (unchecked)
-      
+
       selectedCustomChartType.value = chart;
-      
+
       try {
         // Lazy load the template
         const template = await loadCustomChartTemplate(chart.value);
-        
+
         if (template) {
           // Keep the default commented instructions and only replace the option code
           const defaultComments = `// To know more about ECharts , 
@@ -888,22 +913,28 @@ export default defineComponent({
 // Define your ECharts 'option' here. 
 // 'data' variable is available for use and contains the response data from the search result and it is an array.
 `;
-          dashboardPanelData.data.customChartContent = defaultComments + template.code;
-          
+          dashboardPanelData.data.customChartContent =
+            defaultComments + template.code;
+
           // Handle query replacement based on user selection
-          const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
+          const currentQueryIndex =
+            dashboardPanelData.layout.currentQueryIndex || 0;
           if (dashboardPanelData.data.queries[currentQueryIndex]) {
             if (replaceQuery && template.query && template.query.trim()) {
               // Replace with example query if option is selected
-              dashboardPanelData.data.queries[currentQueryIndex].query = template.query.trim();
+              dashboardPanelData.data.queries[currentQueryIndex].query =
+                template.query.trim();
               // Enable custom query mode for custom charts
-              dashboardPanelData.data.queries[currentQueryIndex].customQuery = true;
+              dashboardPanelData.data.queries[currentQueryIndex].customQuery =
+                true;
             }
             // If replaceQuery is false, preserve the existing query (do nothing)
           }
         }
       } catch (error) {
-        showErrorNotification("There was an error applying the chart example code. Please try again");
+        showErrorNotification(
+          "There was an error applying the chart example code. Please try again",
+        );
       }
     };
 
@@ -1040,6 +1071,7 @@ export default defineComponent({
       // todo check for the edit more
       if (route.query.panelId) {
         editMode.value = true;
+
         const panelData = await getPanel(
           store,
           route.query.dashboard,
@@ -1053,6 +1085,17 @@ export default defineComponent({
             dashboardPanelData.data,
             JSON.parse(JSON.stringify(panelData ?? {})),
           );
+
+          // FIX: For custom_chart panels, ensure customQuery flag is always true
+          // This prevents the query from being lost due to watchers that fire during mount
+          if (dashboardPanelData.data.type === "custom_chart") {
+            dashboardPanelData.data.queries.forEach((query: any) => {
+              if (query.query) {
+                // Only set customQuery=true if there's actually a query
+                query.customQuery = true;
+              }
+            });
+          }
         } catch (e) {
           console.error("Error while parsing panel data", e);
         }
@@ -1086,13 +1129,15 @@ export default defineComponent({
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
       await loadDashboard();
-      
+
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
-      if (!editMode.value && 
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery) {
+      if (
+        !editMode.value &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      ) {
         await makeAutoSQLQuery();
       }
 
@@ -1670,8 +1715,6 @@ export default defineComponent({
       // Update the custom chart content with the selected template
       dashboardPanelData.data.customChartContent = templateCode;
     };
-
-
 
     watch(
       () => dashboardPanelData.layout.splitter,
