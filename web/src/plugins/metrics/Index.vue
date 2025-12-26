@@ -317,7 +317,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="dashboardPanelData.data.type == 'custom_chart'"
           class="col tw-mr-[0.625rem]"
           style="
-            height: calc(100vh - 106px);
             overflow-y: auto;
             display: flex;
             flex-direction: row;
@@ -380,10 +379,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 106px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%">
-                  <div
-                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
-                  >
+                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column">
+                  <div style="height: 500px; flex-shrink: 0; overflow: hidden">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -391,10 +388,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="layoutSplitterUpdated"
                     >
                       <template #before>
-                        <CustomChartEditor
-                          v-model="dashboardPanelData.data.customChartContent"
-                          style="width: 100%; height: 100%"
-                        />
+                        <div style="position: relative; width: 100%; height: 100%">
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%"
+                          />
+                        </div>
                       </template>
                       <template #separator>
                         <div class="splitter-vertical splitter-enabled"></div>
@@ -420,12 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           :allowAlertCreation="true"
-                          @updated:vrl-function-field-list="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
+                          @updated:vrl-function-field-list="updateVrlFunctionFieldList"
+                          @last-triggered-at-update="handleLastTriggeredAtUpdate"
                           @series-data-update="seriesDataUpdate"
                           @show-legends="showLegendsDialog = true"
                           searchType="ui"
@@ -440,7 +435,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <DashboardQueryEditor />
+                  <div class="row column tw-h-[calc(100vh-180px)]">
+                    <DashboardQueryEditor />
+                  </div>
                 </div>
                 <q-separator vertical />
                 <div class="col-auto">
