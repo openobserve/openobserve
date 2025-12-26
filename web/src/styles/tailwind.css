@@ -12,6 +12,18 @@
   --color-secondary: rgb(var(--q-secondary) / <alpha-value>); */
 }
 
+@plugin "@tailwindcss/typography";
+
+@source "../**/*.{vue,js,ts}";
+
+@theme {
+  --prefix: tw;
+
+  /* Custom colors */
+  /* --color-primary: rgb(var(--q-primary) / <alpha-value>);
+  --color-secondary: rgb(var(--q-secondary) / <alpha-value>); */
+}
+
 @layer base {
   *, :before, :after {
     border-color: #e5e7eb;
