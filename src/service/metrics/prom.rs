@@ -183,6 +183,7 @@ pub async fn remote_write(
     let mut uds_check_time = 0u128;
     let mut schema_check_time = 0u128;
     let mut partition_check_time = 0u128;
+    let mut label_processing_time = 0u128;
     let mut sample_processing_time = 0u128;
     let mut event_count = 0;
     let mut sample_count = 0;
@@ -214,6 +215,7 @@ pub async fn remote_write(
     for mut event in request.timeseries {
         event_count += 1;
         // get labels
+        let label_start = std::time::Instant::now();
         let mut replica_label = String::new();
 
         let labels: FxIndexMap<String, String> = event
@@ -241,10 +243,11 @@ pub async fn remote_write(
             Some(v) => format_stream_name(v.to_string()),
             None => continue,
         };
+        label_processing_time += label_start.elapsed().as_micros();
 
         // get stream pipeline (moved to event level - only once per metric)
+        let t = std::time::Instant::now();
         if !stream_executable_pipelines.contains_key(&metric_name) {
-            let t = std::time::Instant::now();
             let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
                 org_id,
                 &metric_name,
@@ -252,12 +255,12 @@ pub async fn remote_write(
             )
             .await;
             stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-            pipeline_check_time += t.elapsed().as_micros();
         }
+        pipeline_check_time += t.elapsed().as_micros();
 
         // get user defined schema (moved to event level - only once per metric)
+        let t = std::time::Instant::now();
         if !user_defined_schema_map.contains_key(&metric_name) {
-            let t = std::time::Instant::now();
             let streams = vec![StreamParams {
                 org_id: org_id.to_owned().into(),
                 stream_type: StreamType::Metrics,
@@ -270,12 +273,12 @@ pub async fn remote_write(
                 &mut streams_need_all_values_map,
             )
             .await;
-            uds_check_time += t.elapsed().as_micros();
         }
+        uds_check_time += t.elapsed().as_micros();
 
         // check for schema (moved to event level - only once per metric)
+        let t = std::time::Instant::now();
         if !metric_schema_map.contains_key(&metric_name) {
-            let t = std::time::Instant::now();
             let _schema_exists = stream_schema_exists(
                 org_id,
                 &metric_name,
@@ -283,12 +286,12 @@ pub async fn remote_write(
                 &mut metric_schema_map,
             )
             .await;
-            schema_check_time += t.elapsed().as_micros();
         }
+        schema_check_time += t.elapsed().as_micros();
 
         // get partition keys (moved to event level - only once per metric)
+        let t = std::time::Instant::now();
         if !stream_partitioning_map.contains_key(&metric_name) {
-            let t = std::time::Instant::now();
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
                 org_id,
                 &StreamType::Metrics,
@@ -296,10 +299,8 @@ pub async fn remote_write(
             )
             .await;
             stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-            partition_check_time += t.elapsed().as_micros();
         }
-
-        // Note: alerts are now pre-loaded before the loop to avoid repeated lock contention
+        partition_check_time += t.elapsed().as_micros();
 
         // parse samples
         let sample_start = std::time::Instant::now();
@@ -427,17 +428,19 @@ pub async fn remote_write(
             - schema_check_time
             - partition_check_time
             - alerts_preload_time
+            - label_processing_time
             - sample_processing_time
             - (ha_check_total_time * 1000.0) as u128;
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms (events: {event_count}, samples: {sample_count}) | \
-            breakdown: alerts_preload={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            breakdown: alerts_preload={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
             alerts_preload_time as f64 / 1000.0,
             pipeline_check_time as f64 / 1000.0,
             uds_check_time as f64 / 1000.0,
             schema_check_time as f64 / 1000.0,
             partition_check_time as f64 / 1000.0,
+            label_processing_time as f64 / 1000.0,
             sample_processing_time as f64 / 1000.0,
             ha_check_total_time,
             other_time as f64 / 1000.0,
