@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full">
+  <div class="tw:w-full tw:h-full">
     <div class="q-px-md q-py-md">
       <div class="general-page-title">
         {{ t("settings.correlation.title") }}
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw-mx-4">
+    <div class="tw:mx-4">
       <q-tabs
         v-model="activeTab"
         dense
@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-tab-panels v-model="activeTab" animated class="tw-mt-4 tw-overflow-hidden tw-bg-transparent">
-        <q-tab-panel name="identity" class="tw-p-0 tw-overflow-hidden">
+      <q-tab-panels v-model="activeTab" animated class="tw:mt-4 tw:overflow-hidden tw:bg-transparent">
+        <q-tab-panel name="identity" class="tw:p-0 tw:overflow-hidden">
           <ServiceIdentityConfig
             :org-id="store.state.selectedOrganization.identifier"
             :config="store.state.organizationSettings?.deduplication_config"
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-tab-panel>
 
-        <q-tab-panel name="services" class="tw-p-0 tw-overflow-hidden">
+        <q-tab-panel name="services" class="tw:p-0 tw:overflow-hidden">
           <DiscoveredServices />
         </q-tab-panel>
 
-        <q-tab-panel name="alert-correlation" class="tw-p-0 tw-overflow-hidden">
+        <q-tab-panel name="alert-correlation" class="tw:p-0 tw:overflow-hidden">
           <OrganizationDeduplicationSettings
             :org-id="store.state.selectedOrganization.identifier"
             :config="store.state.organizationSettings?.deduplication_config"

@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="row q-col-gutter-sm q-mt-xs tw-ml-[0.1rem]"
+              class="row q-col-gutter-sm q-mt-xs tw:ml-[0.1rem]"
             >
               <div class="col-6">
                 <q-input
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="q-gutter-sm q-mt-md">
-            <div class="col-12 tw-text-[14px] tw-font-bold header-label">
+            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
               Metadata Configuration
             </div>
 
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="q-gutter-sm">
-            <div class="col-12 tw-text-[14px] tw-font-bold header-label">
+            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
               Headers
             </div>
             <div
@@ -483,10 +483,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="col-12 q-mt-md tw-inline-flex">
+          <div class="col-12 q-mt-md tw:inline-flex">
             <q-toggle
               data-test="add-destination-skip-tls-verify-toggle"
-              class="o2-toggle-button-xs q-mt-sm tw-inline-flex"
+              class="o2-toggle-button-xs q-mt-sm tw:inline-flex"
               size="xs"
               :class="
                 store.state.theme === 'dark'
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="step === 1">
           <q-btn
             data-test="step1-cancel-btn"
-            class="o2-secondary-button tw-h-[36px] q-mr-sm"
+            class="o2-secondary-button tw:h-[36px] q-mr-sm"
             :label="t('alerts.cancel')"
             flat
             :class="
@@ -564,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="nextStep"
             :disable="!canProceedStep1"
             label="Continue"
-            class="no-border o2-primary-button tw-h-[36px]"
+            class="no-border o2-primary-button tw:h-[36px]"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="step3-back-btn"
             @click="prevStep"
             label="Back"
-            class="o2-secondary-button tw-h-[36px] q-mr-sm"
+            class="o2-secondary-button tw:h-[36px] q-mr-sm"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-secondary-button-dark'
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="add-destination-cancel-btn"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
             flat
             :class="
@@ -604,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-destination-submit-btn"
             :label="t('alerts.save')"
-            class="no-border q-ml-sm o2-primary-button tw-h-[36px]"
+            class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'

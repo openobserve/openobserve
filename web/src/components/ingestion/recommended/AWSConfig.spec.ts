@@ -444,8 +444,8 @@ describe("AWSConfig", () => {
 
   // Test 38: Template documentation links rendering
   it("should render documentation section", () => {
-    expect(wrapper.find('.tw-font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw-list-decimal').exists()).toBe(true);
+    expect(wrapper.find('.tw:font-bold').exists()).toBe(true);
+    expect(wrapper.find('.tw:list-decimal').exists()).toBe(true);
   });
 
   // Test 39: Template AWS service links rendering
@@ -494,7 +494,7 @@ describe("AWSConfig", () => {
     
     // Verify template structure
     expect(wrapper.find('.q-ma-md').exists()).toBe(true);
-    expect(wrapper.find('.tw-font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw-list-decimal').exists()).toBe(true);
+    expect(wrapper.find('.tw:font-bold').exists()).toBe(true);
+    expect(wrapper.find('.tw:list-decimal').exists()).toBe(true);
   });
 });

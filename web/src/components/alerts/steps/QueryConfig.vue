@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4">
+    <div class="step-content card-container tw:px-3 tw:py-4">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
-      <div v-if="shouldShowTabs" class="tw-mb-4 tw-flex tw-items-center tw-justify-between">
-        <div class="flex items-center app-tabs-container tw-h-[36px] tw-w-fit">
+      <div v-if="shouldShowTabs" class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
+        <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
           <AppTabs
             data-test="step2-query-tabs"
             :tabs="tabOptions"
@@ -66,26 +66,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- SQL/PromQL Preview Mode -->
       <template v-else>
-        <div class="tw-w-full tw-flex tw-flex-col tw-gap-4">
+        <div class="tw:w-full tw:flex tw:flex-col tw:gap-4">
 
           <!-- Preview Boxes Container -->
-          <div class="tw-flex tw-gap-4 tw-w-full">
+          <div class="tw:flex tw:gap-4 tw:w-full">
             <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
-            <div ref="sqlPromqlPreviewRef" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
-              <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
+            <div ref="sqlPromqlPreviewRef" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
               </div>
-              <div class="preview-content tw-px-3 tw-py-2">
+              <div class="preview-content tw:px-3 tw:py-2">
                 <pre class="preview-code">{{ sqlOrPromqlQuery || `No ${localTab === 'sql' ? 'SQL' : 'PromQL'} query defined yet` }}</pre>
               </div>
             </div>
 
             <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
-            <div v-if="vrlFunction" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
-              <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
+            <div v-if="vrlFunction" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
                 <span class="preview-title">VRL Preview</span>
               </div>
-              <div class="preview-content tw-px-3 tw-py-2">
+              <div class="preview-content tw:px-3 tw:py-2">
                 <pre class="preview-code">{{ vrlFunction }}</pre>
               </div>
             </div>

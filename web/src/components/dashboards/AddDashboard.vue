@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             dense
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             data-test="dashboard-add-cancel"
           />
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.save')"
             dense
             flat
-            class="o2-primary-button tw-h-[36px] q-ml-md"
+            class="o2-primary-button tw:h-[36px] q-ml-md"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             type="submit"
             no-caps

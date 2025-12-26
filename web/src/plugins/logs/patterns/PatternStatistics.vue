@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw-py-2 tw-px-4 tw-shrink-0 tw-bg-[var(--o2-bg-gray)] tw-text-sm"
+    class="tw:py-2 tw:px-4 tw:shrink-0 tw:bg-[var(--o2-bg-gray)] tw:text-sm"
     data-test="pattern-statistics"
     :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
   >

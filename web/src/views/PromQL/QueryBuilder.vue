@@ -1,5 +1,5 @@
 <template>
-  <div class="promql-query-builder tw-px-[0.625rem]">
+  <div class="promql-query-builder tw:px-[0.625rem]">
     <q-card>
       <q-card-section>
         <div class="text-h5 q-mb-md">PromQL Query Builder</div>

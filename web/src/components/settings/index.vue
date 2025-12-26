@@ -17,19 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="">
-    <!-- <div class="head q-table__title tw-mx-2 tw-mb-2 tw-px-2 q-py-sm o2-management-header">
+    <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
       {{ t("settings.header") }}
     </div> -->
       <q-splitter
-      class="logs-splitter-smooth tw-overflow-hidden"
+      class="logs-splitter-smooth tw:overflow-hidden"
       v-model="splitterModel"
       :limits="[0, 400]"
       unit="px"
     >
       <template v-slot:before>
-        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
-          <div class="card-container tw-mb-[0.625rem]">
-            <div class="flex tw-h-[calc(100vh-50px)]">
+        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+          <div class="card-container tw:mb-[0.625rem]">
+            <div class="flex tw:h-[calc(100vh-50px)]">
               <div class="full-width" v-if="showManagementTabs">
                 <q-tabs
                   class="management-tabs"
@@ -189,10 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   content-class="tab_content"
                 >
-                <div class="tw-flex tw-items-center tw-w-full">
+                <div class="tw:flex tw:items-center tw:w-full">
                   <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-                  <span class="tw-text-sm tw-font-medium tw-ml-2"
-                  :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
+                  <span class="tw:text-sm tw:font-medium tw:ml-2"
+                  :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw:text-white' : 'tw:text-black'"
                   >{{ t('regex_patterns.title') }}</span>
                 </div>
               </q-route-tab>
@@ -231,9 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
             <div
-              class="card-container tw-h-[calc(100vh-50px)] tw-overflow-auto"
+              class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto"
             >
              <router-view title=""> </router-view>
           </div>

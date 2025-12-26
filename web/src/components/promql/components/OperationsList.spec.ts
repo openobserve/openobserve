@@ -80,7 +80,7 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".tw-py-\\[0\\.25rem\\]").exists()).toBe(true);
+      expect(wrapper.find(".tw:py-\\[0\\.25rem\\]").exists()).toBe(true);
     });
 
     it("should display layout name", () => {

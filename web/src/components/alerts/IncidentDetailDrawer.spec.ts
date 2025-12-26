@@ -724,7 +724,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw-font-semibold");
+      expect(formatted).toContain("tw:font-semibold");
     });
 
     it("should format unordered lists", () => {

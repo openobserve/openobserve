@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-sm"
+              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-sm"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -328,15 +328,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              borderless hide-bottom-space></q-input>
           </div>
           <div v-if="variableData.type == 'custom'">
-            <div class="tw-flex">
-              <div class="tw-w-6"></div>
-              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+            <div class="tw:flex">
+              <div class="tw:w-6"></div>
+              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Label
               </div>
-              <div class="tw-flex-1 tw-font-semibold tw-text-gray-500">
+              <div class="tw:flex-1 tw:font-semibold tw:text-gray-500">
                 Value
               </div>
-              <div class="tw-w-12 tw-flex tw-flex-col tw-items-center">
+              <div class="tw:w-12 tw:flex tw:flex-col tw:items-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
                 <q-checkbox
                   v-if="variableData.multiSelect"
@@ -344,21 +344,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="customSelectAllModel"
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
-                  class="tw-ml-[0.4rem]"
+                  class="tw:ml-[0.4rem]"
                 >
                   <q-tooltip anchor="top middle" self="bottom middle">
                     Default - Select All
                   </q-tooltip>
                 </q-checkbox>
               </div>
-              <div class="tw-w-[2.62rem]"></div>
+              <div class="tw:w-[2.62rem]"></div>
             </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
               class="row"
             >
-              <span class="tw-pt-3.5 tw-w-6">{{ index + 1 }}</span>
+              <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
               <q-input
                 dense
                 filled
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="'Value ' + (index + 1)"
                 name="value"
               />
-              <div class="tw-flex tw-w-12 tw-item-center tw-justify-center">
+              <div class="tw:flex tw:w-12 tw:item-center tw:justify-center">
                 <q-checkbox
                   dense
                   v-model="variableData.options[index].selected"
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
-              class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
               :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
-              class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
               :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             />
@@ -556,7 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 v-model="variableData.escapeSingleQuotes"
                 :label="t('dashboard.escapeSingleQuotes')"
-                class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
+                class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
                 size="lg"
                 :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               />
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="sticky-footer">
         <q-btn
           :label="t('dashboard.cancel')"
-          class="o2-secondary-button tw-h-[36px]"
+          class="o2-secondary-button tw:h-[36px]"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           flat
           @click="close"
@@ -593,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           type="submit"
           :loading="saveVariableApiCall.isLoading.value"
-          class="o2-primary-button tw-h-[36px] q-ml-md"
+          class="o2-primary-button tw:h-[36px] q-ml-md"
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           flat
           @click="addVariableForm?.submit()"

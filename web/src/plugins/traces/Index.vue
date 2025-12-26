@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 style="min-height: auto">
     <div id="tracesSecondLevel">
       <div
-        class="tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
         :class="
-          activeTab === 'service-maps' ? 'tw-min-h-[45px]' : 'tw-min-h-[82px]'
+          activeTab === 'service-maps' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
         "
       >
         <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
@@ -42,9 +42,9 @@ style="min-height: auto">
       <!-- Service Maps Tab Content -->
       <div
         v-if="activeTab === 'service-maps' && store.state.zoConfig.service_graph_enabled"
-        class="tw-px-[0.625rem] tw-pb-[0.625rem] tw-h-[calc(100vh-98px)] tw-overflow-hidden"
+        class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-98px)] tw:overflow-hidden"
       >
-        <service-graph class="tw-h-full" />
+        <service-graph class="tw:h-full" />
       </div>
 
       <!-- Search Tab Content -->
@@ -59,10 +59,10 @@ style="min-height: auto">
           :limits="searchObj.config.splitterLimit"
           style="width: 100%"
           @update:model-value="onSplitterUpdate"
-          class="tw-h-full"
+          class="tw:h-full"
         >
           <template #before>
-            <div class="tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
+            <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
               <index-list
                 v-show="searchObj.meta.showFields"
                 ref="indexListRef"
@@ -91,9 +91,9 @@ style="min-height: auto">
           </template>
           <template #after>
             <div
-              class="tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
+              class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
             >
-              <div class="card-container tw-h-full">
+              <div class="card-container tw:h-full">
                 <div
                   v-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
@@ -141,7 +141,7 @@ style="min-height: auto">
                 <div v-else-if="!isStreamSelected">
                   <h5
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center tw-mx-[10%] tw-py-[40px] tw-mt-0 tw-text-[20px]"
+                    class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noStreamSelectedMessage") }}
@@ -154,7 +154,7 @@ style="min-height: auto">
                     !searchObj.searchApplied &&
                     !searchObj.data.queryResults?.hits?.length
                   "
-                  class="text-center tw-mx-[10%] tw-py-[40px] tw-text-[20px]"
+                  class="text-center tw:mx-[10%] tw:py-[40px] tw:text-[20px]"
                 >
                   <q-icon name="info"
 color="primary" size="md" />
