@@ -102,12 +102,6 @@ pub trait DbAdapter: Send + Sync {
     /// Truncate a table
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error>;
 
-    /// Disable foreign key constraints
-    async fn disable_foreign_keys(&self) -> Result<(), anyhow::Error>;
-
-    /// Enable foreign key constraints
-    async fn enable_foreign_keys(&self) -> Result<(), anyhow::Error>;
-
     /// Close the connection
     async fn close(&self) -> Result<(), anyhow::Error>;
 }

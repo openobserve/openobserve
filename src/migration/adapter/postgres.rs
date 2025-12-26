@@ -268,6 +268,11 @@ impl DbAdapter for PostgresAdapter {
             )
         };
 
+        // Disable triggers for this table during upsert
+        sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
+            .execute(&self.pool)
+            .await?;
+
         let mut count = 0u64;
         for row in rows {
             let mut query = sqlx::query(&sql);
@@ -296,35 +301,25 @@ impl DbAdapter for PostgresAdapter {
             count += 1;
         }
 
+        // Re-enable triggers
+        sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
+            .execute(&self.pool)
+            .await?;
+
         Ok(count)
     }
 
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error> {
+        // Disable triggers, truncate, then re-enable for this specific table
+        sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
+            .execute(&self.pool)
+            .await?;
         sqlx::query(&format!("TRUNCATE TABLE \"{}\" CASCADE", table))
             .execute(&self.pool)
             .await?;
-        Ok(())
-    }
-
-    async fn disable_foreign_keys(&self) -> Result<(), anyhow::Error> {
-        // Disable all triggers (including foreign key checks) for each table
-        let tables = self.list_tables().await?;
-        for table in &tables {
-            let _ = sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
-                .execute(&self.pool)
-                .await;
-        }
-        Ok(())
-    }
-
-    async fn enable_foreign_keys(&self) -> Result<(), anyhow::Error> {
-        // Re-enable all triggers for each table
-        let tables = self.list_tables().await?;
-        for table in &tables {
-            let _ = sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
-                .execute(&self.pool)
-                .await;
-        }
+        sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 

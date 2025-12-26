@@ -142,10 +142,6 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
     }
 
     // 6. Prepare target database
-    print!("Disabling foreign key constraints... ");
-    target.disable_foreign_keys().await?;
-    println!("✓");
-
     if config.truncate_target {
         println!("Truncating target tables...");
         for table in &tables {
@@ -166,8 +162,6 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
         let result = migrate_table(source.as_ref(), target.as_ref(), table, stats, &config).await;
 
         if let Err(e) = result {
-            // Re-enable foreign keys before returning error
-            let _ = target.enable_foreign_keys().await;
             print_error(table, &e.to_string());
             return Err(e);
         }
@@ -175,13 +169,7 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
         stats.duration_ms = table_start.elapsed().as_millis() as u64;
     }
 
-    // 8. Restore target database
-    println!();
-    print!("Enabling foreign key constraints... ");
-    target.enable_foreign_keys().await?;
-    println!("✓");
-
-    // 9. Print report
+    // 8. Print report
     let end_time = Utc::now().timestamp_micros();
     print_report(&table_stats, start_time, end_time, &config.from, &config.to);
 

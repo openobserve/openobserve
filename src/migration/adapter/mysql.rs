@@ -292,6 +292,12 @@ impl DbAdapter for MysqlAdapter {
             )
         };
 
+        // Use a dedicated connection with foreign keys disabled
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SET FOREIGN_KEY_CHECKS = 0")
+            .execute(&mut *conn)
+            .await?;
+
         let mut count = 0u64;
         for row in rows {
             let mut query = sqlx::query(&sql);
@@ -316,30 +322,29 @@ impl DbAdapter for MysqlAdapter {
                 };
             }
 
-            query.execute(&self.pool).await?;
+            query.execute(&mut *conn).await?;
             count += 1;
         }
+
+        sqlx::query("SET FOREIGN_KEY_CHECKS = 1")
+            .execute(&mut *conn)
+            .await?;
 
         Ok(count)
     }
 
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error> {
-        sqlx::query(&format!("TRUNCATE TABLE `{}`", table))
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
-
-    async fn disable_foreign_keys(&self) -> Result<(), anyhow::Error> {
+        // Disable foreign key checks and truncate in the same connection
+        // to avoid connection pool issues
+        let mut conn = self.pool.acquire().await?;
         sqlx::query("SET FOREIGN_KEY_CHECKS = 0")
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await?;
-        Ok(())
-    }
-
-    async fn enable_foreign_keys(&self) -> Result<(), anyhow::Error> {
+        sqlx::query(&format!("TRUNCATE TABLE `{}`", table))
+            .execute(&mut *conn)
+            .await?;
         sqlx::query("SET FOREIGN_KEY_CHECKS = 1")
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await?;
         Ok(())
     }

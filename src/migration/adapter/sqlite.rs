@@ -297,20 +297,6 @@ impl DbAdapter for SqliteAdapter {
         Ok(())
     }
 
-    async fn disable_foreign_keys(&self) -> Result<(), anyhow::Error> {
-        sqlx::query("PRAGMA foreign_keys = OFF")
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
-
-    async fn enable_foreign_keys(&self) -> Result<(), anyhow::Error> {
-        sqlx::query("PRAGMA foreign_keys = ON")
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
-
     async fn close(&self) -> Result<(), anyhow::Error> {
         self.pool.close().await;
         Ok(())
