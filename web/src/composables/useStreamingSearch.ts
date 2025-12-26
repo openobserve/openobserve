@@ -228,7 +228,15 @@ const useHttpStreaming = () => {
       url = `/_values_stream`;
     } else if (type === "promql") {
       // PromQL streaming endpoint
-      url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${queryReq.start_time}&end=${queryReq.end_time}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
+      // For instant queries, set start == end to get a single evaluation point
+      const queryType = queryReq.query_type || "range";
+      const startTime = queryType === "instant" ? queryReq.end_time : queryReq.start_time;
+      const endTime = queryReq.end_time;
+
+      // Always use query_range endpoint (returns matrix format)
+      url = `/prometheus/api/v1/query_range?use_streaming=true&use_cache=${use_cache}&start=${startTime}&end=${endTime}&step=${queryReq.step}&query=${encodeURIComponent(queryReq.query)}`;
+
+      // Add common metadata parameters
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name) url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;

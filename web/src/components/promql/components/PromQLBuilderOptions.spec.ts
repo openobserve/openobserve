@@ -118,6 +118,14 @@ describe("PromQLBuilderOptions", () => {
       expect(stepValue.exists()).toBe(true);
     });
 
+    it("should render query type field", () => {
+      wrapper = createWrapper();
+      const queryType = wrapper.find(
+        '[data-test="dashboard-promql-builder-query-type"]'
+      );
+      expect(queryType.exists()).toBe(true);
+    });
+
     it("should display legend label", () => {
       wrapper = createWrapper();
       const labels = wrapper.findAll(".field-label");
@@ -128,6 +136,12 @@ describe("PromQLBuilderOptions", () => {
       wrapper = createWrapper();
       const labels = wrapper.findAll(".field-label");
       expect(labels[1].text()).toBe("Step Value");
+    });
+
+    it("should display query type label", () => {
+      wrapper = createWrapper();
+      const labels = wrapper.findAll(".field-label");
+      expect(labels[2].text()).toBe("Type");
     });
   });
 
@@ -171,6 +185,99 @@ describe("PromQLBuilderOptions", () => {
         '[data-test="dashboard-promql-builder-legend"]'
       );
       expect(legend.attributes("style")).toContain("width: 260px");
+    });
+  });
+
+  describe("Query Type Field", () => {
+    it("should initialize query_type to range by default", () => {
+      const dataWithoutQueryType = {
+        ...mockDashboardPanelData,
+        data: {
+          queries: [
+            {
+              fields: { stream: "http_requests_total" },
+              config: { promql_legend: "", step_value: "" },
+            },
+          ],
+        },
+      };
+
+      wrapper = createWrapper(dataWithoutQueryType);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
+      ).toBe("range");
+    });
+
+    it("should bind to query_type in query config", () => {
+      const dataWithQueryType = {
+        ...mockDashboardPanelData,
+        data: {
+          queries: [
+            {
+              fields: { stream: "http_requests_total" },
+              config: {
+                promql_legend: "",
+                step_value: "",
+                query_type: "instant",
+              },
+            },
+          ],
+        },
+      };
+
+      wrapper = createWrapper(dataWithQueryType);
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
+      ).toBe("instant");
+    });
+
+    it("should have query type options", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.queryTypeOptions).toHaveLength(2);
+      expect(wrapper.vm.queryTypeOptions[0]).toEqual({
+        label: "Range",
+        value: "range",
+      });
+      expect(wrapper.vm.queryTypeOptions[1]).toEqual({
+        label: "Instant",
+        value: "instant",
+      });
+    });
+
+    it("should update query_type when changed", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.dashboardPanelData.data.queries[0].config.query_type =
+        "instant";
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
+      ).toBe("instant");
+    });
+
+    it("should render query type select", () => {
+      wrapper = createWrapper();
+      const queryTypeSelect = wrapper.findComponent({ name: "QSelect" });
+      expect(queryTypeSelect.exists()).toBe(true);
+    });
+
+    it("should have correct width for query type select", () => {
+      wrapper = createWrapper();
+      const queryType = wrapper.find(
+        '[data-test="dashboard-promql-builder-query-type"]'
+      );
+      expect(queryType.exists()).toBe(true);
+      const style = queryType.attributes("style");
+      if (style) {
+        expect(style).toContain("width: 120px");
+      }
+    });
+
+    it("should show query type info tooltip", () => {
+      wrapper = createWrapper();
+      const tooltips = wrapper.findAllComponents({ name: "QTooltip" });
+      expect(tooltips.length).toBeGreaterThan(0);
     });
   });
 
@@ -420,6 +527,10 @@ describe("PromQLBuilderOptions", () => {
         wrapper.find('[data-test="dashboard-promql-builder-step-value"]')
           .exists()
       ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-promql-builder-query-type"]')
+          .exists()
+      ).toBe(true);
     });
 
     it("should have tooltips for user guidance", () => {
@@ -439,7 +550,7 @@ describe("PromQLBuilderOptions", () => {
     it("should have option field wrappers", () => {
       wrapper = createWrapper();
       const wrappers = wrapper.findAll(".option-field-wrapper");
-      expect(wrappers.length).toBe(2);
+      expect(wrappers.length).toBe(3); // Legend, Step Value, and Query Type
     });
 
     it("should have axis container", () => {
@@ -450,7 +561,7 @@ describe("PromQLBuilderOptions", () => {
     it("should have field labels", () => {
       wrapper = createWrapper();
       const labels = wrapper.findAll(".field-label");
-      expect(labels.length).toBe(2);
+      expect(labels.length).toBe(3); // Legend, Step Value, and Query Type
     });
 
     it("should have field input wrappers", () => {

@@ -1110,7 +1110,11 @@
     "labelFilters": "Filters voor etiketten",
     "operations": "Operaties",
     "promQLBuilder": "ProMQL Builder",
-    "options": "Opties"
+    "options": "Opties",
+    "SQL": "SQL",
+    "builder": "Bouwer",
+    "custom": "Op maat",
+    "sqlBuilder": "SQL Builder"
   },
   "home": {
     "streams": "Streams",
