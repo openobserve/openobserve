@@ -1936,7 +1936,10 @@ export default defineComponent({
         wizardStep.value = wizardStep.value + 1;
       }
 
-      lastValidStep.value = wizardStep.value;
+      // Only update lastValidStep if moving forward (don't reduce it when editing)
+      if (wizardStep.value > lastValidStep.value) {
+        lastValidStep.value = wizardStep.value;
+      }
     };
 
     // Validate a specific step (used by both Continue button and header navigation)
@@ -2229,6 +2232,8 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+      // Enable all steps when editing an existing alert
+      this.lastValidStep = 6;
 
       if (!this.formData.trigger_condition?.timezone) {
         if (this.formData.tz_offset === 0) {
@@ -2252,15 +2257,21 @@ export default defineComponent({
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes,
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    // Convert context_attributes from object to array format (only if it's an object)
+    if (this.formData.context_attributes && typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+      this.formData.context_attributes = Object.keys(
+        this.formData.context_attributes,
+      ).map((attr) => {
+        return {
+          key: attr,
+          value: this.formData.context_attributes[attr],
+          id: getUUID(),
+        };
+      });
+    } else if (!this.formData.context_attributes) {
+      // If null or undefined, initialize as empty array
+      this.formData.context_attributes = [];
+    }
     // VERSION DETECTION AND CONVERSION
     // Supports three versions:
     // - V0: Flat array of conditions with implicit AND between all (no groups)

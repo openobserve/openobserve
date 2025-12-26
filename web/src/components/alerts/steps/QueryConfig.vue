@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Preview Boxes Container -->
           <div class="tw-flex tw-gap-4 tw-w-full">
-            <!-- SQL/PromQL Preview Box (50%) -->
+            <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
             <div ref="sqlPromqlPreviewRef" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
               <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
@@ -80,13 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- VRL Preview Box (50%) -->
-            <div class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
+            <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
+            <div v-if="vrlFunction" class="preview-box tw-flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" style="height: 464px;">
               <div class="preview-header tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2">
                 <span class="preview-title">VRL Preview</span>
               </div>
               <div class="preview-content tw-px-3 tw-py-2">
-                <pre class="preview-code">{{ vrlFunction || 'No VRL function defined yet' }}</pre>
+                <pre class="preview-code">{{ vrlFunction }}</pre>
               </div>
             </div>
           </div>
@@ -275,7 +275,7 @@ export default defineComponent({
     });
 
     const updateTab = (tab: string) => {
-      const hasComparisonWindow = props.multiTimeRange.length > 0;
+      const hasComparisonWindow = props.multiTimeRange?.length > 0;
 
       // Check if switching to custom or promql while multi-windows are present
       if ((tab === 'custom' || tab === 'promql') && hasComparisonWindow) {
