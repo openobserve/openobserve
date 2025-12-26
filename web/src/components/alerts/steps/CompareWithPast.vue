@@ -192,9 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-secondary-button"
             style="font-size: 14px;"
             no-caps
-            @click="goToSqlEditor"
+            @click="handleGoToSqlEditor"
           >
           <q-tooltip
+              ref="goToConditionsTooltipRef"
               anchor="top middle"
               self="bottom middle"
               max-width="300px"
@@ -258,6 +259,7 @@ export default defineComponent({
     const store = useStore();
 
     const multiWindowContainerRef = ref<HTMLElement | null>(null);
+    const goToConditionsTooltipRef = ref<any>(null);
     const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
 
     // Watch for prop changes
@@ -348,10 +350,19 @@ export default defineComponent({
       emit("goToSqlEditor");
     };
 
+    const handleGoToSqlEditor = () => {
+      // Hide the tooltip before navigating
+      if (goToConditionsTooltipRef.value) {
+        goToConditionsTooltipRef.value.hide();
+      }
+      goToSqlEditor();
+    };
+
     return {
       t,
       store,
       multiWindowContainerRef,
+      goToConditionsTooltipRef,
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
@@ -361,6 +372,7 @@ export default defineComponent({
       isComparisonDisabled,
       comparisonDisabledTooltip,
       goToSqlEditor,
+      handleGoToSqlEditor,
     };
   },
 });

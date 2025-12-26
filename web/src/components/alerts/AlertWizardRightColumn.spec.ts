@@ -515,14 +515,15 @@ describe("AlertWizardRightColumn.vue", () => {
     });
   });
 
-  describe("Auto-Expand Logic - Query Step with Custom Tab", () => {
-    it("should auto-expand preview when navigating to step 2 with custom tab", async () => {
+  describe("Manual Expand/Collapse Behavior", () => {
+    it("should NOT auto-expand preview when navigating to step 2 with custom tab", async () => {
       wrapper.vm.expandState.preview = false;
 
       await wrapper.setProps({ wizardStep: 2, selectedTab: "custom" });
       await nextTick();
 
-      expect(wrapper.vm.expandState.preview).toBe(true);
+      // Preview should remain collapsed - user controls expand/collapse
+      expect(wrapper.vm.expandState.preview).toBe(false);
     });
 
     it("should not auto-expand preview on step 2 with SQL tab", async () => {
@@ -571,19 +572,26 @@ describe("AlertWizardRightColumn.vue", () => {
       expect(wrapper.vm.expandState.preview).toBe(false);
     });
 
-    it("should save to localStorage when auto-expanding", async () => {
+    it("should NOT save to localStorage when navigating to step 2 (no auto-expand)", async () => {
       wrapper.vm.expandState.preview = false;
+      // Clear localStorage first
+      localStorage.removeItem("alertWizardExpandState");
 
       await wrapper.setProps({ wizardStep: 2, selectedTab: "custom" });
       await nextTick();
 
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.preview).toBe(true);
+      // Since we don't auto-expand anymore, localStorage should not be updated
+      const saved = localStorage.getItem("alertWizardExpandState");
+      expect(saved).toBeNull();
     });
 
-    it("should trigger on immediate watch execution", async () => {
+    it("should respect localStorage state on mount (no auto-expand)", async () => {
+      // Set preview to collapsed in localStorage
+      localStorage.setItem(
+        "alertWizardExpandState",
+        JSON.stringify({ preview: false, summary: true })
+      );
+
       // Create a new wrapper with preview collapsed and on step 2 with custom tab
       const newWrapper = mount(AlertWizardRightColumn, {
         global: {
@@ -599,17 +607,11 @@ describe("AlertWizardRightColumn.vue", () => {
         },
       });
 
-      // Set preview to collapsed before mount
-      localStorage.setItem(
-        "alertWizardExpandState",
-        JSON.stringify({ preview: false, summary: true })
-      );
-
       await nextTick();
       await flushPromises();
 
-      // Should auto-expand due to immediate: true
-      expect(newWrapper.vm.expandState.preview).toBe(true);
+      // Should remain collapsed as per localStorage (no auto-expand)
+      expect(newWrapper.vm.expandState.preview).toBe(false);
 
       newWrapper.unmount();
     });
