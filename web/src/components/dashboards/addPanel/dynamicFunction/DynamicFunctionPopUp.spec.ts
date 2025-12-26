@@ -631,7 +631,7 @@ describe("DynamicFunctionPopUp", () => {
   describe("Layout and Styling", () => {
     it("should have flex layout", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div.tw:flex');
+      const container = wrapper.find('div.tw-flex');
       expect(container.exists()).toBe(true);
     });
 

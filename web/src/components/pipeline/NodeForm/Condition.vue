@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="stream-routing-section full-width"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between ">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between ">
       {{ t("pipeline.conditionTitle") }}
       <div>
           <q-btn round flat icon="cancel" @click="openCancelDialog">
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="tw:w-[130px]"
+              condition-input-width="tw-w-[130px]"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           v-if="pipelineObj.isEditNode"
             data-test="add-condition-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
             color="negative"
             flat
             type="button"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
           <q-btn
             data-test="add-condition-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
             flat
             type="button"
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-condition-save-btn"
             :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps
@@ -802,7 +802,7 @@ const validateSqlQuery = () => {
 }
 
 /* Make condition rows wrap and fit in narrow space */
-.pipeline-filter-group-wrapper :deep(.tw:whitespace-nowrap) {
+.pipeline-filter-group-wrapper :deep(.tw-whitespace-nowrap) {
   white-space: normal !important;
 }
 
@@ -812,7 +812,7 @@ const validateSqlQuery = () => {
 }
 
 /* Make condition inputs more compact */
-.pipeline-filter-group-wrapper :deep(.tw:flex-no-wrap) {
+.pipeline-filter-group-wrapper :deep(.tw-flex-no-wrap) {
   flex-wrap: wrap !important;
   gap: 0.25rem;
 }
@@ -824,7 +824,7 @@ const validateSqlQuery = () => {
 }
 
 /* Make FilterGroup responsive for sidepanel */
-.pipeline-filter-group-wrapper :deep(.xl\\:tw:w-fit) {
+.pipeline-filter-group-wrapper :deep(.xl\\:tw-w-fit) {
   width: 100% !important;
   max-width: 100% !important;
 }

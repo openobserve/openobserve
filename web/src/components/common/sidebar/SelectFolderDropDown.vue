@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         behavior="menu"
         borderless
         dense
-        class="showLabelOnTop no-case tw:mr-1"
+        class="showLabelOnTop no-case tw-mr-1"
         style="width: calc(100% - 44px)"
         :disable="disableDropdown"
       >

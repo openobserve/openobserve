@@ -8,7 +8,7 @@
       :class="
         store.state.theme === 'dark'
           ? 'bg-grey-9'
-          : 'tw:bg-[var(--o2-table-header-bg)]'
+          : 'tw-bg-[var(--o2-table-header-bg)]'
       "
     >
       <div class="trace-name text-body2 text-bold">

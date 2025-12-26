@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw-w-full" style="min-width: 400px;">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="text-center text-h6 tw-py-2"
         >
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container">
           <!-- Destination Errors Section -->

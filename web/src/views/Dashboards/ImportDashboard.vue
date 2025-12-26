@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="q-mx-sm q-pt-xs">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
+    <div class="card-container tw-mb-[0.625rem]">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
       <div class="col">
         <div class="flex">
           <q-btn
@@ -68,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: calc(100vw - 100px);"
         >
           <template #before>
-          <div class="tw:w-full tw:h-full ">
-            <div class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]">
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+          <div class="tw-w-full tw-h-full ">
+            <div class="card-container tw-py-[0.625rem] tw-pl-[0.625rem] tw-mb-[0.625rem]">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
             <app-tabs
                 data-test="dashboard-import-type-tabs"
                 class="tabs-selection-container"
@@ -82,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             <div
               v-if="activeTab == 'import_json_url'"
-              class="editor-container-url card-container tw:py-1"
+              class="editor-container-url card-container tw-py-1"
             >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+              <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
                 <div
                   style="width: calc(100% - 10px)"
                   class="flex full-width"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-import-url-editor"
                   ref="queryEditorFileRef"
                   editor-id="dashboards-query-editor-file"
-                  class="monaco-editor tw:mx-2"
+                  class="monaco-editor tw-mx-2"
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
@@ -135,9 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="activeTab == 'import_json_file'"
-              class="dashboard-import-json-container card-container tw:py-1"
+              class="dashboard-import-json-container card-container tw-py-1"
             >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+              <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit="onSubmit">
                 <div
                   style="width: calc(100% - 10px)"
                   class="flex full-width"
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-import-json-file-editor"
                   ref="queryEditorJsonRef"
                   editor-id="dashboards-query-editor-json"
-                  class="monaco-editor tw:mx-2"
+                  class="monaco-editor tw-mx-2"
                   :debounceTime="300"
                   v-model:query="jsonStr"
                   language="json"
@@ -217,9 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
+              class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-130px)]"
             >
-              <div  class="text-center text-h6 tw:py-2">Error Validations</div>
+              <div  class="text-center text-h6 tw-py-2">Error Validations</div>
               <q-separator class="q-mt-md" />
               <div
                 class="error-section"

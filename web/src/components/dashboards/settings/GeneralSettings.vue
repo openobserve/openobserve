@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
           data-test="dashboard-general-setting-dynamic-filter"
-          class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
+          class="tw-h-[36px] -tw-ml-3 o2-toggle-button-lg"
           size="lg"
           :class="
             store.state.theme === 'dark'
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="closeBtn"
             v-close-popup="true"
             :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-secondary-button-dark'
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             :disable="dashboardData.title.trim() === ''"
             :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'

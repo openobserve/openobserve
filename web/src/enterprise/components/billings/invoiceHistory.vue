@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-py-md" style="min-height: inherit;">
-    <div class="row q-px-sm q-table__title tw:font-[600]">
+    <div class="row q-px-sm q-table__title tw-font-[600]">
       {{ t("billing.invoiceHistory") }}
     </div>
     <div>

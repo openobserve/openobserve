@@ -17,27 +17,27 @@
       option-value="value"
       emit-value
       map-options
-      class="tw:w-72 o2-custom-select-dashboard"
+      class="tw-w-72 o2-custom-select-dashboard"
     >
     </q-select>
-    <div class="tw:w-full tw:p-3 tw:flex tw:gap-2">
+    <div class="tw-w-full tw-p-3 tw-flex tw-gap-2">
       <!-- Loop through the args for the first n-1 arguments -->
-      <div class="tw:w-full">
+      <div class="tw-w-full">
         <div
           v-for="(arg, argIndex) in fields.args"
           :key="argIndex + '-' + arg.type"
-          class="tw:w-full tw:flex tw:flex-col"
+          class="tw-w-full tw-flex tw-flex-col"
         >
           <div
-            class="tw:flex"
+            class="tw-flex"
             :style="{
               marginLeft: isChild ? '-60px' : '0px',
             }"
           >
-            <div class="tw:mr-2 tw:relative" style="min-height: 50px">
+            <div class="tw-mr-2 tw-relative" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="tw:absolute tw:top-0 tw:w-[1px] tw:bg-[#001495] tw:opacity-50"
+                class="tw-absolute tw-top-0 tw-w-[1px] tw-bg-[#001495] tw-opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1
@@ -48,18 +48,18 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: -1px">
+              <div class="tw-absolute" style="top: 30px; left: -1px">
                 <SubTaskArrow />
               </div>
             </div>
 
             <div>
-              <div class="tw:flex tw:items-center tw:gap-x-2">
+              <div class="tw-flex tw-items-center tw-gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex">
+              <div class="tw-flex">
                 <!-- type selector -->
                 <q-select
                   v-model="fields.args[argIndex].type"
@@ -78,7 +78,7 @@
                   dense
                   filled
                   :display-value="''"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
+                  class="o2-custom-select-dashboard arg-type-select tw-mr-0.5"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
@@ -91,7 +91,7 @@
                 </q-select>
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
-                  class="tw:w-52"
+                  class="tw-w-52"
                   v-if="fields.args[argIndex]?.type === 'field'"
                 >
                   <StreamFieldSelect
@@ -107,7 +107,7 @@
                   v-model="fields.args[argIndex].value"
                   placeholder="Enter string"
                   :required="isRequired(fields.functionName, argIndex)"
-                  class="tw:w-52"
+                  class="tw-w-52"
                   dense
                   :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                 />
@@ -118,7 +118,7 @@
                   v-model.number="fields.args[argIndex].value"
                   placeholder="Enter number"
                   :required="isRequired(fields.functionName, argIndex)"
-                  class="tw:w-52"
+                  class="tw-w-52"
                   dense
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
@@ -140,7 +140,7 @@
                       fields.args[argIndex].value = newValue.value;
                     }
                   "
-                  class="tw:w-52"
+                  class="tw-w-52"
                   :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
                 />
 
@@ -152,7 +152,7 @@
                   flat
                   round
                   @click="removeArgument(argIndex)"
-                  class="tw:h-10 tw:w-10"
+                  class="tw-h-10 tw-w-10"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
                 />
               </div>
@@ -169,7 +169,7 @@
       color="primary"
       label="+ Add"
       padding="5px 14px"
-      class="tw:mt-3"
+      class="tw-mt-3"
       no-caps
       dense
       :data-test="`dashboard-function-dropdown-add-argument-button`"

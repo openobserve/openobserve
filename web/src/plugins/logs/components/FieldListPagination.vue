@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:pt-[0.375rem] tw:justify-between tw:w-full"
-    :class="showUserDefinedSchemaToggle || showQuickMode ? 'tw:flex' : ''"
+    class="tw-pt-[0.375rem] tw-justify-between tw-w-full"
+    :class="showUserDefinedSchemaToggle || showQuickMode ? 'tw-flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showUserDefinedSchemaToggle">
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
-        class="schema-field-toggle q-mr-xs tw:p-0"
+        class="schema-field-toggle q-mr-xs tw-p-0"
         toggle-color="primary"
         bordered
         size="0.5rem"
@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:user_defined_slot>
           <div data-test="logs-user-defined-fields-btn">
-            <q-icon name="person" class="tw:text-[12px]!"></q-icon>
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <q-icon name="person" class="!tw-text-[12px]"></q-icon>
+            <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
               anchor="center right"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:all_fields_slot>
           <div data-test="logs-all-fields-btn">
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               anchor="center right"
@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:interesting_fields_slot v-if="showQuickMode">
           <div data-test="logs-interesting-fields-btn">
-            <q-icon name="info" class="tw:text-[12px]!" />
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <q-icon name="info" class="!tw-text-[12px]" />
+            <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
             <q-tooltip
               anchor="center right"
               self="center left"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:all_fields_slot>
           <div data-test="logs-all-fields-btn">
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               anchor="center right"
@@ -122,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:interesting_fields_slot v-if="showQuickMode">
           <div data-test="logs-interesting-fields-btn">
-            <q-icon name="info" class="tw:text-[12px]!" />
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <q-icon name="info" class="!tw-text-[12px]" />
+            <q-icon name="schema" class="!tw-text-[12px]"></q-icon>
             <q-tooltip
               anchor="center right"
               self="center left"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+    <div class="tw-flex tw-items-center tw-justify-end tw-gap-2">
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="field-list-pagination">
         <q-tooltip

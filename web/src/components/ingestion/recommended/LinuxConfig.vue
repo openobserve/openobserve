@@ -6,7 +6,7 @@
     <div>
       <div class="text-subtitle1 q-pl-xs q-mt-md">
         Once you have installed the OpenObserve collector, it will:
-        <ol class="tw:list-decimal tw:ml-5">
+        <ol class="tw-list-decimal tw-ml-5">
           <li>Collect system logs</li>
           <li>Collect host metrics</li>
         </ol>

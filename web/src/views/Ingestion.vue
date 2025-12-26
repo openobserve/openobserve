@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="ingestionPage">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
       <div class=" card-container">
         <div class="q-px-md q-pt-md full-width">
           <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token != ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token == ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-else
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
+            class="o2-primary-button tw-h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tabs>
       </div>
     </div>
-    <div class="tw:h-[calc(100vh-140px)] tw:overflow-hidden">
+    <div class="tw-h-[calc(100vh-140px)] tw-overflow-hidden">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"

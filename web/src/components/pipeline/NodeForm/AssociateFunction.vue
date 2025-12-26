@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
+    <div class="stream-routing-title q-pb-sm q-pl-md tw-flex tw-items-center tw-justify-between">
       {{ t("pipeline.associateFunction") }}
       <div>
           <q-btn v-close-popup="true" round flat icon="cancel" >
@@ -46,18 +46,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
     >
-      <div class="tw:flex tw:items-center">
+      <div class="tw-flex tw-items-center">
         <q-toggle
           data-test="create-function-toggle"
-          class="q-mb-sm tw:inline-block tw:h-[36px] o2-toggle-button-lg"
+          class="q-mb-sm tw-inline-block tw-h-[36px] o2-toggle-button-lg"
           size="lg"
-          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw:ml-4' : '']"
+          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw-ml-4' : '']"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
         <div
           v-if="createNewFunction"
-          class="q-pb-sm container text-body2 tw:inline-block tw:pl-4 tw:text-gray-600"
+          class="q-pb-sm container text-body2 tw-inline-block tw-pl-4 tw-text-gray-600"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card>
         </div>
 
-        <div  v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
+        <div  v-if="createNewFunction" class="pipeline-add-function tw-w-[95vw]">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-toggle
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+            class="q-mb-sm tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
             size="lg"
             :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             :label="t('pipeline.flatteningLbl')"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
             v-if="pipelineObj.isEditNode && !createNewFunction"
             data-test="associate-function-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
             flat
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
             flat
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="
               createNewFunction ? t('alerts.createFunction') : t('alerts.save')
             "
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
             no-caps

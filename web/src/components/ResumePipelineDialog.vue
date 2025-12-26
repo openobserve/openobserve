@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-radio>
       </q-card-section>
 
-      <q-card-actions class="resume-pipeline-dialog-actions q-pa-none tw:flex tw:justify-center" style="padding: 0px;">
+      <q-card-actions class="resume-pipeline-dialog-actions q-pa-none tw-flex tw-justify-center" style="padding: 0px;">
         <q-btn
           v-close-popup
           unelevated

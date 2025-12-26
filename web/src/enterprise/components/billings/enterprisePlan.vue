@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("billing.enterpriseNote") }}
     </div>
 
-    <div class="row justify-between q-pa-md tw:mt-[18px] ">
+    <div class="row justify-between q-pa-md tw-mt-[18px] ">
       <q-btn
         :label="t('billing.contactLabel')"
         text-color="white"

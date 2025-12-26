@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-header"
   >
     <div
-      class="tw:relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
+      class="tw-relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
       :style="{
         width: splitterWidth + 'px',
       }"

@@ -693,7 +693,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent (line 41, 119)
-      const mainContainer = wrapper.find('.tw:flex.tw:overflow-auto');
+      const mainContainer = wrapper.find('.tw-flex.tw-overflow-auto');
       if (mainContainer.exists()) {
         expect(mainContainer.attributes('style')).toContain('75%');
       }
@@ -729,7 +729,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent (line 41, 119)
-      const mainContainer = wrapper.find('.tw:flex.tw:overflow-auto');
+      const mainContainer = wrapper.find('.tw-flex.tw-overflow-auto');
       if (mainContainer.exists()) {
         expect(mainContainer.attributes('style')).toContain('100%');
       }

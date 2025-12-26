@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-12 q-py-sm variables-input "
   :class="{
-    'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
+    'flex tw-gap-2 items-center tw-w-full': variables.length == 0,
   }"
   >
     <div class="q-pb-xs custom-input-label text-bold">
@@ -39,12 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
     <template v-if="!variables.length">
-      <div class="flex justify-between items-center tw:ml-auto">
+      <div class="flex justify-between items-center tw-ml-auto">
 
         <q-btn
           data-test="alert-variables-add-btn"
           size="sm"
-          class="text-bold no-border o2-secondary-button tw:h-[36px]"
+          class="text-bold no-border o2-secondary-button tw-h-[36px]"
           flat
           no-caps
           @click="addVariable"

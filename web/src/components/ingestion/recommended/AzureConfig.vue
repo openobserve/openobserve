@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-ma-md">
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold">
+    <div class="tw-text-[16px]">
+      <div class="tw-font-bold">
         Azure Function for sending logs to OpenObserve
       </div>
-      <div class="tw:py-2">
+      <div class="tw-py-2">
         <a
           href="https://github.com/openobserve/azure-function-openobserve"
-          class="hover:tw:underline"
+          class="hover:tw-underline"
           target="_blank"
           rel="noopener noreferrer"
         >

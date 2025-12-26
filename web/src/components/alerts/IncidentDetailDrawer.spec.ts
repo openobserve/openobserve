@@ -715,23 +715,23 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold tw:text-gray-900">bold</strong>');
+      expect(formatted).toContain('<strong class="tw-font-semibold tw-text-gray-900">bold</strong>');
     });
 
     it("should format h2 headers", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-bold");
-      expect(formatted).toContain("tw:text-sm");
-      expect(formatted).toContain("tw:text-blue-600");
+      expect(formatted).toContain("tw-font-bold");
+      expect(formatted).toContain("tw-text-sm");
+      expect(formatted).toContain("tw-text-blue-600");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-semibold");
+      expect(formatted).toContain("tw-font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -746,16 +746,16 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "1. First item\n2. Second item";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<div class="tw:flex tw:gap-2 tw:ml-2 tw:mb-2"><span class="tw:font-semibold tw:text-gray-600 tw:min-w-[20px]">1.</span><span class="tw:flex-1">First item</span></div>');
-      expect(formatted).toContain('<div class="tw:flex tw:gap-2 tw:ml-2 tw:mb-2"><span class="tw:font-semibold tw:text-gray-600 tw:min-w-[20px]">2.</span><span class="tw:flex-1">Second item</span></div>');
+      expect(formatted).toContain('<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">1.</span><span class="tw-flex-1">First item</span></div>');
+      expect(formatted).toContain('<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">2.</span><span class="tw-flex-1">Second item</span></div>');
     });
 
     it("should format complex markdown", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold tw:text-gray-900">Issue</strong>');
-      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain('<strong class="tw-font-semibold tw-text-gray-900">Issue</strong>');
+      expect(formatted).toContain("tw-font-bold");
       expect(formatted).toContain("•");
     });
   });

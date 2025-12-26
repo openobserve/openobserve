@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section>
       <!-- Header -->
       <div
-        class="flex justify-between items-center q-px-md q-py-sm header tw:top-0 tw:sticky"
+        class="flex justify-between items-center q-px-md q-py-sm header tw-top-0 tw-sticky"
         style="margin-bottom: 5px"
       >
         <div class="flex items-center q-table__title q-mr-md">
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             :icon="isAllCopied ? 'check' : 'content_copy'"
             :label="isAllCopied ? 'Copied' : 'Copy all'"
-            class="q-px-sm q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
+            class="q-px-sm q-mr-sm tw-border tw-border-solid tw-border-[var(--o2-border-color)] tw-font-normal"
             no-caps
             dense
             size="sm"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 size="xs"
                 no-caps
-                class="copy-btn q-ml-sm tw:font-normal"
+                class="copy-btn q-ml-sm tw-font-normal"
                 @click.stop="copyLegend(legend.name, index)"
               >
                 <q-tooltip>{{

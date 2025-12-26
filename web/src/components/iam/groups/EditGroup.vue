@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="edit-group-section" class="relative-position full-height">
     <div
       data-test="edit-group-section-title"
-      class="tw:pb-[0.625rem]"
+      class="tw-pb-[0.625rem]"
     >
     <div class="card-container q-py-sm">
       <span style="font-size: 18px" class="q-px-md ">
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex justify-end tw:w-full"
+    class="flex justify-end tw-w-full"
       style="position: sticky; bottom: 0.45rem; z-index: 2"
     >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
+      <div class="card-container tw-w-full tw-py-2 tw-px-3 tw-justify-end tw-flex">
       <q-btn
         data-test="edit-group-cancel-btn"
         class="o2-secondary-button"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column index-menu tw:p-[0.375rem]!">
+  <div class="column index-menu !tw-p-[0.375rem]">
     <q-select
       data-test="log-search-index-list-select-stream"
       v-model="searchObj.data.stream.selectedStream"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       hide-selected
       fill-input
-      class="tw:mb-[0.375rem]"
+      class="tw-mb-[0.375rem]"
       @filter="filterStreamFn"
       @update:model-value="onStreamChange"
     >
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
     <!-- <div
-      class="tw:w-full tw:h-[1px] tw:bg-[var(--o2-border-color)] tw:mb-[0.375rem]"
+      class="tw-w-full tw-h-[1px] tw-bg-[var(--o2-border-color)] tw-mb-[0.375rem]"
     ></div> -->
     <div class="index-table">
       <q-table
@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-header
         hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="tw:w-full tw:h-[calc(100vh-13.175rem)]"
+        class="tw-w-full tw-h-[calc(100vh-13.175rem)]"
         id="tracesFieldList"
       >
         <template #body-cell-name="props">
-          <q-tr :props="props" class="hover:tw:bg-[var(--o2-hover-accent)]!">
+          <q-tr :props="props" class="hover:!tw-bg-[var(--o2-hover-accent)]">
             <q-td
               :props="props"
               class="field_list"
@@ -76,21 +76,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <div
                 v-if="props.row.ftsKey || !props.row.showValues"
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:tw:bg-[var(--o2-hover-accent)]!"
+                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm hover:!tw-bg-[var(--o2-hover-accent)]"
                 :title="props.row.label || props.row.name"
               >
                 <div class="field_label ellipsis" style="font-size: 14px">
                   {{ props.row.label || props.row.name }}
                 </div>
                 <div
-                  class="field_overlay hover:tw:bg-[var(--o2-hover-accent)]!"
+                  class="field_overlay hover:!tw-bg-[var(--o2-hover-accent)]"
                 >
                   <q-btn
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
                     size="0.4rem"
-                    class="q-mr-sm tw:text-[var(--o2-text-primary)]!"
+                    class="q-mr-sm !tw-text-[var(--o2-text-primary)]"
                     @click.stop="addToFilter(`${props.row.name}=''`)"
                     round
                   />
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
-            class="tw:p-0 tw:pb-[0.375rem]"
+            class="tw-p-0 tw-pb-[0.375rem]"
           >
             <template #prepend>
               <q-icon name="search" />
@@ -119,12 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-tr
             v-if="searchObj.loadingStream"
-            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+            class="tw-flex tw-items-center tw-justify-center tw-w-full tw-pt-[2rem]"
           >
             <q-td colspan="100%" class="text-bold"
 style="opacity: 0.7">
               <div
-                class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
+                class="text-subtitle2 text-weight-bold tw-w-fit tw-mx-auto tw-my-0 tw-flex-col tw-justify-items-center"
               >
                 <q-spinner-hourglass size="1.8rem" color="primary" />
                 {{ t("traces.loadingStream") }}

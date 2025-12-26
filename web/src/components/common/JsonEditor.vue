@@ -9,7 +9,7 @@
           {{ title }}
         </div>
       </div>
-      <div class="tw:flex tw:items-center">
+      <div class="tw-flex tw-items-center">
         <div>
           <q-btn
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -27,7 +27,7 @@
           @mouseleave="isHovered = false"
 
         >
-          <div class="row items-center no-wrap tw:gap-2  ">
+          <div class="row items-center no-wrap tw-gap-2  ">
             <img  :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
         </q-btn>
@@ -35,16 +35,16 @@
         <q-icon
           v-close-popup
           name="cancel"
-          class="cursor-pointer tw:mr-3"
+          class="cursor-pointer tw-mr-3"
           size="20px"
           data-test="json-editor-close"
         />
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="tw:h-[calc(100vh-65px)] tw:flex">
-      <div class="row common-json-editor column tw:h-[calc(100vh-65px)]"
-      :class="store.state.isAiChatEnabled ? 'tw:w-[64.5vw]' : 'tw:w-[90vw]'"
+    <div class="tw-h-[calc(100vh-65px)] tw-flex">
+      <div class="row common-json-editor column tw-h-[calc(100vh-65px)]"
+      :class="store.state.isAiChatEnabled ? 'tw-w-[64.5vw]' : 'tw-w-[90vw]'"
       >
       <q-card-section class="col q-pa-none">
       <query-editor
@@ -78,12 +78,12 @@
       <q-btn
         flat
         :label="t('common.cancel')"
-        class="q-ml-sm o2-secondary-button tw:h-[36px]"
+        class="q-ml-sm o2-secondary-button tw-h-[36px]"
         v-close-popup
         data-test="json-editor-cancel"
       />
       <q-btn
-        class="q-ml-sm o2-primary-button tw:h-[36px]"
+        class="q-ml-sm o2-primary-button tw-h-[36px]"
         padding="sm lg"
         no-caps
         :label="t('common.save')"
@@ -94,7 +94,7 @@
     </div>
     <!-- o2aichat enableddd -->
 
-    <div  class="q-ml-sm tw:w-[25vw] tw:h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+    <div  class="q-ml-sm tw-w-[25vw] tw-h-[calc(100vh - 65px)]" v-if="store.state.isAiChatEnabled " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
             <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
           </div>
     </div>

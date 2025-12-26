@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="dedup-summary-cards tw:grid tw:grid-cols-4 tw:gap-4 tw:mb-4">
+  <div class="dedup-summary-cards tw-grid tw-grid-cols-4 tw-gap-4 tw-mb-4">
     <!-- Card 1: Total Alerts -->
     <q-card class="summary-card">
-      <q-card-section class="tw:p-4">
-        <div class="tw:text-2xl tw:font-semibold">{{ summary.total_alerts }}</div>
-        <div class="tw:text-sm tw:text-gray-600">Total Alerts</div>
+      <q-card-section class="tw-p-4">
+        <div class="tw-text-2xl tw-font-semibold">{{ summary.total_alerts }}</div>
+        <div class="tw-text-sm tw-text-gray-600">Total Alerts</div>
       </q-card-section>
     </q-card>
 
     <!-- Card 2: Alerts with Dedup -->
     <q-card class="summary-card">
-      <q-card-section class="tw:p-4">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <div class="tw:text-2xl tw:font-semibold">{{ summary.alerts_with_dedup }}</div>
+      <q-card-section class="tw-p-4">
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <div class="tw-text-2xl tw-font-semibold">{{ summary.alerts_with_dedup }}</div>
           <q-icon name="filter_alt" size="sm" color="primary" />
         </div>
-        <div class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
+        <div class="tw-text-sm tw-text-gray-600 tw-flex tw-items-center tw-gap-1">
           Using Deduplication
-          <q-icon name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon name="info_outline" size="xs" class="tw-cursor-pointer">
             <q-tooltip class="bg-grey-8">
               Alerts with deduplication configured
             </q-tooltip>
@@ -46,24 +46,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card
       class="summary-card"
       :class="{
-        'tw:bg-green-50': summary.suppression_rate > 0.5,
-        'tw:bg-yellow-50': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
+        'tw-bg-green-50': summary.suppression_rate > 0.5,
+        'tw-bg-yellow-50': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
       }"
     >
-      <q-card-section class="tw:p-4">
-        <div class="tw:text-2xl tw:font-semibold" :class="{
-          'tw:text-green-700': summary.suppression_rate > 0.5,
-          'tw:text-yellow-700': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
+      <q-card-section class="tw-p-4">
+        <div class="tw-text-2xl tw-font-semibold" :class="{
+          'tw-text-green-700': summary.suppression_rate > 0.5,
+          'tw-text-yellow-700': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
         }">
           {{ formatPercentage(summary.suppression_rate) }}
         </div>
-        <div class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
+        <div class="tw-text-sm tw-text-gray-600 tw-flex tw-items-center tw-gap-1">
           Suppression Rate (24h)
-          <q-icon name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon name="info_outline" size="xs" class="tw-cursor-pointer">
             <q-tooltip class="bg-grey-8">
               {{ summary.suppressions_total }} suppressed /
               {{ summary.suppressions_total + summary.passed_total }} total
-              <div class="tw:mt-1">
+              <div class="tw-mt-1">
                 Passed: {{ summary.passed_total }}
               </div>
             </q-tooltip>
@@ -74,14 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Card 4: Pending Batches -->
     <q-card class="summary-card">
-      <q-card-section class="tw:p-4">
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <div class="tw:text-2xl tw:font-semibold">{{ summary.pending_batches }}</div>
+      <q-card-section class="tw-p-4">
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <div class="tw-text-2xl tw-font-semibold">{{ summary.pending_batches }}</div>
           <q-icon name="group_work" size="sm" color="amber" />
         </div>
-        <div class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
+        <div class="tw-text-sm tw-text-gray-600 tw-flex tw-items-center tw-gap-1">
           Pending Batches
-          <q-icon name="info_outline" size="xs" class="tw:cursor-pointer">
+          <q-icon name="info_outline" size="xs" class="tw-cursor-pointer">
             <q-tooltip class="bg-grey-8">
               Alerts waiting to be grouped together
             </q-tooltip>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
     <div
-      class="col-12 flex tw:ml-2"
+      class="col-12 flex tw-ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
 

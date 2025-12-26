@@ -17,19 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-ma-md">
     <CopyContent class="q-mt-sm" :content="content" />
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
+    <div class="tw-text-[16px]">
+      <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
       </div>
-      <ol class="tw:list-decimal tw:pl-[27px]">
+      <ol class="tw-list-decimal tw-pl-[27px]">
         <li
           v-for="awsService in awsServiceLinks"
           :key="awsService.name"
-          class="tw:py-1"
+          class="tw-py-1"
         >
           <a
             :href="awsService.link"
-            class="tw:underline"
+            class="tw-underline"
             target="_blank"
             rel="noopener noreferrer"
             >{{ awsService.name }}</a

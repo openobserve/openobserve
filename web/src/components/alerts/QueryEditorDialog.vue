@@ -23,17 +23,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="tw:flex tw:h-full editor-dialog-card tw:pl-1">
+    <div class="tw-flex tw-h-full editor-dialog-card tw-pl-1">
       <div
-        class="tw:h-full tw:flex tw:pr-1"
+        class="tw-h-full tw-flex tw-pr-1"
         :style="{
           width: isFullScreen ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
         }"
       >
-        <div class="tw:h-full tw:w-full tw:px-2 tw:py-2">
+        <div class="tw-h-full tw-w-full tw-px-2 tw-py-2">
           <!-- Header -->
-          <div class="tw:h-8 tw:flex tw:items-center tw:justify-between" style="font-size: 20px;">
-            <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-h-8 tw-flex tw-items-center tw-justify-between" style="font-size: 20px;">
+            <div class="tw-flex tw-items-center tw-gap-2">
               <div
                 data-test="add-alert-back-btn"
                 class="flex justify-center items-center cursor-pointer"
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-icon name="arrow_back_ios_new" size="14px" />
               </div>
-              <span class="tw:text-[18px] tw:font-[400]">Add Conditions</span>
+              <span class="tw-text-[18px] tw-font-[400]">Add Conditions</span>
             </div>
-            <div class="tw:flex tw:items-center">
+            <div class="tw-flex tw-items-center">
               <q-btn
                 v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                 :ripple="false"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="isHovered = true"
                 @mouseleave="isHovered = false"
               >
-                <div class="row items-center no-wrap tw:gap-2">
+                <div class="row items-center no-wrap tw-gap-2">
                   <img :src="getBtnLogo" class="header-icon ai-icon" />
                 </div>
               </q-btn>
@@ -69,26 +69,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="fullscreen"
                 size="16px"
                 dense
-                class="tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-white' : ''"
+                class="tw-cursor-pointer"
+                :class="store.state.theme === 'dark' ? 'tw-text-white' : ''"
                 :color="isFullScreen ? 'primary' : undefined"
                 @click="() => isFullScreen = !isFullScreen"
               />
             </div>
           </div>
-          <q-separator class="tw:my-2"/>
+          <q-separator class="tw-my-2"/>
 
           <!-- Main Content Grid -->
-          <div class="tw:grid tw:h-[calc(100vh-100px)] tw:w-full tw:grid-cols-[60%_40%] tw:gap-x-2">
+          <div class="tw-grid tw-h-[calc(100vh-100px)] tw-w-full tw-grid-cols-[60%_40%] tw-gap-x-2">
             <!-- Left Section (60%) -->
-            <div class="tw:flex tw:w-full">
-              <div class="tw:flex tw:w-full tw:flex-col tw:h-full tw:gap-y-2">
+            <div class="tw-flex tw-w-full">
+              <div class="tw-flex tw-w-full tw-flex-col tw-h-full tw-gap-y-2">
                 <!-- SQL/PromQL Editor Section (60% of left) -->
-                <div class="tw:flex-[3] tw:w-full">
-                  <div class="tw:w-full tw:h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                    <div class="tw:flex tw:items-center tw:justify-between tw:pb-2 tw:pt-1">
+                <div class="tw-flex-[3] tw-w-full">
+                  <div class="tw-w-full tw-h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+                    <div class="tw-flex tw-items-center tw-justify-between tw-pb-2 tw-pt-1">
                       <span class="editor-text-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
-                      <div class="tw:flex tw:gap-2 tw:items-center tw:h-6">
+                      <div class="tw-flex tw-gap-2 tw-items-center tw-h-6">
                         <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
                           <q-btn
                             data-test="alert-generate-query-btn"
@@ -100,12 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleAIChat"
                           >
                             <img :style="{ width: '16px', height: '16px' }" :src="getBtnO2Logo" />
-                            <span class="tw:font-[400] tw:pl-[4px] tw:text-[12px] tw:pr-[6px] tw:py-[4px] tw:text-[#7980cc]">
+                            <span class="tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]">
                               {{ localTab == 'sql' ? 'Generate SQL' : 'Generate PromQL' }}
                             </span>
                           </q-btn>
                         </div>
-                        <div class="tw:h-full tw:flex tw:justify-center tw:items-center o2-select-input tw:w-full col" style="padding-top: 0">
+                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input tw-w-full col" style="padding-top: 0">
                           <q-select
                             v-model="selectedColumn"
                             :options="filteredFields"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :disable="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           >
                             <q-icon name="search" size="20px" />
-                            <span class="tw:text-[12px] tw:font-[400]">Run Query</span>
+                            <span class="tw-text-[12px] tw-font-[400]">Run Query</span>
                           </q-btn>
                         </div>
                       </div>
@@ -152,14 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       label="Input"
                       :isExpanded="true"
                       :showExpandIcon="false"
-                      :label-class="'tw:ml-2'"
-                      class="tw:mt-1"
+                      :label-class="'tw-ml-2'"
+                      class="tw-mt-1"
                     >
                       <template #right>
-                        <div v-if="streamName" class="tw:text-[12px] tw:font-semibold tw:mr-2">
-                          on <span class="tw:text-[14px] tw:font-bold">{{ streamName }}</span> stream
+                        <div v-if="streamName" class="tw-text-[12px] tw-font-semibold tw-mr-2">
+                          on <span class="tw-text-[14px] tw-font-bold">{{ streamName }}</span> stream
                         </div>
-                        <div v-else class="tw:text-[12px] tw:font-semibold tw:mr-2">
+                        <div v-else class="tw-text-[12px] tw-font-semibold tw-mr-2">
                           No Stream Selected
                         </div>
                       </template>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="scheduled-alert-sql-editor"
                       ref="queryEditorRef"
                       editor-id="alerts-query-editor"
-                      class="tw:w-full"
+                      class="tw-w-full"
                       :debounceTime="300"
                       v-model:query="localSqlQuery"
                       :class="[
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="scheduled-alert-promql-editor"
                       ref="queryEditorRef"
                       editor-id="alerts-query-editor-dialog"
-                      class="tw:w-full"
+                      class="tw-w-full"
                       :debounceTime="300"
                       v-model:query="localPromqlQuery"
                       @update:query="updatePromqlQuery"
@@ -217,11 +217,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- VRL Editor Section (40% of left) -->
-                <div v-if="localTab !== 'promql'" class="tw:flex-[2] tw:w-full">
-                  <div class="tw:w-full tw:h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                    <div class="tw:flex tw:items-center tw:justify-between tw:pb-1 tw:pt-1">
+                <div v-if="localTab !== 'promql'" class="tw-flex-[2] tw-w-full">
+                  <div class="tw-w-full tw-h-full" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+                    <div class="tw-flex tw-items-center tw-justify-between tw-pb-1 tw-pt-1">
                       <span class="editor-text-title">VRL Editor</span>
-                      <div class="tw:flex tw:gap-2 tw:items-center">
+                      <div class="tw-flex tw-gap-2 tw-items-center">
                         <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
                           <q-btn
                             data-test="alert-generate-vrl-btn"
@@ -233,12 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleAIChat"
                           >
                             <img :style="{ width: '16px', height: '16px' }" :src="getBtnO2Logo" />
-                            <span class="tw:font-[400] tw:pl-[4px] tw:text-[12px] tw:pr-[6px] tw:py-[4px] tw:text-[#7980cc]">
+                            <span class="tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]">
                               Generate VRL
                             </span>
                           </q-btn>
                         </div>
-                        <div class="tw:h-full tw:flex tw:justify-center tw:items-center o2-select-input tw:w-full col" style="padding-top: 0;">
+                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input tw-w-full col" style="padding-top: 0;">
                           <q-select
                             v-model="selectedFunction"
                             :options="functionOptions"
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="height: 32px;"
                           >
                             <q-icon name="search" size="18px" />
-                            <span class="tw:text-[12px] tw:font-[400]">Apply VRL</span>
+                            <span class="tw-text-[12px] tw-font-[400]">Apply VRL</span>
                           </q-btn>
                         </div>
                       </div>
@@ -290,14 +290,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       label="Input"
                       :isExpanded="true"
                       :showExpandIcon="false"
-                      :label-class="'tw:ml-2'"
-                      class="tw:mt-1"
+                      :label-class="'tw-ml-2'"
+                      class="tw-mt-1"
                     ></FullViewContainer>
                     <QueryEditor
                       data-test="scheduled-alert-vrl-function-editor"
                       ref="fnEditorRef"
                       editor-id="fnEditor-dialog"
-                      class="tw:w-full tw:h-[calc(100%-80px)]"
+                      class="tw-w-full tw-h-[calc(100%-80px)]"
                       :debounceTime="300"
                       v-model:query="vrlFunctionContent"
                       :class="[
@@ -317,69 +317,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Right Section (40%) - Output -->
             <div
-              class="tw:flex tw:flex-col tw:h-full tw:p-2 tw:gap-y-2 tw:overflow-y-hidden tw:transition-none"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#374151]' : 'tw:bg-[#F4F4F5]'"
+              class="tw-flex tw-flex-col tw-h-full tw-p-2 tw-gap-y-2 tw-overflow-y-hidden tw-transition-none"
+              :class="store.state.theme === 'dark' ? 'tw-bg-[#374151]' : 'tw-bg-[#F4F4F5]'"
             >
               <!-- SQL/PromQL Output -->
               <div
-                class="tw:w-full tw:transition-none"
+                class="tw-w-full tw-transition-none"
                 :class="expandCombinedOutput ?
-                  expandSqlOutput && localTab == 'sql' ? 'tw:flex-1 tw:h-[calc(50%-24px)]' : localTab != 'sql' ? 'tw:flex-1 tw:h-[calc(100%-24px)]' : 'tw:h-[24px]' :
-                  expandSqlOutput ? 'tw:flex-1 tw:h-[calc(100%-24px)]' : 'tw:h-[24px]'"
+                  expandSqlOutput && localTab == 'sql' ? 'tw-flex-1 tw-h-[calc(50%-24px)]' : localTab != 'sql' ? 'tw-flex-1 tw-h-[calc(100%-24px)]' : 'tw-h-[24px]' :
+                  expandSqlOutput ? 'tw-flex-1 tw-h-[calc(100%-24px)]' : 'tw-h-[24px]'"
               >
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-[100%] tw:gap-2">
+                <div class="tw-flex tw-items-center tw-justify-between tw-w-[100%] tw-gap-2">
                   <FullViewContainer
                     name="Output"
                     label="Output"
-                    class="tw:w-full"
+                    class="tw-w-full"
                     :isExpanded="expandSqlOutput"
                     @update:isExpanded="expandSqlOutput = $event"
                   >
                     <template #right>
                       <div
-                        class="tw:flex tw:items-center tw:justify-center tw:text-[12px] tw:font-semibold tw:mr-2"
-                        :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#6B7280]'"
+                        class="tw-flex tw-items-center tw-justify-center tw-text-[12px] tw-font-semibold tw-mr-2"
+                        :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-[#6B7280]'"
                       >
                         Results include all multi-window additions
                       </div>
                     </template>
                   </FullViewContainer>
                 </div>
-                <div v-if="expandSqlOutput" class="tw:h-[calc(100%-0px)] tw:overflow-y-hidden">
+                <div v-if="expandSqlOutput" class="tw-h-[calc(100%-0px)] tw-overflow-y-hidden">
                   <!-- No output before run query -->
-                  <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)] tw:w-full no-output-before-run-query">
-                    <div class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:gap-2">
+                  <div v-if="!tempRunQuery && outputEvents == ''" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] tw-w-full no-output-before-run-query">
+                    <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                       <q-icon
                         :name="outlinedLightbulb"
                         size="40px"
-                        :class="store.state.theme === 'dark' ? 'tw:text-[#FB923C]' : 'tw:text-[#FB923C]'"
+                        :class="store.state.theme === 'dark' ? 'tw-text-[#FB923C]' : 'tw-text-[#FB923C]'"
                       />
                       <div>
                         <span>Please click Run Query to see the output</span>
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="(outputEvents == '') && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)] no-output-before-run-query">
-                    <div class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:gap-2">
+                  <div v-else-if="(outputEvents == '') && !runQueryLoading" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] no-output-before-run-query">
+                    <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                       <q-icon
                         :name="outlinedWarning"
                         size="40px"
-                        class="tw:text-orange-400"
+                        class="tw-text-orange-400"
                       />
                       <div>
                         <span>{{ runPromqlError ? runPromqlError : "No results found" }}</span>
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)]">
+                  <div v-else-if="runQueryLoading" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)]">
                     <q-spinner-hourglass color="primary" size="40px" />
-                    <div class="tw:text-sm tw:text-gray-500">
+                    <div class="tw-text-sm tw-text-gray-500">
                       Fetching Search Results...
                     </div>
                   </div>
                   <QueryEditor
                     v-else-if="expandSqlOutput"
-                    class="tw:w-full tw:h-[calc(100%-24px)] tw:overflow-y-auto"
+                    class="tw-w-full tw-h-[calc(100%-24px)] tw-overflow-y-auto"
                     data-test="sql-output-editor"
                     ref="outputEventsEditorRef"
                     editor-id="sql-output-editor"
@@ -394,63 +394,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output (SQL + VRL) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="tw:w-full tw:transition-none"
+                class="tw-w-full tw-transition-none"
                 :class="expandSqlOutput ?
-                  expandCombinedOutput ? 'tw:flex-1 tw:h-[calc(50%-24px)]' : 'tw:flex-1 tw:h-[calc(100%-24px)]'
-                  : expandCombinedOutput ? 'tw:flex-1 tw:h-[24px]' : 'tw:flex-1 tw:h-[calc(100%-24px)]'"
+                  expandCombinedOutput ? 'tw-flex-1 tw-h-[calc(50%-24px)]' : 'tw-flex-1 tw-h-[calc(100%-24px)]'
+                  : expandCombinedOutput ? 'tw-flex-1 tw-h-[24px]' : 'tw-flex-1 tw-h-[calc(100%-24px)]'"
               >
-                <div class="tw:flex tw:flex-col tw:items-start tw:justify-between tw:h-fit">
+                <div class="tw-flex tw-flex-col tw-items-start tw-justify-between tw-h-fit">
                   <FullViewContainer
                     name="Combined Output"
                     label="Combined Output"
                     :isExpanded="expandCombinedOutput"
-                    class="tw:w-full"
+                    class="tw-w-full"
                     @update:isExpanded="expandCombinedOutput = $event"
                   >
                     <template #right>
                       <div
-                        class="tw:flex tw:items-center tw:justify-center tw:text-[12px] tw:font-semibold tw:mr-2"
-                        :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#6B7280]'"
+                        class="tw-flex tw-items-center tw-justify-center tw-text-[12px] tw-font-semibold tw-mr-2"
+                        :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-[#6B7280]'"
                       >
                         SQL + VRL
                       </div>
                     </template>
                   </FullViewContainer>
                 </div>
-                <div v-if="expandCombinedOutput && localTab !== 'promql'" class="tw:h-full">
-                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)] tw:w-full no-output-before-run-query">
-                    <div class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:gap-2">
+                <div v-if="expandCombinedOutput && localTab !== 'promql'" class="tw-h-full">
+                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] tw-w-full no-output-before-run-query">
+                    <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                       <q-icon
                         :name="outlinedLightbulb"
                         size="40px"
-                        :class="store.state.theme === 'dark' ? 'tw:text-[#FB923C]' : 'tw:text-[#FB923C]'"
+                        :class="store.state.theme === 'dark' ? 'tw-text-[#FB923C]' : 'tw-text-[#FB923C]'"
                       />
                       <div>
                         <span>Please click Apply VRL to see the combined output</span>
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="(outputFnEvents == '') && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)] no-output-before-run-query">
-                    <div class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:gap-2">
+                  <div v-else-if="(outputFnEvents == '') && !runFnQueryLoading && tempTestFunction" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] no-output-before-run-query">
+                    <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                       <q-icon
                         :name="outlinedWarning"
                         size="40px"
-                        class="tw:text-orange-400"
+                        class="tw-text-orange-400"
                       />
                       <div>
                         <span>No results found</span>
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-[calc(100%-24px)]">
+                  <div v-else-if="runFnQueryLoading" class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)]">
                     <q-spinner-hourglass color="primary" size="40px" />
-                    <div class="tw:text-sm tw:text-gray-500">
+                    <div class="tw-text-sm tw-text-gray-500">
                       Fetching Search Results...
                     </div>
                   </div>
                   <QueryEditor
                     v-else
-                    class="tw:w-full tw:h-[calc(100%-24px)]"
+                    class="tw-w-full tw-h-[calc(100%-24px)]"
                     data-test="vrl-function-test-events-output-editor"
                     ref="outputFnEventsEditorRef"
                     editor-id="test-function-events-output-editor"
@@ -976,7 +976,7 @@ const getBtnLogo = computed(() => {
 }
 
 // Force no transitions on collapsible output sections
-.tw:transition-none {
+.tw-transition-none {
   transition: none !important;
 }
 </style>

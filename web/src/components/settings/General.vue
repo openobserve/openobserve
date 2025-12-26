@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <!-- platform settings section -->
-    <div class="tw:mx-4">
+    <div class="tw-mx-4">
       <GroupHeader title="Platform Settings" :showIcon="false" />
-      <div class="tw:w-full tw:flex tw:flex-col">
+      <div class="tw-w-full tw-flex tw-flex-col">
         <q-form @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
           <div class="settings-grid-item">
@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw:items-start">
+          <div class="settings-grid-item tw-items-start">
             <span class="individual-setting-title">
               Manage Theme
             </span>
-            <div class="tw:flex tw:gap-2 tw:items-center" style="margin-left: -60px;">
+            <div class="tw-flex tw-gap-2 tw-items-center" style="margin-left: -60px;">
               <!-- Light Mode Theme -->
               <div
                 class="theme-color-chip"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip>Reset to default colors</q-tooltip>
               </div>
             </div>
-            <span class="individual-setting-description tw:self-start">
+            <span class="individual-setting-description tw-self-start">
               Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
             </span>
           </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
-              class="q-mb-md o2-primary-button no-border tw:h-[36px]"
+              class="q-mb-md o2-primary-button no-border tw-h-[36px]"
               type="submit"
               no-caps
               size="md"
@@ -133,16 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="individual-setting-title">
             {{ t('settings.customLogoText') }}
           </span>
-          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw:flex tw:gap-3 tw:items-center">
+          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw-flex tw-gap-3 tw-items-center">
             <q-input
-              class="showLabelOnTop tw:w-[250px] tw:mr-sm"
+              class="showLabelOnTop tw-w-[250px] tw-mr-sm"
               stack-label
               borderless
               dense
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
-            <div class="btn-group tw:flex tw:h-[28px]">
+            <div class="btn-group tw-flex tw-h-[28px]">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -168,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="tw:w-[190px] tw:text-center tw:truncate">{{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
-              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw:text-center tw:text-[12px] tw:max-w-[250px]">
+            <span class="tw-w-[190px] tw-text-center tw-truncate">{{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
+              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw-text-center tw-text-[12px] tw-max-w-[250px]">
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
             </span>
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Light Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
             {{ t("settings.customLogoTitle") }} (Light Mode)
           </div>
           <div
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             ></q-btn>
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
+          <div v-else class="tw-flex tw-items-center tw-gap-3">
             <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
             v-model="filesLight"
@@ -227,13 +227,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @rejected="onRejected"
             dense
             borderless
-            class="q-mx-none o2-file-input tw:w-[250px] "
+            class="q-mx-none o2-file-input tw-w-[250px] "
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
             </template>
           </q-file>
-          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
+          <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
               Custom logo for light mode theme. This will be displayed when users are in light mode.
             </span>
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dark Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
             {{ t("settings.customLogoTitle") }} (Dark Mode)
           </div>
           <div
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             ></q-btn>
           </div>
-          <div v-else class="tw:flex tw:items-center tw:gap-3">
+          <div v-else class="tw-flex tw-items-center tw-gap-3">
             <q-file
             data-test="setting_ent_custom_logo_dark_img_file_upload"
             v-model="filesDark"
@@ -305,13 +305,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @rejected="onRejected"
             dense
             borderless
-            class="q-mx-none o2-file-input tw:w-[250px] "
+            class="q-mx-none o2-file-input tw-w-[250px] "
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
             </template>
           </q-file>
-          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
+          <div class="tw-flex tw-flex-col tw-mb-5">
             <span class="individual-setting-description">
               Custom logo for dark mode theme. This will be displayed when users are in dark mode.
             </span>
@@ -357,11 +357,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.deleteLogoMessage") }}
       </q-card-section>
 
-      <q-card-actions align="right" class="tw:flex tw:gap-1">
+      <q-card-actions align="right" class="tw-flex tw-gap-1">
         <q-btn
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
           :label="t('confirmDialog.cancel')"
-          class="o2-secondary-button tw:h-[28px] no-border"
+          class="o2-secondary-button tw-h-[28px] no-border"
           flat
           no-caps
           @click="cancelConfirmDialog"
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
-          class="o2-primary-button tw:h-[28px] no-border"
+          class="o2-primary-button tw-h-[28px] no-border"
           no-caps
           flat
           @click="confirmDialogOK"

@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '70vw' : '40vw'
             }"
     >
-      <div class="add-regex-pattern-header q-px-md tw:flex tw:items-center tw:justify-between">
-        <div class="tw:flex tw:items-center tw:justify-between">
+      <div class="add-regex-pattern-header q-px-md tw-flex tw-items-center tw-justify-between">
+        <div class="tw-flex tw-items-center tw-justify-between">
                 <q-btn
                     data-test="add-regex-pattern-back-btn"
                     @click="closeAddRegexPatternDialog"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ isEdit ? t("regex_patterns.edit_regex_pattern") : t("regex_patterns.create_regex_pattern") }}
           </div>
         </div>
-        <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw-flex tw-items-center tw-justify-between tw-gap-2">
             <q-btn
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             :ripple="false"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
             >
-            <div class="row items-center no-wrap tw:gap-2  ">
+            <div class="row items-center no-wrap tw-gap-2  ">
                 <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
             </q-btn>
@@ -61,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="fullscreen" 
             size="14px" 
             dense 
-            class="tw:cursor-pointer" 
-            :class="store.state.theme === 'dark' ? 'tw:text-white' : ''"
+            class="tw-cursor-pointer" 
+            :class="store.state.theme === 'dark' ? 'tw-text-white' : ''"
             :color="isFullScreen ? 'primary' : undefined"
             @click="toggleFullScreen"
           />
@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator class="q-mb-md q-mt-sm" />
       <!-- form inputs starts here -->
-       <div class="tw:flex tw:w-[100%]">
+       <div class="tw-flex tw-w-[100%]">
             <div
-            :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw:w-[75%] q-pl-sm' : 'tw:w-[65%] q-pl-sm' : 'tw:w-[100%] q-px-md'"
+            :class="store.state.isAiChatEnabled ? isFullScreen ? 'tw-w-[75%] q-pl-sm' : 'tw-w-[65%] q-pl-sm' : 'tw-w-[100%] q-px-md'"
             >
-            <q-form @submit="saveRegexPattern" class="tw:flex tw:flex-col tw:gap-4" style="overflow: auto; height: calc(100vh - 150px);">
-                <div class="tw:flex tw:flex-col">
+            <q-form @submit="saveRegexPattern" class="tw-flex tw-flex-col tw-gap-4" style="overflow: auto; height: calc(100vh - 150px);">
+                <div class="tw-flex tw-flex-col">
                     <q-input
                         v-bind:readonly="isEdit"
                         v-bind:disable="isEdit"
@@ -113,32 +113,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Describe your pattern to help users understand"
                         />
                 <div class="regex-pattern-input-container">
-                    <div class="tw:flex tw:items-center tw:justify-between">
+                    <div class="tw-flex tw-items-center tw-justify-between">
                         <span class="regex-pattern-input-label">
                             Regex Pattern
                         </span>
                         <q-btn v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                         class="tw:px-2 tw:py-1 tw:flex tw:items-center"
+                         class="tw-px-2 tw-py-1 tw-flex tw-items-center"
                         style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
-                        <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />
-                        <span class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1">
+                        <img :src="goToAILogo" class="tw-w-[20px] tw-h-[20px] tw-mr-1" />
+                        <span class="tw-text-[#5960B2] tw-text-sm tw-flex tw-items-center tw-gap-1">
                             Try O2 AI to write expressions 
                         </span>
-                        <q-icon size="sm" name="arrow_right_alt" class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1" />
+                        <q-icon size="sm" name="arrow_right_alt" class="tw-text-[#5960B2] tw-w-[20px] tw-h-[20px] tw-ml-1" />
 
                             </q-btn>
                     </div>
                     <div class="regex-pattern-input">
                         <div
-                            class="tw:py-[2px] tw:h-[24px]"
-                            :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
+                            class="tw-py-[2px] tw-h-[24px]"
+                            :class="store.state.theme === 'dark' ? 'tw-bg-gray-500' : 'tw-bg-gray-200 '"
                         >
                                 <div
-                                class="tw:text-[12px] tw:font-[500] tw:px-2"
+                                class="tw-text-[12px] tw-font-[500] tw-px-2"
                                 :class="[
                                     store.state.theme === 'dark'
-                                    ? 'tw:text-[#ffffff]'
-                                    : 'tw:text-[#6B7280]',
+                                    ? 'tw-text-[#ffffff]'
+                                    : 'tw-text-[#6B7280]',
                                 ]"
                                 >
                                 Write Pattern
@@ -162,14 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                     </div>
                 </div>
-                <q-separator class="tw:my-2" />
+                <q-separator class="tw-my-2" />
                 <div>
-                    <div class="tw:flex tw:items-center tw:justify-between">
+                    <div class="tw-flex tw-items-center tw-justify-between">
                         <span class="regex-pattern-test-string-label">
                             Test Regex Pattern
                         </span>
-                        <div class="tw:h-[19px] tw:flex tw:items-center tw:justify-center tw:font-[600]" style="border-radius: 3px;">
-                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw:px-2 tw:bg-[#5960B2] tw:text-[12px] tw:text-white tw:min-h-[19px] tw:h-[19px] tw:flex tw:items-center tw:justify-center"
+                        <div class="tw-h-[19px] tw-flex tw-items-center tw-justify-center tw-font-[600]" style="border-radius: 3px;">
+                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw-px-2 tw-bg-[#5960B2] tw-text-[12px] tw-text-white tw-min-h-[19px] tw-h-[19px] tw-flex tw-items-center tw-justify-center"
                         style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
                         <span>
                             Test Input
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="query"
                         v-model:is-expanded="expandState.regexTestString"
                         label="Input string"
-                        class="tw:mt-1 tw:py-md tw:h-[24px]"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
                     <template #right>
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="output"
                         v-model:is-expanded="expandState.outputString"
                         label="Output"
-                        class="tw:mt-1 tw:py-md tw:h-[24px]"
+                        class="tw-mt-1 tw-py-md tw-h-[24px]"
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                     >
                 </FullViewContainer>
@@ -237,18 +237,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Output String"
                         rows="5"
                         />
-                        <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px] " 
+                        <div v-else class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-[111px] " 
                         :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'"
 
                         >
                             <div v-if="!testLoading && outputString.length === 0">
-                                <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#A8A8A8]'" />
-                            <span class="tw:text-[12px] tw:font-[400] tw:text-center" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#4B5563]'">
+                                <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#A8A8A8]'" />
+                            <span class="tw-text-[12px] tw-font-[400] tw-text-center" :class="store.state.theme === 'dark' ? 'tw-text-[#ffffff]' : 'tw-text-[#4B5563]'">
                                 Please click Test Input to see the results
                             </span>
                             </div>
                             <div v-else-if="testLoading">
-                                <span class="tw:flex tw:items-center tw:justify-center tw:h-[111px]">
+                                <span class="tw-flex tw-items-center tw-justify-center tw-h-[111px]">
                                     <q-spinner-hourglass color="primary" size="24px" />
                                 </span>
                             </div>
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex justify-end q-mt-sm" style="position: sticky; bottom: 0; right: 0;">
                 <q-btn
                     v-close-popup
-                    class="q-mr-md o2-secondary-button tw:h-[36px]"
+                    class="q-mr-md o2-secondary-button tw-h-[36px]"
                     :label="t('regex_patterns.cancel')"
                     no-caps
                     flat
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-regex-pattern-cancel-btn"
                 />
                 <q-btn
-                    class="o2-primary-button no-border tw:h-[36px]"
+                    class="o2-primary-button no-border tw-h-[36px]"
                     :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
                     type="submit"
                     no-caps

@@ -1,9 +1,9 @@
 <template>
   <div
-   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+   class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs"
   >
-    <div v-if="!showSearchResults" class="tw:h-full">
-       <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
+    <div v-if="!showSearchResults" class="tw-h-full">
+       <div class="flex tw-justify-between tw-items-center tw-h-[68px] card-container tw-mb-[0.625rem]">
         <div class="flex items-center q-py-sm q-pl-md">
           <div
             data-test="search-scheduler-back-btn"
@@ -19,7 +19,7 @@
           >
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <div class="text-h6 tw:font-[600]" data-test="search-scheduler-title">
+          <div class="text-h6 tw-font-[600]" data-test="search-scheduler-title">
             {{ t('search_scheduler_job.title') }}
           </div>
         </div>
@@ -28,7 +28,7 @@
             <q-btn
               :label="t('search_scheduler_job.get_jobs')"
               @click="fetchSearchHistory"
-              class="q-ml-md o2-primary-button tw:h-[36px] tw:rounded-md"
+              class="q-ml-md o2-primary-button tw-h-[36px] tw-rounded-md"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
               flat
@@ -39,8 +39,8 @@
         </div>
       </div>
 
-   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh-128px)] card-container">
+   <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class=" tw-h-[calc(100vh-128px)] card-container">
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -180,8 +180,8 @@
                     />
                   </div>
                   <div v-if="activeTab == 'query'">
-                    <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                      <div class="tw:flex tw:items-center q-py-sm">
+                    <div class="text-left tw-px-2 q-mb-sm expanded-content">
+                      <div class="tw-flex tw-items-center q-py-sm">
                         <strong
                           >{{ t('search_scheduler_job.sql_query') }} :
                           <span>
@@ -194,7 +194,7 @@
                               dense
                               flat
                               icon="content_copy"
-                              class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
+                              class="copy-btn-sql tw-ml-2 tw-py-2 tw-px-2" /></span
                         ></strong>
                         <q-btn
                           @click.stop="fetchSearchResults(props.row)"
@@ -202,7 +202,7 @@
                           size="xs"
                           :label="t('search_scheduler_job.logs')"
                           dense
-                          class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
+                          class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
                           icon="search"
                           flat
                           style="
@@ -216,7 +216,7 @@
                           "
                         />
                       </div>
-                      <div class="tw:flex tw:items-start tw:justify-center">
+                      <div class="tw-flex tw-items-start tw-justify-center">
                         <div class="scrollable-content expanded-sql">
                           <pre style="text-wrap: wrap">{{
                             props.row?.sql
@@ -226,9 +226,9 @@
                     </div>
                     <div
                       v-if="props.row?.function"
-                      class="text-left q-mb-sm tw:px-2 expanded-content"
+                      class="text-left q-mb-sm tw-px-2 expanded-content"
                     >
-                      <div class="tw:flex tw:items-center q-py-sm">
+                      <div class="tw-flex tw-items-center q-py-sm">
                         <strong
                           >{{ t('search_scheduler_job.function_definition') }} :
                           <span>
@@ -243,11 +243,11 @@
                               dense
                               flat
                               icon="content_copy"
-                              class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
+                              class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2" /></span
                         ></strong>
                       </div>
 
-                      <div class="tw:flex tw:items-start tw:justify-center">
+                      <div class="tw-flex tw-items-start tw-justify-center">
                         <div class="scrollable-content expanded-function">
                           <pre style="text-wrap: wrap">{{
                             props.row?.function
@@ -258,7 +258,7 @@
                   </div>
                   <div class="q-py-md" v-else>
                     <div
-                      class="text-left tw:px-2 q-mb-sm expanded-content flex tw:flex-col"
+                      class="text-left tw-px-2 q-mb-sm expanded-content flex tw-flex-col"
                     >
                       <query-editor
                         style="height: 130px"
@@ -277,11 +277,11 @@
               </q-tr>
             </template>
             <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
               {{ resultTotal }} {{ t('search_scheduler_job.results') }}
             </div>
-            <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
+            <div class="tw-ml-auto tw-mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
             <q-separator
               style="height: 1.5rem; margin: auto 0"
               vertical
@@ -301,12 +301,12 @@
           </div>
           </template>
             <template #no-data>
-              <div v-if="!isLoading" class="tw:flex tw:mx-auto">
+              <div v-if="!isLoading" class="tw-flex tw-mx-auto">
                 <NoData />
               </div>
               <div
                 v-if="isLoading"
-                class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
+                class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
               >
                 <q-spinner-hourglass color="primary" size="lg" />
               </div>

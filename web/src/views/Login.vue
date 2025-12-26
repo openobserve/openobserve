@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
-    <div class="flex relative-position tw:px-3 tw:pt-2">
+    <div class="flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
         loading="lazy"

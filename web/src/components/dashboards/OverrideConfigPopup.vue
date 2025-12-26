@@ -22,7 +22,7 @@
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="q-mb-md flex items-start tw:w-full tw:flex"
+      class="q-mb-md flex items-start tw-w-full tw-flex"
       style="gap: 15px"
     >
       <q-select
@@ -37,9 +37,9 @@
         map-options
         borderless
         dense
-        class="tw:flex-1 o2-custom-select-dashboard"
+        class="tw-flex-1 o2-custom-select-dashboard"
        hide-bottom-space/>
-      <div class="tw:flex items-center" style="width: 60%; gap: 10px">
+      <div class="tw-flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
           :label="'Type'"
@@ -58,7 +58,7 @@
 
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
-          class="tw:flex items-center"
+          class="tw-flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-select
@@ -73,7 +73,7 @@
             map-options
             borderless
             dense
-            class="tw:flex-1 o2-custom-select-dashboard"
+            class="tw-flex-1 o2-custom-select-dashboard"
            hide-bottom-space/>
           <q-input
             v-if="overrideConfig.config[0].value.unit === 'custom'"
@@ -91,7 +91,7 @@
 
         <div
           v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
-          class="tw:flex items-center"
+          class="tw-flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-checkbox

@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup="true"
             data-test="add-stream-cancel-btn"
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('logStream.cancel')"
             no-caps
             flat
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="save-stream-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('common.save')"
             type="submit"
             no-caps

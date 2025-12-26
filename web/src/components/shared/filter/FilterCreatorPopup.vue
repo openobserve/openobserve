@@ -46,13 +46,13 @@
       <q-card-actions align="right">
         <q-btn
           v-close-popup
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('common.cancel')"
           no-caps
           flat
         />
         <q-btn
-          class="o2-primary-button no-border tw:h-[36px]"
+          class="o2-primary-button no-border tw-h-[36px]"
           :label="t('common.apply')"
           no-caps
           flat

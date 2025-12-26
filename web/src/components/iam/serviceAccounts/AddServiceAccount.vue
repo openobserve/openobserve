@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="o2-side-dialog column full-height">
-    <q-card-section class=" q-py-md tw:w-full">
+    <q-card-section class=" q-py-md tw-w-full">
       <div class="row items-center no-wrap q-py-sm">
         <div class="col ">
           <div v-if="beingUpdated" style="font-size: 18px">
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop tw-mt-2"
             ref="email"
             stack-label
             hide-bottom-space
@@ -57,17 +57,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="firstName"
             :label="t('user.description')"
-            class="showLabelOnTop tw:mt-2"
+            class="showLabelOnTop tw-mt-2"
             ref="description"
             stack-label
             hide-bottom-space
             borderless
             dense
           />
-          <div class="flex justify-start tw:mt-6">
+          <div class="flex justify-start tw-mt-6">
             <q-btn
               v-close-popup="true"
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('user.cancel')"
               no-caps
               flat
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn
               :label="t('user.save')"
-              class="o2-primary-button no-border tw:h-[36px]"
+              class="o2-primary-button no-border tw-h-[36px]"
               type="submit"
               no-caps
               flat

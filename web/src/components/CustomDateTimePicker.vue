@@ -24,7 +24,7 @@
       no-route-dismiss
     >
       <q-tab-panels
-        class="tw:flex tw:justify-between"
+        class="tw-flex tw-justify-between"
         v-model="picker.activeTab"
       >
         <q-tab-panel name="relative" class="q-pa-none">

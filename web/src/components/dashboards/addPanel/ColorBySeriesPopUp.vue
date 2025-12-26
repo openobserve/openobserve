@@ -21,7 +21,7 @@
     style="padding: 5px 10px; min-width: min(1200px, 90vw)"
   >
     <div
-      class="flex justify-between items-center q-pa-md header tw:top-0 tw:sticky"
+      class="flex justify-between items-center q-pa-md header tw-top-0 tw-sticky"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
@@ -39,8 +39,8 @@
         data-test="dashboard-color-by-series-cancel"
       ></q-btn>
     </div>
-    <div class="flex tw:justify-between tw:flex-col">
-      <div class="tw:mt-2 scrollable-content scroll tw:min-h-52">
+    <div class="flex tw-justify-between tw-flex-col">
+      <div class="tw-mt-2 scrollable-content scroll tw-min-h-52">
         <draggable
           v-model="editColorBySeries"
           :options="dragOptions"
@@ -52,7 +52,7 @@
             :key="index"
             class="draggable-row"
           >
-            <div class="draggable-handle tw:self-center">
+            <div class="draggable-handle tw-self-center">
               <q-icon
                 name="drag_indicator"
                 color="grey-13"
@@ -60,8 +60,8 @@
                 :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
-            <div class="draggable-content tw:flex tw:gap-x-6">
-              <div class="input-container tw:flex-1">
+            <div class="draggable-content tw-flex tw-gap-x-6">
+              <div class="input-container tw-flex-1">
                 <CommonAutoComplete
                   v-model="series.value"
                   :items="seriesDataItems"
@@ -89,10 +89,10 @@
               </div>
 
               <!-- Color Picker -->
-              <div class="color-section tw:flex-1">
+              <div class="color-section tw-flex-1">
                 <div
                   v-if="series.color !== null"
-                  class="tw:items-center tw:flex"
+                  class="tw-items-center tw-flex"
                 >
                   <q-input
                     v-model="series.color"
@@ -116,19 +116,19 @@
                   <q-icon
                     :name="outlinedCancel"
                     style="width: 10%"
-                    class="cursor-pointer tw:align-middle"
+                    class="cursor-pointer tw-align-middle"
                     size="xs"
                     title="Remove color"
                     @click="removeColorByIndex(index)"
                   />
                 </div>
-                <div v-else class="tw:w-full">
+                <div v-else class="tw-w-full">
                   <q-btn
                     label="Set color"
                     no-caps
                     flat
                     dense
-                    class="tw:text-blue-700 tw:font-semibold tw:w-full"
+                    class="tw-text-blue-700 tw-font-semibold tw-w-full"
                     @click="setColorByIndex(index)"
                   />
                 </div>
@@ -150,7 +150,7 @@
       </div>
       <!-- Footer Buttons -->
     </div>
-    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
+    <div class="flex justify-between tw-sticky tw-bottom-0 sticky-footer">
       <q-btn
         @click="addcolorBySeries"
         label="+ Add a new color"

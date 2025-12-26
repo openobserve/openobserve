@@ -1,18 +1,18 @@
 <template>
   <li
-    class="tw:cursor-pointer tw:py-[1px] tw:px-2 hover:tw:bg-gray-200 tw:text-[14px] tw:rounded-[2px] tw:flex tw:h-[25px] file-item"
+    class="tw-cursor-pointer tw-py-[1px] tw-px-2 hover:tw-bg-gray-200 tw-text-[14px] tw-rounded-[2px] tw-flex tw-h-[25px] file-item"
     :class="{
-      'bg-primary tw:text-white': isActive,
+      'bg-primary tw-text-white': isActive,
     }"
     @click="openFile"
   >
-    <div class="tw:w-[calc(100%-40px)] tw:flex tw:items-center">
+    <div class="tw-w-[calc(100%-40px)] tw-flex tw-items-center">
       <template v-if="isEditing">
         <input
           ref="nameInput"
           v-model.trim="fileName"
-          class="tw:w-full tw:border tw:rounded tw:h-full tw:bg-transparent tw:border-none tw:outline-none"
-          :class="isActive ? 'tw:text-white' : 'tw:text-black'"
+          class="tw-w-full tw-border tw-rounded tw-h-full tw-bg-transparent tw-border-none tw-outline-none"
+          :class="isActive ? 'tw-text-white' : 'tw-text-black'"
           @blur="onBlur"
         />
       </template>
@@ -21,17 +21,17 @@
       </template>
     </div>
     <div
-      class="tw:w-[36px] tw:flex tw:items-center tw:space-x-2 tw:ml-auto file-actions"
+      class="tw-w-[36px] tw-flex tw-items-center tw-space-x-2 tw-ml-auto file-actions"
     >
       <button
         @click.stop="editFile"
-        :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'"
+        :class="isActive ? 'tw-text-gray-100' : 'tw-text-gray-600'"
       >
         <q-icon name="edit" />
       </button>
       <button
         @click.stop="deleteFile"
-        :class="isActive ? 'tw:text-gray-100' : 'tw:text-gray-600'"
+        :class="isActive ? 'tw-text-gray-100' : 'tw-text-gray-600'"
       >
         <q-icon name="delete" />
       </button>

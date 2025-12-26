@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :class="[
-        'tw:prose tw:prose-sm tw:max-w-none',
-        store.state?.theme === 'dark' && 'tw:prose-invert',
+        'tw-prose tw-prose-sm tw-max-w-none',
+        store.state?.theme === 'dark' && 'tw-prose-invert',
       ]"
       v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"
