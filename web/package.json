@@ -80,7 +80,7 @@
   },
   "devDependencies": {
     "@cypress/vue": "^6.0.2",
-    "@cypress/webpack-dev-server": "^4.0.1",
+    "@cypress/webpack-dev-server": "^5.4.1",
     "@quasar/vite-plugin": "^1.9.0",
     "@rushstack/eslint-patch": "^1.10.5",
     "@tailwindcss/typography": "^0.5.16",
@@ -105,7 +105,7 @@
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.20",
     "c8": "^10.1.3",
-    "cypress": "^14.0.0",
+    "cypress": "^15.8.1",
     "cypress-localstorage-commands": "^2.2.7",
     "dotenv": "^17.2.3",
     "eslint": "^9.10.0",
