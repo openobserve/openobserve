@@ -386,7 +386,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         true,
       );
     } catch (e: any) {
-      console.error("Error while loading stream fields", e);
       return { name: streamName, schema: [], settings: {} };
     }
   }
@@ -1825,6 +1824,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == false
     ) {
+      dashboardPanelData.meta.stream.customQueryFields = [];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(
@@ -3052,7 +3053,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.meta.promql.labelValuesMap = new Map();
       }
     } catch (error) {
-      console.error("Error fetching PromQL labels:", error);
       dashboardPanelData.meta.promql.availableLabels = [];
       dashboardPanelData.meta.promql.labelValuesMap = new Map();
     } finally {
