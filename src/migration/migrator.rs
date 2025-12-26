@@ -1,0 +1,377 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use chrono::Utc;
+
+use super::{
+    MigrationConfig,
+    adapter::{DbAdapter, create_adapter},
+    progress::{ProgressBar, TableStats, print_error, print_plan, print_report},
+};
+
+/// file_list related tables (handled by migrate-file-list)
+const FILE_LIST_TABLES: &[&str] = &[
+    "file_list",
+    "file_list_deleted",
+    "file_list_history",
+    "file_list_dump_stats",
+    "file_list_jobs",
+];
+
+/// System internal tables (excluded from migration)
+const SYSTEM_TABLES: &[&str] = &["sqlite_sequence"];
+
+/// Run meta migration (all tables except file_list related)
+pub async fn run_meta(config: MigrationConfig) -> Result<(), anyhow::Error> {
+    config.validate()?;
+    run_migration(config, MigrationMode::Meta).await
+}
+
+/// Run file_list migration
+pub async fn run_file_list(config: MigrationConfig) -> Result<(), anyhow::Error> {
+    config.validate()?;
+    run_migration(config, MigrationMode::FileList).await
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum MigrationMode {
+    Meta,
+    FileList,
+}
+
+impl MigrationMode {
+    fn name(&self) -> &'static str {
+        match self {
+            MigrationMode::Meta => "migrate-meta",
+            MigrationMode::FileList => "migrate-file-list",
+        }
+    }
+}
+
+async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(), anyhow::Error> {
+    println!();
+    println!("Starting migration ({})...", mode.name());
+    println!("══════════════════════════════════════════════════════════════");
+    println!();
+
+    // 1. Connect to databases
+    print!("Connecting to source ({})... ", config.from);
+    let source = create_adapter(&config.from).await?;
+    println!("✓");
+
+    print!("Connecting to target ({})... ", config.to);
+    let target = create_adapter(&config.to).await?;
+    println!("✓");
+    println!();
+
+    // 2. Discover tables
+    print!("Discovering tables... ");
+    let all_tables = source.list_tables().await?;
+    let tables = filter_tables(&all_tables, mode, &config);
+    let excluded = get_excluded_tables(&all_tables, mode);
+    println!("{} tables to migrate", tables.len());
+    println!();
+
+    if tables.is_empty() {
+        println!("No tables to migrate.");
+        return Ok(());
+    }
+
+    // 3. Validate tables
+    print!("Validating table schemas... ");
+    for table in &tables {
+        validate_table(source.as_ref(), target.as_ref(), table).await?;
+    }
+    println!("✓");
+    println!();
+
+    // 4. Collect table stats
+    let mut table_stats = Vec::new();
+    for table in &tables {
+        let columns = source.get_columns(table).await?;
+        let timestamp_col = detect_timestamp_column(&columns);
+        let count = source
+            .count(
+                table,
+                timestamp_col.as_deref(),
+                if config.incremental {
+                    config.since
+                } else {
+                    None
+                },
+            )
+            .await?;
+
+        table_stats.push(TableStats {
+            name: table.clone(),
+            total: count,
+            migrated: 0,
+            timestamp_col,
+            duration_ms: 0,
+        });
+    }
+
+    // 5. Dry run check
+    if config.dry_run {
+        let mode_str = if config.incremental {
+            "incremental"
+        } else {
+            "full"
+        };
+        print_plan(
+            &config.from,
+            &config.to,
+            mode_str,
+            config.batch_size,
+            &table_stats,
+            &excluded,
+        );
+        return Ok(());
+    }
+
+    // 6. Prepare target database
+    print!("Disabling foreign key constraints... ");
+    target.disable_foreign_keys().await?;
+    println!("✓");
+
+    if config.truncate_target {
+        println!("Truncating target tables...");
+        for table in &tables {
+            print!("  {} ... ", table);
+            target.truncate_table(table).await?;
+            println!("✓");
+        }
+    }
+    println!();
+
+    // 7. Execute migration
+    let start_time = Utc::now().timestamp_micros();
+
+    for (idx, table) in tables.iter().enumerate() {
+        let stats = &mut table_stats[idx];
+        let table_start = std::time::Instant::now();
+
+        let result = migrate_table(source.as_ref(), target.as_ref(), table, stats, &config).await;
+
+        if let Err(e) = result {
+            // Re-enable foreign keys before returning error
+            let _ = target.enable_foreign_keys().await;
+            print_error(table, &e.to_string());
+            return Err(e);
+        }
+
+        stats.duration_ms = table_start.elapsed().as_millis() as u64;
+    }
+
+    // 8. Restore target database
+    println!();
+    print!("Enabling foreign key constraints... ");
+    target.enable_foreign_keys().await?;
+    println!("✓");
+
+    // 9. Print report
+    let end_time = Utc::now().timestamp_micros();
+    print_report(&table_stats, start_time, end_time, &config.from, &config.to);
+
+    // Close connections
+    source.close().await?;
+    target.close().await?;
+
+    Ok(())
+}
+
+fn filter_tables(
+    all_tables: &[String],
+    mode: MigrationMode,
+    config: &MigrationConfig,
+) -> Vec<String> {
+    let mut tables: Vec<String> = all_tables
+        .iter()
+        .filter(|t| {
+            // Filter by mode
+            let is_file_list = FILE_LIST_TABLES.contains(&t.as_str());
+            let is_system = SYSTEM_TABLES.contains(&t.as_str());
+
+            if is_system {
+                return false;
+            }
+
+            match mode {
+                MigrationMode::Meta => !is_file_list,
+                MigrationMode::FileList => is_file_list,
+            }
+        })
+        .cloned()
+        .collect();
+
+    // Apply --tables filter
+    if let Some(ref include) = config.tables {
+        tables.retain(|t| include.contains(t));
+    }
+
+    // Apply --exclude filter
+    if let Some(ref exclude) = config.exclude {
+        tables.retain(|t| !exclude.contains(t));
+    }
+
+    tables.sort();
+    tables
+}
+
+fn get_excluded_tables(all_tables: &[String], mode: MigrationMode) -> Vec<String> {
+    all_tables
+        .iter()
+        .filter(|t| {
+            let is_file_list = FILE_LIST_TABLES.contains(&t.as_str());
+            let is_system = SYSTEM_TABLES.contains(&t.as_str());
+
+            if is_system {
+                return true;
+            }
+
+            match mode {
+                MigrationMode::Meta => is_file_list,
+                MigrationMode::FileList => !is_file_list,
+            }
+        })
+        .cloned()
+        .collect()
+}
+
+async fn validate_table(
+    source: &dyn DbAdapter,
+    target: &dyn DbAdapter,
+    table: &str,
+) -> Result<(), anyhow::Error> {
+    // Check target table exists
+    let target_tables = target.list_tables().await?;
+    if !target_tables.contains(&table.to_string()) {
+        return Err(anyhow::anyhow!(
+            "Table '{}' does not exist in target database.\n\
+            Please initialize the target database first by running:\n\
+            \n\
+            ZO_META_STORE={} ./openobserve init-db\n",
+            table,
+            target.name()
+        ));
+    }
+
+    // Check column compatibility
+    let source_cols = source.get_columns(table).await?;
+    let target_cols = target.get_columns(table).await?;
+
+    let source_col_names: std::collections::HashSet<_> =
+        source_cols.iter().map(|c| &c.name).collect();
+    let target_col_names: std::collections::HashSet<_> =
+        target_cols.iter().map(|c| &c.name).collect();
+
+    // Check all source columns exist in target
+    for col in &source_col_names {
+        if !target_col_names.contains(col) {
+            return Err(anyhow::anyhow!(
+                "Column '{}' in table '{}' does not exist in target database",
+                col,
+                table
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn detect_timestamp_column(columns: &[super::adapter::ColumnInfo]) -> Option<String> {
+    // Priority: updated_at > created_at
+    for col in columns {
+        if col.name == "updated_at" {
+            return Some("updated_at".to_string());
+        }
+    }
+    for col in columns {
+        if col.name == "created_at" {
+            return Some("created_at".to_string());
+        }
+    }
+    None
+}
+
+async fn migrate_table(
+    source: &dyn DbAdapter,
+    target: &dyn DbAdapter,
+    table: &str,
+    stats: &mut TableStats,
+    config: &MigrationConfig,
+) -> Result<(), anyhow::Error> {
+    let columns = source.get_columns(table).await?;
+    let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+    let primary_keys = source.get_primary_keys(table).await?;
+
+    let timestamp_col = stats.timestamp_col.as_deref();
+    let since = if config.incremental {
+        config.since
+    } else {
+        None
+    };
+
+    let total = stats.total;
+    // Create progress bar
+    let mut progress = ProgressBar::new(total, &format!("{:<25}", truncate_str(table, 25)));
+
+    let mut offset = 0u64;
+    let mut migrated = 0u64;
+
+    loop {
+        let rows = source
+            .select_batch(
+                table,
+                &column_names,
+                offset,
+                config.batch_size,
+                timestamp_col,
+                since,
+            )
+            .await?;
+
+        if rows.is_empty() {
+            break;
+        }
+
+        let batch_count = rows.len() as u64;
+        target
+            .upsert_batch(table, &column_names, &primary_keys, &rows)
+            .await?;
+
+        migrated += batch_count;
+        offset += config.batch_size;
+
+        progress.update(migrated);
+
+        if batch_count < config.batch_size {
+            break;
+        }
+    }
+
+    progress.finish();
+    stats.migrated = migrated;
+
+    Ok(())
+}
+
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len - 3])
+    }
+}

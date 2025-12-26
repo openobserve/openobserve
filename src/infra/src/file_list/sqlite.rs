@@ -27,12 +27,12 @@ use config::{
     },
 };
 use hashbrown::HashMap;
-use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
+use sqlx::{Executor, QueryBuilder, Row, Sqlite};
 
 use crate::{
     db::{
         IndexStatement,
-        sqlite::{CLIENT_RO, CLIENT_RW, create_index, delete_index},
+        sqlite::{CLIENT_RO, CLIENT_RW, add_column, create_index, delete_index},
     },
     errors::{Error, Result},
     file_list::FileRecord,
@@ -1953,24 +1953,6 @@ pub async fn create_table_index() -> Result<()> {
         .execute(&*client)
         .await?;
 
-    Ok(())
-}
-
-async fn add_column(
-    client: &Pool<Sqlite>,
-    table: &str,
-    column: &str,
-    data_type: &str,
-) -> Result<()> {
-    // Attempt to add the column, ignoring the error if the column already exists
-    let check_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
-    if let Err(e) = sqlx::query(&check_sql).execute(client).await {
-        // Check if the error is about the duplicate column
-        if !e.to_string().contains("duplicate column name") {
-            // If the error is not about the duplicate column, return it
-            return Err(e.into());
-        }
-    }
     Ok(())
 }
 

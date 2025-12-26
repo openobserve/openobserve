@@ -634,22 +634,8 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    let pool = CLIENT_DDL.clone();
-    let mut tx = pool.begin().await?;
     DB_QUERY_NUMS.with_label_values(&["alter", "meta"]).inc();
-    if let Err(e) = sqlx::query(
-        r#"ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;"#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        log::error!("[POSTGRES] Error in adding column start_dt: {e}");
-        if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] Error in rolling back transaction: {e}");
-        }
-        return Err(e.into());
-    }
-    tx.commit().await?;
+    add_column("meta", "start_dt", "BIGINT NOT NULL DEFAULT 0").await?;
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
     create_index(IndexStatement::new(
@@ -742,5 +728,48 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
         .with_label_values(&["drop_index", table])
         .observe(time);
     log::info!("[POSTGRES] index {idx_name} deleted successfully");
+    Ok(())
+}
+
+pub async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
+    let pool = CLIENT_DDL.clone();
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        return Ok(());
+    }
+
+    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {data_type};");
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
+        log::error!("[POSTGRES] Error in adding column {column}: {e}");
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {e}");
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::info!("[POSTGRES] Error in committing transaction: {e}");
+        return Err(e.into());
+    }
+    Ok(())
+}
+
+pub async fn drop_column(table: &str, column: &str) -> Result<()> {
+    let pool = CLIENT_DDL.clone();
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        let alert_sql = format!("ALTER TABLE {table} DROP COLUMN {column};");
+        sqlx::query(&alert_sql).execute(&pool).await?;
+    }
     Ok(())
 }

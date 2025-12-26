@@ -721,27 +721,8 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    let pool = CLIENT_DDL.clone();
-    let mut tx = pool.begin().await?;
-
     DB_QUERY_NUMS.with_label_values(&["alter", "meta"]).inc();
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;"#)
-            .execute(&mut *tx)
-            .await
-        && !e.to_string().contains("Duplicate column name")
-    {
-        // Check for the specific MySQL error code for duplicate column
-        log::error!("[MYSQL] Unexpected error in adding column: {e}");
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {e}");
-        }
-        return Err(e.into());
-    }
-    if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {e}");
-        return Err(e.into());
-    };
+    add_column("meta", "start_dt", "BIGINT NOT NULL DEFAULT 0").await?;
 
     // create new index meta_module_start_dt_idx
     create_index(IndexStatement::new(
@@ -860,6 +841,53 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
         .with_label_values(&["drop_index", table])
         .observe(time);
     log::info!("[MYSQL] index {idx_name} deleted successfully");
+    Ok(())
+}
+
+pub async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
+    let pool = CLIENT_DDL.clone();
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        return Ok(());
+    }
+
+    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await
+        && !e.to_string().contains("Duplicate column name")
+    {
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column {column}: {e}");
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {e}");
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::info!("[MYSQL] Error in committing transaction: {e}");
+        return Err(e.into());
+    };
+    Ok(())
+}
+
+pub async fn drop_column(table: &str, column: &str) -> Result<()> {
+    let pool = CLIENT_DDL.clone();
+    let check_sql = format!(
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+    );
+    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
+        .fetch_one(&pool)
+        .await?;
+    if has_column > 0 {
+        let alert_sql = format!("ALTER TABLE {table} DROP COLUMN {column}");
+        sqlx::query(&alert_sql).execute(&pool).await?;
+    }
+
     Ok(())
 }
 

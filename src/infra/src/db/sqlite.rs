@@ -736,18 +736,8 @@ CREATE TABLE IF NOT EXISTS meta
 async fn add_start_dt_column() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    // Attempt to add the column, ignoring the error if the column already exists
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
-            .execute(&*client)
-            .await
-    {
-        // Check if the error is about the duplicate column
-        if !e.to_string().contains("duplicate column name") {
-            // If the error is not about the duplicate column, return it
-            return Err(e.into());
-        }
-    }
+
+    add_column(&client, "meta", "start_dt", "INTEGER NOT NULL DEFAULT 0").await?;
     drop(client);
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
@@ -825,5 +815,36 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     let sql = format!("DROP INDEX IF EXISTS {idx_name};");
     sqlx::query(&sql).execute(&*client).await?;
     log::info!("[SQLITE] index {idx_name} deleted successfully");
+    Ok(())
+}
+
+pub async fn add_column(
+    client: &Pool<Sqlite>,
+    table: &str,
+    column: &str,
+    data_type: &str,
+) -> Result<()> {
+    // Check if the column exists using PRAGMA table_info
+    let check_sql = format!("PRAGMA table_info({table});");
+    let columns: Vec<(i64, String, String, i64, Option<String>, i64)> =
+        sqlx::query_as(&check_sql).fetch_all(client).await?;
+    let has_column = columns.iter().any(|(_, name, ..)| name == column);
+    if !has_column {
+        let alter_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+        sqlx::query(&alter_sql).execute(client).await?;
+    }
+    Ok(())
+}
+
+pub async fn drop_column(client: &Pool<Sqlite>, table: &str, column: &str) -> Result<()> {
+    // Check if the column exists using PRAGMA table_info
+    let check_sql = format!("PRAGMA table_info({table});");
+    let columns: Vec<(i64, String, String, i64, Option<String>, i64)> =
+        sqlx::query_as(&check_sql).fetch_all(client).await?;
+    let has_column = columns.iter().any(|(_, name, ..)| name == column);
+    if has_column {
+        let alter_sql = format!("ALTER TABLE {table} DROP COLUMN {column};");
+        sqlx::query(&alter_sql).execute(client).await?;
+    }
     Ok(())
 }

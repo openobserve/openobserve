@@ -26,7 +26,7 @@ use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_m
 use crate::{
     db::{
         self, IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
+        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
@@ -68,7 +68,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
     data         TEXT not null
 );
             "#,
@@ -77,15 +76,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .await?;
 
         // create start_dt column for old version <= 0.9.2
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "information_schema.columns"])
-            .inc();
-        let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
-            .fetch_one(&pool)
-            .await?;
-        if has_data_column == 0 {
-            add_data_column().await?;
-        }
+        add_column("scheduled_jobs", "data", "TEXT NOT NULL DEFAULT ''").await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column("scheduled_jobs", "created_at").await?;
+
         Ok(())
     }
 
@@ -846,22 +841,4 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
-}
-
-async fn add_data_column() -> Result<()> {
-    log::info!("[POSTGRES] Adding data column to scheduled_jobs table");
-    let pool = CLIENT_DDL.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["alter", "scheduled_jobs"])
-        .inc();
-    if let Err(e) = sqlx::query(
-        r#"ALTER TABLE scheduled_jobs ADD COLUMN IF NOT EXISTS data TEXT NOT NULL DEFAULT '';"#,
-    )
-    .execute(&pool)
-    .await
-    {
-        log::error!("[POSTGRES] Error in adding column data: {e}");
-        return Err(e.into());
-    }
-    Ok(())
 }

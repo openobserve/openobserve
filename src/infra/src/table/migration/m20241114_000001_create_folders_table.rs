@@ -143,8 +143,7 @@ mod tests {
                 "folder_id" varchar(256) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "type" smallint NOT NULL
             )"#
         );
         assert_eq!(
@@ -168,8 +167,7 @@ mod tests {
                 `folder_id` varchar(256) NOT NULL,
                 `name` varchar(256) NOT NULL,
                 `description` text,
-                `type` smallint NOT NULL,
-                `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                `type` smallint NOT NULL
             )"#
         );
         assert_eq!(
@@ -193,8 +191,7 @@ mod tests {
                 "folder_id" varchar(256) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
-                "type" smallint NOT NULL,
-                "created_at" timestamp_text DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "type" smallint NOT NULL
             )"#
         );
         assert_eq!(
