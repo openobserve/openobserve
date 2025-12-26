@@ -164,6 +164,45 @@ static URL_JOB_SENDER: Lazy<mpsc::UnboundedSender<EnrichmentUrlJobEvent>> = Lazy
     tx
 });
 
+/// Initializes the URL job processing system.
+///
+/// **CRITICAL**: This function MUST be called during ingester startup to ensure
+/// the background processor and stale job recovery tasks are initialized.
+///
+/// # Why this is necessary
+///
+/// The `URL_JOB_SENDER` static is lazily initialized on first access. If an ingester
+/// crashes while processing a job, and other ingesters have never received a URL job
+/// event, they will never initialize the lazy static. This means:
+///
+/// 1. The main event processor never starts
+/// 2. **The stale job recovery task never starts** - stale jobs are never recovered!
+///
+/// By calling this function eagerly on ingester startup, we ensure that all ingesters
+/// have the recovery task running, even if they never process a URL job.
+///
+/// # When to call
+///
+/// Call this function once during ingester startup, after the database connection is
+/// established but before starting the HTTP server. It's safe to call multiple times
+/// (subsequent calls are no-ops due to the Lazy implementation).
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // In ingester initialization code:
+/// if LOCAL_NODE.is_ingester() {
+///     crate::service::enrichment_table::url_processor::init_url_processor();
+/// }
+/// ```
+pub fn init_url_processor() {
+    // Force initialization of the lazy static by accessing it.
+    // This triggers the background tasks (event processor + stale job recovery).
+    // We don't need to send an event - just touching the static is enough.
+    let _ = &*URL_JOB_SENDER;
+    log::info!("[ENRICHMENT::URL] URL job processor initialized");
+}
+
 /// Triggers URL job processing by sending an event to the MPSC channel.
 ///
 /// This function is called from the API handler after saving the job to the database.

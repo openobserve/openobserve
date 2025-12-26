@@ -41,6 +41,7 @@ pub struct EnrichmentTableUrlRecord {
     pub append_data: bool,
     pub last_byte_position: i64,
     pub supports_range: bool,
+    pub is_local_region: bool,
 }
 
 impl From<Model> for EnrichmentTableUrlRecord {
@@ -59,6 +60,7 @@ impl From<Model> for EnrichmentTableUrlRecord {
             append_data: model.append_data,
             last_byte_position: model.last_byte_position,
             supports_range: model.supports_range,
+            is_local_region: model.is_local_region,
         }
     }
 }
@@ -95,6 +97,7 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
         active.append_data = Set(record.append_data);
         active.last_byte_position = Set(record.last_byte_position);
         active.supports_range = Set(record.supports_range);
+        active.is_local_region = Set(record.is_local_region);
         active.update(client).await?;
     } else {
         // Insert new record
@@ -112,6 +115,7 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
             append_data: Set(record.append_data),
             last_byte_position: Set(record.last_byte_position),
             supports_range: Set(record.supports_range),
+            is_local_region: Set(record.is_local_region),
             ..Default::default()
         };
         Entity::insert(active).exec(client).await?;
@@ -228,10 +232,11 @@ pub async fn claim_stale_jobs(
     // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient
     // protection
     if backend == sea_orm::DatabaseBackend::Sqlite {
-        // Find stale jobs
+        // Find stale jobs (only local region jobs)
         let stale_jobs: Vec<Model> = Entity::find()
             .filter(Column::Status.eq(processing_status))
             .filter(Column::UpdatedAt.lt(stale_threshold_timestamp))
+            .filter(Column::IsLocalRegion.eq(true))
             .limit(limit as u64)
             .all(client)
             .await?;
@@ -264,12 +269,12 @@ pub async fn claim_stale_jobs(
                 WHERE (org, name) IN (
                     SELECT org, name
                     FROM enrichment_table_urls
-                    WHERE status = {} AND updated_at < {}
+                    WHERE status = {} AND updated_at < {} AND is_local_region = true
                     LIMIT {}
                 )
                 RETURNING id, org, name, url, status, error_message, created_at, updated_at,
                           total_bytes_fetched, total_records_processed, retry_count,
-                          append_data, last_byte_position, supports_range
+                          append_data, last_byte_position, supports_range, is_local_region
                 "#,
                 pending_status, now, processing_status, stale_threshold_timestamp, limit
             )
@@ -285,7 +290,7 @@ pub async fn claim_stale_jobs(
                     FROM (
                         SELECT org, name
                         FROM enrichment_table_urls
-                        WHERE status = {} AND updated_at < {}
+                        WHERE status = {} AND updated_at < {} AND is_local_region = true
                         LIMIT {}
                     ) AS subquery
                 )
@@ -315,9 +320,9 @@ pub async fn claim_stale_jobs(
             r#"
             SELECT id, org, name, url, status, error_message, created_at, updated_at,
                    total_bytes_fetched, total_records_processed, retry_count,
-                   append_data, last_byte_position, supports_range
+                   append_data, last_byte_position, supports_range, is_local_region
             FROM enrichment_table_urls
-            WHERE status = {} AND updated_at = {}
+            WHERE status = {} AND updated_at = {} AND is_local_region = true
             ORDER BY updated_at DESC
             LIMIT {}
             "#,
