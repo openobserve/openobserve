@@ -70,7 +70,7 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v2";
+const CACHE_VERSION: &str = "v3";
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
