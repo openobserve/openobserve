@@ -22,15 +22,14 @@ use crate::{
     common::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
-            user::{
-                RoleBulkDeleteRequest, RoleBulkDeleteResponse, UserGroup,
-                UserGroupBulkDeleteRequest, UserGroupBulkDeleteResponse, UserGroupRequest,
-                UserRoleRequest,
-            },
+            user::{UserGroup, UserGroupRequest, UserRoleRequest},
         },
         utils::auth::UserEmail,
     },
-    handler::http::extractors::Headers,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -167,9 +166,9 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = RoleBulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RoleBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
@@ -179,7 +178,7 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
 pub async fn delete_role_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<RoleBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -216,7 +215,7 @@ pub async fn delete_role_bulk(
             }
         }
     }
-    Ok(MetaHttpResponse::json(RoleBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
@@ -236,9 +235,9 @@ pub async fn delete_role_bulk(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = RoleBulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = RoleBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
@@ -248,7 +247,7 @@ pub async fn delete_role_bulk(
 pub async fn delete_role_bulk(
     _path: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>,
-    _req: web::Json<RoleBulkDeleteRequest>,
+    _req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
@@ -280,7 +279,7 @@ pub async fn delete_role_bulk(
 pub async fn delete_role(
     _path: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>,
-    _req: web::Json<RoleBulkDeleteRequest>,
+    _req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
@@ -1063,9 +1062,9 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroupBulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroupBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -1073,7 +1072,7 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
 pub async fn delete_group_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<UserGroupBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -1111,7 +1110,7 @@ pub async fn delete_group_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(UserGroupBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
@@ -1131,9 +1130,9 @@ pub async fn delete_group_bulk(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserGroupBulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = UserGroupBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -1141,7 +1140,7 @@ pub async fn delete_group_bulk(
 pub async fn delete_group_bulk(
     _path: web::Path<String>,
     Headers(_user_email): Headers<UserEmail>,
-    _req: web::Json<UserGroupBulkDeleteRequest>,
+    _req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }

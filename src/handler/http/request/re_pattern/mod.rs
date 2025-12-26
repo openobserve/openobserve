@@ -28,25 +28,19 @@ use crate::common::{
     meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     utils::auth::{remove_ownership, set_ownership},
 };
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
+use crate::{
+    common::utils::auth::UserEmail,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternCreateRequest {
     name: String,
     description: String,
     pattern: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-struct PatternBulkDeleteRequest {
-    ids: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-struct PatternBulkDeleteResponse {
-    successful: Vec<String>,
-    unsuccessful: Vec<String>,
-    err: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -365,7 +359,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("org_id" = String, Path, description = "org id of for the patterns to delete", example = "default")
     ),
     request_body(
-        content = PatternBulkDeleteRequest,
+        content = BulkDeleteRequest,
         description = "re_patterns to delete",
         content_type = "application/json",
     ),
@@ -383,7 +377,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 pub async fn delete_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req): Json<PatternBulkDeleteRequest>,
+    Json(req): Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 
@@ -428,7 +422,7 @@ pub async fn delete_bulk(
         }
     }
     if !unsuccessful.is_empty() {
-        return Ok(MetaHttpResponse::json(PatternBulkDeleteResponse {
+        return Ok(MetaHttpResponse::json(BulkDeleteResponse {
             successful,
             unsuccessful,
             err,
@@ -449,7 +443,7 @@ pub async fn delete_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(PatternBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

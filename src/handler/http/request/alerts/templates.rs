@@ -23,7 +23,8 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
-        models::destinations::{Template, TemplateBulkDeleteRequest, TemplateBulkDeleteResponse},
+        models::destinations::Template,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
@@ -266,12 +267,12 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
     security(
         ("Authorization"= [])
     ),
-    request_body(content = TemplateBulkDeleteRequest, description = "Template names", content_type = "application/json"),    
+    request_body(content = BulkDeleteRequest, description = "Template names", content_type = "application/json"),    
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = TemplateBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -282,7 +283,7 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
 async fn delete_template_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<TemplateBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -312,7 +313,7 @@ async fn delete_template_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(TemplateBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

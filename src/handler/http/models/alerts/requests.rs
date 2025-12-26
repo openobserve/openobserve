@@ -127,12 +127,6 @@ pub struct AlertBulkEnableRequest {
     pub ids: Vec<Ksuid>,
 }
 
-#[derive(Deserialize, ToSchema)]
-pub struct AlertBulkDeleteRequest {
-    #[schema(value_type = Vec<String>)]
-    pub ids: Vec<Ksuid>,
-}
-
 /// HTTP request body for `GenerateSql` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct GenerateSqlRequestBody {

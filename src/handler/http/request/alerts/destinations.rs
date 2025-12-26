@@ -23,9 +23,8 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
-        models::destinations::{
-            Destination, DestinationBulkDeleteRequest, DestinationBulkDeleteResponse,
-        },
+        models::destinations::Destination,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
@@ -280,9 +279,9 @@ async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpRes
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = DestinationBulkDeleteRequest, description = "Destination ids", content_type = "application/json"),  
+    request_body(content = BulkDeleteRequest, description = "Destination ids", content_type = "application/json"),  
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = DestinationBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
@@ -293,7 +292,7 @@ async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpRes
 async fn delete_destination_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<DestinationBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -322,7 +321,7 @@ async fn delete_destination_bulk(
             }
         }
     }
-    Ok(MetaHttpResponse::json(DestinationBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

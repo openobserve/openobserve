@@ -20,15 +20,16 @@ use actix_web::HttpRequest;
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
-    crate::cipher::{
-        KeyAddRequest, KeyBulkDeleteRequest, KeyGetResponse, KeyInfo, KeyListResponse,
-    },
+    crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
     crate::common::utils::auth::check_permissions,
     crate::common::{
         meta::authz::Authz,
         utils::auth::{UserEmail, remove_ownership, set_ownership},
     },
-    crate::handler::http::extractors::Headers,
+    crate::handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     actix_web::http,
     actix_web::web::Json,
     config::utils::time::now_micros,
@@ -324,7 +325,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     params(
         ("org_id" = String, Path, description = "name of the organization from which delete", example = "default")
     ),
-    request_body(content = KeyBulkDeleteRequest, description = "Key name list", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "Key name list", content_type = "application/json"),
     responses(
         (
             status = 200,
@@ -338,11 +339,9 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[delete("/{org_id}/cipher_keys/bulk")]
 pub async fn delete_bulk(
     path: web::Path<String>,
-    body: web::Json<KeyBulkDeleteRequest>,
+    body: web::Json<BulkDeleteRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
-    use crate::cipher::KeyBulkDeleteResponse;
-
     let org_id = path.into_inner();
     let body = body.into_inner();
     let user_id = &user_email.user_id;
@@ -373,7 +372,7 @@ pub async fn delete_bulk(
             }
         }
     }
-    Ok(MetaHttpResponse::json(KeyBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

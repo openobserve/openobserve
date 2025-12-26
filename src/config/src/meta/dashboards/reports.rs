@@ -293,18 +293,6 @@ impl ReportListFilters {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ReportBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ReportBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

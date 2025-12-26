@@ -17,12 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
-use config::meta::{
-    actions::action::{
-        ActionBulkDeleteRequest, ActionBulkDeleteResponse, UpdateActionDetailsRequest,
-    },
-    destinations::Template,
-};
+use config::meta::{actions::action::UpdateActionDetailsRequest, destinations::Template};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -50,7 +45,13 @@ use {
     std::str::FromStr,
 };
 
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
+use crate::{
+    common::utils::auth::UserEmail,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
+};
 
 #[cfg(feature = "enterprise")]
 const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
@@ -127,9 +128,9 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = ActionBulkDeleteRequest, description = "Ids for actions to be deleted", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "Ids for actions to be deleted", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ActionBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
@@ -139,7 +140,7 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
 pub async fn delete_action_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<ActionBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -148,16 +149,12 @@ pub async fn delete_action_bulk(
         let user_id = user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(
-                &id.to_string(),
-                &org_id,
-                &user_id,
-                "actions",
-                "DELETE",
-                None,
-            )
-            .await
-            {
+            if Ksuid::from_str(id).is_err() {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "invalid action id {id}"
+                )));
+            };
+            if !check_permissions(id, &org_id, &user_id, "actions", "DELETE", None).await {
                 return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
         }
@@ -167,7 +164,10 @@ pub async fn delete_action_bulk(
         let mut err = None;
 
         for id in req.ids {
-            match delete_app_from_target_cluster(&org_id, id).await {
+            // we have already checked the conversion in the perm checks above,
+            // so can unwrap safely
+            let action_id = Ksuid::from_str(&id).unwrap();
+            match delete_app_from_target_cluster(&org_id, action_id).await {
                 Ok(_) => {
                     remove_ownership(&org_id, "actions", Authz::new(&id.to_string())).await;
                     successful.push(id);
@@ -179,7 +179,7 @@ pub async fn delete_action_bulk(
                 }
             }
         }
-        Ok(MetaHttpResponse::json(ActionBulkDeleteResponse {
+        Ok(MetaHttpResponse::json(BulkDeleteResponse {
             successful,
             unsuccessful,
             err,

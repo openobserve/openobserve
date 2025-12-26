@@ -46,13 +46,15 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             user::{
                 AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserBulkDeleteRequest, UserBulkDeleteResponse, UserOrgRole, UserRequest,
-                UserRoleRequest, UserUpdateMode, get_roles,
+                UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
             },
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
-    handler::http::extractors::Headers,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     service::users,
 };
 
@@ -374,7 +376,7 @@ pub async fn delete(
 pub async fn delete_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<UserBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -413,7 +415,7 @@ pub async fn delete_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(UserBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

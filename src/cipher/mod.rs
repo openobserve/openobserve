@@ -44,19 +44,6 @@ pub struct KeyInfo {
 pub struct KeyListResponse {
     pub keys: Vec<KeyInfo>,
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct KeyBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Default, Serialize, ToSchema)]
-pub struct KeyBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use o2_enterprise::enterprise::cipher::http_repr::{HttpMechanism, HttpStore};

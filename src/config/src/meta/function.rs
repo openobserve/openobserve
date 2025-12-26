@@ -148,18 +148,6 @@ pub struct VRLResultResolver {
     pub fields: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct FunctionBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct FunctionBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

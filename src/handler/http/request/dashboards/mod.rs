@@ -27,8 +27,6 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::dashboards::{
-            DashboardBulkDeleteRequest,
-            DashboardBulkDeleteResponse,
             DashboardRequestBody,
             DashboardResponseBody,
             ListDashboardsQuery,
@@ -36,6 +34,7 @@ use crate::{
             MoveDashboardRequestBody,
             MoveDashboardsRequestBody, // UpdateDashboardRequestBody, UpdateDashboardResponseBody,
         },
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::dashboards::{self, DashboardError},
 };
@@ -337,12 +336,12 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = DashboardBulkDeleteRequest,
+        content = BulkDeleteRequest,
         description = "Dashboard ids",
         example = json!({"ids": vec!["1","2","3"]}),
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = DashboardBulkDeleteResponse),
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
@@ -354,7 +353,7 @@ async fn delete_dashboard_bulk(
     path: web::Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<DashboardBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -392,7 +391,7 @@ async fn delete_dashboard_bulk(
         }
     }
 
-    MetaHttpResponse::json(DashboardBulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

@@ -20,10 +20,7 @@ use actix_web::{
     web::{self, Json, Query},
 };
 use ahash::HashMap;
-use config::{
-    ider,
-    meta::pipeline::{Pipeline, PipelineBulkDeleteRequest, PipelineBulkDeleteResponse},
-};
+use config::{ider, meta::pipeline::Pipeline};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -32,6 +29,7 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{db::pipeline::PipelineError, pipeline},
 };
@@ -268,9 +266,9 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = PipelineBulkDeleteRequest, description = "Pipeline data", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "Pipeline data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = PipelineBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
@@ -280,7 +278,7 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
 async fn delete_pipeline_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<PipelineBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -310,7 +308,7 @@ async fn delete_pipeline_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(PipelineBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

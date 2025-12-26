@@ -30,15 +30,15 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            service_account::{
-                APIToken, ServiceAccountBulkDeleteRequest, ServiceAccountBulkDeleteResponse,
-                ServiceAccountRequest, UpdateServiceAccountRequest,
-            },
+            service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
             user::{UpdateUser, UserRequest, UserUpdateMode},
         },
         utils::auth::UserEmail,
     },
-    handler::http::extractors::Headers,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     service::users,
 };
 
@@ -292,9 +292,9 @@ pub async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = ServiceAccountBulkDeleteRequest, description = "emails of accounts to be deleted", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "emails of accounts to be deleted", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = ServiceAccountBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
@@ -304,7 +304,7 @@ pub async fn delete(
 pub async fn delete_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<ServiceAccountBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -352,7 +352,7 @@ pub async fn delete_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(ServiceAccountBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

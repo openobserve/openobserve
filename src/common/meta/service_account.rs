@@ -39,17 +39,6 @@ pub struct UpdateServiceAccountRequest {
     pub last_name: String,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ServiceAccountBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ServiceAccountBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
 #[cfg(test)]
 mod tests {
     use super::*;

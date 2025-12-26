@@ -17,9 +17,7 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::meta::{
-    dashboards::reports::{
-        Report, ReportBulkDeleteRequest, ReportBulkDeleteResponse, ReportListFilters,
-    },
+    dashboards::reports::{Report, ReportListFilters},
     triggers::{Trigger, TriggerModule},
 };
 
@@ -30,6 +28,7 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{
         dashboards::reports::{self, ReportError},
@@ -351,11 +350,11 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = ReportBulkDeleteRequest,
+        content = BulkDeleteRequest,
         description = "Reports to delete",
     ),
     responses(
-        (status = StatusCode::OK, description = "Success", body = ReportBulkDeleteResponse),
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
@@ -365,7 +364,7 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
 async fn delete_report_bulk(
     path: web::Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<ReportBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -395,7 +394,7 @@ async fn delete_report_bulk(
             },
         }
     }
-    Ok(MetaHttpResponse::json(ReportBulkDeleteResponse {
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

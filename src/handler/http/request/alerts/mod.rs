@@ -29,7 +29,7 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::handler::http::request::search::utils::check_stream_permissions,
+    crate::handler::http::request::search::utils::check_stream_permissions, std::str::FromStr,
 };
 
 use crate::{
@@ -38,17 +38,19 @@ use crate::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkDeleteRequest, AlertBulkEnableRequest, CreateAlertRequestBody,
-                EnableAlertQuery, GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery,
+                GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
                 UpdateAlertRequestBody,
             },
             responses::{
-                AlertBulkDeleteResponse, AlertBulkEnableResponse, EnableAlertResponseBody,
-                GenerateSqlMetadata, GenerateSqlResponseBody, GetAlertResponseBody,
-                ListAlertsResponseBody,
+                AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
+                GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
             },
         },
-        request::dashboards::{get_folder, is_overwrite},
+        request::{
+            BulkDeleteRequest, BulkDeleteResponse,
+            dashboards::{get_folder, is_overwrite},
+        },
     },
     service::{
         alerts::{
@@ -332,9 +334,9 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization id"),
     ),
-    request_body(content = AlertBulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
+    request_body(content = BulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = AlertBulkDeleteResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
@@ -346,7 +348,7 @@ async fn delete_alert_bulk(
     path: web::Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<AlertBulkDeleteRequest>,
+    req: web::Json<BulkDeleteRequest>,
 ) -> HttpResponse {
     let org_id = path.into_inner();
     let req = req.into_inner();
@@ -355,16 +357,10 @@ async fn delete_alert_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(
-            &id.to_string(),
-            &org_id,
-            &_user_id,
-            "alerts",
-            "DELETE",
-            Some(&folder_id),
-        )
-        .await
-        {
+        if Ksuid::from_str(id).is_err() {
+            return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
+        };
+        if !check_permissions(id, &org_id, &_user_id, "alerts", "DELETE", Some(&folder_id)).await {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -375,7 +371,9 @@ async fn delete_alert_bulk(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     for id in req.ids {
-        match alert::delete_by_id(client, &org_id, id).await {
+        // already checked this is valid, so ok to unwrap
+        let alert_id = Ksuid::from_str(&id).unwrap();
+        match alert::delete_by_id(client, &org_id, alert_id).await {
             Ok(_) => {
                 successful.push(id);
             }
@@ -387,7 +385,7 @@ async fn delete_alert_bulk(
         }
     }
 
-    MetaHttpResponse::json(AlertBulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,

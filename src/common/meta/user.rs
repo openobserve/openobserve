@@ -463,42 +463,6 @@ impl AuthTokensExt {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct UserGroupBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct UserGroupBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct RoleBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct RoleBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct UserBulkDeleteRequest {
-    pub ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct UserBulkDeleteResponse {
-    pub successful: Vec<String>,
-    pub unsuccessful: Vec<String>,
-    pub err: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
