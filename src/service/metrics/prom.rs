@@ -633,6 +633,12 @@ pub async fn remote_write(
 
     // write data to wal
     step_start = std::time::Instant::now();
+    let mut stream_count = 0;
+    let mut get_writer_time = 0u128;
+    let mut write_file_time = 0u128;
+    let mut report_stats_time = 0u128;
+    let mut deletion_check_time = 0u128;
+
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -640,6 +646,7 @@ pub async fn remote_write(
         }
 
         // check if we are allowed to ingest
+        let t = std::time::Instant::now();
         if db::compact::retention::is_deleting_stream(
             org_id,
             StreamType::Metrics,
@@ -649,13 +656,21 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+        deletion_check_time += t.elapsed().as_micros();
+
+        stream_count += 1;
 
         // write to file
+        let t = std::time::Instant::now();
         let writer =
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        get_writer_time += t.elapsed().as_micros();
+
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
+        let t = std::time::Instant::now();
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
+        write_file_time += t.elapsed().as_micros();
 
         let fns_length: usize =
             stream_executable_pipelines
@@ -672,6 +687,7 @@ pub async fn remote_write(
         } else {
             Some(email_str)
         };
+        let t = std::time::Instant::now();
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -682,10 +698,25 @@ pub async fn remote_write(
             started_at,
         )
         .await;
+        report_stats_time += t.elapsed().as_micros();
     }
     let elapsed_ms = step_start.elapsed().as_millis();
     if elapsed_ms > 200 {
-        log::info!("[remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms",);
+        let other_time = elapsed_ms * 1000
+            - get_writer_time
+            - write_file_time
+            - report_stats_time
+            - deletion_check_time;
+
+        log::info!(
+            "[remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms (streams: {stream_count}) | \
+            breakdown: deletion_check={:.1}ms, get_writer={:.1}ms, write_file={:.1}ms, report_stats={:.1}ms, other={:.1}ms",
+            deletion_check_time as f64 / 1000.0,
+            get_writer_time as f64 / 1000.0,
+            write_file_time as f64 / 1000.0,
+            report_stats_time as f64 / 1000.0,
+            other_time as f64 / 1000.0,
+        );
     }
 
     let time = start.elapsed().as_secs_f64();
