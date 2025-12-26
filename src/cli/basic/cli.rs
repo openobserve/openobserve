@@ -633,28 +633,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_pipeline_command_parsing() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "migrate-pipeline"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "migrate-pipeline");
-        assert!(!sub_matches.get_flag("drop-table"));
-    }
-
-    #[test]
-    fn test_migrate_pipeline_with_drop_table() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "migrate-pipeline", "--drop-table"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "migrate-pipeline");
-        assert!(sub_matches.get_flag("drop-table"));
-    }
-
-    #[test]
     fn test_delete_parquet_command_parsing() {
         let app = create_test_app();
         let matches = app
@@ -697,44 +675,6 @@ mod tests {
             sub_matches.get_one::<String>("file").unwrap(),
             "test.parquet"
         );
-    }
-
-    #[test]
-    fn test_seaorm_rollback_all_command() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "all"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, _) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "all");
-    }
-
-    #[test]
-    fn test_seaorm_rollback_last_command() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "last", "5"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "last");
-        assert_eq!(sub_sub_matches.get_one::<u32>("N").unwrap(), &5);
-    }
-
-    #[test]
-    fn test_seaorm_rollback_last_default() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "last"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "last");
-        assert_eq!(sub_sub_matches.get_one::<u32>("N"), None);
     }
 
     #[test]
