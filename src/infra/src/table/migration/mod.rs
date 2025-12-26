@@ -166,3 +166,12 @@ pub fn get_text_type() -> String {
         _ => "text".to_string(),
     }
 }
+
+pub fn get_binary_type() -> String {
+    let db_type = config::get_config().common.meta_store.as_str().into();
+    match db_type {
+        MetaStore::MySQL => config::get_config().limit.db_binary_data_type.clone(),
+        MetaStore::Sqlite => "blob".to_string(),
+        _ => "bytea".to_string(),
+    }
+}
