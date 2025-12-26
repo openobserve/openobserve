@@ -223,14 +223,6 @@ impl DbAdapter for PostgresAdapter {
             return Ok(0);
         }
 
-        // Enable IDENTITY INSERT for tables with identity columns
-        let _ = sqlx::query(&format!(
-            "ALTER TABLE \"{}\" ALTER COLUMN \"id\" DROP IDENTITY IF EXISTS",
-            table
-        ))
-        .execute(&self.pool)
-        .await;
-
         let cols = columns
             .iter()
             .map(|c| format!("\"{}\"", c))

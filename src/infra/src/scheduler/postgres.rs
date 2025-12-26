@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .execute(&pool)
         .await?;
 
-        // create start_dt column for old version <= 0.9.2
+        // create data column for old version <= 0.10.9
         add_column("scheduled_jobs", "data", "TEXT NOT NULL DEFAULT ''").await?;
 
         // drop created_at column for old version <= 0.40.0

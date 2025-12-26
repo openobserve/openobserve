@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .execute(&*client)
         .await?;
 
-        // create start_dt column for old version <= 0.9.2
+        // create data column for old version <= 0.10.9
         add_column(
             &client,
             "scheduled_jobs",

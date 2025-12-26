@@ -63,7 +63,9 @@ fn create_cli_app() -> Command {
                 .about("init openobserve data dir")
                 .arg(arg!("path", 'p', "path", "init this path as data root dir")),
             Command::new("init-db")
-                    .about("init openobserve database tables").args(dataArgs()),
+                    .about("init openobserve database tables"),
+            Command::new("upgrade-db")
+                .about("upgrade db table schemas"),
             Command::new("migrate-file-list")
                 .about("migrate file_list related tables between databases")
                 .args([
@@ -135,8 +137,6 @@ fn create_cli_app() -> Command {
             Command::new("consistent-hash").about("consistent hash").args([
                 arg!("file", 'f', "file", "file", true).num_args(1..),
             ]),
-            Command::new("upgrade-db")
-                .about("upgrade db table schemas").args(dataArgs()),
             Command::new("query-optimiser").about("query optimiser").args([
                     arg!("url", 'u', "url", "url", true),
                     arg!("token", 't', "token", "token", true),
