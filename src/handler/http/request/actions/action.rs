@@ -149,12 +149,12 @@ pub async fn delete_action_bulk(
 
         for id in &req.ids {
             if !check_permissions(
-                Some(id.to_string()),
+                &id.to_string(),
                 &org_id,
                 &user_id,
                 "actions",
                 "DELETE",
-                "",
+                None,
             )
             .await
             {
@@ -731,13 +731,18 @@ pub async fn upload_zipped_action(
             Some(_) => "PUT",
             None => "POST",
         };
+        // the default to org_id is what the original check_permission impl would do
+        let action_id = action
+            .id
+            .map(|ksuid| ksuid.to_string())
+            .unwrap_or(org_id.clone());
         if !check_permissions(
-            action.id.map(|ksuid| ksuid.to_string()),
+            &action_id,
             &org_id,
             &user_email.user_id,
             "actions",
             method,
-            "",
+            None,
         )
         .await
         {

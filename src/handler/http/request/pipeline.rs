@@ -288,16 +288,7 @@ async fn delete_pipeline_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(
-            Some(id.to_string()),
-            &org_id,
-            &_user_id,
-            "pipelines",
-            "DELETE",
-            "",
-        )
-        .await
-        {
+        if !check_permissions(id, &org_id, &_user_id, "pipelines", "DELETE", None).await {
             return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }
@@ -460,16 +451,7 @@ pub async fn enable_pipeline_bulk(
         let user_id = _user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(
-                Some(id.to_string()),
-                &org_id,
-                &user_id,
-                "pipelines",
-                "PUT",
-                "",
-            )
-            .await
-            {
+            if !check_permissions(id, &org_id, &user_id, "pipelines", "PUT", None).await {
                 return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
         }

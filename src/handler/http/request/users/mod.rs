@@ -100,12 +100,12 @@ pub async fn list(
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            Some(format!("_all_{org_id}")),
+            &format!("_all_{org_id}"),
             &org_id,
             &user_email.user_id,
             "users",
             "GET",
-            "",
+            None,
         )
         .await
     {
@@ -382,16 +382,7 @@ pub async fn delete_bulk(
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
-        if !check_permissions(
-            Some(email.to_string()),
-            &org_id,
-            &initiator_id,
-            "users",
-            "DELETE",
-            "",
-        )
-        .await
-        {
+        if !check_permissions(email, &org_id, &initiator_id, "users", "DELETE", None).await {
             return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }

@@ -364,12 +364,12 @@ async fn delete_dashboard_bulk(
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(
-            Some(id.to_string()),
+            id,
             &org_id,
             &_user_id,
             "dashboards",
             "DELETE",
-            &folder_id,
+            Some(&folder_id),
         )
         .await
         {

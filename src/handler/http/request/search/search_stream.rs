@@ -346,12 +346,12 @@ pub async fn search_http2_stream(
     if get_clear_cache_from_request(&query) {
         for stream_name in stream_names.iter() {
             if !check_permissions(
-                Some(stream_name.to_string()),
+                stream_name,
                 &org_id,
                 &user_id,
                 stream_type.as_str(),
                 "PUT",
-                "",
+                None,
             )
             .await
             {

@@ -301,16 +301,7 @@ async fn delete_destination_bulk(
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
-        if !check_permissions(
-            Some(name.to_string()),
-            &org_id,
-            &_user_id,
-            "destinations",
-            "DELETE",
-            "",
-        )
-        .await
-        {
+        if !check_permissions(name, &org_id, &_user_id, "destinations", "DELETE", None).await {
             return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }

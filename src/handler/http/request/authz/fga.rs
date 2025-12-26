@@ -187,12 +187,12 @@ pub async fn delete_role_bulk(
 
     for name in &req.ids {
         if !check_permissions(
-            Some(format!("{org_id}/{name}")),
+            &format!("{org_id}/{name}"),
             &org_id,
             &user_id,
             "roles",
             "DELETE",
-            "",
+            None,
         )
         .await
         {
@@ -1081,12 +1081,12 @@ pub async fn delete_group_bulk(
 
     for name in &req.ids {
         if !check_permissions(
-            Some(format!("{org_id}/{name}")),
+            &format!("{org_id}/{name}"),
             &org_id,
             &user_id,
             "groups",
             "DELETE",
-            "",
+            None,
         )
         .await
         {

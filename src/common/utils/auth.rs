@@ -1040,12 +1040,12 @@ pub fn generate_presigned_url(
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn check_permissions(
-    _object_id: Option<String>,
+    _object_id: &str,
     _org_id: &str,
     _user_id: &str,
     _object_type: &str,
     _method: &str,
-    _parent_id: &str,
+    _parent_id: Option<&str>,
 ) -> bool {
     false
 }
@@ -1053,12 +1053,12 @@ pub async fn check_permissions(
 /// Returns false if Auth fails
 #[cfg(feature = "enterprise")]
 pub async fn check_permissions(
-    object_id: Option<String>,
+    object_id: &str,
     org_id: &str,
     user_id: &str,
     object_type: &str,
     method: &str,
-    parent_id: &str,
+    parent_id: Option<&str>,
 ) -> bool {
     if !is_root_user(user_id) {
         let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
@@ -1066,11 +1066,6 @@ pub async fn check_permissions(
             None => return false,
         }
         .clone();
-
-        let object_id = match object_id {
-            Some(id) => id,
-            None => org_id.to_string(),
-        };
 
         return crate::handler::http::auth::validator::check_permissions(
             user_id,
@@ -1086,7 +1081,7 @@ pub async fn check_permissions(
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
-                parent_id: parent_id.to_string(),
+                parent_id: parent_id.unwrap_or("").to_string(),
             },
             user.role,
             user.is_external,

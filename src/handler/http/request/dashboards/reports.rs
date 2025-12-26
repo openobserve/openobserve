@@ -373,16 +373,7 @@ async fn delete_report_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(
-            Some(id.to_string()),
-            &org_id,
-            &_user_id,
-            "reports",
-            "DELETE",
-            "",
-        )
-        .await
-        {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
             return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
         }
     }

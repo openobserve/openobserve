@@ -356,12 +356,12 @@ async fn delete_alert_bulk(
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(
-            Some(id.to_string()),
+            &id.to_string(),
             &org_id,
             &_user_id,
             "alerts",
             "DELETE",
-            &folder_id,
+            Some(&folder_id),
         )
         .await
         {
@@ -546,8 +546,7 @@ async fn enable_alert_bulk(
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(Some(id.to_string()), &org_id, user_id, "alerts", "PUT", "").await
-            {
+            if !check_permissions(&id.to_string(), &org_id, user_id, "alerts", "PUT", None).await {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }

@@ -313,12 +313,12 @@ pub async fn delete_bulk(
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
         if !check_permissions(
-            Some(email.to_string()),
+            email,
             &org_id,
             &initiator_id,
             "service_accounts",
             "DELETE",
-            "",
+            None,
         )
         .await
         {
