@@ -85,7 +85,7 @@ pub async fn check_cache(
     trace_id: &str,
     org_id: &str,
     req: &mut config::meta::search::Request,
-    origin_sql: &mut String,
+    origin_sql: &mut str,
     file_path: &str,
     is_aggregate: bool,
     sql: &Sql,
@@ -142,7 +142,7 @@ pub async fn check_cache(
         // Note: handle_histogram is now called in prepare_cache_response() before hash computation
         // to ensure consistent hashing. We just need to update req.query.sql with the normalized
         // SQL.
-        req.query.sql = origin_sql.clone();
+        req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 

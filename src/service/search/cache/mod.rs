@@ -585,18 +585,16 @@ pub async fn prepare_cache_response(
         && sql.group_by.is_empty()
         && sql.order_by.is_empty()
         && !origin_sql.contains('*')
+        && let Some(caps) = RE_SELECT_FROM.captures(&origin_sql)
+        && let Some(cap) = caps.get(1)
     {
-        if let Some(caps) = RE_SELECT_FROM.captures(&origin_sql) {
-            if let Some(cap) = caps.get(1) {
-                let cap_str = cap.as_str();
-                if !cap_str.contains(TIMESTAMP_COL_NAME) {
-                    // Add _timestamp to SELECT clause
-                    origin_sql =
-                        origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
-                    req.query.sql = origin_sql.clone();
-                    ts_column = TIMESTAMP_COL_NAME.to_string();
-                }
-            }
+        let cap_str = cap.as_str();
+        if !cap_str.contains(TIMESTAMP_COL_NAME) {
+            // Add _timestamp to SELECT clause
+            origin_sql =
+                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
+            req.query.sql = origin_sql.clone();
+            ts_column = TIMESTAMP_COL_NAME.to_string();
         }
     }
 
