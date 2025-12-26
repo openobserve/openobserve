@@ -1737,6 +1737,7 @@ function convertCronToMinutes(cronExpression: string) {
   try {
     const interval = cronParser.parseExpression(cronExpression, {
       currentDate: new Date(),
+      tz: 'UTC',
     });
     // Get the first and second execution times
     const firstExecution = interval.next();

@@ -847,7 +847,7 @@ import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -1440,8 +1440,9 @@ const validateReportData = async () => {
   if (formData.value.frequency.type === "cron") {
     try {
       cronError.value = "";
-      cronParser.parseExpression(frequency.value.cron, {
+      CronExpressionParser.parse(frequency.value.cron, {
         currentDate: new Date(),
+        utc: true,
       });
       validateFrequency();
     } catch (err) {
