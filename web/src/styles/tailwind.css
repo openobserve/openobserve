@@ -1,16 +1,4 @@
-@import "tailwindcss";
-
-@plugin "@tailwindcss/typography";
-
-@source "../**/*.{vue,js,ts}";
-
-@theme {
-  --prefix: tw-;
-
-  /* Custom colors */
-  /* --color-primary: rgb(var(--q-primary) / <alpha-value>);
-  --color-secondary: rgb(var(--q-secondary) / <alpha-value>); */
-}
+@import "tailwindcss" prefix(tw);
 
 @layer base {
   h5 {
@@ -36,3 +24,95 @@
   }
   /* ... */
 }
+
+
+/* @plugin "@tailwindcss/typography"; */
+
+/* @theme {
+  --color-primary: rgb(var(--q-primary));
+  --color-secondary: rgb(var(--q-secondary));
+} */
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+*/
+/* @layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+} */
+/* 
+h5 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 2rem;
+  letter-spacing: normal;
+  margin: revert;
+}
+
+h6 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 2rem;
+  letter-spacing: 0.0125em;
+  margin: revert;
+}
+
+.q-menu .q-item .q-item__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: auto;
+}
+
+
+/* @plugin "@tailwindcss/typography"; */
+
+/* @theme {
+  --color-primary: rgb(var(--q-primary));
+  --color-secondary: rgb(var(--q-secondary));
+} */
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+*/
+/* @layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+} */
+/* 
+h5 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 2rem;
+  letter-spacing: normal;
+  margin: revert;
+}
+
+h6 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 2rem;
+  letter-spacing: 0.0125em;
+  margin: revert;
+}
+
+.q-menu .q-item .q-item__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: auto;
+} */

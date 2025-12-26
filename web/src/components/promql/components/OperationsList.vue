@@ -154,11 +154,11 @@
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
       <q-card style="min-width: 500px">
-        <q-card-section class="!tw-pt-[0.625rem] !tw-pb-[0.625rem]">
+        <q-card-section class="tw-pt-[0.625rem]! tw-pb-[0.625rem]!">
           <div class="tw-text-[1.2rem]">Add Operation</div>
         </q-card-section>
 
-        <q-card-section class="!tw-py-[0.625rem]">
+        <q-card-section class="tw-py-[0.625rem]!">
           <q-input
             v-model="searchQuery"
             dense

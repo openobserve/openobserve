@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row !tw-m-0 !tw-p-[0.375rem] !tw-items-start">
+    <div class="row tw-m-0! tw-p-[0.375rem]! tw-items-start!">
       <div class="float-right col flex">
         <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-caps
                 size="sm"
                 icon="search"
-                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-r-none q-px-sm btn-height-32"
+                class="button button-left tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-r-none! q-px-sm btn-height-32"
               >
                 <q-tooltip>
                   {{ t("common.search") }}
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-visualize-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
-                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right !tw-rounded-l-none',
+                  config.isEnterprise == 'true' ? 'button button-center tw-rounded-none' : 'button button-right tw-rounded-l-none!',
                   'tw-flex tw-justify-center tw-items-center no-border no-outline q-px-sm btn-height-32'
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : ''
                 "
-                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm btn-height-32"
+                class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline tw-rounded-l-none! q-px-sm btn-height-32"
                 @click="onLogsVisualizeToggleUpdate('patterns')"
                 no-caps
                 size="sm"
@@ -942,7 +942,7 @@ class="q-pr-sm q-pt-xs" />
                   borderless
                   dense
                   clearable
-                  class="!tw-mb-[0.375rem] indexlist-search-input q-mx-sm q-mt-sm"
+                  class="tw-mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
                   v-model="regionFilter"
                   :label="t('search.regionFilterMsg')"
                 >
@@ -1124,7 +1124,7 @@ class="q-pr-sm q-pt-xs" />
         :style="backgroundColorStyle"
       >
         <q-splitter
-          class="logs-search-splitter !tw-h-full"
+          class="logs-search-splitter tw-h-full!"
           no-scroll
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"

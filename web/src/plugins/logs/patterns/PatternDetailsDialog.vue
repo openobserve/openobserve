@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card
       v-if="selectedPattern"
-      class="column full-height no-wrap detail-table-dialog !tw-w-[90vw] !tw-max-w-[90vw] tw-border-t-4 tw-border-t-[var(--q-primary)] tw-border-solid"
+      class="column full-height no-wrap detail-table-dialog tw-w-[90vw]! tw-max-w-[90vw]! tw-border-t-4 tw-border-t-[var(--q-primary)] tw-border-solid"
     >
       <!-- Header -->
       <q-card-section class="q-px-md q-pb-sm">
