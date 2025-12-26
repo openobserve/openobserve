@@ -93,6 +93,19 @@ fn mask_token_if_needed(token: String, org_id: Option<&str>, user_email: &str) -
     }
 }
 
+#[cfg(feature = "enterprise")]
+/// Wrapper function to call o2-enterprise's tenant admin role creation logic
+async fn create_and_assign_tenant_admin_role(
+    org_id: &str,
+    service_account_email: &str,
+) -> Result<(), anyhow::Error> {
+    o2_openfga::authorizer::roles::create_and_assign_tenant_admin_role(
+        org_id,
+        service_account_email,
+    )
+    .await
+}
+
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let mut stream_summary = StreamSummary::default();
@@ -441,6 +454,24 @@ pub async fn create_org(
                     crate::service::users::get_user(Some(config::META_ORG_ID), user_email).await
                 {
                     if meta_user.role == UserRole::ServiceAccount {
+                        // Create tenant admin role and add service account to it
+                        #[cfg(feature = "enterprise")]
+                        {
+                            if let Err(e) =
+                                create_and_assign_tenant_admin_role(&org.identifier, user_email)
+                                    .await
+                            {
+                                log::error!(
+                                    "Failed to create/assign tenant admin role for '{}' in org '{}': {}",
+                                    user_email,
+                                    org.identifier,
+                                    e
+                                );
+                                // Don't fail org creation if role assignment fails
+                                // The org and service account are already created
+                            }
+                        }
+
                         // IMPORTANT: Do NOT mask the token in the creation response
                         // The whole point of returning it is so automation can use it immediately
                         // Token masking should only apply when viewing/retrieving tokens later
