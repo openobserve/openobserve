@@ -28,25 +28,31 @@
                   <!-- Label Selection -->
                   <q-select
                     v-model="label.label"
-                    :options="getAvailableLabelsForFilter(index)"
+                    :options="filteredLabelOptions"
                     label="Label"
                     dense
                     borderless
                     stack-label
                     hide-bottom-space
-                    class="showLabelOnTop q-mb-sm"
+                    class="label-filter-label-select showLabelOnTop !tw-normal-case q-mb-sm"
+                    input-class="!tw-normal-case"
                     use-input
                     fill-input
                     hide-selected
-                    input-debounce="0"
+                    input-debounce="300"
                     :loading="loadingLabels"
                     clearable
+                    @filter="(val, update) => filterLabels(val, update, index)"
                     data-test="promql-label-select"
                   >
                     <template v-slot:no-option>
                       <q-item>
                         <q-item-section class="text-grey">
-                          {{ loadingLabels ? 'Loading labels...' : 'No labels found' }}
+                          {{
+                            loadingLabels
+                              ? "Loading labels..."
+                              : "No labels found"
+                          }}
                         </q-item-section>
                       </q-item>
                     </template>
@@ -61,7 +67,8 @@
                     borderless
                     stack-label
                     hide-bottom-space
-                    class="showLabelOnTop q-mb-sm"
+                    class="label-filter-operator-select showLabelOnTop q-mb-sm"
+                    input-class="!tw-normal-case"
                     data-test="promql-operator-select"
                   />
 
@@ -74,16 +81,20 @@
                     borderless
                     stack-label
                     hide-bottom-space
-                    class="showLabelOnTop"
+                    class="label-filter-value-select showLabelOnTop"
+                    input-class="!tw-normal-case"
                     use-input
                     fill-input
                     hide-selected
-                    input-debounce="0"
+                    input-debounce="300"
                     emit-value
                     map-options
                     option-value="value"
                     option-label="label"
-                    @filter="(val, update) => filterLabelValues(val, update, label.label)"
+                    @filter="
+                      (val, update) =>
+                        filterLabelValues(val, update, label.label)
+                    "
                     :disable="!label.label"
                     clearable
                     data-test="promql-value-select"
@@ -91,7 +102,11 @@
                     <template v-slot:no-option>
                       <q-item>
                         <q-item-section class="text-grey">
-                          {{ !label.label ? 'Select a label first' : 'No values found' }}
+                          {{
+                            !label.label
+                              ? "Select a label first"
+                              : "No values found"
+                          }}
                         </q-item-section>
                       </q-item>
                     </template>
@@ -99,7 +114,11 @@
                       <q-item v-bind="scope.itemProps">
                         <q-item-section>
                           <q-item-label>{{ scope.opt.label }}</q-item-label>
-                          <q-item-label v-if="scope.opt.isVariable" caption class="text-grey-7">
+                          <q-item-label
+                            v-if="scope.opt.isVariable"
+                            caption
+                            class="text-grey-7"
+                          >
                             Variable
                           </q-item-label>
                         </q-item-section>
@@ -159,22 +178,34 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 // Get fetchPromQLLabels from composable
-const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+const dashboardPanelDataPageKey = inject(
+  "dashboardPanelDataPageKey",
+  "dashboard",
+);
 const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-// Use shared meta from dashboard data for label options
-const availableLabels = computed(() => props.dashboardData?.meta?.promql?.availableLabels || []);
-const labelValuesMap = computed(() => props.dashboardData?.meta?.promql?.labelValuesMap || new Map());
-const loadingLabels = computed(() => props.dashboardData?.meta?.promql?.loadingLabels || false);
+const availableLabels = computed(
+  () => props.dashboardData?.meta?.promql?.availableLabels || [],
+);
+
+const labelValuesMap = computed(
+  () => props.dashboardData?.meta?.promql?.labelValuesMap || new Map(),
+);
+const loadingLabels = computed(
+  () => props.dashboardData?.meta?.promql?.loadingLabels || false,
+);
 
 const operatorOptions = ["=", "!=", "=~", "!~"];
 
-// Get available labels excluding already selected ones for a specific filter
-const getAvailableLabelsForFilter = (currentIndex: number) => {
-  const selectedLabels = props.labels
-    .map((l, idx) => (idx !== currentIndex ? l.label : null))
-    .filter((l) => l && l.trim());
-  return availableLabels.value.filter((label) => !selectedLabels.includes(label));
+const availableLabelOptions = ref([]);
+const filteredLabelOptions = ref([...availableLabelOptions.value]);
+
+
+const filterLabelOptions = () => {
+  const selectedLabels = props.labels.map((l) => l.label);
+  availableLabelOptions.value = availableLabels.value.filter(
+    (label) => !selectedLabels.includes(label),
+  );
 };
 
 const computedLabel = (label: QueryBuilderLabelFilter): string => {
@@ -187,30 +218,46 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
+watch(
+  () => props.labels,
+  async () => {
+    filterLabelOptions();
+  },
+  {
+    deep: true,
+    immediate: true,
+  },
+);
+
 // Watch for metric changes to fetch available labels
 watch(
   () => props.metric,
   async (newMetric) => {
     if (newMetric) {
       await fetchPromQLLabels(newMetric);
-    } else if (props.dashboardData?.meta?.promql) {
-      props.dashboardData.meta.promql.availableLabels = [];
-      props.dashboardData.meta.promql.labelValuesMap = new Map();
+      filterLabelOptions();
     }
+    // When metric is cleared, the computed properties will handle empty state
+    // No need to mutate props.dashboardData
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const addLabel = () => {
-  props.labels.push({
-    label: "",
-    op: "=",
-    value: "",
-  });
+  const newLabels: QueryBuilderLabelFilter[] = [
+    ...props.labels,
+    {
+      label: "",
+      op: "=",
+      value: "",
+    },
+  ];
+  emit("update:labels", newLabels);
 };
 
 const removeLabel = (index: number) => {
-  props.labels.splice(index, 1);
+  const newLabels = props.labels.filter((_, idx) => idx !== index);
+  emit("update:labels", newLabels);
 };
 
 // Get label value options including variables
@@ -245,12 +292,23 @@ const getLabelValueOptions = (labelKey: string) => {
   return options;
 };
 
+// Filter labels with autocomplete
+const filterLabels = (val: string, update: any, currentIndex: number) => {
+  update(() => {
+    const options = availableLabelOptions.value;
+    if (val === "") {
+      filteredLabelOptions.value = options;
+    } else {
+      const needle = val.toLowerCase();
+      filteredLabelOptions.value = options.filter((v) =>
+        v.toLowerCase().includes(needle),
+      );
+    }
+  });
+};
+
 // Filter label values with autocomplete
-const filterLabelValues = (
-  val: string,
-  update: any,
-  labelKey: string
-) => {
+const filterLabelValues = (val: string, update: any, labelKey: string) => {
   if (!labelKey) {
     update(() => {});
     return;
@@ -265,7 +323,7 @@ const filterLabelValues = (
     // Filter options based on input
     const needle = val.toLowerCase();
     return allOptions.filter((opt: any) =>
-      opt.label.toLowerCase().includes(needle)
+      opt.label.toLowerCase().includes(needle),
     );
   });
 };
