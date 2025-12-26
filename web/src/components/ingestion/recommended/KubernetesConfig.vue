@@ -83,7 +83,7 @@ Make changes accordingly to the above URL.
     <hr />
     <div class="text-subtitle1 q-pl-xs q-mt-md">
       Once you have installed the OpenObserve collector, it will:
-      <ul class="tw:list-disc tw:ml-5">
+      <ul class="tw-list-disc tw-ml-5">
         <li>Collect metrics from your Kubernetes cluster</li>
         <li>Collect events from your Kubernetes cluster</li>
         <li>Collect logs from your Kubernetes cluster</li>
@@ -92,7 +92,7 @@ Make changes accordingly to the above URL.
           that are written in following languages using OpenTelemetry
           auto-instrumentation. It can be done by setting the following to the
           pod/namespace annotations:
-          <ul class="tw:list-disc tw:ml-5">
+          <ul class="tw-list-disc tw-ml-5">
             <li>
               <b>Java:</b> instrumentation.opentelemetry.io/inject-java:
               "openobserve-collector/openobserve-java"
@@ -111,7 +111,7 @@ Make changes accordingly to the above URL.
             </li>
             <li>
               <b>Go (Uses eBPF):</b>
-              <ul class="tw:list-disc tw:ml-5">
+              <ul class="tw-list-disc tw-ml-5">
                 <li>
                   instrumentation.opentelemetry.io/inject-go:
                   "openobserve-collector/openobserve-go"
@@ -128,13 +128,13 @@ Make changes accordingly to the above URL.
       You can refer and install
       <a
         href="https://github.com/openobserve/hotcommerce"
-        class="hover:tw:underline text-primary"
+        class="hover:tw-underline text-primary"
         >HOT commerce</a
       >
       app as an example to understand how this works in practice. Refer to
       <a
         href="https://github.com/open-telemetry/opentelemetry-operator"
-        class="hover:tw:underline text-primary"
+        class="hover:tw-underline text-primary"
         >OpenTelemetry operator</a
       >
       for further documentation.

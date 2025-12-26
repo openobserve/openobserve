@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
 
     <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
       >
-        <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
+        <div class="q-table__title tw-font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
-          <div class="tw:flex tw:justify-end">
+          <div class="tw-flex tw-justify-end">
             <q-input
               v-model="filterQuery"
               borderless
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
+            class="o2-secondary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="alert-destination-list-add-alert-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
+            class="o2-primary-button q-ml-sm tw-h-[36px]"
             no-caps
             flat
             :disable="!templates.length"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
               <q-btn
                 data-test="destination-export"
                 padding="sm"

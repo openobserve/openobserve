@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             flat
             clearable
-            class="no-border tw:w-full"
+            class="no-border tw-w-full"
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('regex_patterns.refresh')"
             icon="refresh"
             flat
-            class="o2-secondary-button tw:w-[120px]"
+            class="o2-secondary-button tw-w-[120px]"
             @click="refreshPatterns"
             :loading="loading"
             data-test="built-in-pattern-refresh-btn"

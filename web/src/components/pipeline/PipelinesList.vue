@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page v-if="currentRouteName === 'pipelines'">
-    <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="pipeline-list-title">
+    <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+      <div class="card-container tw-mb-[0.625rem]">
+        <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[68px]">
+          <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
                 {{ t("pipeline.header") }}
               </div>
-              <div class="tw:flex tw:items-center q-ml-auto">
-                <div class="app-tabs-container tw:h-[36px] q-mr-sm">
+              <div class="tw-flex tw-items-center q-ml-auto">
+                <div class="app-tabs-container tw-h-[36px] q-mr-sm">
                   <app-tabs
                   data-test="pipeline-list-tabs"
                   class="tabs-selection-container"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
                 <q-btn
                     data-test="pipeline-list-history-btn"
-                    class="q-ml-sm o2-secondary-button tw:h-[36px]"
+                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
                     :class="
                         store.state.theme === 'dark'
                         ? 'o2-secondary-button-dark'
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="pipeline-list-add-pipeline-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
+                  class="q-ml-sm o2-primary-button tw-h-[36px]"
                   flat
                   no-caps
                   :label="t(`pipeline.addPipeline`)"
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
+      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+        <div class="card-container tw-h-[calc(100vh-127px)]">
           <q-table
             data-test="pipeline-list-table"
             ref="qTableRef"
@@ -227,12 +227,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td v-if="props.row?.sql_query" colspan="100%">
                   <div
                     data-test="scheduled-pipeline-expanded-content"
-                    class="text-left tw:px-2 q-mb-sm expanded-content"
+                    class="text-left tw-px-2 q-mb-sm expanded-content"
                   >
-                    <div class="tw:flex tw:items-center q-py-sm">
+                    <div class="tw-flex tw-items-center q-py-sm">
                       <strong>{{ t('pipeline_list.sql_query') }} : <span></span></strong>
                     </div>
-                    <div class="tw:flex tw:items-start tw:justify-center">
+                    <div class="tw-flex tw-items-start tw-justify-center">
                       <div
                         data-test="scheduled-pipeline-expanded-sql"
                         class="scrollable-content expanded-sql"
@@ -282,26 +282,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-export-pipelines-btn"
-                  class="flex  q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
+                  class="flex  q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
                   no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="exportBulkPipelines"
                 >
                   <q-icon name="download" size="16px" />
-                  <span class="tw:ml-2">{{ t('pipeline_list.export') }}</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.export') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-pause-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
+                  class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
                   no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="bulkTogglePipelines('pause')"
                 >
                   <q-icon name="pause" size="16px" />
-                  <span class="tw:ml-2">{{ t('pipeline_list.pause') }}</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.pause') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkTogglePipelines('resume')"
                 >
                   <q-icon name="play_arrow" size="16px" />
-                  <span class="tw:ml-2">{{ t('pipeline_list.resume') }}</span>
+                  <span class="tw-ml-2">{{ t('pipeline_list.resume') }}</span>
                 </q-btn>
                 <q-btn
                   v-if="selectedPipelines.length > 0"
@@ -397,15 +397,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'pipeline-error-dialog-dark' : 'pipeline-error-dialog-light'"
     >
       <!-- Header with Pipeline Name and Timestamp -->
-      <q-card-section class="pipeline-error-header tw:flex tw:items-center tw:justify-between">
-        <div class="tw:flex-1">
-          <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
+      <q-card-section class="pipeline-error-header tw-flex tw-items-center tw-justify-between">
+        <div class="tw-flex-1">
+          <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
             <q-icon name="error" size="24px" class="error-icon" />
             <span class="pipeline-name">{{ errorDialog.data?.name }}</span>
           </div>
           <div class="error-timestamp">
-            <span class="tw:mr-2">{{ t('pipeline_list.last_error') }}:</span>
-            <q-icon name="schedule" size="14px" class="tw:mr-1" />
+            <span class="tw-mr-2">{{ t('pipeline_list.last_error') }}:</span>
+            <q-icon name="schedule" size="14px" class="tw-mr-1" />
             {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
           </div>
         </div>
@@ -423,8 +423,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-card-section v-if="errorDialog.data" class="pipeline-error-content">
         <!-- Error Summary -->
-        <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
-          <div class="section-label tw:mb-2">{{ t('pipeline_list.error_summary') }}</div>
+        <div v-if="errorDialog.data.last_error.error_summary" class="tw-mb-4">
+          <div class="section-label tw-mb-2">{{ t('pipeline_list.error_summary') }}</div>
           <div class="error-summary-box">
             {{ errorDialog.data.last_error.error_summary }}
           </div>
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Node Errors -->
         <div v-if="errorDialog.data.last_error.node_errors && Object.keys(errorDialog.data.last_error.node_errors).length > 0">
-          <div class="section-label tw:mb-3">{{ t('pipeline_list.node_errors') }}</div>
+          <div class="section-label tw-mb-3">{{ t('pipeline_list.node_errors') }}</div>
           <div class="node-errors-container">
             <div
               v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           no-caps
           :label="t('pipeline_list.close')"
-          class="o2-secondary-button tw:h-[36px]"
+          class="o2-secondary-button tw-h-[36px]"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="closeErrorDialog"
         />

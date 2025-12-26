@@ -1,9 +1,9 @@
 <template>
   <div
-    class="action-scripts-toolbar tw:pb-1.5 tw:w-full tw:flex tw:justify-between tw:items-center"
+    class="action-scripts-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="tw:mr-2 add-script-back-btn">
+    <div class="tw-flex tw-items-center">
+      <div class="tw-mr-2 add-script-back-btn">
         <div
           data-test="add-script-back-btn"
           class="flex justify-center items-center cursor-pointer"
@@ -19,18 +19,18 @@
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-script-title q-mr-md">
+      <div class="tw-text-lg tw-w-full add-script-title q-mr-md">
         Add Action
       </div>
       <q-form ref="addScriptForm" class="o2-input">
-        <div class="tw:flex tw:items-center">
+        <div class="tw-flex tw-items-center">
           <q-input
             data-test="add-script-name-input"
             v-model.trim="actionName"
             :label="t('actions.name')"
             color="input-border"
             bg-color="input-bg"
-            class="q-pa-none tw:w-full"
+            class="q-pa-none tw-w-full"
             stack-label
             outlined
             filled
@@ -60,7 +60,7 @@
               self="center left"
               max-width="300px"
               :offset="[2, 0]"
-              class="tw:text-[12px]"
+              class="tw-text-[12px]"
             >
               {{ isValidMethodName() }}
             </q-tooltip>
@@ -72,7 +72,7 @@
       <q-btn
         data-test="add-script-fullscreen-btn"
         v-close-popup="true"
-        class="text-bold tw:border-primary add-script-fullscreen-btn"
+        class="text-bold tw-border-primary add-script-fullscreen-btn"
         :label="t('common.fullscreen')"
         :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
         padding="sm"
@@ -83,7 +83,7 @@
       <q-btn
         data-test="add-script-save-btn"
         :label="t('actions.save')"
-        class="text-bold no-border tw:ml-[12px] add-script-save-btn"
+        class="text-bold no-border tw-ml-[12px] add-script-save-btn"
         color="secondary"
         padding="sm md"
         type="submit"
@@ -92,7 +92,7 @@
       />
       <q-btn
         data-test="add-script-cancel-btn"
-        class="cancel-btn text-bold tw:ml-[12px] tw:border-3 tw:border-red-600 add-script-cancel-btn"
+        class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600 add-script-cancel-btn"
         :label="t('common.cancel')"
         text-color="negative"
         padding="sm md"

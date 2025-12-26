@@ -1,5 +1,5 @@
 <template>
-  <div class="label-filter-editor tw:py-[0.25rem]">
+  <div class="label-filter-editor tw-py-[0.25rem]">
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">{{ t("panel.labelFilters") }}</div>
       <span class="layout-separator">:</span>

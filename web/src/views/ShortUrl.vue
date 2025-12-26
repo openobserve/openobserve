@@ -1,7 +1,7 @@
 <template>
   <div
     data-test="loading-container"
-    class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"
+    class="tw-h-[100vh] tw-flex tw-flex-col tw-items-center tw-justify-center"
   >
     <q-spinner data-test="spinner" color="primary" size="3em" :thickness="2" />
     <div data-test="message" class="message">Redirecting...</div>

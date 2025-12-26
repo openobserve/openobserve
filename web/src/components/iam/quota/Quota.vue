@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: inherit"
   >
     <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container">
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container tw-mb-[0.625rem]">
         <div class="q-px-md q-py-sm">
           <div
             class="q-table__title full-width q-pb-sm"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rules="[(val: any) => !!val || 'Field is required!']"
               >
               </q-select>
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+              <div class="app-tabs-container tw-h-[36px] tw-w-fit">
                 <app-tabs
                   data-test="quota-tabs"
                   class="tabs-selection-container"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-table-btn"
                 label="Edit Quota"
                 flat
-                class="border title-height o2-secondary-button tw:h-[36px]"
+                class="border title-height o2-secondary-button tw-h-[36px]"
                 :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 no-caps
                 :disable="activeTab == 'role-limits' && !expandedRow"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="app-tabs-container tw:h-[36px] tw:w-fit float-right q-ml-auto"
+              class="app-tabs-container tw-h-[36px] tw-w-fit float-right q-ml-auto"
             >
               <app-tabs
                 data-test="table-json-type-selection-tabs"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:h-[calc(100vh-218px)]">
+      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw-h-[calc(100vh-218px)]">
       <q-table
         :rows="apiLimitsRows"
         :columns="generateColumns()"
@@ -253,11 +253,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
       </div>
 
-      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
+      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw-h-[50vh] tw-flex tw-justify-center tw-items-center">
         <q-spinner-hourglass color="primary" size="lg" />
       </div>
       <div
-        class="card-container tw:pb-[0.625rem]"
+        class="card-container tw-pb-[0.625rem]"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
         style="height: calc(100vh - 220px)"
       >
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:h-[calc(100vh-218px)]">
+       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw-h-[calc(100vh-218px)]">
         <q-table
           :rows="rolesLimitRows"
           :columns="roleLimitsColumns"
@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
           <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
             <q-td v-for="col in props.cols" :key="col.name">
-              <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
+              <div v-if="col.name == 'create'" class="tw-h-[50vh] tw-w-full tw-flex tw-justify-center tw-items-center">
               <q-spinner-hourglass color="primary" size="lg" />
             </div>
             </q-td>
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
       </div>
-      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
+      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw-h-[70vh] tw-flex tw-justify-center tw-items-center">
         <q-spinner-hourglass color="primary" size="lg" />
       </div>
       <div
@@ -482,12 +482,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2"
+        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md tw-py-2"
         v-if="editTable && activeType == 'table'"
       >
         <q-btn
           label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           label="Save"
-          class="o2-primary-button no-border tw:h-[36px]"
+          class="o2-primary-button no-border tw-h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
           no-caps
           flat
@@ -504,12 +504,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md"
+        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md q-mt-md"
         v-if="editTable && activeType == 'json'"
       >
         <q-btn
           label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="o2-primary-button no-border tw:h-[36px]"
+          class="o2-primary-button no-border tw-h-[36px]"
           no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"

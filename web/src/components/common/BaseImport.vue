@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
+  <div class="tw-w-full" :class="containerClass" :style="containerStyle">
     <!-- Header Section -->
-    <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
+    <div class="card-container tw-mb-[0.625rem]" :class="headerContainerClass">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]" :class="headerClass">
         <div class="col">
           <div class="flex">
             <q-btn
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-center">
           <q-btn
             v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('function.cancel')"
             no-caps
             flat
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`${testPrefix}-import-cancel-btn`"
           />
           <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('dashboard.import')"
             type="submit"
             no-caps
@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[30, 60]"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full">
+            <div class="tw-w-full tw-h-full">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+              <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+                <div class="app-tabs-container tw-h-[36px] tw-w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
@@ -91,12 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url card-container tw-py-1"
               >
-                <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
+                <q-form class="tw-mx-2 tw-pb-2" @submit.prevent>
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
+                    <div class="flex tw-mt-[0.725rem] tw-h-[64px]">
                       <div style="width: 100%" class="q-pr-sm">
                         <q-input
                           :data-test="`${testPrefix}-import-url-input`"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw-mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -132,9 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- File Upload Tab -->
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container tw:py-1"
+                class="editor-container-json card-container tw-py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
+                <q-form class="tw-mx-2 q-mt-md tw-pb-2" @submit.prevent>
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="monaco-editor tw-mx-2"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -192,14 +192,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:mb-[0.625rem] tw:w-full"
+              class="card-container tw-mb-[0.625rem] tw-w-full"
               :style="outputContainerStyle"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-h6 tw:py-2">Output Messages</div>
+                  <div class="text-center text-h6 tw-py-2">Output Messages</div>
                   <q-separator class="q-mx-md q-mt-md" />
                   <div class="error-report-container">
                     <div class="text-center q-pa-md text-grey-6">
@@ -295,7 +295,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs",
+      default: "tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs",
     },
     containerStyle: {
       type: String,
@@ -307,11 +307,11 @@ export default defineComponent({
     },
     headerClass: {
       type: String,
-      default: "tw:py-3",
+      default: "tw-py-3",
     },
     titleClass: {
       type: String,
-      default: "tw:font-[600] tw:text-[20px]",
+      default: "tw-font-[600] tw-text-[20px]",
     },
     contentWrapperClass: {
       type: String,

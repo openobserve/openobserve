@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw-w-full" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="text-center text-h6 tw-py-2"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+        <div v-else class="text-center text-h6 tw-py-2">Output Messages</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
@@ -169,8 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="o2-custom-bg"
     style="height: calc(100vh - 50px);"
   >
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
+    <div class="card-container tw-mb-[0.625rem]">
+      <div class="flex tw-px-4 items-center no-wrap tw-h-[68px]">
         <div class="col">
           <div class="flex">
             <q-btn
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-center">
           <q-btn
             v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('function.cancel')"
             no-caps
             flat
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="regex-pattern-import-cancel-btn"
           />
           <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('dashboard.import')"
             type="submit"
             no-caps
@@ -220,8 +220,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="editor-container-built-in">
-      <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
-        <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+      <div class="card-container tw-py-[0.625rem] tw-px-[0.625rem] tw-mb-[0.625rem]">
+        <div class="app-tabs-container tw-h-[36px] tw-w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"
             class="tabs-selection-container"

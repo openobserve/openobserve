@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header tw:px-4 tw:py-2 tw:text-xs tw:font-semibold">
+    <div class="menu-header tw-px-4 tw-py-2 tw-text-xs tw-font-semibold">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <q-separator />

@@ -245,7 +245,7 @@ describe("WebVitalsDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".performance-dashboard");
-      expect(dashboard.classes()).toContain("tw:invisible");
+      expect(dashboard.classes()).toContain("tw-invisible");
     });
 
     it("should show dashboard when not loading", async () => {
@@ -253,7 +253,7 @@ describe("WebVitalsDashboard", () => {
       await wrapper.vm.$nextTick();
 
       const dashboard = wrapper.find(".performance-dashboard");
-      expect(dashboard.classes()).toContain("tw:visible");
+      expect(dashboard.classes()).toContain("tw-visible");
     });
   });
 

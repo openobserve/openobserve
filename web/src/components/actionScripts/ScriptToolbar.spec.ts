@@ -356,16 +356,16 @@ describe('ScriptToolbar.vue', () => {
       const toolbar = wrapper.find('.action-scripts-toolbar');
       
       expect(toolbar.exists()).toBe(true);
-      expect(toolbar.classes()).toContain('tw:pb-1.5');
-      expect(toolbar.classes()).toContain('tw:w-full');
-      expect(toolbar.classes()).toContain('tw:flex');
-      expect(toolbar.classes()).toContain('tw:justify-between');
-      expect(toolbar.classes()).toContain('tw:items-center');
+      expect(toolbar.classes()).toContain('tw-pb-1.5');
+      expect(toolbar.classes()).toContain('tw-w-full');
+      expect(toolbar.classes()).toContain('tw-flex');
+      expect(toolbar.classes()).toContain('tw-justify-between');
+      expect(toolbar.classes()).toContain('tw-items-center');
     });
 
     it('has correct left section structure', () => {
       wrapper = createWrapper();
-      const leftSection = wrapper.find('.tw:flex.tw:items-center');
+      const leftSection = wrapper.find('.tw-flex.tw-items-center');
       
       expect(leftSection.exists()).toBe(true);
     });

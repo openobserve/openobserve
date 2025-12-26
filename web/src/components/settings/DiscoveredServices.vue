@@ -15,37 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full discovered-services">
-    <div class="tw:mb-6">
-      <div class="text-h6 tw:mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
+  <div class="tw-w-full discovered-services">
+    <div class="tw-mb-6">
+      <div class="text-h6 tw-mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
       <div class="text-body2 text-grey-7">
         {{ t("settings.correlation.discoveredServicesDescription") }}
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
+    <div v-if="loading" class="tw-flex tw-justify-center tw-py-8">
       <q-spinner-dots color="primary" size="2.5rem" />
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="tw:text-center tw:py-8">
-      <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
+    <div v-else-if="error" class="tw-text-center tw-py-8">
+      <q-icon name="error_outline" size="3rem" color="negative" class="tw-mb-4" />
       <div class="text-body1 text-negative">{{ error }}</div>
       <q-btn
         flat
         color="primary"
         :label="t('settings.correlation.retry')"
         @click="loadServices"
-        class="tw:mt-4"
+        class="tw-mt-4"
       />
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="groupedServices.groups.length === 0" class="tw:text-center tw:py-8">
-      <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
+    <div v-else-if="groupedServices.groups.length === 0" class="tw-text-center tw-py-8">
+      <q-icon name="search_off" size="3rem" color="grey-5" class="tw-mb-4" />
       <div class="text-body1 text-grey-7">{{ t("settings.correlation.noServicesYet") }}</div>
-      <div class="text-body2 text-grey-6 tw:mt-2">
+      <div class="text-body2 text-grey-6 tw-mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
     </div>
@@ -53,26 +53,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Services List -->
     <div v-else>
       <!-- Compact Summary & Suggestions Banner -->
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-4 tw:p-3 tw:rounded-lg tw:bg-grey-2 dark:tw:bg-grey-9">
+      <div class="tw-flex tw-items-center tw-justify-between tw-mb-4 tw-p-3 tw-rounded-lg tw-bg-grey-2 dark:tw-bg-grey-9">
         <!-- Stats (compact inline) -->
-        <div class="tw:flex tw:items-center tw:gap-6">
-          <div class="tw:flex tw:items-center tw:gap-2">
+        <div class="tw-flex tw-items-center tw-gap-6">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-icon name="hub" size="1.25rem" color="primary" />
-            <span class="tw:font-semibold text-primary">{{ groupedServices.total_fqns }}</span>
+            <span class="tw-font-semibold text-primary">{{ groupedServices.total_fqns }}</span>
             <span class="text-caption text-grey-7">{{ t("settings.correlation.fqns") }}</span>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-icon name="miscellaneous_services" size="1.25rem" color="primary" />
-            <span class="tw:font-semibold text-primary">{{ groupedServices.total_services }}</span>
+            <span class="tw-font-semibold text-primary">{{ groupedServices.total_services }}</span>
             <span class="text-caption text-grey-7">{{ t("settings.correlation.services") }}</span>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-icon
               :name="fullCorrelationCount > 0 ? 'check_circle' : 'warning'"
               size="1.25rem"
               :color="fullCorrelationCount > 0 ? 'positive' : 'warning'"
             />
-            <span class="tw:font-semibold" :class="fullCorrelationCount > 0 ? 'text-positive' : 'text-warning'">
+            <span class="tw-font-semibold" :class="fullCorrelationCount > 0 ? 'text-positive' : 'text-warning'">
               {{ fullCorrelationCount }}
             </span>
             <span class="text-caption text-grey-7">{{ t("settings.correlation.fullyCorrelated") }}</span>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Correlation Suggestions -->
-        <div v-if="correlationSuggestions.length > 0" class="tw:flex tw:items-center tw:gap-2">
+        <div v-if="correlationSuggestions.length > 0" class="tw-flex tw-items-center tw-gap-2">
           <q-btn
             flat
             dense
@@ -95,21 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- View Mode & Filter -->
-      <div class="tw:flex tw:gap-4 tw:mb-4 tw:items-center">
+      <div class="tw-flex tw-gap-4 tw-mb-4 tw-items-center">
         <q-btn-toggle
           v-model="viewMode"
           toggle-color="primary"
           :options="viewModeOptions"
           dense
           unelevated
-          class="tw:border tw:rounded"
+          class="tw-border tw-rounded"
         />
         <q-input
           v-model="searchQuery"
           dense
           filled
           :placeholder="getSearchPlaceholder"
-          class="tw:flex-1"
+          class="tw-flex-1"
           clearable
         >
           <template #prepend>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="filterOptions"
           emit-value
           map-options
-          class="tw:w-48"
+          class="tw-w-48"
         />
       </div>
 
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="fqn"
         flat
         dense
-        class="tw:rounded-lg tw:border"
+        class="tw-rounded-lg tw-border"
         :pagination="{ rowsPerPage: 20 }"
       >
         <template #body-cell-status="props">
@@ -149,13 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #body-cell-fqn="props">
           <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.fqn }}</span>
+            <span class="tw-font-semibold">{{ props.row.fqn }}</span>
           </q-td>
         </template>
         <template #body-cell-correlation_key="props">
           <q-td :props="props">
-            <div class="tw:flex tw:flex-col tw:gap-1">
-              <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="tw-flex tw-flex-col tw-gap-1">
+              <div class="tw-flex tw-items-center tw-gap-2">
                 <q-chip
                   size="sm"
                   :color="getDerivedFromColor(getCorrelationSource(props.row))"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ formatDerivedFrom(getCorrelationSource(props.row)) }}
                 </q-chip>
-                <span class="tw:font-mono tw:text-xs text-grey-7">
+                <span class="tw-font-mono tw-text-xs text-grey-7">
                   {{ getCorrelationDimensionValue(props.row) }}
                 </span>
               </div>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #body-cell-telemetry="props">
           <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
+            <div class="tw-flex tw-gap-1">
               <q-badge
                 v-if="props.row.stream_summary.logs_count > 0"
                 color="blue"
@@ -242,22 +242,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="uniqueKey"
         flat
         dense
-        class="tw:rounded-lg tw:border"
+        class="tw-rounded-lg tw-border"
         :pagination="{ rowsPerPage: 20 }"
       >
         <template #body-cell-service_name="props">
           <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.service_name }}</span>
+            <span class="tw-font-semibold">{{ props.row.service_name }}</span>
           </q-td>
         </template>
         <template #body-cell-fqn="props">
           <q-td :props="props">
-            <span class="tw:font-mono tw:text-sm">{{ props.row.fqn }}</span>
+            <span class="tw-font-mono tw-text-sm">{{ props.row.fqn }}</span>
           </q-td>
         </template>
         <template #body-cell-stream_types="props">
           <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
+            <div class="tw-flex tw-gap-1">
               <q-badge
                 v-if="props.row.streams.logs?.length"
                 color="blue"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
 
       <!-- View: By Stream -->
-      <q-list v-else-if="viewMode === 'stream'" separator class="tw:rounded-lg tw:border">
+      <q-list v-else-if="viewMode === 'stream'" separator class="tw-rounded-lg tw-border">
         <template v-for="(streamGroup, streamType) in filteredStreamGroups" :key="streamType">
           <q-expansion-item
             v-if="Object.keys(streamGroup).length > 0"
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="tw:font-semibold tw:capitalize">{{ streamType }}</q-item-label>
+                <q-item-label class="tw-font-semibold tw-capitalize">{{ streamType }}</q-item-label>
                 <q-item-label caption>
                   {{ Object.keys(streamGroup).length }} stream(s)
                 </q-item-label>
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Streams within type -->
-            <q-list class="tw:ml-8">
+            <q-list class="tw-ml-8">
               <q-expansion-item
                 v-for="(services, streamName) in streamGroup"
                 :key="streamName"
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Services for this stream -->
-                <q-list dense class="tw:ml-8">
+                <q-list dense class="tw-ml-8">
                   <q-item v-for="svc in services" :key="svc.uniqueKey" dense>
                     <q-item-section avatar>
                       <q-icon name="miscellaneous_services" size="1rem" color="grey-5" />
@@ -394,14 +394,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
           <q-separator />
-          <q-card-section class="tw:max-h-96 tw:overflow-auto">
+          <q-card-section class="tw-max-h-96 tw-overflow-auto">
             <q-list dense separator>
               <q-item v-for="(value, key) in selectedService?.dimensions" :key="key">
                 <q-item-section>
-                  <q-item-label class="tw:font-mono tw:text-sm">{{ key }}</q-item-label>
+                  <q-item-label class="tw-font-mono tw-text-sm">{{ key }}</q-item-label>
                 </q-item-section>
                 <q-item-section side>
-                  <q-item-label class="tw:font-mono tw:text-sm text-grey-7">{{ value }}</q-item-label>
+                  <q-item-label class="tw-font-mono tw-text-sm text-grey-7">{{ value }}</q-item-label>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -424,12 +424,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card-section>
 
           <!-- Correlation Dimensions Section -->
-          <q-card-section v-if="selectedFqnGroup" class="tw:bg-blue-50 dark:tw:bg-blue-900/20 tw:py-3">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+          <q-card-section v-if="selectedFqnGroup" class="tw-bg-blue-50 dark:tw-bg-blue-900/20 tw-py-3">
+            <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
               <q-icon name="link" color="primary" size="1.25rem" />
-              <span class="tw:font-semibold text-primary">{{ t("settings.correlation.correlationDimensions") }}</span>
+              <span class="tw-font-semibold text-primary">{{ t("settings.correlation.correlationDimensions") }}</span>
             </div>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
               <q-chip
                 v-for="(value, key) in getSharedDimensions(selectedFqnGroup)"
                 :key="key"
@@ -438,8 +438,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 text-color="white"
                 dense
               >
-                <span class="tw:font-semibold">{{ key }}:</span>
-                <span class="tw:ml-1">{{ value }}</span>
+                <span class="tw-font-semibold">{{ key }}:</span>
+                <span class="tw-ml-1">{{ value }}</span>
               </q-chip>
             </div>
             <div v-if="Object.keys(getSharedDimensions(selectedFqnGroup)).length === 0" class="text-caption text-grey-7">
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card-section>
 
           <q-separator />
-          <q-card-section class="tw:p-0">
+          <q-card-section class="tw-p-0">
             <q-table
               :rows="selectedFqnGroup?.services || []"
               :columns="serviceColumns"
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #body-cell-streams="props">
                 <q-td :props="props">
-                  <div class="tw:flex tw:gap-1 tw:flex-wrap">
+                  <div class="tw-flex tw-gap-1 tw-flex-wrap">
                     <q-badge
                       v-if="props.row.streams.logs?.length"
                       color="blue"
@@ -532,14 +532,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn icon="close" flat round dense v-close-popup />
           </q-card-section>
           <q-separator />
-          <q-card-section class="tw:max-h-96 tw:overflow-auto">
+          <q-card-section class="tw-max-h-96 tw-overflow-auto">
             <q-list separator>
               <q-item v-for="suggestion in correlationSuggestions" :key="suggestion.fqn">
                 <q-item-section avatar>
                   <q-icon name="lightbulb" color="orange" />
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label class="tw:font-semibold">{{ suggestion.fqn }}</q-item-label>
+                  <q-item-label class="tw-font-semibold">{{ suggestion.fqn }}</q-item-label>
                   <q-item-label caption>
                     <span v-if="suggestion.missingTypes.length > 0">
                       {{ t("settings.correlation.missing") }}:
@@ -548,18 +548,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="type"
                         :color="getStreamTypeColor(type)"
                         text-color="white"
-                        class="tw:mr-1"
+                        class="tw-mr-1"
                       >
                         {{ type }}
                       </q-badge>
                     </span>
                   </q-item-label>
-                  <q-item-label caption class="tw:mt-1">
+                  <q-item-label caption class="tw-mt-1">
                     {{ suggestion.reason }}
                   </q-item-label>
                 </q-item-section>
                 <q-item-section side>
-                  <div class="tw:flex tw:gap-1">
+                  <div class="tw-flex tw-gap-1">
                     <q-badge
                       v-if="suggestion.hasLogs"
                       color="blue"
@@ -581,9 +581,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-card-section>
           <q-separator />
-          <q-card-section class="tw:bg-grey-2 dark:tw:bg-grey-9">
+          <q-card-section class="tw-bg-grey-2 dark:tw-bg-grey-9">
             <div class="text-caption">
-              <q-icon name="info" size="1rem" class="tw:mr-1" />
+              <q-icon name="info" size="1rem" class="tw-mr-1" />
               {{ t("settings.correlation.suggestionsInfoText") }}
             </div>
           </q-card-section>

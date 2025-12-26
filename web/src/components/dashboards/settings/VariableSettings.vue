@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- show variables dependencies if variables exist -->
             <q-btn
               v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md o2-secondary-button tw:h-[36px]"
+              class="text-bold no-border q-ml-md o2-secondary-button tw-h-[36px]"
               no-caps
               no-outline
               :class="
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-dependencies-btn"
             />
             <q-btn
-              class="text-bold no-border q-ml-md o2-primary-button tw:h-[36px]"
+              class="text-bold no-border q-ml-md o2-primary-button tw-h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'

@@ -125,7 +125,7 @@
               />
               <div style="flex: 1; overflow: hidden">
                 <div
-                  class="tw:flex tw:justify-end tw:mr-2 tw:items-center"
+                  class="tw-flex tw-justify-end tw-mr-2 tw-items-center"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->

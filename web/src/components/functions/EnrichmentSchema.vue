@@ -27,7 +27,7 @@
         <div class="row items-center no-wrap">
             <div class="col">
             <div
-                class="text-body1 tw:font-semibold tw:text-xl"
+                class="text-body1 tw-font-semibold tw-text-xl"
                 data-test="schema-title-text"
             >
                 {{ t("logStream.schemaHeader") }}
@@ -43,18 +43,18 @@
         <q-card-section class="q-ma-none q-pa-none">
         <div
           v-if="loadingState"
-          class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
+          class="q-pt-md text-center q-w-md q-mx-lg tw-flex tw-justify-center"
           style="max-width: 450px"
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
-            class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5"
+            class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
           >
             <div
               data-test="stream-details-container"
-              class="stream_details_container tw:flex tw:justify-between tw:gap-5 tw:flex-wrap"
+              class="stream_details_container tw-flex tw-justify-between tw-gap-5 tw-flex-wrap"
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
@@ -88,8 +88,8 @@
               </div>
             </div>
           </div>
-          <div class="flex items-center justify-between tw:gap-4 tw:mt-4">
-            <div class="tw:text-sm display-total-fields">
+          <div class="flex items-center justify-between tw-gap-4 tw-mt-4">
+            <div class="tw-text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>
                 <q-input

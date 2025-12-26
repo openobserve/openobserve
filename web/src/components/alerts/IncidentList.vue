@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+  <div data-test="incident-list" class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
     <!-- Incidents table -->
-    <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
+    <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+      <div class="card-container tw-h-[calc(100vh-127px)]">
         <q-table
           ref="qTableRef"
           v-model:pagination="pagination"
@@ -64,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else-if="col.name === 'title'">
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:font-medium">
+                <div class="tw-flex tw-items-center tw-gap-1">
+                  <span class="tw-font-medium">
                     {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
                   </span>
                 </div>
@@ -138,22 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Loading state -->
         <template #loading>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
+          <div class="tw-flex tw-items-center tw-justify-center tw-py-20">
             <q-spinner-hourglass color="primary" size="3rem" />
           </div>
         </template>
 
         <!-- Empty state -->
         <template #no-data>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
+          <div v-if="!loading" class="tw-flex tw-items-center tw-justify-center tw-w-full tw-h-full">
             <no-data />
           </div>
         </template>
 
         <!-- Bottom pagination -->
         <template v-slot:bottom="scope">
-          <div class="bottom-btn tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+          <div class="bottom-btn tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
               {{ pagination.rowsNumber }} {{ pagination.rowsNumber === 1 ? 'Incident' : 'Incidents' }}
             </div>
             <QTablePagination

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="alert-history-summary tw:h-full tw:w-full">
+  <div class="alert-history-summary tw-h-full tw-w-full">
     <q-table
       data-test="alert-history-summary-table"
       :rows="historyRows"
@@ -24,21 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="pagination"
       :loading="loading"
       @request="onRequest"
-      class="tw:h-full"
+      class="tw-h-full"
       flat
       bordered
     >
       <template #body-cell-alert_name="props">
-        <q-td :props="props" class="cursor-pointer hover:tw:bg-gray-100 dark:hover:tw:bg-gray-700">
-          <div class="tw:flex tw:items-center" @click="openDrawer(props.row)">
-            <span class="tw:font-medium">{{ props.row.alert_name }}</span>
+        <q-td :props="props" class="cursor-pointer hover:tw-bg-gray-100 dark:hover:tw-bg-gray-700">
+          <div class="tw-flex tw-items-center" @click="openDrawer(props.row)">
+            <span class="tw-font-medium">{{ props.row.alert_name }}</span>
           </div>
         </q-td>
       </template>
 
       <template #body-cell-current_state="props">
         <q-td :props="props">
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="tw-flex tw-items-center tw-gap-2">
             <q-icon
               :name="getStateIcon(props.row.current_state)"
               :color="getStateColor(props.row.current_state)"
@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #no-data>
-        <div class="tw:w-full tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
-          <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
+        <div class="tw-w-full tw-text-center tw-py-8">
+          <q-icon name="history" size="48px" class="tw-text-gray-400" />
+          <div class="tw-mt-2 tw-text-gray-600 dark:tw-text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>

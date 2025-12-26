@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
       </div>
-      <div class="row button-group tw:ml-[0.25rem]">
+      <div class="row button-group tw-ml-[0.25rem]">
         <div v-if="dashboardPanelData.data.type != 'custom_chart'">
           <button
             data-test="dashboard-builder-query-type"

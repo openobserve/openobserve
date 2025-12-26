@@ -24,21 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     elevated
     class="alert-history-drawer"
   >
-    <div class="tw:h-full tw:flex tw:flex-col">
+    <div class="tw-h-full tw-flex tw-flex-col">
       <!-- Header -->
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:p-4 tw:border-b"
+        class="tw-flex tw-items-center tw-justify-between tw-p-4 tw-border-b"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:border-gray-600'
-            : 'tw:border-gray-200'
+            ? 'tw-border-gray-600'
+            : 'tw-border-gray-200'
         "
       >
-        <div class="tw:flex tw:items-center tw:gap-3">
+        <div class="tw-flex tw-items-center tw-gap-3">
           <q-icon name="history" size="24px" />
           <div>
-            <div class="tw:font-semibold tw:text-lg">{{ props.alertName }}</div>
-            <div class="tw:text-sm tw:text-gray-500 dark:tw:text-gray-400">
+            <div class="tw-font-semibold tw-text-lg">{{ props.alertName }}</div>
+            <div class="tw-text-sm tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.alertHistory") }}
             </div>
           </div>
@@ -56,43 +56,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Stats Summary -->
       <div
         v-if="stats"
-        class="tw:p-4 tw:border-b"
+        class="tw-p-4 tw-border-b"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:border-gray-600 tw:bg-gray-800'
-            : 'tw:border-gray-200 tw:bg-gray-50'
+            ? 'tw-border-gray-600 tw-bg-gray-800'
+            : 'tw-border-gray-200 tw-bg-gray-50'
         "
       >
-        <div class="tw:grid tw:grid-cols-2 tw:gap-4">
+        <div class="tw-grid tw-grid-cols-2 tw-gap-4">
           <div>
-            <div class="tw:text-xs tw:text-gray-500 dark:tw:text-gray-400">
+            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.totalEvaluations") }}
             </div>
-            <div class="tw:text-xl tw:font-semibold">
+            <div class="tw-text-xl tw-font-semibold">
               {{ stats.total }}
             </div>
           </div>
           <div>
-            <div class="tw:text-xs tw:text-gray-500 dark:tw:text-gray-400">
+            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.firingCount") }}
             </div>
-            <div class="tw:text-xl tw:font-semibold tw:text-red-500">
+            <div class="tw-text-xl tw-font-semibold tw-text-red-500">
               {{ stats.firing }}
             </div>
           </div>
           <div>
-            <div class="tw:text-xs tw:text-gray-500 dark:tw:text-gray-400">
+            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.avgEvaluationTime") }}
             </div>
-            <div class="tw:text-lg tw:font-semibold">
+            <div class="tw-text-lg tw-font-semibold">
               {{ formatDuration(stats.avgDuration) }}
             </div>
           </div>
           <div>
-            <div class="tw:text-xs tw:text-gray-500 dark:tw:text-gray-400">
+            <div class="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400">
               {{ t("alerts.successRate") }}
             </div>
-            <div class="tw:text-lg tw:font-semibold tw:text-green-500">
+            <div class="tw-text-lg tw-font-semibold tw-text-green-500">
               {{ stats.successRate }}%
             </div>
           </div>
@@ -100,19 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Timeline -->
-      <div class="tw:flex-1 tw:overflow-y-auto tw:p-4">
-        <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
+      <div class="tw-flex-1 tw-overflow-y-auto tw-p-4">
+        <div v-if="loading" class="tw-flex tw-justify-center tw-py-8">
           <q-spinner color="primary" size="40px" />
         </div>
 
-        <div v-else-if="historyItems.length === 0" class="tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
-          <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
+        <div v-else-if="historyItems.length === 0" class="tw-text-center tw-py-8">
+          <q-icon name="history" size="48px" class="tw-text-gray-400" />
+          <div class="tw-mt-2 tw-text-gray-600 dark:tw-text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
         </div>
 
-        <q-timeline v-else color="primary" class="tw:mt-2">
+        <q-timeline v-else color="primary" class="tw-mt-2">
           <q-timeline-entry
             v-for="(item, index) in historyItems"
             :key="index"
@@ -120,16 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="getStatusIcon(item.status)"
           >
             <template #title>
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="tw:font-medium">{{ formatStatus(item.status) }}</span>
-                <span class="tw:text-xs tw:text-gray-500">
+              <div class="tw-flex tw-items-center tw-justify-between">
+                <span class="tw-font-medium">{{ formatStatus(item.status) }}</span>
+                <span class="tw-text-xs tw-text-gray-500">
                   {{ formatTimestamp(item.timestamp) }}
                 </span>
               </div>
             </template>
 
             <template #subtitle>
-              <div class="tw:text-sm tw:mt-1 tw:space-y-1">
+              <div class="tw-text-sm tw-mt-1 tw-space-y-1">
                 <div v-if="item.is_realtime">
                   <q-badge color="blue" label="Real-time" />
                 </div>
@@ -137,12 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-badge color="orange" label="Silenced" />
                 </div>
                 <div v-if="item.evaluation_took_in_secs">
-                  <span class="tw:text-gray-600 dark:tw:text-gray-400">
+                  <span class="tw-text-gray-600 dark:tw-text-gray-400">
                     Duration: {{ formatDuration(item.evaluation_took_in_secs) }}
                   </span>
                 </div>
-                <div v-if="item.error" class="tw:text-red-500 tw:mt-1">
-                  <q-icon name="error" size="14px" class="tw:mr-1" />
+                <div v-if="item.error" class="tw-text-red-500 tw-mt-1">
+                  <q-icon name="error" size="14px" class="tw-mr-1" />
                   {{ item.error }}
                 </div>
               </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-timeline>
 
         <!-- Load more button -->
-        <div v-if="hasMore && !loading" class="tw:text-center tw:mt-4">
+        <div v-if="hasMore && !loading" class="tw-text-center tw-mt-4">
           <q-btn
             flat
             color="primary"

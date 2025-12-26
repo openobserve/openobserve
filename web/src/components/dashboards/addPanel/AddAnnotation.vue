@@ -81,19 +81,19 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <div class="tw:w-full tw:flex">
+        <div class="tw-w-full tw-flex">
           <q-btn
             v-if="annotationData.annotation_id"
             color="negative"
             label="Delete"
             @click="handleDeleteWithConfirm"
           />
-          <div class="tw:flex-1"></div>
+          <div class="tw-flex-1"></div>
           <q-btn
             flat
             label="Cancel"
             @click="handleClose"
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
+            class="o2-secondary-button tw-h-[36px] q-ml-md"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-secondary-button-dark'
@@ -101,7 +101,7 @@
             "
           />
           <q-btn
-            class="o2-primary-button tw:h-[36px] q-ml-md"
+            class="o2-primary-button tw-h-[36px] q-ml-md"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'

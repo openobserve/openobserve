@@ -6,7 +6,7 @@
       :options="colorModeOptions"
       dense
       :label="t('dashboard.colorMode')"
-      class="showLabelOnTop selectedLabel tw:w-full"
+      class="showLabelOnTop selectedLabel tw-w-full"
       stack-label
       emit-value
       :display-value="

@@ -21,17 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <!-- Header -->
-      <q-card-section class="dialog-header tw:pb-3">
+      <q-card-section class="dialog-header tw-pb-3">
         <div class="dialog-title">{{ title }}</div>
       </q-card-section>
 
       <!-- Content -->
-      <q-card-section class="dialog-content tw:py-4">
+      <q-card-section class="dialog-content tw-py-4">
         <div class="message-text">{{ message }}</div>
       </q-card-section>
 
       <!-- Actions -->
-      <q-card-actions class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
+      <q-card-actions class="dialog-actions tw-flex tw-justify-end tw-gap-2 tw-px-4 tw-pb-4">
         <q-btn
           data-test="custom-cancel-button"
           label="Cancel"

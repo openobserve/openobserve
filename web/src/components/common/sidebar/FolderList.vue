@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
+  <div class="card-container tw-h-full tw-flex tw-flex-col tw-pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
           Folders
           <div>
             <q-btn
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
           </div>
         </div>
-        <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
+        <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
 
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             placeholder="Search Folder"
             style="width: 100%;"
             clearable
-            class="tw:mx-2 q-px-xs"
+            class="tw-mx-2 q-px-xs"
             :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
+      <div class="folders-tabs tw-flex-1 tw-overflow-y-auto">
         <q-tabs
           indicator-color="transparent"
           inline-label

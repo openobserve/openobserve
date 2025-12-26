@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem]"
+      class="tw-pb-[0.625rem]"
     >
     <div class="card-container q-py-sm">
           <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container tw:h-[calc(100vh-200px)]"
+          class="card-container tw-h-[calc(100vh-200px)]"
         >
           <div
             class="flex justify-between items-center"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   :debounce="500"
                   dense
-                  class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
+                  class="no-border q-mr-md o2-search-input tw-h-[36px] tw-w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
@@ -273,10 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full"
+        class="flex justify-end tw-w-full"
         style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
+      <div class="card-container tw-w-full tw-py-2 tw-px-3 tw-justify-end tw-flex">
         <q-btn
           data-test="edit-role-cancel-btn"
           class="o2-secondary-button"

@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
-    <div class="card-container tw:h-[calc(100vh-50px)]">
+  <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
+    <div class="card-container tw-h-[calc(100vh-50px)]">
       <div class="flex justify-between items-start q-py-sm q-px-sm">
-        <div class="flex items-center tw:pl-3">
+        <div class="flex items-center tw-pl-3">
           <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               dense
               hide-bottom-space
-              class="tw:w-[300px]"
+              class="tw-w-[300px]"
               :error="pipelineNameError"
               :error-message="pipelineNameErrorMessage"
             />
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-end items-center">
           <!-- this is normal secondary button but only icon is there without label -->
             <q-btn
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
+              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
               flat
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-pipeline-cancel-btn"
             label="Cancel"
             flat
-            class="q-ml-md o2-secondary-button tw:h-[36px]"
+            class="q-ml-md o2-secondary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-pipeline-save-btn"
             label="Save"
-            class="q-ml-md o2-primary-button tw:h-[36px]"
+            class="q-ml-md o2-primary-button tw-h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat

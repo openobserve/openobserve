@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="feature-comparison-wrapper">
-    <div class="feature-comparison-header tw:mb-6">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
+    <div class="feature-comparison-header tw-mb-6">
+      <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
         <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
           <q-icon name="compare_arrows" size="24px" />
         </div>
