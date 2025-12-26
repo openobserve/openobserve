@@ -873,5 +873,10 @@ export default defineComponent({
     padding-top: 4px;
     padding-bottom: 4px;
   }
+
+  // Prevent capitalization for column filter fields
+  :deep(.q-field__native > :first-child) {
+    text-transform: none !important;
+  }
 }
 </style>
