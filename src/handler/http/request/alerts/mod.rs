@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use actix_web::{
     HttpRequest, HttpResponse, delete, get,
     http::StatusCode,
@@ -29,7 +31,7 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::handler::http::request::search::utils::check_stream_permissions, std::str::FromStr,
+    crate::handler::http::request::search::utils::check_stream_permissions,
 };
 
 use crate::{
@@ -353,14 +355,23 @@ async fn delete_alert_bulk(
     let org_id = path.into_inner();
     let req = req.into_inner();
     let _user_id = user_email.user_id;
-    let folder_id = crate::common::utils::http::get_folder(&query);
+    let _folder_id = crate::common::utils::http::get_folder(&query);
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if Ksuid::from_str(id).is_err() {
             return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
         };
-        if !check_permissions(id, &org_id, &_user_id, "alerts", "DELETE", Some(&folder_id)).await {
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "alerts",
+            "DELETE",
+            Some(&_folder_id),
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

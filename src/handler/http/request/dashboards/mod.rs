@@ -358,7 +358,7 @@ async fn delete_dashboard_bulk(
     let org_id = path.into_inner();
     let req = req.into_inner();
     let _user_id = user_email.user_id;
-    let folder_id = crate::common::utils::http::get_folder(&query);
+    let _folder_id = crate::common::utils::http::get_folder(&query);
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
@@ -368,7 +368,7 @@ async fn delete_dashboard_bulk(
             &_user_id,
             "dashboards",
             "DELETE",
-            Some(&folder_id),
+            Some(&_folder_id),
         )
         .await
         {
