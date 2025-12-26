@@ -1079,17 +1079,11 @@ mod tests {
         );
 
         // TEXT type
-        let alter_sql = format!(
-            "ALTER TABLE {} ADD COLUMN {} {};",
-            table, "name", "TEXT"
-        );
+        let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {};", table, "name", "TEXT");
         assert_eq!(alter_sql, "ALTER TABLE users ADD COLUMN name TEXT;");
 
         // BLOB type
-        let alter_sql = format!(
-            "ALTER TABLE {} ADD COLUMN {} {};",
-            table, "data", "BLOB"
-        );
+        let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {};", table, "data", "BLOB");
         assert_eq!(alter_sql, "ALTER TABLE users ADD COLUMN data BLOB;");
 
         // REAL type

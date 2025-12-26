@@ -1246,17 +1246,17 @@ mod tests {
             "ALTER TABLE {} ADD COLUMN {} {};",
             table, "email", "VARCHAR(255)"
         );
-        assert_eq!(alert_sql, "ALTER TABLE users ADD COLUMN email VARCHAR(255);");
+        assert_eq!(
+            alert_sql,
+            "ALTER TABLE users ADD COLUMN email VARCHAR(255);"
+        );
 
         // TEXT type
         let alert_sql = format!(
             "ALTER TABLE {} ADD COLUMN {} {};",
             table, "description", "TEXT"
         );
-        assert_eq!(
-            alert_sql,
-            "ALTER TABLE users ADD COLUMN description TEXT;"
-        );
+        assert_eq!(alert_sql, "ALTER TABLE users ADD COLUMN description TEXT;");
 
         // DATETIME type
         let alert_sql = format!(
