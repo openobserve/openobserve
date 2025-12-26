@@ -439,8 +439,9 @@ pub async fn remote_write(
             - (ha_check_total_time * 1000.0) as u128;
 
         log::info!(
-            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms (events: {event_count}, samples: {sample_count}) | \
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
             preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
             preload_pipeline_time as f64 / 1000.0,
             preload_uds_time as f64 / 1000.0,
