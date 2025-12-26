@@ -1030,7 +1030,10 @@
     "hiddenColumns": "Columnas ocultas",
     "stickyFirstColumn": "Primera columna adhesiva",
     "stickyColumns": "Columnas adhesivas",
-    "promqlTableMode": "Modo de tabla PromQL"
+    "promqlTableMode": "Modo de tabla PromQL",
+    "overrideMessageExample": "Por ejemplo, {endpoint} se reemplazará por el valor de etiqueta de endpoint.",
+    "stepValueTooltipInfo": "Si no se especifica, se utilizará el valor del paso de Configuración del panel.",
+    "optional": "Opcional"
   },
   "panel": {
     "header": "Panel",

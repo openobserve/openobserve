@@ -1046,7 +1046,10 @@
     "hiddenColumns": "非表示列",
     "stickyFirstColumn": "スティッキー・ファースト・カラム",
     "stickyColumns": "スティッキーカラム",
-    "promqlTableMode": "プロムQL テーブルモード"
+    "promqlTableMode": "プロムQL テーブルモード",
+    "overrideMessageExample": "たとえば、{endpoint} はエンドポイントのラベル値に置き換えられます。",
+    "stepValueTooltipInfo": "指定しない場合は、パネル設定のステップ値が使用されます。",
+    "optional": "[オプション]"
   },
   "panel": {
     "header": "パネル",

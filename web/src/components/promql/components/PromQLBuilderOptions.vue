@@ -40,7 +40,10 @@
                   self="bottom middle"
                   max-width="250px"
                 >
+                  ({{ t("dashboard.optional") }}) <b>Legend - </b>
                   {{ t("dashboard.overrideMessage") }}
+                  <br />
+                  {{ t("dashboard.overrideMessageExample") }}
                 </q-tooltip>
               </q-icon>
             </div>
@@ -79,8 +82,10 @@
                     self="bottom middle"
                     max-width="250px"
                   >
-                    <b>Step - </b>
+                    ({{ t("dashboard.optional") }}) <b>Step - </b>
                     {{ t("dashboard.stepValueTooltip") }}
+                    <br />
+                    {{ t("dashboard.stepValueTooltipInfo") }}
                     <br />
                     {{ t("dashboard.stepValueExample") }}
                   </q-tooltip>

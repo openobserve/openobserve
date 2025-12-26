@@ -1030,7 +1030,10 @@
     "hiddenColumns": "Colonnes masquées",
     "stickyFirstColumn": "Première colonne collante",
     "stickyColumns": "Colonnes adhésives",
-    "promqlTableMode": "Mode Tableau ProMQL"
+    "promqlTableMode": "Mode Tableau ProMQL",
+    "overrideMessageExample": "Par exemple, {endpoint} sera remplacé par la valeur d'étiquette du point de terminaison.",
+    "stepValueTooltipInfo": "Si elle n'est pas spécifiée, la valeur de l'étape de Configuration du panneau sera utilisée.",
+    "optional": "Facultatif"
   },
   "panel": {
     "header": "Panneau",

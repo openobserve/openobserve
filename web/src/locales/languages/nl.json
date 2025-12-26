@@ -1030,7 +1030,10 @@
     "hiddenColumns": "Verborgen kolommen",
     "stickyFirstColumn": "Sticky eerste kolom",
     "stickyColumns": "Kleverige kolommen",
-    "promqlTableMode": "ProMQL-tabelmodus"
+    "promqlTableMode": "ProMQL-tabelmodus",
+    "overrideMessageExample": "{endpoint} wordt bijvoorbeeld vervangen door de labelwaarde voor eindpunt.",
+    "stepValueTooltipInfo": "Indien niet gespecificeerd, wordt de stapwaarde van Paneelconfiguratie gebruikt.",
+    "optional": "Optioneel"
   },
   "panel": {
     "header": "Paneel",

@@ -1030,7 +1030,10 @@
     "hiddenColumns": "Versteckte Spalten",
     "stickyFirstColumn": "Klebrige erste Spalte",
     "stickyColumns": "Klebrige Spalten",
-    "promqlTableMode": "PromQL-Tabellenmodus"
+    "promqlTableMode": "PromQL-Tabellenmodus",
+    "overrideMessageExample": "Beispielsweise wird {endpoint} durch den Labelwert für Endpunkt ersetzt.",
+    "stepValueTooltipInfo": "Wenn nicht angegeben, wird der Schrittwert aus der Panel-Konfiguration verwendet.",
+    "optional": "Fakultativ"
   },
   "panel": {
     "header": "Panel",
