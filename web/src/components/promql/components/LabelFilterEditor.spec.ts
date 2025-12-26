@@ -322,9 +322,9 @@ describe("LabelFilterEditor", () => {
       expect(
         wrapper.find('[data-test="promql-add-label-filter"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-label-filter-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(
+        true,
+      );
       expect(
         wrapper.find('[data-test="promql-label-filter-remove-0"]').exists(),
       ).toBe(true);
