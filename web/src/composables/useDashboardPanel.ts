@@ -1824,6 +1824,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery == false
     ) {
+      dashboardPanelData.meta.stream.customQueryFields = [];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(
