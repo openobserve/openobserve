@@ -94,43 +94,32 @@
             </q-input>
           </div>
 
-                    <!-- Query Type Select (Range/Instant) -->
+                    <!-- Query Type Tabs (Range/Instant) -->
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("common.type") }}</span>
-            <q-select
-              v-model="
+            <AppTabs
+              :tabs="queryTypeTabs"
+              :active-tab="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].config.query_type
               "
-              :options="queryTypeOptions"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              emit-value
-              map-options
+              class="tabs-selection-container"
+              @update:active-tab="updateQueryType"
               data-test="dashboard-promql-builder-query-type"
-              hide-bottom-space
-              style="width: 120px"
-            >
-              <template v-slot:append>
-                <q-icon name="info" size="16px" class="cursor-pointer">
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    max-width="250px"
-                  >
-                    <b>Query Type - </b><br />
-                    Range: Returns time series data over a time range.<br />
-                    Instant: Returns single value at a specific point in time.
-                  </q-tooltip>
-                </q-icon>
-              </template>
-            </q-select>
+            />
+            <q-icon name="info" size="16px" class="cursor-pointer !tw-text-[var(--o2-icon-color-dark)]">
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+                max-width="250px"
+              >
+                <b>Query Type - </b><br />
+                Range: Returns time series data over a time range.<br />
+                Instant: Returns single value at a specific point in time.
+              </q-tooltip>
+            </q-icon>
           </div>
         </div>
       </div>
@@ -142,11 +131,13 @@
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
   components: {
     CommonAutoComplete,
+    AppTabs,
   },
   props: {
     dashboardPanelData: {
@@ -166,8 +157,8 @@ export default defineComponent({
       currentQuery.config.query_type = "range";
     }
 
-    // Query type options for q-select
-    const queryTypeOptions = [
+    // Query type tabs for AppTabs
+    const queryTypeTabs = [
       {
         label: "Range",
         value: "range",
@@ -228,17 +219,44 @@ export default defineComponent({
       }
     };
 
+    // Method to update query type when tab changes
+    const updateQueryType = (value: string) => {
+      props.dashboardPanelData.data.queries[
+        props.dashboardPanelData.layout.currentQueryIndex
+      ].config.query_type = value;
+    };
+
     return {
       t,
-      queryTypeOptions,
+      queryTypeTabs,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      updateQueryType,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+.option-field-wrapper {
+  :deep(.o2-tabs) {
+    border: 1px solid var(--o2-border-color) !important;
+    border-radius: 4px;
+    overflow: hidden !important;
+
+    .o2-tab {
+      border-radius: 0px !important;
+      padding: 4px 8px !important;
+      min-width: 66px !important;
+    }
+
+    .active {
+      background-color: transparent !important;
+      border-bottom: 2px solid var(--o2-theme-color) !important;
+      color: var(--o2-theme-color) !important;
+    }
+  }
+}
 .layout-name {
   white-space: nowrap;
   min-width: 80px;
@@ -270,7 +288,7 @@ export default defineComponent({
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .field-label {
