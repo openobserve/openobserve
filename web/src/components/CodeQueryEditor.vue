@@ -335,12 +335,37 @@ export default defineComponent({
       }
 
       if (!editorElement) {
-        console.error("Query Editor element not found after retries");
         return;
       }
 
-      if (editorElement && editorElement?.hasChildNodes()) return;
+      // If editor already exists (hasChildNodes), update its value and options instead of returning
+      if (editorElement && editorElement?.hasChildNodes()) {
+        if (editorObj) {
+          // Update editor value if different from current
+          const currentValue = editorObj.getValue();
+          if (currentValue !== props.query?.trim()) {
+            editorObj.setValue(props.query?.trim() || "");
+          }
 
+          // Update readonly option if different
+          const currentReadOnly = editorObj.getRawOptions().readOnly;
+          if (currentReadOnly !== props.readOnly) {
+            editorObj.updateOptions({ readOnly: props.readOnly });
+          }
+          return;
+        } else {
+          // editorObj is null but element has children - stale DOM
+          // Don't recreate if new props are empty/readonly (likely a stale mount with default props)
+          // The existing editor in the DOM is probably correct
+          if (!props.query?.trim() && props.readOnly) {
+            return;
+          }
+
+          // New props have actual data - safe to recreate
+          editorElement.innerHTML = '';
+          // Fall through to create new editor below
+        }
+      }
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
@@ -544,9 +569,9 @@ export default defineComponent({
     // update readonly when prop value changes
     watch(
       () => props.query,
-      () => {
+      (newQuery, oldQuery) => {
         if (props.readOnly || !editorObj?.hasWidgetFocus()) {
-          editorObj?.getModel().setValue(props.query);
+          editorObj?.getModel()?.setValue(props.query);
         }
       },
     );

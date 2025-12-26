@@ -35,6 +35,7 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
     textStyle: {
       fontSize: 12,
     },
+    enterable: true,
     extraCssText: TOOLTIP_SCROLL_STYLE,
     axisPointer: {
       type: "cross",
