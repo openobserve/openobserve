@@ -179,16 +179,12 @@ pub async fn remote_write(
     let mut ha_check_total_time = 0.0;
 
     // Detailed performance tracking
-    let mut pipeline_check_time = 0u128;
-    let mut uds_check_time = 0u128;
-    let mut schema_check_time = 0u128;
-    let mut partition_check_time = 0u128;
     let mut label_processing_time = 0u128;
     let mut sample_processing_time = 0u128;
     let mut event_count = 0;
     let mut sample_count = 0;
 
-    // Pre-load alerts for all unique metrics to avoid repeated lock contention
+    // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
     let mut unique_metrics = HashSet::new();
     for event in &request.timeseries {
@@ -198,8 +194,14 @@ pub async fn remote_write(
         }
     }
 
+    let mut preload_pipeline_time = 0u128;
+    let mut preload_uds_time = 0u128;
+    let mut preload_schema_time = 0u128;
+    let mut preload_partition_time = 0u128;
+    let mut preload_alerts_time = 0u128;
+
     if !unique_metrics.is_empty() {
-        let streams_for_alerts: Vec<StreamParams> = unique_metrics
+        let streams: Vec<StreamParams> = unique_metrics
             .iter()
             .map(|name| StreamParams {
                 org_id: org_id.to_owned().into(),
@@ -207,10 +209,72 @@ pub async fn remote_write(
                 stream_type: StreamType::Metrics,
             })
             .collect();
-        crate::service::ingestion::get_stream_alerts(&streams_for_alerts, &mut stream_alerts_map)
-            .await;
+
+        // Preload pipelines
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !stream_executable_pipelines.contains_key(stream_name_str) {
+                let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
+                    &stream.org_id,
+                    &stream.stream_name,
+                    &stream.stream_type,
+                )
+                .await;
+                stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
+            }
+        }
+        preload_pipeline_time = t.elapsed().as_micros();
+
+        // Preload UDS
+        let t = std::time::Instant::now();
+        crate::service::ingestion::get_uds_and_original_data_streams(
+            &streams,
+            &mut user_defined_schema_map,
+            &mut streams_need_original_map,
+            &mut streams_need_all_values_map,
+        )
+        .await;
+        preload_uds_time = t.elapsed().as_micros();
+
+        // Preload schemas
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !metric_schema_map.contains_key(stream_name_str) {
+                let _schema_exists = stream_schema_exists(
+                    &stream.org_id,
+                    &stream.stream_name,
+                    stream.stream_type,
+                    &mut metric_schema_map,
+                )
+                .await;
+            }
+        }
+        preload_schema_time = t.elapsed().as_micros();
+
+        // Preload partition keys
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !stream_partitioning_map.contains_key(stream_name_str) {
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    &stream.org_id,
+                    &stream.stream_type,
+                    &stream.stream_name,
+                )
+                .await;
+                stream_partitioning_map.insert(stream.stream_name.to_string(), partition_det);
+            }
+        }
+        preload_partition_time = t.elapsed().as_micros();
+
+        // Preload alerts
+        let t = std::time::Instant::now();
+        crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
+        preload_alerts_time = t.elapsed().as_micros();
     }
-    let alerts_preload_time = preload_start.elapsed().as_micros();
+    let total_preload_time = preload_start.elapsed().as_micros();
 
     for mut event in request.timeseries {
         event_count += 1;
@@ -245,62 +309,8 @@ pub async fn remote_write(
         };
         label_processing_time += label_start.elapsed().as_micros();
 
-        // get stream pipeline (moved to event level - only once per metric)
-        let t = std::time::Instant::now();
-        if !stream_executable_pipelines.contains_key(&metric_name) {
-            let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
-                org_id,
-                &metric_name,
-                &StreamType::Metrics,
-            )
-            .await;
-            stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-        }
-        pipeline_check_time += t.elapsed().as_micros();
-
-        // get user defined schema (moved to event level - only once per metric)
-        let t = std::time::Instant::now();
-        if !user_defined_schema_map.contains_key(&metric_name) {
-            let streams = vec![StreamParams {
-                org_id: org_id.to_owned().into(),
-                stream_type: StreamType::Metrics,
-                stream_name: metric_name.to_owned().into(),
-            }];
-            crate::service::ingestion::get_uds_and_original_data_streams(
-                &streams,
-                &mut user_defined_schema_map,
-                &mut streams_need_original_map,
-                &mut streams_need_all_values_map,
-            )
-            .await;
-        }
-        uds_check_time += t.elapsed().as_micros();
-
-        // check for schema (moved to event level - only once per metric)
-        let t = std::time::Instant::now();
-        if !metric_schema_map.contains_key(&metric_name) {
-            let _schema_exists = stream_schema_exists(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-            )
-            .await;
-        }
-        schema_check_time += t.elapsed().as_micros();
-
-        // get partition keys (moved to event level - only once per metric)
-        let t = std::time::Instant::now();
-        if !stream_partitioning_map.contains_key(&metric_name) {
-            let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                org_id,
-                &StreamType::Metrics,
-                &metric_name,
-            )
-            .await;
-            stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-        }
-        partition_check_time += t.elapsed().as_micros();
+        // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
+        // before the loop to avoid repeated async queries
 
         // parse samples
         let sample_start = std::time::Instant::now();
@@ -423,23 +433,20 @@ pub async fn remote_write(
     // Detailed performance logging
     if parse_timeseries_ms > 200 || ha_check_total_time > 200.0 {
         let other_time = parse_timeseries_ms * 1000
-            - pipeline_check_time
-            - uds_check_time
-            - schema_check_time
-            - partition_check_time
-            - alerts_preload_time
+            - total_preload_time
             - label_processing_time
             - sample_processing_time
             - (ha_check_total_time * 1000.0) as u128;
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms (events: {event_count}, samples: {sample_count}) | \
-            breakdown: alerts_preload={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
-            alerts_preload_time as f64 / 1000.0,
-            pipeline_check_time as f64 / 1000.0,
-            uds_check_time as f64 / 1000.0,
-            schema_check_time as f64 / 1000.0,
-            partition_check_time as f64 / 1000.0,
+            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            total_preload_time as f64 / 1000.0,
+            preload_pipeline_time as f64 / 1000.0,
+            preload_uds_time as f64 / 1000.0,
+            preload_schema_time as f64 / 1000.0,
+            preload_partition_time as f64 / 1000.0,
+            preload_alerts_time as f64 / 1000.0,
             label_processing_time as f64 / 1000.0,
             sample_processing_time as f64 / 1000.0,
             ha_check_total_time,
