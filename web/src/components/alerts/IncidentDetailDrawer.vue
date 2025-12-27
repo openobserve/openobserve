@@ -23,12 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header -->
     <div class="incident-detail-header row items-center no-wrap q-px-md tw-p-4">
       <div class="col">
-        <div class="tw-text-[18px] tw-flex tw-items-center">
-          {{ t("alerts.incidents.header") }}
+        <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
+          <div class="tw-text-[18px]">
+            {{ t("alerts.incidents.header") }}
+          </div>
           <!-- Incident name with colored indicator -->
           <span
             :class="[
-              'tw-font-bold tw-mr-4 tw-px-2 tw-py-1 tw-rounded-md tw-ml-2 tw-max-w-xs tw-truncate tw-inline-block',
+              'tw-font-bold tw-px-2 tw-py-1 tw-rounded-md tw-max-w-xs tw-truncate tw-inline-block',
               store.state.theme === 'dark'
                 ? 'tw-text-blue-400 tw-bg-blue-900/50'
                 : 'tw-text-blue-600 tw-bg-blue-50'
@@ -40,6 +42,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ incidentDetails.title }}
             </q-tooltip>
           </span>
+
+          <!-- Compact Status, Severity, Alerts badges -->
+          <div v-if="incidentDetails" class="tw-flex tw-items-center tw-gap-2">
+            <!-- Status Badge -->
+            <q-badge
+              :color="getStatusColor(incidentDetails.status)"
+              class="tw-px-2.5 tw-py-1.5 tw-cursor-default"
+              outline
+            >
+              <div class="tw-flex tw-items-center tw-gap-1.5">
+                <q-icon name="info" size="14px" />
+                <span>{{ getStatusLabel(incidentDetails.status) }}</span>
+              </div>
+              <q-tooltip :delay="200" class="tw-text-xs">
+                {{ t("alerts.incidents.status") }}: {{ getStatusLabel(incidentDetails.status) }}
+              </q-tooltip>
+            </q-badge>
+
+            <!-- Severity Badge -->
+            <q-badge
+              :style="{ backgroundColor: getSeverityColorHex(incidentDetails.severity), color: '#fff' }"
+              class="tw-px-2.5 tw-py-1.5 tw-cursor-default"
+            >
+              <div class="tw-flex tw-items-center tw-gap-1.5">
+                <q-icon name="warning" size="14px" />
+                <span>{{ incidentDetails.severity }}</span>
+              </div>
+              <q-tooltip :delay="200" class="tw-text-xs">
+                {{ t("alerts.incidents.severity") }}: {{ incidentDetails.severity }}
+              </q-tooltip>
+            </q-badge>
+
+            <!-- Alert Count Badge -->
+            <q-badge
+              color="primary"
+              class="tw-px-2.5 tw-py-1.5 tw-cursor-default"
+              outline
+            >
+              <div class="tw-flex tw-items-center tw-gap-1.5">
+                <q-icon name="notifications_active" size="14px" />
+                <span>{{ incidentDetails.alert_count }} Alerts</span>
+              </div>
+              <q-tooltip :delay="200" class="tw-text-xs">
+                {{ t("alerts.incidents.alertCount") }}: {{ incidentDetails.alert_count }} correlated alerts
+              </q-tooltip>
+            </q-badge>
+          </div>
         </div>
       </div>
       <div class="col-auto">
@@ -57,141 +106,161 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Content -->
     <div v-if="!loading && incidentDetails" class="tw-flex-1 tw-flex tw-overflow-hidden">
       <!-- Left Column: Incident Details -->
-      <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-p-4 q-px-md tw-overflow-auto" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
-        <!-- Status, Severity, Alerts - Vertical Stack -->
-        <div class="tw-flex tw-flex-col tw-gap-3 tw-mb-4">
-          <!-- Status Tile -->
-          <div class="tile">
-            <div
-              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
-            >
-              <div class="tile-header tw-flex tw-justify-between tw-items-start">
-                <div
-                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
-                >
-                  {{ t("alerts.incidents.status") }}
-                </div>
-                <div class="tile-icon tw-opacity-80">
-                  <q-icon name="info" size="24px" :color="getStatusColor(incidentDetails.status)" />
-                </div>
-              </div>
-              <div
-                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
-              >
-                {{ getStatusLabel(incidentDetails.status) }}
-              </div>
-            </div>
-          </div>
+      <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-flex tw-flex-col" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
 
-          <!-- Severity Tile -->
-          <div class="tile">
+        <!-- Top Section (52% height) - Table of Contents -->
+        <div
+          style="height: 52%"
+          class="tw-border-b tw-p-4 tw-flex tw-flex-col"
+          :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+        >
+          <div
+            :class="[
+              'tw-rounded-lg tw-border tw-overflow-hidden tw-flex tw-flex-col tw-flex-1',
+              store.state.theme === 'dark'
+                ? 'tw-border-gray-700'
+                : 'tw-border-gray-200'
+            ]"
+          >
+            <!-- Header -->
             <div
-              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
+              :class="[
+                'tw-px-3 tw-py-2 tw-flex tw-items-center tw-gap-2 tw-border-b tw-flex-shrink-0',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-gray-800 tw-border-gray-700'
+                  : 'tw-bg-gray-100 tw-border-gray-200'
+              ]"
             >
-              <div class="tile-header tw-flex tw-justify-between tw-items-start">
-                <div
-                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
-                >
-                  {{ t("alerts.incidents.severity") }}
-                </div>
-                <div class="tile-icon tw-opacity-80">
-                  <q-icon name="warning" size="24px" :color="getSeverityColor(incidentDetails.severity)" />
-                </div>
-              </div>
-              <div
-                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
-              >
-                {{ incidentDetails.severity }}
-              </div>
+              <q-icon name="format_list_bulleted" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
+                Table of Contents
+              </span>
             </div>
-          </div>
-
-          <!-- Alert Count Tile -->
-          <div class="tile">
-            <div
-              class="tile-content tw-rounded-lg tw-p-3 tw-border tw-shadow-sm tw-h-20 tw-flex tw-flex-col tw-justify-between"
-              :class="store.state.theme === 'dark' ? 'tile-content-dark tw-border-gray-700' : 'tile-content-light tw-border-gray-200'"
-            >
-              <div class="tile-header tw-flex tw-justify-between tw-items-start">
-                <div
-                  class="tile-title tw-text-xs tw-font-bold tw-text-left"
-                  :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-500'"
-                >
-                  {{ t("alerts.incidents.alertCount") }}
-                </div>
-                <div class="tile-icon tw-opacity-80">
-                  <q-icon name="notifications_active" size="24px" color="primary" />
-                </div>
+            <!-- Content -->
+            <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3 tw-flex-1 tw-overflow-auto">
+              <div v-if="tableOfContents.length === 0" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-400'" class="tw-text-xs tw-italic">
+                No sections available
               </div>
-              <div
-                class="tile-value tw-text-lg tw-flex tw-items-end tw-justify-start"
-                :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-900'"
-              >
-                {{ incidentDetails.alert_count }}
+              <div v-else class="tw-space-y-1">
+                <!-- TOC Items -->
+                <template v-for="item in tableOfContents" :key="item.id">
+                  <div>
+                    <!-- Level 1 Item -->
+                    <div
+                      :class="[
+                        'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1.5 tw-rounded tw-transition-colors',
+                        store.state.theme === 'dark'
+                          ? 'tw-text-gray-200'
+                          : 'tw-text-gray-900'
+                      ]"
+                    >
+                      <!-- Icon on the left -->
+                      <q-icon
+                        :name="item.children.length > 0 ? 'folder' : 'article'"
+                        size="14px"
+                        class="tw-opacity-60 tw-flex-shrink-0"
+                      />
+                      <!-- Text in the middle - clickable to scroll -->
+                      <span
+                        @click="scrollToSection(item.id)"
+                        :class="[
+                          'tw-text-xs tw-font-medium tw-truncate tw-flex-1 tw-cursor-pointer',
+                          store.state.theme === 'dark'
+                            ? 'hover:tw-text-blue-400'
+                            : 'hover:tw-text-blue-600'
+                        ]"
+                      >{{ item.text }}</span>
+                      <!-- Expand button on the right (only for items with children) -->
+                      <q-btn
+                        v-if="item.children.length > 0"
+                        flat
+                        dense
+                        round
+                        size="xs"
+                        :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
+                        @click="toggleSection(item, $event)"
+                        class="tw-flex-shrink-0"
+                      >
+                        <q-tooltip :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <!-- Level 2 Children -->
+                    <div v-if="expandedSections[item.id] && item.children.length > 0" class="tw-ml-4 tw-space-y-1 tw-mt-1">
+                      <template v-for="child in item.children" :key="child.id">
+                        <div>
+                          <!-- Level 2 Item -->
+                          <div
+                            :class="[
+                              'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1 tw-rounded tw-transition-colors',
+                              store.state.theme === 'dark'
+                                ? 'tw-text-gray-300'
+                                : 'tw-text-gray-700'
+                            ]"
+                          >
+                            <!-- Icon on the left -->
+                            <q-icon
+                              name="label"
+                              size="12px"
+                              class="tw-opacity-60 tw-flex-shrink-0"
+                            />
+                            <!-- Text in the middle - clickable to scroll -->
+                            <span
+                              @click="scrollToSection(child.id)"
+                              :class="[
+                                'tw-text-xs tw-truncate tw-flex-1 tw-cursor-pointer',
+                                store.state.theme === 'dark'
+                                  ? 'hover:tw-text-blue-400'
+                                  : 'hover:tw-text-blue-600'
+                              ]"
+                            >{{ child.text }}</span>
+                            <!-- Expand button on the right (only for items with children) -->
+                            <q-btn
+                              v-if="child.children.length > 0"
+                              flat
+                              dense
+                              round
+                              size="xs"
+                              :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
+                              @click="toggleSection(child, $event)"
+                              class="tw-flex-shrink-0"
+                            >
+                              <q-tooltip :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                            </q-btn>
+                          </div>
+
+                          <!-- Level 3 Children -->
+                          <div v-if="expandedSections[child.id] && child.children.length > 0" class="tw-ml-4 tw-space-y-1 tw-mt-1">
+                            <div
+                              v-for="grandchild in child.children"
+                              :key="grandchild.id"
+                              @click="scrollToSection(grandchild.id)"
+                              :class="[
+                                'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1 tw-rounded tw-cursor-pointer tw-transition-colors',
+                                store.state.theme === 'dark'
+                                  ? 'hover:tw-bg-gray-700 tw-text-gray-400'
+                                  : 'hover:tw-bg-blue-50 tw-text-gray-600'
+                              ]"
+                            >
+                              <q-icon name="fiber_manual_record" size="8px" class="tw-opacity-60" />
+                              <span class="tw-text-[11px] tw-truncate">{{ grandchild.text }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="tw-mb-4">
-          <div class="tw-flex tw-gap-2">
-            <q-btn
-              v-if="incidentDetails.status === 'open'"
-              color="warning"
-              no-caps
-              unelevated
-              dense
-              @click="acknowledgeIncident"
-              :loading="updating"
-              align="left"
-              class="action-btn-compact tw-justify-start tw-flex-1"
-            >
-              <q-icon name="check_circle" size="xs" class="tw-mr-1.5" />
-              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.acknowledge") }}</span>
-              <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="incidentDetails.status !== 'resolved'"
-              color="positive"
-              no-caps
-              unelevated
-              dense
-              @click="resolveIncident"
-              :loading="updating"
-              align="left"
-              class="action-btn-compact tw-justify-start tw-flex-1"
-            >
-              <q-icon name="task_alt" size="xs" class="tw-mr-1.5" />
-              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.resolve") }}</span>
-              <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="incidentDetails.status === 'resolved'"
-              color="negative"
-              no-caps
-              unelevated
-              dense
-              @click="reopenIncident"
-              :loading="updating"
-              align="left"
-              class="action-btn-compact tw-justify-start"
-            >
-              <q-icon name="restart_alt" size="xs" class="tw-mr-1.5" />
-              <span class="tw-text-xs tw-font-medium">{{ t("alerts.incidents.reopen") }}</span>
-              <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
-
+        <!-- Bottom Section (48% height) - Timeline, Dimensions, Topology -->
+        <div style="height: 48%" class="tw-overflow-auto tw-p-4">
         <!-- Timeline with UTC timestamps -->
         <div
+          id="timeline"
           :class="[
             'tw-rounded-lg tw-border tw-mb-4 tw-overflow-hidden',
             store.state.theme === 'dark'
@@ -228,63 +297,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Content -->
           <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3">
-            <div class="tw-space-y-3">
-              <div class="tw-flex tw-items-start tw-gap-2">
-                <q-icon name="play_arrow" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-green-400' : 'tw-text-green-600'" class="tw-mt-0.5" />
-                <div class="tw-flex-1">
-                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
-                    First Alert
-                  </div>
-                  <div
-                    :class="[
-                      'tw-text-xs tw-font-semibold tw-font-mono',
-                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
-                    ]"
-                  >
-                    {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
-                  </div>
-                </div>
+            <div class="tw-space-y-2.5">
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <q-icon name="play_arrow" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-green-400' : 'tw-text-green-600'" />
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-font-medium">
+                  First Alert:
+                </span>
+                <span
+                  :class="[
+                    'tw-text-xs tw-font-mono',
+                    store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                  ]"
+                >
+                  {{ formatTimestampUTC(incidentDetails.first_alert_at) }}
+                </span>
               </div>
 
-              <div class="tw-flex tw-items-start tw-gap-2">
-                <q-icon name="flag" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-orange-600'" class="tw-mt-0.5" />
-                <div class="tw-flex-1">
-                  <div :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-mb-0.5">
-                    Last Alert
-                  </div>
-                  <div
-                    :class="[
-                      'tw-text-xs tw-font-semibold tw-font-mono',
-                      store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
-                    ]"
-                  >
-                    {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
-                  </div>
-                </div>
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <q-icon name="flag" size="14px" :class="store.state.theme === 'dark' ? 'tw-text-orange-400' : 'tw-text-orange-600'" />
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-text-[11px] tw-font-medium">
+                  Last Alert:
+                </span>
+                <span
+                  :class="[
+                    'tw-text-xs tw-font-mono',
+                    store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'
+                  ]"
+                >
+                  {{ formatTimestampUTC(incidentDetails.last_alert_at) }}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Dimensions & Topology - side by side -->
-        <div class="tw-flex tw-gap-3 tw-mb-4">
+        <!-- Dimensions & Topology - stacked -->
+        <div class="tw-flex tw-flex-col tw-gap-3 tw-mb-4">
           <!-- Stable Dimensions -->
-          <div class="tw-flex-1 tw-min-w-0">
-            <div class="tw-text-xs tw-font-medium tw-mb-1">
-              {{ t("alerts.incidents.stableDimensions") }}
+          <div
+            :class="[
+              'tw-rounded-lg tw-border tw-overflow-hidden',
+              store.state.theme === 'dark'
+                ? 'tw-border-gray-700'
+                : 'tw-border-gray-200'
+            ]"
+          >
+            <!-- Header -->
+            <div
+              :class="[
+                'tw-px-3 tw-py-2 tw-flex tw-items-center tw-gap-2 tw-border-b',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-gray-800 tw-border-gray-700'
+                  : 'tw-bg-gray-100 tw-border-gray-200'
+              ]"
+            >
+              <q-icon name="category" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
+                {{ t("alerts.incidents.stableDimensions") }}
+              </span>
             </div>
-            <div class="info-box tw-rounded tw-p-2 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
+            <!-- Content -->
+            <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3 tw-overflow-x-auto">
               <div
                 v-for="(value, key) in incidentDetails.stable_dimensions"
                 :key="key"
-                class="tw-flex"
+                class="tw-flex tw-text-xs tw-mb-1.5 last:tw-mb-0"
               >
-                <span class="label-text tw-mr-1">{{ key }}:</span>
-                <span class="tw-font-mono tw-truncate">{{ value }}</span>
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-mr-1 tw-font-medium tw-whitespace-nowrap">{{ key }}:</span>
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'" class="tw-font-mono tw-whitespace-nowrap">{{ value }}</span>
               </div>
               <div
                 v-if="Object.keys(incidentDetails.stable_dimensions).length === 0"
-                class="muted-text"
+                :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-400'"
+                class="tw-text-xs tw-italic"
               >
                 No dimensions
               </div>
@@ -292,37 +377,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Topology Context -->
-          <div v-if="incidentDetails.topology_context" class="tw-flex-1 tw-min-w-0">
-            <div class="tw-text-xs tw-font-medium tw-mb-1">
-              {{ t("alerts.incidents.topology") }}
+          <div
+            v-if="incidentDetails.topology_context"
+            :class="[
+              'tw-rounded-lg tw-border tw-overflow-hidden',
+              store.state.theme === 'dark'
+                ? 'tw-border-gray-700'
+                : 'tw-border-gray-200'
+            ]"
+          >
+            <!-- Header -->
+            <div
+              :class="[
+                'tw-px-3 tw-py-2 tw-flex tw-items-center tw-gap-2 tw-border-b',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-gray-800 tw-border-gray-700'
+                  : 'tw-bg-gray-100 tw-border-gray-200'
+              ]"
+            >
+              <q-icon name="account_tree" size="16px" class="tw-opacity-80" />
+              <span :class="store.state.theme === 'dark' ? 'tw-text-gray-300' : 'tw-text-gray-700'" class="tw-text-xs tw-font-semibold">
+                {{ t("alerts.incidents.topology") }}
+              </span>
             </div>
-            <div class="info-box tw-rounded tw-p-2 tw-text-xs" :class="isDarkMode ? 'info-box-dark' : 'info-box-light'">
-              <div>
-                <span class="label-text">Service:</span>
-                <span class="tw-ml-1 tw-font-mono">{{ incidentDetails.topology_context.service }}</span>
+            <!-- Content -->
+            <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3">
+              <div class="tw-text-xs tw-mb-2">
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">Service:</span>
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-200' : 'tw-text-gray-900'" class="tw-ml-1 tw-font-mono">{{ incidentDetails.topology_context.service }}</span>
               </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw-mt-1">
-                <span class="label-text">{{ t("alerts.incidents.upstreamServices") }}:</span>
+              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw-text-xs tw-mb-2">
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">{{ t("alerts.incidents.upstreamServices") }}:</span>
                 <span class="tw-ml-1">
                   <q-badge
                     v-for="svc in incidentDetails.topology_context.upstream_services"
                     :key="svc"
                     color="blue-grey-4"
                     :label="svc"
-                    class="tw-mr-1"
+                    class="tw-mr-1 tw-mt-1"
                     size="xs"
                   />
                 </span>
               </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw-mt-1">
-                <span class="label-text">{{ t("alerts.incidents.downstreamServices") }}:</span>
+              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw-text-xs">
+                <span :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'" class="tw-font-medium">{{ t("alerts.incidents.downstreamServices") }}:</span>
                 <span class="tw-ml-1">
                   <q-badge
                     v-for="svc in incidentDetails.topology_context.downstream_services"
                     :key="svc"
                     color="blue-grey-4"
                     :label="svc"
-                    class="tw-mr-1"
+                    class="tw-mr-1 tw-mt-1"
                     size="xs"
                   />
                 </span>
@@ -330,6 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        </div>
+        <!-- End Bottom Section -->
       </div>
 
       <!-- Right Column: Tabs and Content -->
@@ -354,17 +461,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-tab>
           </q-tabs>
-          <!-- AI Chat Button -->
-          <q-btn
-            size="sm"
-            flat
-            dense
-            @click="openSREChat"
-            class="tw-ml-auto"
-          >
-            <img :src="getAIIconURL()" class="tw-w-5 tw-h-5" />
-            <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
-          </q-btn>
+
+          <!-- Action buttons -->
+          <div class="tw-flex tw-gap-2 tw-ml-auto tw-items-center">
+            <q-btn
+              v-if="incidentDetails.status === 'open'"
+              color="warning"
+              size="sm"
+              no-caps
+              unelevated
+              dense
+              @click="acknowledgeIncident"
+              :loading="updating"
+              class="tw-px-3"
+            >
+              <q-icon name="check_circle" size="16px" class="tw-mr-1" />
+              {{ t("alerts.incidents.acknowledge") }}
+              <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-if="incidentDetails.status !== 'resolved'"
+              color="positive"
+              size="sm"
+              no-caps
+              unelevated
+              dense
+              @click="resolveIncident"
+              :loading="updating"
+              class="tw-px-3"
+            >
+              <q-icon name="task_alt" size="16px" class="tw-mr-1" />
+              {{ t("alerts.incidents.resolve") }}
+              <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-if="incidentDetails.status === 'resolved'"
+              color="info"
+              size="sm"
+              no-caps
+              unelevated
+              dense
+              @click="reopenIncident"
+              :loading="updating"
+              class="tw-px-3"
+            >
+              <q-icon name="refresh" size="16px" class="tw-mr-1" />
+              {{ t("alerts.incidents.reopen") }}
+              <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
+            </q-btn>
+
+            <!-- AI Chat Button -->
+            <q-btn
+              size="sm"
+              flat
+              dense
+              @click="openSREChat"
+              class="tw-ml-2"
+            >
+              <img :src="getAIIconURL()" class="tw-w-5 tw-h-5" />
+              <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
+            </q-btn>
+          </div>
         </div>
 
         <!-- Tab Content Area -->
@@ -394,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="rcaStreamContent"
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(rcaStreamContent)"
+              v-html="formattedRcaContent"
             />
           </div>
 
@@ -402,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
+              v-html="formattedRcaContent"
             />
           </div>
 
@@ -460,6 +617,8 @@ import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import { getImageURL } from "@/utils/zincutils";
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -486,6 +645,18 @@ export default defineComponent({
     // Tab management
     const activeTab = ref("incidentAnalysis");
 
+    // Table of Contents
+    interface TocItem {
+      id: string;
+      text: string;
+      level: number;
+      children: TocItem[];
+      expanded: boolean;
+    }
+    const tableOfContents = ref<TocItem[]>([]);
+    const expandedSections = ref<Record<string, boolean>>({});
+    const tocRenderKey = ref(0);
+
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
@@ -494,6 +665,19 @@ export default defineComponent({
     // Check if dark mode is active
     const isDarkMode = computed(() => {
       return store.state.theme === "dark";
+    });
+
+    // Computed property for formatted RCA content
+    const formattedRcaContent = computed(() => {
+      const content = rcaLoading.value && rcaStreamContent.value
+        ? rcaStreamContent.value
+        : hasExistingRca.value
+        ? incidentDetails.value?.topology_context?.suggested_root_cause || ''
+        : '';
+
+      if (!content) return '';
+
+      return formatRcaContent(content);
     });
 
     const loadDetails = async (incidentId: string) => {
@@ -643,6 +827,21 @@ export default defineComponent({
       }
     };
 
+    const getSeverityColorHex = (severity: string) => {
+      switch (severity) {
+        case "P1":
+          return "#b91c1c"; // red-700
+        case "P2":
+          return "#c2410c"; // orange-700
+        case "P3":
+          return "#d97706"; // amber-600
+        case "P4":
+          return "#6b7280"; // gray-500
+        default:
+          return "#6b7280"; // gray-500
+      }
+    };
+
     const getSeverityTextColor = (severity: string) => {
       switch (severity) {
         case "P1":
@@ -701,40 +900,319 @@ export default defineComponent({
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
-    const escapeHtml = (text: string): string => {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+    // Extract headings from markdown content to build table of contents
+    const extractTableOfContents = (content: string): TocItem[] => {
+      // Handle both actual newlines and escaped \n in JSON strings
+      const normalizedContent = content.replace(/\\n/g, '\n');
+      const lines = normalizedContent.split('\n');
+      const toc: TocItem[] = [];
+      const stack: TocItem[] = [];
+      let inCodeBlock = false;
+
+      lines.forEach((line) => {
+        // Check for code block delimiters (````)
+        if (line.trim().startsWith('```')) {
+          inCodeBlock = !inCodeBlock;
+          return;
+        }
+
+        // Skip lines inside code blocks
+        if (inCodeBlock) {
+          return;
+        }
+
+        const match = line.match(/^(#{1,3})\s+(.+)$/);
+        if (match) {
+          const level = match[1].length;
+          const text = match[2].trim();
+          const id = 'section-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+          // Skip h1 headings (document title) - only show h2 and h3 in TOC
+          if (level === 1) {
+            return;
+          }
+
+          const tocItem: TocItem = {
+            id,
+            text,
+            level,
+            children: [],
+            expanded: false
+          };
+
+          // Adjust level for display (h2 becomes level 1, h3 becomes level 2)
+          const displayLevel = level - 1;
+
+          // Find the correct parent based on adjusted level
+          while (stack.length > 0 && stack[stack.length - 1].level >= displayLevel) {
+            stack.pop();
+          }
+
+          // Update the item with display level
+          tocItem.level = displayLevel;
+
+          if (stack.length === 0) {
+            // Top level item
+            toc.push(tocItem);
+          } else {
+            // Child item
+            stack[stack.length - 1].children.push(tocItem);
+          }
+
+          stack.push(tocItem);
+        }
+      });
+
+      return toc;
+    };
+
+    // Scroll to a section in the RCA report
+    const scrollToSection = (id: string) => {
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        // Only search within RCA content areas (not left sidebar)
+        const rcaContainers = Array.from(document.querySelectorAll('.rca-container'));
+        let element: HTMLElement | null = null;
+        let scrollContainer: Element | null = null;
+
+        // Search for the element only within RCA containers
+        for (const container of rcaContainers) {
+          const foundElement = container.querySelector(`#${id}`) as HTMLElement;
+          if (foundElement) {
+            element = foundElement;
+            scrollContainer = container;
+            break;
+          }
+        }
+
+        if (element && scrollContainer) {
+          // Get the element's position relative to the scroll container
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const elementRect = element.getBoundingClientRect();
+          const relativeTop = elementRect.top - containerRect.top;
+          const offsetPosition = scrollContainer.scrollTop + relativeTop - 20;
+
+          // Scroll within the container with offset
+          scrollContainer.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 50);
+    };
+
+    // Toggle section expansion in TOC
+    const toggleSection = (item: TocItem, event?: Event) => {
+      if (event) {
+        event.stopPropagation();
+      }
+      // Create a new object to avoid triggering reactive updates during render
+      expandedSections.value = {
+        ...expandedSections.value,
+        [item.id]: !expandedSections.value[item.id]
+      };
+    };
+
+    const convertKeyValueListsToTables = (content: string): string => {
+      // Pattern: Lists where items follow "**Key**: Value" or "- **Key**: Value" format
+      // Convert these to markdown tables for better readability
+      const lines = content.split('\n');
+      const result: string[] = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // Check if this line starts a key-value list pattern
+        const isKeyValueItem = /^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(line.trim());
+
+        if (isKeyValueItem) {
+          // Found a key-value list, collect all consecutive items
+          const tableRows: Array<{ key: string; value: string }> = [];
+          let j = i;
+
+          while (j < lines.length) {
+            const currentLine = lines[j].trim();
+            const match = currentLine.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
+
+            if (match) {
+              tableRows.push({ key: match[1], value: match[2] });
+              j++;
+            } else if (currentLine === '' && j < lines.length - 1) {
+              // Allow one blank line within the list
+              const nextLine = lines[j + 1]?.trim();
+              if (/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(nextLine)) {
+                j++; // Skip the blank line
+                continue;
+              } else {
+                break;
+              }
+            } else {
+              break;
+            }
+          }
+
+          // Convert to table if we have 3 or more items
+          if (tableRows.length >= 3) {
+            result.push(''); // Add blank line before table
+            result.push('| Field | Value |');
+            result.push('|-------|-------|');
+            tableRows.forEach(row => {
+              result.push(`| ${row.key} | ${row.value} |`);
+            });
+            result.push(''); // Add blank line after table
+            i = j;
+          } else {
+            // Not enough items for a table, keep as list
+            result.push(line);
+            i++;
+          }
+        } else {
+          result.push(line);
+          i++;
+        }
+      }
+
+      return result.join('\n');
     };
 
     const formatRcaContent = (content: string) => {
-      // First, escape all HTML to prevent XSS attacks
-      const escaped = escapeHtml(content);
+      // First, extract table of contents - only update if content changed
+      const newToc = extractTableOfContents(content);
+      if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
+        tableOfContents.value = newToc;
+      }
 
-      // Collapse only consecutive/multiple newlines (2 or more) into single newline
-      let normalized = escaped.replace(/\n{2,}/g, '\n');
+      // Convert key-value lists to tables
+      const processedContent = convertKeyValueListsToTables(content);
 
-      // Simple markdown-like formatting for RCA content
-      let formatted = normalized;
+      // Configure marked with custom renderer using marked.use() extension API
+      marked.use({
+        renderer: {
+          heading({ tokens, depth, text }: any) {
+            // Parse inline tokens to get the heading text
+            const parsedText = this.parser.parseInline(tokens);
 
-      // Convert # headers with better styling
-      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-5 tw-mb-3 tw-border-b tw-pb-2 tw-text-gray-800">$1</div>');
-      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-sm tw-mt-4 tw-mb-2 tw-text-blue-600">$1</div>');
-      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700">$1</div>');
+            // Generate ID for heading - extract raw text from tokens first
+            let rawText = '';
+            if (tokens && Array.isArray(tokens)) {
+              rawText = tokens.map((t: any) => {
+                // Handle different token types
+                if (t.type === 'text' && t.text) return t.text;
+                if (t.raw) return t.raw;
+                if (t.text) return t.text;
+                return '';
+              }).join('').trim();
+            }
 
-      // Convert **bold** to <strong>
-      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold tw-text-gray-900">$1</strong>');
+            // Fallback: strip HTML tags from parsed text
+            if (!rawText) {
+              rawText = parsedText.replace(/<[^>]*>/g, '').trim();
+            }
 
-      // Convert - list items with better spacing
-      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-text-blue-500 tw-font-bold">•</span><span class="tw-flex-1">$1</span></div>');
+            const id = 'section-' + rawText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-      // Convert numbered lists with better spacing
-      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">$1.</span><span class="tw-flex-1">$2</span></div>');
+            const classes = [
+              'rca-h1 tw-font-bold tw-text-lg tw-text-center tw-mb-4 tw-pb-2 tw-border-b-2',
+              // TODO: Discuss with team - h2 section separators with background and left border
+              // Remove 'rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600' if not approved
+              'rca-h2 tw-font-bold tw-text-lg tw-mt-5 tw-mb-3 tw-text-blue-600 rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600',
+              'rca-h3 tw-font-semibold tw-text-base tw-mt-4 tw-mb-2',
+              'rca-h4 tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700',
+            ];
+            return `<h${depth} id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</h${depth}>`;
+          },
+          code({ text }: any) {
+            return `<div class="rca-code-block tw-bg-gray-100 tw-border tw-border-gray-300 tw-rounded tw-p-3 tw-my-3 tw-overflow-x-auto"><pre class="tw-text-xs tw-font-mono tw-whitespace-pre tw-m-0"><code>${text}</code></pre></div>`;
+          },
+          codespan({ text }: any) {
+            return `<code class="rca-inline-code tw-bg-gray-100 tw-px-1.5 tw-py-0.5 tw-rounded tw-text-xs tw-font-mono">${text}</code>`;
+          },
+          list(token: any) {
+            const body = token.items.map((item: any) => this.listitem(item)).join('');
+            const tag = token.ordered ? 'ol' : 'ul';
+            const classes = token.ordered ? 'rca-ol tw-pl-5 tw-my-3 tw-space-y-1.5 tw-list-decimal' : 'rca-ul tw-pl-5 tw-my-3 tw-space-y-1.5 tw-list-disc';
+            return `<${tag} class="${classes}">${body}</${tag}>`;
+          },
+          listitem(item: any) {
+            const text = this.parser.parse(item.tokens);
+            return `<li class="rca-list-item">${text}</li>`;
+          },
+          table(token: any) {
+            let header = '<tr>';
+            for (let i = 0; i < token.header.length; i++) {
+              const cell = token.header[i];
+              const content = this.parser.parseInline(cell.tokens);
+              const cellClass = i === 0 ? 'rca-first-cell' : '';
+              header += `<th class="tw-px-3 tw-py-2 tw-text-left tw-font-semibold tw-text-xs tw-border-b ${cellClass}">${content}</th>`;
+            }
+            header += '</tr>';
 
-      // Convert remaining single newlines to <br>
-      formatted = formatted.replace(/\n/g, '<br>');
+            let body = '';
+            for (const row of token.rows) {
+              body += '<tr class="hover:tw-bg-gray-50">';
+              for (let i = 0; i < row.length; i++) {
+                const cell = row[i];
+                const content = this.parser.parseInline(cell.tokens);
+                const cellClass = i === 0 ? 'rca-first-cell' : '';
+                body += `<td class="tw-px-3 tw-py-2 tw-text-xs tw-border-b ${cellClass}">${content}</td>`;
+              }
+              body += '</tr>';
+            }
 
-      return formatted;
+            return `<div class="rca-table-wrapper tw-my-4 tw-overflow-x-auto"><table class="rca-table tw-w-full tw-border tw-border-gray-300 tw-rounded"><thead class="tw-bg-gray-100">${header}</thead><tbody>${body}</tbody></table></div>`;
+          },
+          blockquote({ tokens }: any) {
+            const text = this.parser.parse(tokens);
+            return `<blockquote class="rca-blockquote tw-border-l-4 tw-border-blue-500 tw-pl-4 tw-py-2 tw-my-3 tw-bg-blue-50 tw-italic">${text}</blockquote>`;
+          },
+          paragraph({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<p class="tw-mb-3">${text}</p>`;
+          },
+          strong({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<strong class="tw-font-semibold">${text}</strong>`;
+          },
+          em({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<em class="tw-italic">${text}</em>`;
+          },
+          hr() {
+            return `<hr class="tw-my-4 tw-border-t tw-border-gray-300" />`;
+          },
+        }
+      });
+
+      
+      // Configure marked options
+      marked.setOptions({
+        gfm: true,
+        breaks: false,
+      });
+
+      // Parse markdown
+      const html = marked.parse(processedContent) as string;
+
+      // Debug: Check Timeline heading in HTML before DOMPurify
+      const timelineMatch = html.match(/<h2[^>]*>Timeline<\/h2>/);
+      console.log('Timeline HTML before DOMPurify:', timelineMatch ? timelineMatch[0] : 'NOT FOUND');
+
+      // Sanitize HTML to prevent XSS
+      const sanitized = DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'hr', 'div', 'span'],
+        ALLOWED_ATTR: ['class', 'value', 'style', 'id'],
+        ADD_ATTR: ['id'],
+        KEEP_CONTENT: true,
+        RETURN_TRUSTED_TYPE: false
+      });
+
+      // Debug: Check Timeline heading after DOMPurify
+      const timelineMatchAfter = sanitized.match(/<h2[^>]*>Timeline<\/h2>/);
+      console.log('Timeline HTML after DOMPurify:', timelineMatchAfter ? timelineMatchAfter[0] : 'NOT FOUND');
+
+      // Wrap in container
+      return `<div class="rca-report-content">${sanitized}</div>`;
     };
 
     const triggerRca = async () => {
@@ -821,18 +1299,25 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      tableOfContents,
+      expandedSections,
+      tocRenderKey,
+      formattedRcaContent,
       close,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
       triggerRca,
       openSREChat,
+      scrollToSection,
+      toggleSection,
       getStatusColor,
       getStatusDotColor,
       getStatusTextColor,
       getStatusLabel,
       getSeverityColor,
       getSeverityDotColor,
+      getSeverityColorHex,
       getSeverityTextColor,
       getReasonColor,
       getReasonLabel,
@@ -889,59 +1374,6 @@ body.body--dark .tile-content:hover {
 .action-btn-compact:active {
   transform: translateY(0);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.rca-content {
-  line-height: 1.7;
-  font-size: 14px;
-}
-
-/* RCA Content Styling - Dark Mode */
-body.body--dark .rca-content :deep(strong) {
-  font-weight: 600;
-  color: #cbd5e1; /* slate-300 - soft, readable */
-}
-
-body.body--dark .rca-content :deep(.tw-text-blue-600) {
-  color: #94a3b8; /* slate-400 - muted */
-}
-
-body.body--dark .rca-content :deep(.tw-text-blue-500) {
-  color: #94a3b8; /* slate-400 - muted bullet */
-}
-
-body.body--dark .rca-content :deep(.tw-text-gray-800) {
-  color: #e5e7eb; /* gray-200 */
-}
-
-body.body--dark .rca-content :deep(.tw-text-gray-700) {
-  color: #d1d5db; /* gray-300 */
-}
-
-body.body--dark .rca-content :deep(.tw-text-gray-600) {
-  color: #9ca3af; /* gray-400 */
-}
-
-body.body--dark .rca-content :deep(.tw-text-gray-900) {
-  color: #f3f4f6; /* gray-100 */
-}
-
-body.body--dark .rca-content :deep(.tw-border-b) {
-  border-color: #4b5563; /* gray-600 border */
-}
-
-/* RCA Content Styling - Light Mode */
-.rca-content :deep(strong) {
-  font-weight: 600;
-  color: #1e40af; /* blue-800 */
-}
-
-.rca-content :deep(.tw-text-blue-600) {
-  color: #2563eb; /* blue-600 */
-}
-
-.rca-content :deep(.tw-border-b) {
-  border-color: #bfdbfe; /* blue-200 */
 }
 
 /* Info Box (Stable Dimensions, Topology) - Light Mode */
@@ -1003,4 +1435,8 @@ body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
 body.body--dark .tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
   background: #475569;
 }
+</style>
+
+<style lang="scss">
+@import './RcaReport.scss';
 </style>
