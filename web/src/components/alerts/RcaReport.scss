@@ -85,12 +85,12 @@ body.body--dark .rca-report-content {
   .rca-h3 {
     color: var(--rca-text-secondary);
     position: relative;
-    padding-left: 1.5rem;
+    padding-left: 1rem;
 
     &::before {
       content: '»';
       position: absolute;
-      left: 0.25rem;
+      left: 0rem;
       top: 50%;
       transform: translateY(-50%);
       color: var(--rca-icon-color);
