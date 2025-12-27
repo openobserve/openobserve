@@ -337,15 +337,21 @@ impl DbAdapter for MysqlAdapter {
         // Disable foreign key checks and truncate in the same connection
         // to avoid connection pool issues
         let mut conn = self.pool.acquire().await?;
-        sqlx::query("SET FOREIGN_KEY_CHECKS = 0")
+        if let Err(e) = sqlx::query("SET FOREIGN_KEY_CHECKS = 0")
             .execute(&mut *conn)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to disable foreign key checks for table {table}: {e}");
+        }
         sqlx::query(&format!("TRUNCATE TABLE `{}`", table))
             .execute(&mut *conn)
             .await?;
-        sqlx::query("SET FOREIGN_KEY_CHECKS = 1")
+        if let Err(e) = sqlx::query("SET FOREIGN_KEY_CHECKS = 1")
             .execute(&mut *conn)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to enable foreign key checks for table {table}: {e}");
+        }
         Ok(())
     }
 

@@ -303,15 +303,21 @@ impl DbAdapter for PostgresAdapter {
 
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error> {
         // Disable triggers, truncate, then re-enable for this specific table
-        sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
+        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
             .execute(&self.pool)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to disable triggers for table {table}: {e}");
+        }
         sqlx::query(&format!("TRUNCATE TABLE \"{}\" CASCADE", table))
             .execute(&self.pool)
             .await?;
-        sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
+        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
             .execute(&self.pool)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to enable triggers for table {table}: {e}");
+        }
         Ok(())
     }
 
