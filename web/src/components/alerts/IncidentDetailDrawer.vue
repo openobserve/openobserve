@@ -460,6 +460,8 @@ import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import { getImageURL } from "@/utils/zincutils";
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -701,40 +703,95 @@ export default defineComponent({
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
-    const escapeHtml = (text: string): string => {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
     const formatRcaContent = (content: string) => {
-      // First, escape all HTML to prevent XSS attacks
-      const escaped = escapeHtml(content);
+      // Configure marked with custom renderer using marked.use() extension API
+      marked.use({
+        renderer: {
+          heading({ tokens, depth }: any) {
+            const text = this.parser.parseInline(tokens);
+            const classes = [
+              'rca-h1 tw-font-bold tw-text-xl tw-mt-6 tw-mb-4 tw-pb-2 tw-border-b-2',
+              'rca-h2 tw-font-bold tw-text-lg tw-mt-5 tw-mb-3 tw-text-blue-600',
+              'rca-h3 tw-font-semibold tw-text-base tw-mt-4 tw-mb-2',
+              'rca-h4 tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700',
+            ];
+            return `<h${depth} class="${classes[depth - 1] || ''}">${text}</h${depth}>`;
+          },
+          code({ text }: any) {
+            return `<div class="rca-code-block tw-bg-gray-100 tw-border tw-border-gray-300 tw-rounded tw-p-3 tw-my-3 tw-overflow-x-auto"><pre class="tw-text-xs tw-font-mono tw-whitespace-pre tw-m-0"><code>${text}</code></pre></div>`;
+          },
+          codespan({ text }: any) {
+            return `<code class="rca-inline-code tw-bg-gray-100 tw-px-1.5 tw-py-0.5 tw-rounded tw-text-xs tw-font-mono">${text}</code>`;
+          },
+          list(token: any) {
+            const body = token.items.map((item: any) => this.listitem(item)).join('');
+            const tag = token.ordered ? 'ol' : 'ul';
+            const classes = token.ordered ? 'rca-ol tw-pl-5 tw-my-3 tw-space-y-1.5 tw-list-decimal' : 'rca-ul tw-pl-5 tw-my-3 tw-space-y-1.5 tw-list-disc';
+            return `<${tag} class="${classes}">${body}</${tag}>`;
+          },
+          listitem(item: any) {
+            const text = this.parser.parse(item.tokens);
+            return `<li class="rca-list-item">${text}</li>`;
+          },
+          table(token: any) {
+            let header = '<tr>';
+            for (const cell of token.header) {
+              const content = this.parser.parseInline(cell.tokens);
+              header += `<th class="tw-px-3 tw-py-2 tw-text-left tw-font-semibold tw-text-xs tw-border-b">${content}</th>`;
+            }
+            header += '</tr>';
 
-      // Collapse only consecutive/multiple newlines (2 or more) into single newline
-      let normalized = escaped.replace(/\n{2,}/g, '\n');
+            let body = '';
+            for (const row of token.rows) {
+              body += '<tr class="hover:tw-bg-gray-50">';
+              for (const cell of row) {
+                const content = this.parser.parseInline(cell.tokens);
+                body += `<td class="tw-px-3 tw-py-2 tw-text-xs tw-border-b">${content}</td>`;
+              }
+              body += '</tr>';
+            }
 
-      // Simple markdown-like formatting for RCA content
-      let formatted = normalized;
+            return `<div class="rca-table-wrapper tw-my-4 tw-overflow-x-auto"><table class="rca-table tw-w-full tw-border tw-border-gray-300 tw-rounded"><thead class="tw-bg-gray-100">${header}</thead><tbody>${body}</tbody></table></div>`;
+          },
+          blockquote({ tokens }: any) {
+            const text = this.parser.parse(tokens);
+            return `<blockquote class="rca-blockquote tw-border-l-4 tw-border-blue-500 tw-pl-4 tw-py-2 tw-my-3 tw-bg-blue-50 tw-italic">${text}</blockquote>`;
+          },
+          paragraph({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<p class="tw-mb-3">${text}</p>`;
+          },
+          strong({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<strong class="tw-font-semibold">${text}</strong>`;
+          },
+          em({ tokens }: any) {
+            const text = this.parser.parseInline(tokens);
+            return `<em class="tw-italic">${text}</em>`;
+          },
+          hr() {
+            return `<hr class="tw-my-4 tw-border-t tw-border-gray-300" />`;
+          },
+        }
+      });
 
-      // Convert # headers with better styling
-      formatted = formatted.replace(/^# (.+)$/gm, '<div class="tw-font-bold tw-text-base tw-mt-5 tw-mb-3 tw-border-b tw-pb-2 tw-text-gray-800">$1</div>');
-      formatted = formatted.replace(/^## (.+)$/gm, '<div class="tw-font-bold tw-text-sm tw-mt-4 tw-mb-2 tw-text-blue-600">$1</div>');
-      formatted = formatted.replace(/^### (.+)$/gm, '<div class="tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700">$1</div>');
+      // Configure marked options
+      marked.setOptions({
+        gfm: true,
+        breaks: false,
+      });
 
-      // Convert **bold** to <strong>
-      formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="tw-font-semibold tw-text-gray-900">$1</strong>');
+      // Parse markdown
+      const html = marked.parse(content) as string;
 
-      // Convert - list items with better spacing
-      formatted = formatted.replace(/^- (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-text-blue-500 tw-font-bold">•</span><span class="tw-flex-1">$1</span></div>');
+      // Sanitize HTML to prevent XSS
+      const sanitized = DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'hr', 'div', 'span'],
+        ALLOWED_ATTR: ['class', 'value']
+      });
 
-      // Convert numbered lists with better spacing
-      formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">$1.</span><span class="tw-flex-1">$2</span></div>');
-
-      // Convert remaining single newlines to <br>
-      formatted = formatted.replace(/\n/g, '<br>');
-
-      return formatted;
+      // Wrap in container
+      return `<div class="rca-report-content">${sanitized}</div>`;
     };
 
     const triggerRca = async () => {
@@ -1002,5 +1059,188 @@ body.body--dark .muted-text {
 body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
 body.body--dark .tabs-content-column .tw-overflow-auto::-webkit-scrollbar-thumb {
   background: #475569;
+}
+
+/* RCA Report Content Styles */
+.rca-report-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  line-height: 1.6;
+}
+
+/* Headers */
+.rca-h1 {
+  color: #1e293b;
+  border-bottom-color: #cbd5e1;
+}
+
+body.body--dark .rca-h1 {
+  color: #e5e7eb;
+  border-bottom-color: #4b5563;
+}
+
+.rca-h2 {
+  color: #2563eb;
+}
+
+body.body--dark .rca-h2 {
+  color: #60a5fa;
+}
+
+.rca-h3 {
+  color: #334155;
+}
+
+body.body--dark .rca-h3 {
+  color: #cbd5e1;
+}
+
+.rca-h4 {
+  color: #475569;
+}
+
+body.body--dark .rca-h4 {
+  color: #94a3b8;
+}
+
+/* Lists */
+.rca-ul, .rca-ol {
+  list-style-position: outside;
+}
+
+.rca-ul {
+  list-style-type: disc;
+}
+
+.rca-list-item {
+  color: #1f2937;
+}
+
+body.body--dark .rca-list-item {
+  color: #d1d5db;
+}
+
+.rca-ol-item {
+  color: #1f2937;
+}
+
+body.body--dark .rca-ol-item {
+  color: #d1d5db;
+}
+
+/* Code blocks */
+.rca-code-block {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+body.body--dark .rca-code-block {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.rca-code-block pre {
+  color: #1f2937;
+}
+
+body.body--dark .rca-code-block pre {
+  color: #e5e7eb;
+}
+
+/* Inline code */
+.rca-inline-code {
+  background-color: #f3f4f6;
+  color: #be185d;
+}
+
+body.body--dark .rca-inline-code {
+  background-color: #374151;
+  color: #fda4af;
+}
+
+/* Tables */
+.rca-table {
+  border-color: #d1d5db;
+  background-color: #ffffff;
+}
+
+body.body--dark .rca-table {
+  border-color: #374151;
+  background-color: #1f2937;
+}
+
+.rca-table thead {
+  background-color: #f3f4f6;
+}
+
+body.body--dark .rca-table thead {
+  background-color: #374151;
+}
+
+.rca-table th {
+  border-bottom-color: #d1d5db;
+  color: #374155;
+}
+
+body.body--dark .rca-table th {
+  border-bottom-color: #4b5563;
+  color: #cbd5e1;
+}
+
+.rca-table td {
+  border-bottom-color: #e5e7eb;
+  color: #1f2937;
+}
+
+body.body--dark .rca-table td {
+  border-bottom-color: #374151;
+  color: #d1d5db;
+}
+
+.rca-table tr:hover {
+  background-color: #f9fafb;
+}
+
+body.body--dark .rca-table tr:hover {
+  background-color: #374151;
+}
+
+/* Blockquotes */
+.rca-blockquote {
+  background-color: #eff6ff;
+  border-left-color: #3b82f6;
+  color: #1e40af;
+}
+
+body.body--dark .rca-blockquote {
+  background-color: #1e3a5f;
+  border-left-color: #60a5fa;
+  color: #bfdbfe;
+}
+
+/* Horizontal rules */
+.rca-report-content hr {
+  border-top-color: #d1d5db;
+}
+
+body.body--dark .rca-report-content hr {
+  border-top-color: #4b5563;
+}
+
+/* Strong/Bold text */
+.rca-report-content strong {
+  color: #0f172a;
+}
+
+body.body--dark .rca-report-content strong {
+  color: #f1f5f9;
+}
+
+/* Emphasized/Italic text */
+.rca-report-content em {
+  color: #475569;
+}
+
+body.body--dark .rca-report-content em {
+  color: #cbd5e1;
 }
 </style>
