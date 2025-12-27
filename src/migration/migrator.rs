@@ -177,7 +177,14 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
 
     // 8. Print report
     let end_time = Utc::now().timestamp_micros();
-    print_report(&table_stats, start_time, end_time, &config.from, &config.to);
+    print_report(
+        &table_stats,
+        start_time,
+        end_time,
+        &config.from,
+        &config.to,
+        mode.name(),
+    );
 
     // Close connections
     source.close().await?;

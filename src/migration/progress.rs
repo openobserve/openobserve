@@ -146,6 +146,7 @@ pub fn print_report(
     end_time: i64,
     source: &str,
     target: &str,
+    command: &str,
 ) {
     println!();
     println!("══════════════════════════════════════════════════════════════");
@@ -173,7 +174,7 @@ pub fn print_report(
     );
     println!();
     println!("For incremental sync, use:");
-    println!("  openobserve migrate-meta -f {source} -t {target} --incremental --since {end_time}");
+    println!("  openobserve {command} -f {source} -t {target} --incremental --since {end_time}");
 }
 
 /// Print error message
