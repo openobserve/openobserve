@@ -2,11 +2,11 @@
 // Colors are defined as CSS custom properties for easy theming
 
 .rca-report-content {
-  --rca-bg-primary: #ffffff;
-  --rca-bg-secondary: #f8fafc;
+  --rca-bg-primary: #eff6ff;
+  --rca-bg-secondary: #eff6ff;
   --rca-bg-code: #f3f4f6;
-  --rca-bg-table-even: #fafbfc;
-  --rca-bg-table-hover: #f9fafb;
+  --rca-bg-table-even: #eff6ff;
+  --rca-bg-table-hover: #dbeafe;
   --rca-bg-section: rgba(37, 99, 235, 0.05);
   --rca-bg-blockquote: #eff6ff;
 
@@ -21,9 +21,9 @@
   --rca-text-list: #1f2937;
 
   --rca-border-primary: #cbd5e1;
-  --rca-border-secondary: #e5e7eb;
+  --rca-border-secondary: #bfdbfe;
   --rca-border-tertiary: #d1d5db;
-  --rca-border-table: #f1f5f9;
+  --rca-border-table: #bfdbfe;
   --rca-border-accent: #3b82f6;
 
   --rca-icon-color: #334155;
@@ -185,7 +185,6 @@ body.body--dark .rca-report-content {
 
     tbody {
       tr {
-        transition: all 0.2s ease;
 
         &:last-child td {
           border-bottom: none;
@@ -193,11 +192,6 @@ body.body--dark .rca-report-content {
 
         &:hover {
           background-color: var(--rca-bg-table-hover);
-          transform: scale(1.001);
-        }
-
-        &:nth-child(even) {
-          background-color: var(--rca-bg-table-even);
         }
       }
     }
