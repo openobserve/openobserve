@@ -168,13 +168,17 @@ test.describe("Pre-Test Cleanup", () => {
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
+        /^join_[a-z0-9]+_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams with extra segment (join_<id1>_<id2>_requests, etc.)
         /^func_test_[a-z0-9]+$/,                       // Dashboard functions test streams (func_test_<testId>)
         /^join_manual_test$/,                          // Manual join test stream
         /^test_app_users$/,                            // Test app users stream
         /^test_sessions$/,                             // Test sessions stream
         /^test_web_requests$/,                         // Test web requests stream
         /^alert_trigger_validation$/,                  // Alert trigger validation stream (self-referential POC)
-        /^alert_val_[a-zA-Z0-9]+$/                      // Unique validation streams per test (alert_val_<suffix>)
+        /^alert_val_[a-zA-Z0-9]+$/,                    // Unique validation streams per test (alert_val_<suffix>)
+        /^severity_test_\d+$/,                         // Severity test streams (severity_test_<timestamp>)
+        /^alert_validation_stream$/,                   // Alert validation stream
+        /^auto_playwright_stream$/                     // Auto playwright stream
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
