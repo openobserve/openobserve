@@ -275,14 +275,15 @@ impl DbAdapter for PostgresAdapter {
             .collect::<Vec<_>>()
             .join(", ");
 
+        // Use OVERRIDING SYSTEM VALUE to allow inserting into IDENTITY columns
         let sql = if updates.is_empty() {
             format!(
-                "INSERT INTO \"{}\" ({}) VALUES ({}) ON CONFLICT ({}) DO NOTHING",
+                "INSERT INTO \"{}\" ({}) OVERRIDING SYSTEM VALUE VALUES ({}) ON CONFLICT ({}) DO NOTHING",
                 table, cols, placeholders, pk_cols
             )
         } else {
             format!(
-                "INSERT INTO \"{}\" ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}",
+                "INSERT INTO \"{}\" ({}) OVERRIDING SYSTEM VALUE VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}",
                 table, cols, placeholders, pk_cols, updates
             )
         };
