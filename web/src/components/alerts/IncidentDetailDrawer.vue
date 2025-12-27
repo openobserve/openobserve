@@ -1170,19 +1170,36 @@ body.body--dark .rca-section-bg {
   background-color: rgba(96, 165, 250, 0.08);
 }
 
-.rca-h3 {
+:deep(.rca-h3) {
   color: #334155;
+  position: relative;
+  padding-left: 1.5rem;
 }
 
-body.body--dark .rca-h3 {
+:deep(.rca-h3::before) {
+  content: '»';
+  position: absolute;
+  left: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #334155;
+  font-size: 20px;
+  line-height: 1;
+}
+
+body.body--dark :deep(.rca-h3) {
   color: #cbd5e1;
 }
 
-.rca-h4 {
+body.body--dark :deep(.rca-h3::before) {
+  color: #cbd5e1;
+}
+
+:deep(.rca-h4) {
   color: #475569;
 }
 
-body.body--dark .rca-h4 {
+body.body--dark :deep(.rca-h4) {
   color: #94a3b8;
 }
 
