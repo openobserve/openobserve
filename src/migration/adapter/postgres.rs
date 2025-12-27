@@ -19,7 +19,7 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgRow},
 };
 
-use super::{ColumnInfo, DbAdapter, Row, Value};
+use super::{ColumnInfo, DbAdapter, ForeignKeyInfo, Row, Value};
 
 pub struct PostgresAdapter {
     pool: PgPool,
@@ -152,6 +152,30 @@ impl DbAdapter for PostgresAdapter {
         Ok(rows.into_iter().map(|(name,)| name).collect())
     }
 
+    async fn get_foreign_keys(&self) -> Result<Vec<ForeignKeyInfo>, anyhow::Error> {
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT DISTINCT
+                tc.table_name,
+                ccu.table_name AS referenced_table
+             FROM information_schema.table_constraints AS tc
+             JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+                AND ccu.table_schema = tc.table_schema
+             WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = 'public'",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(table, referenced_table)| ForeignKeyInfo {
+                table,
+                referenced_table,
+            })
+            .collect())
+    }
+
     async fn count(
         &self,
         table: &str,
@@ -263,14 +287,6 @@ impl DbAdapter for PostgresAdapter {
             )
         };
 
-        // Disable triggers for this table during upsert
-        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed to disable triggers for table {table}: {e}");
-        }
-
         let mut count = 0u64;
         for row in rows {
             let mut query = sqlx::query(&sql);
@@ -333,34 +349,14 @@ impl DbAdapter for PostgresAdapter {
             count += 1;
         }
 
-        // Re-enable triggers
-        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed to enable triggers for table {table}: {e}");
-        }
-
         Ok(count)
     }
 
     async fn truncate_table(&self, table: &str) -> Result<(), anyhow::Error> {
-        // Disable triggers, truncate, then re-enable for this specific table
-        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed to disable triggers for table {table}: {e}");
-        }
+        // Use CASCADE to handle foreign key constraints
         sqlx::query(&format!("TRUNCATE TABLE \"{}\" CASCADE", table))
             .execute(&self.pool)
             .await?;
-        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
-            .execute(&self.pool)
-            .await
-        {
-            log::warn!("Failed to enable triggers for table {table}: {e}");
-        }
         Ok(())
     }
 

@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{HashMap, HashSet};
+
 use chrono::Utc;
 
 use super::{
     MigrationConfig,
-    adapter::{DbAdapter, create_adapter},
+    adapter::{DbAdapter, ForeignKeyInfo, create_adapter},
     progress::{ProgressBar, TableStats, print_error, print_plan, print_report},
 };
 
@@ -79,8 +81,12 @@ async fn run_migration(config: MigrationConfig, mode: MigrationMode) -> Result<(
     // 2. Discover tables
     print!("Discovering tables... ");
     let all_tables = source.list_tables().await?;
-    let tables = filter_tables(&all_tables, mode, &config);
+    let filtered_tables = filter_tables(&all_tables, mode, &config);
     let excluded = get_excluded_tables(&all_tables, mode);
+
+    // Get foreign keys from target to sort tables by dependencies
+    let fks = target.get_foreign_keys().await?;
+    let tables = sort_tables_by_dependencies(filtered_tables, &fks);
     println!("{} tables to migrate", tables.len());
     println!();
 
@@ -216,6 +222,75 @@ fn filter_tables(
 
     tables.sort();
     tables
+}
+
+/// Sort tables by foreign key dependencies using topological sort.
+/// Parent tables (referenced by FK) come before child tables (with FK).
+fn sort_tables_by_dependencies(tables: Vec<String>, fks: &[ForeignKeyInfo]) -> Vec<String> {
+    let table_set: HashSet<&String> = tables.iter().collect();
+
+    // Build adjacency list: table -> tables that depend on it
+    // If A references B, then B must come before A
+    let mut dependencies: HashMap<&String, Vec<&String>> = HashMap::new();
+    let mut in_degree: HashMap<&String, usize> = HashMap::new();
+
+    // Initialize all tables with in_degree 0
+    for table in &tables {
+        in_degree.insert(table, 0);
+    }
+
+    // Build the graph
+    for fk in fks {
+        // Only consider FKs where both tables are in our migration set
+        if table_set.contains(&fk.table) && table_set.contains(&fk.referenced_table) {
+            // fk.table depends on fk.referenced_table
+            // So referenced_table -> table (referenced comes first)
+            dependencies
+                .entry(&fk.referenced_table)
+                .or_default()
+                .push(&fk.table);
+            *in_degree.entry(&fk.table).or_insert(0) += 1;
+        }
+    }
+
+    // Kahn's algorithm for topological sort
+    let mut result = Vec::with_capacity(tables.len());
+    let mut queue: Vec<&String> = in_degree
+        .iter()
+        .filter(|(_, degree)| **degree == 0)
+        .map(|(table, _)| *table)
+        .collect();
+
+    // Sort queue for deterministic order (reverse for pop to get ascending)
+    queue.sort_by(|a, b| b.cmp(a));
+
+    while let Some(table) = queue.pop() {
+        result.push(table.clone());
+
+        if let Some(dependents) = dependencies.get(table) {
+            for dependent in dependents {
+                if let Some(degree) = in_degree.get_mut(dependent) {
+                    *degree -= 1;
+                    if *degree == 0 {
+                        // Insert in sorted order for deterministic results (reverse order)
+                        let pos = queue.partition_point(|x| x > dependent);
+                        queue.insert(pos, dependent);
+                    }
+                }
+            }
+        }
+    }
+
+    // If there are cycles, some tables won't be in result
+    // Add them at the end (this shouldn't happen with proper FK design)
+    for table in &tables {
+        if !result.contains(table) {
+            log::warn!("Table {} may have circular FK dependencies", table);
+            result.push(table.clone());
+        }
+    }
+
+    result
 }
 
 fn get_excluded_tables(all_tables: &[String], mode: MigrationMode) -> Vec<String> {
@@ -600,5 +675,92 @@ mod tests {
     fn test_system_tables_constant() {
         assert!(SYSTEM_TABLES.contains(&"sqlite_sequence"));
         assert_eq!(SYSTEM_TABLES.len(), 1);
+    }
+
+    #[test]
+    fn test_sort_tables_no_fks() {
+        let tables = vec!["c".to_string(), "a".to_string(), "b".to_string()];
+        let fks: Vec<ForeignKeyInfo> = vec![];
+
+        let result = sort_tables_by_dependencies(tables, &fks);
+
+        // With no FKs, should be sorted alphabetically
+        assert_eq!(result, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_sort_tables_with_fks() {
+        // orders references users (users must come first)
+        // order_items references orders (orders must come first)
+        let tables = vec![
+            "order_items".to_string(),
+            "orders".to_string(),
+            "users".to_string(),
+        ];
+        let fks = vec![
+            ForeignKeyInfo {
+                table: "orders".to_string(),
+                referenced_table: "users".to_string(),
+            },
+            ForeignKeyInfo {
+                table: "order_items".to_string(),
+                referenced_table: "orders".to_string(),
+            },
+        ];
+
+        let result = sort_tables_by_dependencies(tables, &fks);
+
+        // users -> orders -> order_items
+        let users_pos = result.iter().position(|x| x == "users").unwrap();
+        let orders_pos = result.iter().position(|x| x == "orders").unwrap();
+        let items_pos = result.iter().position(|x| x == "order_items").unwrap();
+
+        assert!(users_pos < orders_pos);
+        assert!(orders_pos < items_pos);
+    }
+
+    #[test]
+    fn test_sort_tables_with_multiple_refs() {
+        // child references both parent1 and parent2
+        let tables = vec![
+            "child".to_string(),
+            "parent1".to_string(),
+            "parent2".to_string(),
+        ];
+        let fks = vec![
+            ForeignKeyInfo {
+                table: "child".to_string(),
+                referenced_table: "parent1".to_string(),
+            },
+            ForeignKeyInfo {
+                table: "child".to_string(),
+                referenced_table: "parent2".to_string(),
+            },
+        ];
+
+        let result = sort_tables_by_dependencies(tables, &fks);
+
+        // Both parent1 and parent2 should come before child
+        let child_pos = result.iter().position(|x| x == "child").unwrap();
+        let parent1_pos = result.iter().position(|x| x == "parent1").unwrap();
+        let parent2_pos = result.iter().position(|x| x == "parent2").unwrap();
+
+        assert!(parent1_pos < child_pos);
+        assert!(parent2_pos < child_pos);
+    }
+
+    #[test]
+    fn test_sort_tables_ignores_external_fks() {
+        // orders references users, but users is not in our table list
+        let tables = vec!["orders".to_string()];
+        let fks = vec![ForeignKeyInfo {
+            table: "orders".to_string(),
+            referenced_table: "users".to_string(),
+        }];
+
+        let result = sort_tables_by_dependencies(tables, &fks);
+
+        // Should still work, just orders in the list
+        assert_eq!(result, vec!["orders"]);
     }
 }

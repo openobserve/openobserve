@@ -19,7 +19,7 @@ use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions, MySqlRow},
 };
 
-use super::{ColumnInfo, DbAdapter, Row, Value};
+use super::{ColumnInfo, DbAdapter, ForeignKeyInfo, Row, Value};
 
 pub struct MysqlAdapter {
     pool: MySqlPool,
@@ -197,6 +197,28 @@ impl DbAdapter for MysqlAdapter {
         .await?;
 
         Ok(rows.into_iter().map(|(name,)| name).collect())
+    }
+
+    async fn get_foreign_keys(&self) -> Result<Vec<ForeignKeyInfo>, anyhow::Error> {
+        // Cast to CHAR to avoid MySQL 8+ returning BLOB types from information_schema
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT DISTINCT
+                CAST(table_name AS CHAR),
+                CAST(referenced_table_name AS CHAR)
+             FROM information_schema.key_column_usage
+             WHERE table_schema = DATABASE()
+                AND referenced_table_name IS NOT NULL",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(table, referenced_table)| ForeignKeyInfo {
+                table,
+                referenced_table,
+            })
+            .collect())
     }
 
     async fn count(

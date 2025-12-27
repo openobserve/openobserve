@@ -19,7 +19,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow},
 };
 
-use super::{ColumnInfo, DbAdapter, Row, Value};
+use super::{ColumnInfo, DbAdapter, ForeignKeyInfo, Row, Value};
 
 pub struct SqliteAdapter {
     pool: SqlitePool,
@@ -188,6 +188,29 @@ impl DbAdapter for SqliteAdapter {
         }
 
         Ok(pks)
+    }
+
+    async fn get_foreign_keys(&self) -> Result<Vec<ForeignKeyInfo>, anyhow::Error> {
+        // Get all tables first
+        let tables = self.list_tables().await?;
+        let mut fks = Vec::new();
+
+        for table in tables {
+            let rows: Vec<SqliteRow> =
+                sqlx::query(&format!("PRAGMA foreign_key_list('{}')", table))
+                    .fetch_all(&self.pool)
+                    .await?;
+
+            for row in rows {
+                let referenced_table: String = row.try_get("table")?;
+                fks.push(ForeignKeyInfo {
+                    table: table.clone(),
+                    referenced_table,
+                });
+            }
+        }
+
+        Ok(fks)
     }
 
     async fn count(

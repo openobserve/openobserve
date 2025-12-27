@@ -57,6 +57,13 @@ pub struct Row {
     pub values: Vec<Value>,
 }
 
+/// Foreign key information
+#[derive(Debug, Clone)]
+pub struct ForeignKeyInfo {
+    pub table: String,
+    pub referenced_table: String,
+}
+
 /// Database adapter trait
 #[async_trait]
 #[allow(dead_code)]
@@ -72,6 +79,9 @@ pub trait DbAdapter: Send + Sync {
 
     /// Get primary key columns for a table
     async fn get_primary_keys(&self, table: &str) -> Result<Vec<String>, anyhow::Error>;
+
+    /// Get foreign key dependencies for all tables
+    async fn get_foreign_keys(&self) -> Result<Vec<ForeignKeyInfo>, anyhow::Error>;
 
     /// Count records in a table, optionally with timestamp filter
     async fn count(
