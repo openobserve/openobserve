@@ -430,15 +430,19 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3) {
+    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
         testLogger.info(`selectStream: Selecting stream: ${stream}`);
 
-        // First, wait for the stream to be available via API
-        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
-        if (!streamAvailable) {
-            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
+        if (apiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+            if (!streamAvailable) {
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+            } else {
+                testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            }
         } else {
-            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)

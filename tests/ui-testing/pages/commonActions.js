@@ -123,6 +123,54 @@ export class CommonActions {
         });
     }
 
+    /**
+     * Ingest test data with a unique identifier for alert trigger validation
+     * This allows us to identify specific test data in the validation stream
+     * @param {string} streamName - Name of the stream to ingest data into
+     * @param {string} uniqueId - Unique identifier for this test run (e.g., randomValue)
+     * @param {string} triggerField - Field name that the alert condition will check (default: 'job')
+     * @param {string} triggerValue - Value that will trigger the alert condition (default: 'test')
+     * @returns {Promise<{uniqueId: string, timestamp: number}>}
+     */
+    async ingestTestDataWithUniqueId(streamName, uniqueId, triggerField = 'job', triggerValue = 'test') {
+        const timestamp = Date.now();
+        // Include trigger values in ALL string fields so any column selection will match
+        // This ensures multi-condition alerts with arbitrary columns will still trigger
+        const triggerString = `test validation alert trigger - run_id: ${uniqueId} - timestamp: ${timestamp}`;
+        const testData = {
+            level: `info test validation`,
+            [triggerField]: `${triggerValue} validation trigger`,
+            test_run_id: `${uniqueId} test validation`,
+            test_timestamp: timestamp,
+            log: `Alert trigger validation test - run_id: ${uniqueId} - timestamp: ${timestamp}`,
+            message: triggerString,
+            stream: `test validation stream`,
+            code: `test validation code`
+        };
+
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = process.env["ORGNAME"];
+        const username = process.env["ZO_ROOT_USER_EMAIL"];
+        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+
+        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/${streamName}/_json" -d '${JSON.stringify([testData])}'`;
+
+        console.log(`Ingesting test data with unique ID: ${uniqueId}`);
+
+        return new Promise((resolve, reject) => {
+            exec(curlCommand, (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Error ingesting test data with unique ID:', error);
+                    reject(error);
+                    return;
+                }
+                console.log('Ingested test data response:', stdout);
+                console.log(`Successfully ingested test data with unique ID: ${uniqueId}`);
+                resolve({ uniqueId, timestamp });
+            });
+        });
+    }
+
     async ingestCustomTestData(streamName) {
         const curlCommand = `curl -u ${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]} -k ${process.env["ZO_BASE_URL"]}/api/${process.env["ORGNAME"]}/${streamName}/_json -d @utils/td150.json`;
 
@@ -193,5 +241,113 @@ export class CommonActions {
         await this.page.reload();
         const newState = await this.getStreamingState();
         console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
+    }
+
+    /**
+     * Query a stream via OpenObserve API to search for specific data
+     * Used for validating alert triggers by searching the validation_stream
+     * @param {string} streamName - Name of the stream to query
+     * @param {string} searchQuery - SQL query to execute (e.g., "SELECT * FROM stream_name")
+     * @param {number} timeRangeMinutes - How far back to search (default: 15 minutes)
+     * @returns {Promise<{success: boolean, hits: number, data: any[]}>}
+     */
+    async queryStream(streamName, searchQuery = null, timeRangeMinutes = 15) {
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = process.env["ORGNAME"];
+        const username = process.env["ZO_ROOT_USER_EMAIL"];
+        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+
+        // Default query if none provided
+        const query = searchQuery || `SELECT * FROM "${streamName}"`;
+
+        // Calculate time range (last N minutes)
+        const endTime = Date.now() * 1000; // microseconds
+        const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
+
+        const searchPayload = {
+            query: {
+                sql: query,
+                start_time: startTime,
+                end_time: endTime,
+                from: 0,
+                size: 100
+            }
+        };
+
+        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/_search?type=logs" -H "Content-Type: application/json" -d '${JSON.stringify(searchPayload)}'`;
+
+        return new Promise((resolve) => {
+            exec(curlCommand, (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Error querying stream:', error);
+                    resolve({ success: false, hits: 0, data: [] });
+                    return;
+                }
+
+                try {
+                    const response = JSON.parse(stdout);
+                    const hits = response.hits?.length || response.total || 0;
+                    console.log(`Query stream ${streamName}: found ${hits} results`);
+                    resolve({
+                        success: true,
+                        hits: hits,
+                        data: response.hits || []
+                    });
+                } catch (parseError) {
+                    console.error('Error parsing query response:', parseError);
+                    console.log('Raw response:', stdout);
+                    resolve({ success: false, hits: 0, data: [] });
+                }
+            });
+        });
+    }
+
+    /**
+     * Search validation stream for alert payloads by unique ID
+     * Used to verify that an alert successfully triggered and sent data
+     * @param {string} validationStreamName - Name of the validation stream to search
+     * @param {string} uniqueId - Unique identifier to search for in the payload
+     * @param {number} maxWaitSeconds - Maximum time to wait for data (default: 60 seconds)
+     * @param {number} pollIntervalSeconds - How often to poll (default: 5 seconds)
+     * @returns {Promise<{found: boolean, payload: any, attempts: number}>}
+     */
+    async waitForAlertInValidationStream(validationStreamName, uniqueId, maxWaitSeconds = 60, pollIntervalSeconds = 5) {
+        const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
+
+        console.log(`Waiting for "${uniqueId}" in stream "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            // Query for recent data containing the search term
+            // Note: The template body is stored in 'text' field, not '_all'
+            const result = await this.queryStream(
+                validationStreamName,
+                `SELECT * FROM "${validationStreamName}" WHERE str_match_ignore_case(text, '${uniqueId}')`,
+                10 // Last 10 minutes
+            );
+
+            if (result.success && result.hits > 0) {
+                console.log(`Found unique ID "${uniqueId}" in validation stream after ${attempt * pollIntervalSeconds}s`);
+                return { found: true, payload: result.data[0], attempts: attempt };
+            }
+
+            if (attempt < maxAttempts) {
+                console.log(`Attempt ${attempt}/${maxAttempts}: Unique ID not found yet, waiting ${pollIntervalSeconds}s...`);
+                await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
+            }
+        }
+
+        console.log(`Unique ID "${uniqueId}" not found in validation stream "${validationStreamName}" after ${maxWaitSeconds}s`);
+        return { found: false, payload: null, attempts: maxAttempts };
+    }
+
+    /**
+     * Generate Basic auth header value
+     * @param {string} username
+     * @param {string} password
+     * @returns {string} Basic auth header value
+     */
+    static generateBasicAuthHeader(username, password) {
+        const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+        return `Basic ${credentials}`;
     }
 } 

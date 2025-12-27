@@ -172,7 +172,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^join_manual_test$/,                          // Manual join test stream
         /^test_app_users$/,                            // Test app users stream
         /^test_sessions$/,                             // Test sessions stream
-        /^test_web_requests$/                          // Test web requests stream
+        /^test_web_requests$/,                         // Test web requests stream
+        /^alert_trigger_validation$/,                  // Alert trigger validation stream (self-referential POC)
+        /^alert_val_[a-zA-Z0-9]+$/                      // Unique validation streams per test (alert_val_<suffix>)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
