@@ -138,8 +138,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Content -->
             <div :class="store.state.theme === 'dark' ? 'tw-bg-gray-800/30' : 'tw-bg-white'" class="tw-p-3 tw-flex-1 tw-overflow-auto">
-              <div :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-400'" class="tw-text-xs tw-italic">
-                Coming soon
+              <div v-if="tableOfContents.length === 0" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-400'" class="tw-text-xs tw-italic">
+                No sections available
+              </div>
+              <div v-else class="tw-space-y-1">
+                <!-- TOC Items -->
+                <template v-for="item in tableOfContents" :key="item.id">
+                  <div>
+                    <!-- Level 1 Item -->
+                    <div
+                      :class="[
+                        'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1.5 tw-rounded tw-transition-colors',
+                        store.state.theme === 'dark'
+                          ? 'tw-text-gray-200'
+                          : 'tw-text-gray-900'
+                      ]"
+                    >
+                      <!-- Icon on the left -->
+                      <q-icon
+                        :name="item.children.length > 0 ? 'folder' : 'article'"
+                        size="14px"
+                        class="tw-opacity-60 tw-flex-shrink-0"
+                      />
+                      <!-- Text in the middle - clickable to scroll -->
+                      <span
+                        @click="scrollToSection(item.id)"
+                        :class="[
+                          'tw-text-xs tw-font-medium tw-truncate tw-flex-1 tw-cursor-pointer',
+                          store.state.theme === 'dark'
+                            ? 'hover:tw-text-blue-400'
+                            : 'hover:tw-text-blue-600'
+                        ]"
+                      >{{ item.text }}</span>
+                      <!-- Expand button on the right (only for items with children) -->
+                      <q-btn
+                        v-if="item.children.length > 0"
+                        flat
+                        dense
+                        round
+                        size="xs"
+                        :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
+                        @click="toggleSection(item, $event)"
+                        class="tw-flex-shrink-0"
+                      >
+                        <q-tooltip :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                      </q-btn>
+                    </div>
+
+                    <!-- Level 2 Children -->
+                    <div v-if="expandedSections[item.id] && item.children.length > 0" class="tw-ml-4 tw-space-y-1 tw-mt-1">
+                      <template v-for="child in item.children" :key="child.id">
+                        <div>
+                          <!-- Level 2 Item -->
+                          <div
+                            :class="[
+                              'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1 tw-rounded tw-transition-colors',
+                              store.state.theme === 'dark'
+                                ? 'tw-text-gray-300'
+                                : 'tw-text-gray-700'
+                            ]"
+                          >
+                            <!-- Icon on the left -->
+                            <q-icon
+                              name="label"
+                              size="12px"
+                              class="tw-opacity-60 tw-flex-shrink-0"
+                            />
+                            <!-- Text in the middle - clickable to scroll -->
+                            <span
+                              @click="scrollToSection(child.id)"
+                              :class="[
+                                'tw-text-xs tw-truncate tw-flex-1 tw-cursor-pointer',
+                                store.state.theme === 'dark'
+                                  ? 'hover:tw-text-blue-400'
+                                  : 'hover:tw-text-blue-600'
+                              ]"
+                            >{{ child.text }}</span>
+                            <!-- Expand button on the right (only for items with children) -->
+                            <q-btn
+                              v-if="child.children.length > 0"
+                              flat
+                              dense
+                              round
+                              size="xs"
+                              :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
+                              @click="toggleSection(child, $event)"
+                              class="tw-flex-shrink-0"
+                            >
+                              <q-tooltip :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                            </q-btn>
+                          </div>
+
+                          <!-- Level 3 Children -->
+                          <div v-if="expandedSections[child.id] && child.children.length > 0" class="tw-ml-4 tw-space-y-1 tw-mt-1">
+                            <div
+                              v-for="grandchild in child.children"
+                              :key="grandchild.id"
+                              @click="scrollToSection(grandchild.id)"
+                              :class="[
+                                'tw-flex tw-items-center tw-gap-2 tw-px-2 tw-py-1 tw-rounded tw-cursor-pointer tw-transition-colors',
+                                store.state.theme === 'dark'
+                                  ? 'hover:tw-bg-gray-700 tw-text-gray-400'
+                                  : 'hover:tw-bg-blue-50 tw-text-gray-600'
+                              ]"
+                            >
+                              <q-icon name="fiber_manual_record" size="8px" class="tw-opacity-60" />
+                              <span class="tw-text-[11px] tw-truncate">{{ grandchild.text }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -149,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="height: 50%" class="tw-overflow-auto tw-p-4">
         <!-- Timeline with UTC timestamps -->
         <div
+          id="timeline"
           :class="[
             'tw-rounded-lg tw-border tw-mb-4 tw-overflow-hidden',
             store.state.theme === 'dark'
@@ -439,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="rcaStreamContent"
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(rcaStreamContent)"
+              v-html="formattedRcaContent"
             />
           </div>
 
@@ -447,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="hasExistingRca" class="rca-container tw-rounded tw-p-3 tw-flex-1 tw-overflow-auto tw-border" :class="isDarkMode ? 'tw-bg-gray-800 tw-border-gray-700' : 'tw-bg-blue-50 tw-border-blue-200'">
             <div
               class="tw-text-sm tw-whitespace-pre-wrap rca-content"
-              v-html="formatRcaContent(incidentDetails.topology_context.suggested_root_cause)"
+              v-html="formattedRcaContent"
             />
           </div>
 
@@ -533,6 +645,18 @@ export default defineComponent({
     // Tab management
     const activeTab = ref("incidentAnalysis");
 
+    // Table of Contents
+    interface TocItem {
+      id: string;
+      text: string;
+      level: number;
+      children: TocItem[];
+      expanded: boolean;
+    }
+    const tableOfContents = ref<TocItem[]>([]);
+    const expandedSections = ref<Record<string, boolean>>({});
+    const tocRenderKey = ref(0);
+
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
@@ -541,6 +665,19 @@ export default defineComponent({
     // Check if dark mode is active
     const isDarkMode = computed(() => {
       return store.state.theme === "dark";
+    });
+
+    // Computed property for formatted RCA content
+    const formattedRcaContent = computed(() => {
+      const content = rcaLoading.value && rcaStreamContent.value
+        ? rcaStreamContent.value
+        : hasExistingRca.value
+        ? incidentDetails.value?.topology_context?.suggested_root_cause || ''
+        : '';
+
+      if (!content) return '';
+
+      return formatRcaContent(content);
     });
 
     const loadDetails = async (incidentId: string) => {
@@ -763,6 +900,119 @@ export default defineComponent({
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
+    // Extract headings from markdown content to build table of contents
+    const extractTableOfContents = (content: string): TocItem[] => {
+      // Handle both actual newlines and escaped \n in JSON strings
+      const normalizedContent = content.replace(/\\n/g, '\n');
+      const lines = normalizedContent.split('\n');
+      const toc: TocItem[] = [];
+      const stack: TocItem[] = [];
+      let inCodeBlock = false;
+
+      lines.forEach((line) => {
+        // Check for code block delimiters (````)
+        if (line.trim().startsWith('```')) {
+          inCodeBlock = !inCodeBlock;
+          return;
+        }
+
+        // Skip lines inside code blocks
+        if (inCodeBlock) {
+          return;
+        }
+
+        const match = line.match(/^(#{1,3})\s+(.+)$/);
+        if (match) {
+          const level = match[1].length;
+          const text = match[2].trim();
+          const id = 'section-' + text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+          // Skip h1 headings (document title) - only show h2 and h3 in TOC
+          if (level === 1) {
+            return;
+          }
+
+          const tocItem: TocItem = {
+            id,
+            text,
+            level,
+            children: [],
+            expanded: false
+          };
+
+          // Adjust level for display (h2 becomes level 1, h3 becomes level 2)
+          const displayLevel = level - 1;
+
+          // Find the correct parent based on adjusted level
+          while (stack.length > 0 && stack[stack.length - 1].level >= displayLevel) {
+            stack.pop();
+          }
+
+          // Update the item with display level
+          tocItem.level = displayLevel;
+
+          if (stack.length === 0) {
+            // Top level item
+            toc.push(tocItem);
+          } else {
+            // Child item
+            stack[stack.length - 1].children.push(tocItem);
+          }
+
+          stack.push(tocItem);
+        }
+      });
+
+      return toc;
+    };
+
+    // Scroll to a section in the RCA report
+    const scrollToSection = (id: string) => {
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        // Only search within RCA content areas (not left sidebar)
+        const rcaContainers = Array.from(document.querySelectorAll('.rca-container'));
+        let element: HTMLElement | null = null;
+        let scrollContainer: Element | null = null;
+
+        // Search for the element only within RCA containers
+        for (const container of rcaContainers) {
+          const foundElement = container.querySelector(`#${id}`) as HTMLElement;
+          if (foundElement) {
+            element = foundElement;
+            scrollContainer = container;
+            break;
+          }
+        }
+
+        if (element && scrollContainer) {
+          // Get the element's position relative to the scroll container
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const elementRect = element.getBoundingClientRect();
+          const relativeTop = elementRect.top - containerRect.top;
+          const offsetPosition = scrollContainer.scrollTop + relativeTop - 20;
+
+          // Scroll within the container with offset
+          scrollContainer.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 50);
+    };
+
+    // Toggle section expansion in TOC
+    const toggleSection = (item: TocItem, event?: Event) => {
+      if (event) {
+        event.stopPropagation();
+      }
+      // Create a new object to avoid triggering reactive updates during render
+      expandedSections.value = {
+        ...expandedSections.value,
+        [item.id]: !expandedSections.value[item.id]
+      };
+    };
+
     const convertKeyValueListsToTables = (content: string): string => {
       // Pattern: Lists where items follow "**Key**: Value" or "- **Key**: Value" format
       // Convert these to markdown tables for better readability
@@ -827,14 +1077,41 @@ export default defineComponent({
     };
 
     const formatRcaContent = (content: string) => {
-      // First, convert key-value lists to tables
+      // First, extract table of contents - only update if content changed
+      const newToc = extractTableOfContents(content);
+      if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
+        tableOfContents.value = newToc;
+      }
+
+      // Convert key-value lists to tables
       const processedContent = convertKeyValueListsToTables(content);
 
       // Configure marked with custom renderer using marked.use() extension API
       marked.use({
         renderer: {
-          heading({ tokens, depth }: any) {
-            const text = this.parser.parseInline(tokens);
+          heading({ tokens, depth, text }: any) {
+            // Parse inline tokens to get the heading text
+            const parsedText = this.parser.parseInline(tokens);
+
+            // Generate ID for heading - extract raw text from tokens first
+            let rawText = '';
+            if (tokens && Array.isArray(tokens)) {
+              rawText = tokens.map((t: any) => {
+                // Handle different token types
+                if (t.type === 'text' && t.text) return t.text;
+                if (t.raw) return t.raw;
+                if (t.text) return t.text;
+                return '';
+              }).join('').trim();
+            }
+
+            // Fallback: strip HTML tags from parsed text
+            if (!rawText) {
+              rawText = parsedText.replace(/<[^>]*>/g, '').trim();
+            }
+
+            const id = 'section-' + rawText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
             const classes = [
               'rca-h1 tw-font-bold tw-text-xl tw-mt-6 tw-mb-4 tw-pb-2 tw-border-b-2',
               // TODO: Discuss with team - h2 section separators with background and left border
@@ -843,7 +1120,7 @@ export default defineComponent({
               'rca-h3 tw-font-semibold tw-text-base tw-mt-4 tw-mb-2',
               'rca-h4 tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700',
             ];
-            return `<h${depth} class="${classes[depth - 1] || ''}">${text}</h${depth}>`;
+            return `<h${depth} id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</h${depth}>`;
           },
           code({ text }: any) {
             return `<div class="rca-code-block tw-bg-gray-100 tw-border tw-border-gray-300 tw-rounded tw-p-3 tw-my-3 tw-overflow-x-auto"><pre class="tw-text-xs tw-font-mono tw-whitespace-pre tw-m-0"><code>${text}</code></pre></div>`;
@@ -907,6 +1184,7 @@ export default defineComponent({
         }
       });
 
+      
       // Configure marked options
       marked.setOptions({
         gfm: true,
@@ -916,11 +1194,22 @@ export default defineComponent({
       // Parse markdown
       const html = marked.parse(processedContent) as string;
 
+      // Debug: Check Timeline heading in HTML before DOMPurify
+      const timelineMatch = html.match(/<h2[^>]*>Timeline<\/h2>/);
+      console.log('Timeline HTML before DOMPurify:', timelineMatch ? timelineMatch[0] : 'NOT FOUND');
+
       // Sanitize HTML to prevent XSS
       const sanitized = DOMPurify.sanitize(html, {
         ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'hr', 'div', 'span'],
-        ALLOWED_ATTR: ['class', 'value', 'style']
+        ALLOWED_ATTR: ['class', 'value', 'style', 'id'],
+        ADD_ATTR: ['id'],
+        KEEP_CONTENT: true,
+        RETURN_TRUSTED_TYPE: false
       });
+
+      // Debug: Check Timeline heading after DOMPurify
+      const timelineMatchAfter = sanitized.match(/<h2[^>]*>Timeline<\/h2>/);
+      console.log('Timeline HTML after DOMPurify:', timelineMatchAfter ? timelineMatchAfter[0] : 'NOT FOUND');
 
       // Wrap in container
       return `<div class="rca-report-content">${sanitized}</div>`;
@@ -1010,12 +1299,18 @@ export default defineComponent({
       hasExistingRca,
       isDarkMode,
       activeTab,
+      tableOfContents,
+      expandedSections,
+      tocRenderKey,
+      formattedRcaContent,
       close,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
       triggerRca,
       openSREChat,
+      scrollToSection,
+      toggleSection,
       getStatusColor,
       getStatusDotColor,
       getStatusTextColor,
