@@ -159,10 +159,19 @@ impl MigratorTrait for Migrator {
     }
 }
 
-pub fn get_text_type() -> String {
+pub fn get_text_type() -> &'static str {
     let db_type = config::get_config().common.meta_store.as_str().into();
     match db_type {
-        MetaStore::MySQL => config::get_config().limit.db_text_data_type.clone(),
-        _ => "text".to_string(),
+        MetaStore::MySQL => "longtext",
+        _ => "text",
+    }
+}
+
+pub fn get_binary_type() -> &'static str {
+    let db_type = config::get_config().common.meta_store.as_str().into();
+    match db_type {
+        MetaStore::MySQL => "longblob",
+        MetaStore::Sqlite => "blob",
+        _ => "bytea",
     }
 }

@@ -34,7 +34,7 @@ use sqlx::{Executor, Postgres, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index, delete_index},
+        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index},
     },
     errors::{Error, Result},
     file_list::FileRecord,
@@ -2236,34 +2236,6 @@ pub async fn create_table_index() -> Result<()> {
         log::warn!("[POSTGRES] create table index(file_list_stream_file_idx) successfully");
     }
 
-    Ok(())
-}
-
-async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
-    let pool = CLIENT_DDL.clone();
-    let check_sql = format!(
-        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
-    );
-    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
-        .fetch_one(&pool)
-        .await?;
-    if has_column > 0 {
-        return Ok(());
-    }
-
-    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {data_type};");
-    let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
-        log::error!("[POSTGRES] Error in adding column {column}: {e}");
-        if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] Error in rolling back transaction: {e}");
-        }
-        return Err(e.into());
-    }
-    if let Err(e) = tx.commit().await {
-        log::info!("[POSTGRES] Error in committing transaction: {e}");
-        return Err(e.into());
-    }
     Ok(())
 }
 

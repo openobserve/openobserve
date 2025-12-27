@@ -62,44 +62,42 @@ fn create_cli_app() -> Command {
             Command::new("init-dir")
                 .about("init openobserve data dir")
                 .arg(arg!("path", 'p', "path", "init this path as data root dir")),
+            Command::new("init-db")
+                    .about("init openobserve database tables"),
+            Command::new("upgrade-db")
+                .about("upgrade db table schemas"),
             Command::new("migrate-file-list")
-                .about("migrate file-list")
+                .about("migrate file_list related tables between databases")
                 .args([
-                    arg!("prefix", 'p', "prefix", "only migrate specified prefix, default is all"),
-                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql"),
-                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true),
+                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true),
+                    Arg::new("batch-size").short('b').long("batch-size").help("batch size for migration").default_value("1000"),
+                    Arg::new("tables").long("tables").help("only migrate specified tables (comma-separated)"),
+                    Arg::new("exclude").long("exclude").help("exclude specified tables (comma-separated)"),
+                    Arg::new("truncate-target").long("truncate-target").help("truncate target tables before migration").action(ArgAction::SetTrue),
+                    Arg::new("incremental").long("incremental").help("incremental mode").action(ArgAction::SetTrue),
+                    Arg::new("since").long("since").help("incremental start time (microseconds timestamp)").value_parser(clap::value_parser!(i64)),
+                    Arg::new("dry-run").long("dry-run").help("only print plan, don't execute").action(ArgAction::SetTrue),
                 ]),
             Command::new("migrate-meta")
-                .about("migrate meta")
+                .about("migrate meta tables between databases (excludes file_list tables)")
                 .args([
-                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true).value_name("from"),
-                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true).value_name("to"),
+                    arg!("from", 'f', "from", "migrate from: sqlite, mysql, postgresql", true),
+                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql", true),
+                    Arg::new("batch-size").short('b').long("batch-size").help("batch size for migration").default_value("1000"),
+                    Arg::new("tables").long("tables").help("only migrate specified tables (comma-separated)"),
+                    Arg::new("exclude").long("exclude").help("exclude specified tables (comma-separated)"),
+                    Arg::new("truncate-target").long("truncate-target").help("truncate target tables before migration").action(ArgAction::SetTrue),
+                    Arg::new("incremental").long("incremental").help("incremental mode").action(ArgAction::SetTrue),
+                    Arg::new("since").long("since").help("incremental start time (microseconds timestamp)").value_parser(clap::value_parser!(i64)),
+                    Arg::new("dry-run").long("dry-run").help("only print plan, don't execute").action(ArgAction::SetTrue),
                 ]),
-            Command::new("migrate-dashboards").about("migrate-dashboards"),
-            Command::new("migrate-pipeline").about("migrate pipelines")
-                .arg(
-                    arg!("drop-table", 'd', "drop-table", "Drop existing Pipeline table first before migrating", false)
-                    .value_name("drop-table")
-                    .num_args(0)
-                ),
             Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .args([
                     arg!("account", 'a', "account", "the account name", false).value_name("account"),
                     arg!("file", 'f', "file", "the parquet file name", true).value_name("file"),
                 ]),
-            Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
-            Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
-                .subcommand(
-                    Command::new("all")
-                    .about("rollback all SeaORM migration steps")
-                )
-                .subcommand(
-                    Command::new("last")
-                    .about("rollback last N SeaORM migration steps")
-                    .arg(
-                        Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
-                ),
             Command::new("recover-file-list").about("recover file list from s3")
                 .args([
                     arg!("account", 'a', "account", "the account name", true).value_name("account"),
@@ -139,8 +137,6 @@ fn create_cli_app() -> Command {
             Command::new("consistent-hash").about("consistent hash").args([
                 arg!("file", 'f', "file", "file", true).num_args(1..),
             ]),
-            Command::new("upgrade-db")
-                .about("upgrade db table schemas").args(dataArgs()),
             Command::new("query-optimiser").about("query optimiser").args([
                     arg!("url", 'u', "url", "url", true),
                     arg!("token", 't', "token", "token", true),
@@ -187,10 +183,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     // init infra, create data dir & tables
     let cfg = config::get_config();
-    infra::init().await.expect("infra init failed");
-    db::org_users::cache().await?;
     match name.as_str() {
         "reset" => {
+            infra::init().await?;
+            db::org_users::cache().await?;
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
@@ -280,26 +276,56 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 }
             }
         }
+        "upgrade-db" | "init-db" => {
+            crate::migration::init_db().await?;
+        }
         "migrate-file-list" => {
             let from = command.remove_one::<String>("from").unwrap_or_default();
             let to = command.remove_one::<String>("to").unwrap_or_default();
-            println!("Running migration file_list from {from} to {to}");
-            migration::file_list::run(&from, &to).await?;
+            let batch_size = command
+                .get_one::<String>("batch-size")
+                .map(|s| s.parse::<u64>().unwrap_or(1000))
+                .unwrap_or(1000);
+            let tables = command.remove_one::<String>("tables");
+            let exclude = command.remove_one::<String>("exclude");
+            let truncate_target = command.get_flag("truncate-target");
+            let incremental = command.get_flag("incremental");
+            let since = command.get_one::<i64>("since").copied();
+            let dry_run = command.get_flag("dry-run");
+
+            let config = migration::MigrationConfig::new(&from, &to)
+                .with_batch_size(batch_size)
+                .with_tables(tables)
+                .with_exclude(exclude)
+                .with_truncate_target(truncate_target)
+                .with_incremental(incremental, since)
+                .with_dry_run(dry_run);
+
+            migration::run_file_list(config).await?;
         }
         "migrate-meta" => {
             let from = command.remove_one::<String>("from").unwrap_or_default();
             let to = command.remove_one::<String>("to").unwrap_or_default();
-            println!("Running migration metadata from {from} to {to}");
-            migration::meta::run(&from, &to).await?
-        }
-        "migrate-dashboards" => {
-            println!("Running migration dashboard");
-            migration::dashboards::run().await?
-        }
-        "migrate-pipeline" => {
-            println!("Running migration pipeline");
-            let drop_table = command.get_flag("drop-table");
-            migration::pipeline_func::run(drop_table).await?;
+            let batch_size = command
+                .get_one::<String>("batch-size")
+                .map(|s| s.parse::<u64>().unwrap_or(1000))
+                .unwrap_or(1000);
+            let tables = command.remove_one::<String>("tables");
+            let exclude = command.remove_one::<String>("exclude");
+            let truncate_target = command.get_flag("truncate-target");
+            let incremental = command.get_flag("incremental");
+            let since = command.get_one::<i64>("since").copied();
+            let dry_run = command.get_flag("dry-run");
+
+            let config = migration::MigrationConfig::new(&from, &to)
+                .with_batch_size(batch_size)
+                .with_tables(tables)
+                .with_exclude(exclude)
+                .with_truncate_target(truncate_target)
+                .with_incremental(incremental, since)
+                .with_dry_run(dry_run);
+
+            migration::run_meta(config).await?;
         }
         "delete-parquet" => {
             let account = command.remove_one::<String>("account").unwrap_or_default();
@@ -323,31 +349,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
-        "migrate-schemas" => {
-            println!("Running schema migration to row per schema version");
-            #[allow(deprecated)]
-            migration::schema::run().await?
-        }
-        "seaorm-rollback" => match command.subcommand() {
-            Some(("all", _)) => {
-                println!("Rolling back all");
-                infra::table::down(None).await?
-            }
-            Some(("last", sub_matches)) => {
-                let n = sub_matches
-                    .get_one::<u32>("N")
-                    .map(|n| n.to_owned())
-                    .unwrap_or(1);
-                println!("Rolling back {n}");
-                infra::table::down(Some(n)).await?
-            }
-            Some((name, _)) => {
-                return Err(anyhow::anyhow!("unsupported sub command: {name}"));
-            }
-            None => {
-                return Err(anyhow::anyhow!("missing sub command"));
-            }
-        },
         "recover-file-list" => {
             let account = command
                 .get_one::<String>("account")
@@ -453,9 +454,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 .collect::<Vec<_>>();
             let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
             super::http::consistent_hash(files).await?;
-        }
-        "upgrade-db" => {
-            crate::migration::init_db().await?;
         }
         "query-optimiser" => {
             let stream_name = command
@@ -635,28 +633,6 @@ mod tests {
     }
 
     #[test]
-    fn test_migrate_pipeline_command_parsing() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "migrate-pipeline"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "migrate-pipeline");
-        assert!(!sub_matches.get_flag("drop-table"));
-    }
-
-    #[test]
-    fn test_migrate_pipeline_with_drop_table() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "migrate-pipeline", "--drop-table"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "migrate-pipeline");
-        assert!(sub_matches.get_flag("drop-table"));
-    }
-
-    #[test]
     fn test_delete_parquet_command_parsing() {
         let app = create_test_app();
         let matches = app
@@ -699,44 +675,6 @@ mod tests {
             sub_matches.get_one::<String>("file").unwrap(),
             "test.parquet"
         );
-    }
-
-    #[test]
-    fn test_seaorm_rollback_all_command() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "all"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, _) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "all");
-    }
-
-    #[test]
-    fn test_seaorm_rollback_last_command() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "last", "5"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "last");
-        assert_eq!(sub_sub_matches.get_one::<u32>("N").unwrap(), &5);
-    }
-
-    #[test]
-    fn test_seaorm_rollback_last_default() {
-        let app = create_test_app();
-        let matches = app
-            .try_get_matches_from(["openobserve", "seaorm-rollback", "last"])
-            .unwrap();
-        let (name, sub_matches) = matches.subcommand().unwrap();
-        assert_eq!(name, "seaorm-rollback");
-        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
-        assert_eq!(sub_name, "last");
-        assert_eq!(sub_sub_matches.get_one::<u32>("N"), None);
     }
 
     #[test]

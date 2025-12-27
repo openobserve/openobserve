@@ -52,7 +52,7 @@ fn create_sessions_table_statement() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(Sessions::AccessToken)
-                .custom(Alias::new(&text_type))
+                .custom(Alias::new(text_type))
                 .not_null(),
         )
         .col(ColumnDef::new(Sessions::CreatedAt).big_integer().not_null())

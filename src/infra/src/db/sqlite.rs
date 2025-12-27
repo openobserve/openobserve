@@ -736,18 +736,8 @@ CREATE TABLE IF NOT EXISTS meta
 async fn add_start_dt_column() -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    // Attempt to add the column, ignoring the error if the column already exists
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
-            .execute(&*client)
-            .await
-    {
-        // Check if the error is about the duplicate column
-        if !e.to_string().contains("duplicate column name") {
-            // If the error is not about the duplicate column, return it
-            return Err(e.into());
-        }
-    }
+
+    add_column(&client, "meta", "start_dt", "INTEGER NOT NULL DEFAULT 0").await?;
     drop(client);
 
     // Proceed to drop the index if it exists and create a new one if it does not exist
@@ -826,4 +816,327 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     sqlx::query(&sql).execute(&*client).await?;
     log::info!("[SQLITE] index {idx_name} deleted successfully");
     Ok(())
+}
+
+pub async fn add_column(
+    client: &Pool<Sqlite>,
+    table: &str,
+    column: &str,
+    data_type: &str,
+) -> Result<()> {
+    // Check if the column exists using PRAGMA table_info
+    let check_sql = format!("PRAGMA table_info({table});");
+    let columns: Vec<(i64, String, String, i64, Option<String>, i64)> =
+        sqlx::query_as(&check_sql).fetch_all(client).await?;
+    let has_column = columns.iter().any(|(_, name, ..)| name == column);
+    if !has_column {
+        let alter_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+        sqlx::query(&alter_sql).execute(client).await?;
+    }
+    Ok(())
+}
+
+pub async fn drop_column(client: &Pool<Sqlite>, table: &str, column: &str) -> Result<()> {
+    // Check if the column exists using PRAGMA table_info
+    let check_sql = format!("PRAGMA table_info({table});");
+    let columns: Vec<(i64, String, String, i64, Option<String>, i64)> =
+        sqlx::query_as(&check_sql).fetch_all(client).await?;
+    let has_column = columns.iter().any(|(_, name, ..)| name == column);
+    if has_column {
+        let alter_sql = format!("ALTER TABLE {table} DROP COLUMN {column};");
+        sqlx::query(&alter_sql).execute(client).await?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_db_new() {
+        let db = SqliteDb::new();
+        assert_eq!(std::mem::size_of_val(&db), 0);
+    }
+
+    #[test]
+    fn test_sqlite_db_default() {
+        let db = SqliteDb::default();
+        assert_eq!(std::mem::size_of_val(&db), 0);
+    }
+
+    #[test]
+    fn test_parse_key_full() {
+        let key = "/module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_no_leading_slash() {
+        let key = "module/key1/key2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2");
+    }
+
+    #[test]
+    fn test_parse_key_module_only() {
+        let key = "/module";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_module_and_key1() {
+        let key = "/module/key1";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_parse_key_with_slashes_in_key2() {
+        let key = "/module/key1/key2/subkey/subsubkey";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert_eq!(k2, "key2/subkey/subsubkey");
+    }
+
+    #[test]
+    fn test_parse_key_empty() {
+        let key = "";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "");
+        assert_eq!(k1, "");
+        assert_eq!(k2, "");
+    }
+
+    #[test]
+    fn test_build_key_without_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 0);
+        assert_eq!(key, "/module/key1/key2");
+    }
+
+    #[test]
+    fn test_build_key_with_start_dt() {
+        let key = super::super::build_key("module", "key1", "key2", 1234567890);
+        assert_eq!(key, "/module/key1/key2/1234567890");
+    }
+
+    #[test]
+    fn test_build_key_empty_parts() {
+        let key = super::super::build_key("", "", "", 0);
+        assert_eq!(key, "//");
+    }
+
+    #[test]
+    fn test_build_key_with_special_chars() {
+        let key = super::super::build_key("mod-ule", "key_1", "key.2", 0);
+        assert_eq!(key, "/mod-ule/key_1/key.2");
+    }
+
+    #[test]
+    fn test_index_statement_new() {
+        let stmt = IndexStatement::new("test_idx", "test_table", false, &["col1", "col2"]);
+        assert_eq!(stmt.idx_name, "test_idx");
+        assert_eq!(stmt.table, "test_table");
+        assert!(!stmt.unique);
+        assert_eq!(stmt.fields, vec!["col1", "col2"]);
+    }
+
+    #[test]
+    fn test_index_statement_unique() {
+        let stmt = IndexStatement::new("unique_idx", "table", true, &["id"]);
+        assert_eq!(stmt.idx_name, "unique_idx");
+        assert_eq!(stmt.table, "table");
+        assert!(stmt.unique);
+        assert_eq!(stmt.fields, vec!["id"]);
+    }
+
+    #[test]
+    fn test_index_statement_single_field() {
+        let stmt = IndexStatement::new("single_idx", "table", false, &["field"]);
+        assert_eq!(stmt.fields.len(), 1);
+        assert_eq!(stmt.fields[0], "field");
+    }
+
+    #[test]
+    fn test_index_statement_multiple_fields() {
+        let stmt = IndexStatement::new("multi_idx", "table", false, &["f1", "f2", "f3", "f4"]);
+        assert_eq!(stmt.fields.len(), 4);
+    }
+
+    #[test]
+    fn test_db_index_hash_same() {
+        let idx1 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "test_idx".to_string(),
+            table: "test_table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash_different_name() {
+        let idx1 = DBIndex {
+            name: "idx1".to_string(),
+            table: "table".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx2".to_string(),
+            table: "table".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(!set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_db_index_hash_different_table() {
+        let idx1 = DBIndex {
+            name: "idx".to_string(),
+            table: "table1".to_string(),
+        };
+        let idx2 = DBIndex {
+            name: "idx".to_string(),
+            table: "table2".to_string(),
+        };
+
+        let mut set = HashSet::new();
+        set.insert(idx1);
+        assert!(!set.contains(&idx2));
+    }
+
+    #[test]
+    fn test_sql_quote_escaping() {
+        let key = "key'with'quotes";
+        let escaped = key.replace('\'', "''");
+        assert_eq!(escaped, "key''with''quotes");
+    }
+
+    #[test]
+    fn test_sql_like_pattern_construction() {
+        let key2 = "prefix";
+        let pattern = format!("{key2}/%");
+        assert_eq!(pattern, "prefix/%");
+    }
+
+    #[test]
+    fn test_add_column_sql_format() {
+        let table = "test_table";
+        let column = "new_column";
+        let data_type = "TEXT NOT NULL DEFAULT ''";
+
+        let check_sql = format!("PRAGMA table_info({table});");
+        assert_eq!(check_sql, "PRAGMA table_info(test_table);");
+
+        let alter_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
+        assert_eq!(
+            alter_sql,
+            "ALTER TABLE test_table ADD COLUMN new_column TEXT NOT NULL DEFAULT '';"
+        );
+    }
+
+    #[test]
+    fn test_drop_column_sql_format() {
+        let table = "test_table";
+        let column = "old_column";
+
+        let check_sql = format!("PRAGMA table_info({table});");
+        assert_eq!(check_sql, "PRAGMA table_info(test_table);");
+
+        let alter_sql = format!("ALTER TABLE {table} DROP COLUMN {column};");
+        assert_eq!(alter_sql, "ALTER TABLE test_table DROP COLUMN old_column;");
+    }
+
+    #[test]
+    fn test_add_column_sql_with_various_types() {
+        let table = "users";
+
+        // INTEGER type
+        let alter_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "age", "INTEGER NOT NULL DEFAULT 0"
+        );
+        assert_eq!(
+            alter_sql,
+            "ALTER TABLE users ADD COLUMN age INTEGER NOT NULL DEFAULT 0;"
+        );
+
+        // TEXT type
+        let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {};", table, "name", "TEXT");
+        assert_eq!(alter_sql, "ALTER TABLE users ADD COLUMN name TEXT;");
+
+        // BLOB type
+        let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {};", table, "data", "BLOB");
+        assert_eq!(alter_sql, "ALTER TABLE users ADD COLUMN data BLOB;");
+
+        // REAL type
+        let alter_sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {};",
+            table, "score", "REAL NOT NULL DEFAULT 0.0"
+        );
+        assert_eq!(
+            alter_sql,
+            "ALTER TABLE users ADD COLUMN score REAL NOT NULL DEFAULT 0.0;"
+        );
+    }
+
+    #[test]
+    fn test_build_key_roundtrip() {
+        let original_parts = ("module", "key1", "key2");
+        let key = super::super::build_key(original_parts.0, original_parts.1, original_parts.2, 0);
+        let (module, k1, k2) = super::super::parse_key(&key);
+        assert_eq!(module, original_parts.0);
+        assert_eq!(k1, original_parts.1);
+        assert_eq!(k2, original_parts.2);
+    }
+
+    #[test]
+    fn test_parse_key_with_numbers() {
+        let key = "/123/456/789";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "123");
+        assert_eq!(k1, "456");
+        assert_eq!(k2, "789");
+    }
+
+    #[test]
+    fn test_parse_key_with_hyphens_underscores() {
+        let key = "/test-module/test_key1/test-key-2";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "test-module");
+        assert_eq!(k1, "test_key1");
+        assert_eq!(k2, "test-key-2");
+    }
+
+    #[test]
+    fn test_index_statement_empty_fields() {
+        let stmt = IndexStatement::new("empty_idx", "table", false, &[]);
+        assert_eq!(stmt.fields.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_key_trailing_slash() {
+        let key = "/module/key1/key2/";
+        let (module, k1, k2) = super::super::parse_key(key);
+        assert_eq!(module, "module");
+        assert_eq!(k1, "key1");
+        assert!(k2.starts_with("key2"));
+    }
 }

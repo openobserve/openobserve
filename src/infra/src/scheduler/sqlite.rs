@@ -16,13 +16,13 @@
 use async_trait::async_trait;
 use chrono::Duration;
 use config::utils::{json, time::now_micros};
-use sqlx::{Pool, Row, Sqlite};
+use sqlx::Row;
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
         self, IndexStatement,
-        sqlite::{CLIENT_RO, CLIENT_RW, create_index},
+        sqlite::{CLIENT_RO, CLIENT_RW, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
@@ -62,7 +62,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
     data         TEXT not null
 );
             "#,
@@ -70,8 +69,18 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .execute(&*client)
         .await?;
 
-        // Add data column for old version <= 0.10.9
-        add_data_column(&client).await?;
+        // create data column for old version <= 0.10.9
+        add_column(
+            &client,
+            "scheduled_jobs",
+            "data",
+            "TEXT NOT NULL DEFAULT ''",
+        )
+        .await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column(&client, "scheduled_jobs", "created_at").await?;
+
         Ok(())
     }
 
@@ -567,21 +576,4 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
         Ok(())
     }
-}
-
-async fn add_data_column(client: &Pool<Sqlite>) -> Result<()> {
-    // Attempt to add the column, ignoring the error if the column already exists
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data TEXT NOT NULL DEFAULT '';"#)
-            .execute(client)
-            .await
-    {
-        // Check if the error is about the duplicate column
-        if !e.to_string().contains("duplicate column name") {
-            // If the error is not about the duplicate column, return it
-            return Err(e.into());
-        }
-    }
-
-    Ok(())
 }
