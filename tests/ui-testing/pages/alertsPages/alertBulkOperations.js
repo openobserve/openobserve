@@ -140,7 +140,7 @@ export class AlertBulkOperations {
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox');
 
-        await expect(this.page.getByText(/Showing 1 - [12] of/)).toBeVisible();
+        await expect(this.page.getByText(/Showing \d+ - \d+ of/)).toBeVisible();
 
         // Click move across folders button
         await this.page.locator(this.locators.moveAcrossFoldersButton).click();

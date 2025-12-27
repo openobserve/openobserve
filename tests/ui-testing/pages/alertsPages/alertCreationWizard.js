@@ -9,7 +9,7 @@
  */
 
 import { expect } from '@playwright/test';
-const testLogger = require('../../playwright-tests/utils/test-logger.js');
+import testLogger from '../../playwright-tests/utils/test-logger.js';
 
 export class AlertCreationWizard {
     constructor(page, commonActions, locators) {
