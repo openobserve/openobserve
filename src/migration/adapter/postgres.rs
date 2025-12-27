@@ -264,9 +264,12 @@ impl DbAdapter for PostgresAdapter {
         };
 
         // Disable triggers for this table during upsert
-        sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
+        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" DISABLE TRIGGER ALL", table))
             .execute(&self.pool)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to disable triggers for table {table}: {e}");
+        }
 
         let mut count = 0u64;
         for row in rows {
@@ -331,9 +334,12 @@ impl DbAdapter for PostgresAdapter {
         }
 
         // Re-enable triggers
-        sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
+        if let Err(e) = sqlx::query(&format!("ALTER TABLE \"{}\" ENABLE TRIGGER ALL", table))
             .execute(&self.pool)
-            .await?;
+            .await
+        {
+            log::warn!("Failed to enable triggers for table {table}: {e}");
+        }
 
         Ok(count)
     }

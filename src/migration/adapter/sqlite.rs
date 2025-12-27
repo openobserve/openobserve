@@ -296,8 +296,8 @@ impl DbAdapter for SqliteAdapter {
                     Value::Double(v) => query.bind(*v),
                     Value::String(v) => query.bind(v.clone()),
                     Value::Bytes(v) => query.bind(v.clone()),
-                    Value::Timestamp(v) => query.bind(v.clone()), /* SQLite stores timestamp as
-                                                                    * text */
+                    Value::Timestamp(v) => query.bind(v.clone()), // SQLite stores timestamp as
+                    // text
                     Value::Json(v) => query.bind(v.clone()), // SQLite stores JSON as text
                 };
             }
