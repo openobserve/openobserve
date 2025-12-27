@@ -267,6 +267,45 @@ pub async fn update_topology(
     Ok(())
 }
 
+/// Update incident metadata (alert_count, last_alert_at, optionally stable_dimensions)
+///
+/// Used when adding alerts to existing incidents to:
+/// - Increment alert counter
+/// - Update last alert timestamp
+/// - Optionally merge new dimensions (for dimension accumulation)
+pub async fn update_incident_metadata(
+    org_id: &str,
+    id: &str,
+    alert_count: i32,
+    last_alert_at: i64,
+    stable_dimensions: Option<serde_json::Value>,
+) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+
+    active.alert_count = Set(alert_count);
+    active.last_alert_at = Set(last_alert_at);
+    active.updated_at = Set(now);
+
+    // Only update dimensions if provided (when dimensions change)
+    if let Some(dims) = stable_dimensions {
+        active.stable_dimensions = Set(dims);
+    }
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
 /// Auto-resolve stale incidents that haven't received new alerts
 ///
 /// Returns the number of incidents resolved
