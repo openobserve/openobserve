@@ -343,10 +343,9 @@ impl DbAdapter for PostgresAdapter {
                         // Check if target column is JSON type (source might store JSON as bytes)
                         if col_type.contains("JSON") {
                             // Try to parse bytes as UTF-8 string, then as JSON
-                            let json: Option<serde_json::Value> =
-                                String::from_utf8(v.clone())
-                                    .ok()
-                                    .and_then(|s| serde_json::from_str(&s).ok());
+                            let json: Option<serde_json::Value> = String::from_utf8(v.clone())
+                                .ok()
+                                .and_then(|s| serde_json::from_str(&s).ok());
                             query.bind(json)
                         } else {
                             query.bind(v.clone())
