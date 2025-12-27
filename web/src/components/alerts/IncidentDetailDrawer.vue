@@ -703,7 +703,73 @@ export default defineComponent({
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
+    const convertKeyValueListsToTables = (content: string): string => {
+      // Pattern: Lists where items follow "**Key**: Value" or "- **Key**: Value" format
+      // Convert these to markdown tables for better readability
+      const lines = content.split('\n');
+      const result: string[] = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // Check if this line starts a key-value list pattern
+        const isKeyValueItem = /^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(line.trim());
+
+        if (isKeyValueItem) {
+          // Found a key-value list, collect all consecutive items
+          const tableRows: Array<{ key: string; value: string }> = [];
+          let j = i;
+
+          while (j < lines.length) {
+            const currentLine = lines[j].trim();
+            const match = currentLine.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
+
+            if (match) {
+              tableRows.push({ key: match[1], value: match[2] });
+              j++;
+            } else if (currentLine === '' && j < lines.length - 1) {
+              // Allow one blank line within the list
+              const nextLine = lines[j + 1]?.trim();
+              if (/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(nextLine)) {
+                j++; // Skip the blank line
+                continue;
+              } else {
+                break;
+              }
+            } else {
+              break;
+            }
+          }
+
+          // Convert to table if we have 3 or more items
+          if (tableRows.length >= 3) {
+            result.push(''); // Add blank line before table
+            result.push('| Field | Value |');
+            result.push('|-------|-------|');
+            tableRows.forEach(row => {
+              result.push(`| ${row.key} | ${row.value} |`);
+            });
+            result.push(''); // Add blank line after table
+            i = j;
+          } else {
+            // Not enough items for a table, keep as list
+            result.push(line);
+            i++;
+          }
+        } else {
+          result.push(line);
+          i++;
+        }
+      }
+
+      return result.join('\n');
+    };
+
     const formatRcaContent = (content: string) => {
+      // First, convert key-value lists to tables
+      const processedContent = convertKeyValueListsToTables(content);
+
       // Configure marked with custom renderer using marked.use() extension API
       marked.use({
         renderer: {
@@ -711,7 +777,9 @@ export default defineComponent({
             const text = this.parser.parseInline(tokens);
             const classes = [
               'rca-h1 tw-font-bold tw-text-xl tw-mt-6 tw-mb-4 tw-pb-2 tw-border-b-2',
-              'rca-h2 tw-font-bold tw-text-lg tw-mt-5 tw-mb-3 tw-text-blue-600',
+              // TODO: Discuss with team - h2 section separators with background and left border
+              // Remove 'rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600' if not approved
+              'rca-h2 tw-font-bold tw-text-lg tw-mt-5 tw-mb-3 tw-text-blue-600 rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600',
               'rca-h3 tw-font-semibold tw-text-base tw-mt-4 tw-mb-2',
               'rca-h4 tw-font-semibold tw-text-sm tw-mt-3 tw-mb-2 tw-text-gray-700',
             ];
@@ -735,18 +803,22 @@ export default defineComponent({
           },
           table(token: any) {
             let header = '<tr>';
-            for (const cell of token.header) {
+            for (let i = 0; i < token.header.length; i++) {
+              const cell = token.header[i];
               const content = this.parser.parseInline(cell.tokens);
-              header += `<th class="tw-px-3 tw-py-2 tw-text-left tw-font-semibold tw-text-xs tw-border-b">${content}</th>`;
+              const cellClass = i === 0 ? 'rca-first-cell' : '';
+              header += `<th class="tw-px-3 tw-py-2 tw-text-left tw-font-semibold tw-text-xs tw-border-b ${cellClass}">${content}</th>`;
             }
             header += '</tr>';
 
             let body = '';
             for (const row of token.rows) {
               body += '<tr class="hover:tw-bg-gray-50">';
-              for (const cell of row) {
+              for (let i = 0; i < row.length; i++) {
+                const cell = row[i];
                 const content = this.parser.parseInline(cell.tokens);
-                body += `<td class="tw-px-3 tw-py-2 tw-text-xs tw-border-b">${content}</td>`;
+                const cellClass = i === 0 ? 'rca-first-cell' : '';
+                body += `<td class="tw-px-3 tw-py-2 tw-text-xs tw-border-b ${cellClass}">${content}</td>`;
               }
               body += '</tr>';
             }
@@ -782,12 +854,12 @@ export default defineComponent({
       });
 
       // Parse markdown
-      const html = marked.parse(content) as string;
+      const html = marked.parse(processedContent) as string;
 
       // Sanitize HTML to prevent XSS
       const sanitized = DOMPurify.sanitize(html, {
         ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'hr', 'div', 'span'],
-        ALLOWED_ATTR: ['class', 'value']
+        ALLOWED_ATTR: ['class', 'value', 'style']
       });
 
       // Wrap in container
@@ -1080,10 +1152,22 @@ body.body--dark .rca-h1 {
 
 .rca-h2 {
   color: #2563eb;
+  border-left-color: #2563eb;
 }
 
 body.body--dark .rca-h2 {
   color: #60a5fa;
+  border-left-color: #60a5fa;
+}
+
+/* TODO: Discuss with team - Section background for h2 separators */
+/* Remove this entire block if section separators are not approved */
+.rca-section-bg {
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+body.body--dark .rca-section-bg {
+  background-color: rgba(96, 165, 250, 0.08);
 }
 
 .rca-h3 {
@@ -1158,9 +1242,21 @@ body.body--dark .rca-inline-code {
 }
 
 /* Tables */
+.rca-table-wrapper {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+body.body--dark .rca-table-wrapper {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 .rca-table {
-  border-color: #d1d5db;
+  border-collapse: separate;
+  border-spacing: 0;
   background-color: #ffffff;
+  border: 1px solid #e5e7eb;
 }
 
 body.body--dark .rca-table {
@@ -1169,39 +1265,104 @@ body.body--dark .rca-table {
 }
 
 .rca-table thead {
-  background-color: #f3f4f6;
+  background: linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 2px solid #cbd5e1;
 }
 
 body.body--dark .rca-table thead {
-  background-color: #374151;
+  background: linear-gradient(to bottom, #334155 0%, #1e293b 100%);
+  border-bottom-color: #475569;
 }
 
 .rca-table th {
-  border-bottom-color: #d1d5db;
-  color: #374155;
+  padding: 14px 18px;
+  color: #1e293b;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-align: left;
+  border-right: 1px solid #e5e7eb;
+}
+
+.rca-table th:last-child {
+  border-right: none;
 }
 
 body.body--dark .rca-table th {
-  border-bottom-color: #4b5563;
-  color: #cbd5e1;
+  color: #e2e8f0;
+  border-right-color: #475569;
 }
 
 .rca-table td {
-  border-bottom-color: #e5e7eb;
-  color: #1f2937;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.6;
+  vertical-align: top;
+}
+
+.rca-table td:last-child {
+  border-right: none;
 }
 
 body.body--dark .rca-table td {
-  border-bottom-color: #374151;
-  color: #d1d5db;
+  border-bottom-color: #334155;
+  border-right-color: #2d3748;
+  color: #cbd5e1;
 }
 
-.rca-table tr:hover {
+.rca-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rca-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.rca-table tbody tr:hover {
   background-color: #f9fafb;
+  transform: scale(1.001);
 }
 
-body.body--dark .rca-table tr:hover {
-  background-color: #374151;
+body.body--dark .rca-table tbody tr:hover {
+  background-color: #2d3748;
+}
+
+.rca-table tbody tr:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+body.body--dark .rca-table tbody tr:nth-child(even) {
+  background-color: #1a2332;
+}
+
+/* First column in tables (usually the key/label) */
+.rca-table td:first-child,
+.rca-table td.rca-first-cell {
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  background-color: #f8fafc;
+  min-width: 160px;
+}
+
+body.body--dark .rca-table td:first-child,
+body.body--dark .rca-table td.rca-first-cell {
+  color: #94a3b8;
+  background-color: #1e293b;
+}
+
+.rca-table tbody tr:hover td:first-child,
+.rca-table tbody tr:hover td.rca-first-cell {
+  background-color: #f1f5f9;
+}
+
+body.body--dark .rca-table tbody tr:hover td:first-child,
+body.body--dark .rca-table tbody tr:hover td.rca-first-cell {
+  background-color: #334155;
 }
 
 /* Blockquotes */
