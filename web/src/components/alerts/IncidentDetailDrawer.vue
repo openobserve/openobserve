@@ -1113,7 +1113,7 @@ export default defineComponent({
             const id = 'section-' + rawText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const classes = [
-              'rca-h1 tw-font-bold tw-text-xl tw-mt-6 tw-mb-4 tw-pb-2 tw-border-b-2',
+              'rca-h1 tw-font-bold tw-text-lg tw-text-center tw-mb-4 tw-pb-2 tw-border-b-2',
               // TODO: Discuss with team - h2 section separators with background and left border
               // Remove 'rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600' if not approved
               'rca-h2 tw-font-bold tw-text-lg tw-mt-5 tw-mb-3 tw-text-blue-600 rca-section-bg tw-px-4 tw-py-3 tw-rounded tw-border-l-4 tw-border-blue-600',
