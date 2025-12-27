@@ -83,6 +83,18 @@ impl MysqlAdapter {
                 continue;
             }
 
+            // Handle JSON type
+            if col_type.contains("JSON") {
+                if let Ok(v) = row.try_get::<serde_json::Value, _>(idx) {
+                    values.push(Value::Json(v.to_string()));
+                } else if let Ok(v) = row.try_get::<String, _>(idx) {
+                    values.push(Value::Json(v));
+                } else {
+                    values.push(Value::Null);
+                }
+                continue;
+            }
+
             // Handle TIMESTAMP/DATETIME types
             if col_type.contains("TIMESTAMP") || col_type.contains("DATETIME") || col_type == "DATE"
             {
@@ -318,6 +330,10 @@ impl DbAdapter for MysqlAdapter {
                         // Parse timestamp string to NaiveDateTime for MySQL
                         let dt = chrono::NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S").ok();
                         query.bind(dt)
+                    }
+                    Value::Json(v) => {
+                        // MySQL accepts JSON as string
+                        query.bind(v.clone())
                     }
                 };
             }

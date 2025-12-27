@@ -47,6 +47,8 @@ pub enum Value {
     Bytes(Vec<u8>),
     /// Timestamp stored as string in format "YYYY-MM-DD HH:MM:SS"
     Timestamp(String),
+    /// JSON stored as string
+    Json(String),
 }
 
 /// A row of data

@@ -223,6 +223,9 @@ impl DbAdapter for PostgresAdapter {
             return Ok(0);
         }
 
+        // Get column info for proper null type binding
+        let column_infos = self.get_columns(table).await?;
+
         let cols = columns
             .iter()
             .map(|c| format!("\"{}\"", c))
@@ -269,9 +272,38 @@ impl DbAdapter for PostgresAdapter {
         for row in rows {
             let mut query = sqlx::query(&sql);
 
-            for value in &row.values {
+            for (idx, value) in row.values.iter().enumerate() {
+                // Get column type for proper null binding
+                let col_name = &columns[idx];
+                let col_type = column_infos
+                    .iter()
+                    .find(|c| &c.name == col_name)
+                    .map(|c| c.data_type.to_uppercase())
+                    .unwrap_or_default();
+
                 query = match value {
-                    Value::Null => query.bind(None::<String>),
+                    Value::Null => {
+                        // Bind null with the correct type based on column definition
+                        if col_type.contains("INT") {
+                            query.bind(None::<i64>)
+                        } else if col_type.contains("BOOL") {
+                            query.bind(None::<bool>)
+                        } else if col_type.contains("FLOAT")
+                            || col_type.contains("DOUBLE")
+                            || col_type.contains("REAL")
+                            || col_type.contains("NUMERIC")
+                        {
+                            query.bind(None::<f64>)
+                        } else if col_type.contains("TIMESTAMP") || col_type.contains("DATE") {
+                            query.bind(None::<chrono::NaiveDateTime>)
+                        } else if col_type.contains("JSON") {
+                            query.bind(None::<serde_json::Value>)
+                        } else if col_type.contains("BYTEA") {
+                            query.bind(None::<Vec<u8>>)
+                        } else {
+                            query.bind(None::<String>)
+                        }
+                    }
                     Value::Bool(v) => query.bind(*v),
                     Value::TinyInt(v) => query.bind(*v as i16),
                     Value::SmallInt(v) => query.bind(*v),
@@ -285,6 +317,11 @@ impl DbAdapter for PostgresAdapter {
                         // Parse timestamp string to NaiveDateTime for PostgreSQL
                         let dt = chrono::NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S").ok();
                         query.bind(dt)
+                    }
+                    Value::Json(v) => {
+                        // Parse JSON string to serde_json::Value for PostgreSQL
+                        let json: Option<serde_json::Value> = serde_json::from_str(v).ok();
+                        query.bind(json)
                     }
                 };
             }

@@ -83,6 +83,23 @@ impl SqliteAdapter {
                 continue;
             }
 
+            // Handle JSON type - SQLite stores JSON as TEXT or BLOB
+            if col_type.contains("JSON") {
+                if let Ok(v) = row.try_get::<String, _>(idx) {
+                    values.push(Value::Json(v));
+                } else if let Ok(v) = row.try_get::<Vec<u8>, _>(idx) {
+                    // Convert bytes to string for JSON
+                    if let Ok(s) = String::from_utf8(v) {
+                        values.push(Value::Json(s));
+                    } else {
+                        values.push(Value::Null);
+                    }
+                } else {
+                    values.push(Value::Null);
+                }
+                continue;
+            }
+
             // Handle TIMESTAMP type - SQLite may store as text or integer
             if col_type.contains("TIMESTAMP") || col_type.contains("DATETIME") {
                 // Try to get as string first (SQLite's default CURRENT_TIMESTAMP format)
@@ -279,7 +296,9 @@ impl DbAdapter for SqliteAdapter {
                     Value::Double(v) => query.bind(*v),
                     Value::String(v) => query.bind(v.clone()),
                     Value::Bytes(v) => query.bind(v.clone()),
-                    Value::Timestamp(v) => query.bind(v.clone()), // SQLite stores timestamp as text
+                    Value::Timestamp(v) => query.bind(v.clone()), /* SQLite stores timestamp as
+                                                                    * text */
+                    Value::Json(v) => query.bind(v.clone()), // SQLite stores JSON as text
                 };
             }
 
