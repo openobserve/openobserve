@@ -330,8 +330,28 @@ impl DbAdapter for PostgresAdapter {
                     Value::BigInt(v) => query.bind(*v),
                     Value::Float(v) => query.bind(*v),
                     Value::Double(v) => query.bind(*v),
-                    Value::String(v) => query.bind(v.clone()),
-                    Value::Bytes(v) => query.bind(v.clone()),
+                    Value::String(v) => {
+                        // Check if target column is JSON type (e.g., MySQL LONGTEXT -> PG JSON)
+                        if col_type.contains("JSON") {
+                            let json: Option<serde_json::Value> = serde_json::from_str(v).ok();
+                            query.bind(json)
+                        } else {
+                            query.bind(v.clone())
+                        }
+                    }
+                    Value::Bytes(v) => {
+                        // Check if target column is JSON type (source might store JSON as bytes)
+                        if col_type.contains("JSON") {
+                            // Try to parse bytes as UTF-8 string, then as JSON
+                            let json: Option<serde_json::Value> =
+                                String::from_utf8(v.clone())
+                                    .ok()
+                                    .and_then(|s| serde_json::from_str(&s).ok());
+                            query.bind(json)
+                        } else {
+                            query.bind(v.clone())
+                        }
+                    }
                     Value::Timestamp(v) => {
                         // Parse timestamp string to NaiveDateTime for PostgreSQL
                         let dt = chrono::NaiveDateTime::parse_from_str(v, "%Y-%m-%d %H:%M:%S").ok();
