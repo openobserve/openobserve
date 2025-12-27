@@ -3,208 +3,167 @@ const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 
+// Test timeout constants (in milliseconds)
+const FIVE_MINUTES_MS = 300000;
+const ALERT_REGISTRATION_WAIT_MS = 15000; // Wait longer for alert to be registered and active
+const UI_STABILIZATION_WAIT_MS = 2000;
+
 test.describe("Alerts UI Operations", () => {
-  // Shared test variables
   let pm;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+  let validationInfra;
 
-  /**
-   * Setup for each test
-   * - Logs in
-   * - Initializes page objects
-   * - Generates shared random value
-   * - Ingests test data (except for scheduled alert test)
-   * - Navigates to alerts page
-   */
   test.beforeEach(async ({ page }, testInfo) => {
     pm = new PageManager(page);
 
-    // Generate shared random value if not already generated
     if (!sharedRandomValue) {
       sharedRandomValue = pm.alertsPage.generateRandomString();
       testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-    // Skip data ingestion for scheduled alert test
+    // Skip data ingestion for scheduled alert test - uses different data
     if (!test.info().title.includes('Scheduled Alert')) {
-      // Ingest test data using common actions
       const streamName = 'auto_playwright_stream';
       await pm.commonActions.ingestTestData(streamName);
     }
-    
-    // Navigate to alerts page
+
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
   });
 
-  /**
-   * Test: Create alert template and destination
-   * Prerequisites for other alert tests
-   */
   test('Create alert template and destination', {
     tag: ['@alertTemplate', '@alertDestination', '@all', '@alerts']
   }, async ({ page }) => {
-    // Create template with shared random value
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplate(createdTemplateName);
     await pm.alertTemplatesPage.verifyCreatedTemplateExists(createdTemplateName);
     testLogger.info('Created template', { templateName: createdTemplateName });
 
-    // Create destination with shared random value
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
     testLogger.info('Created destination', { destinationName: createdDestinationName });
   });
 
-  /**
-   * Test: Delete alert template functionality
-   * Verifies template deletion and in-use scenarios
-   * Uses isolated template to avoid conflicts with other tests
-   */
   test('Verify Delete alert template functionality', {
     tag: ['@deleteTemplate', '@all', '@alerts']
   }, async ({ page }) => {
-    // Create isolated template specifically for deletion test
+    // Use isolated template to avoid conflicts with other tests
     const deleteTemplateName = 'auto_playwright_delete_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.createTemplate(deleteTemplateName);
     testLogger.info('Created isolated template for deletion test', { templateName: deleteTemplateName });
 
-    // Navigate to templates page
     await pm.alertTemplatesPage.navigateToTemplates();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Test template deletion
     await pm.alertTemplatesPage.deleteTemplateAndVerify(deleteTemplateName);
     testLogger.info('Successfully deleted isolated template', { templateName: deleteTemplateName });
   });
 
-  /**
-   * Test: Scheduled Alert with SQL Query
-   * Tests creation and deletion of scheduled alerts
-   */
   test('Create and Delete Scheduled Alert with SQL Query', {
-    tag: ['@scheduledAlerts', '@all', '@alerts']
+    tag: ['@scheduledAlerts', '@all', '@alerts'],
+    timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const streamName = 'auto_playwright_stream';
 
-    // Ensure prerequisites exist
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
+    testLogger.info('Validation infrastructure ready', validationInfra);
+
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
-    createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
-    await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
-    // Navigate to alerts tab
     await pm.commonActions.navigateToAlerts();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Ingest custom test data
     await pm.commonActions.ingestCustomTestData(streamName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Create and verify scheduled alert
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
     await pm.alertsPage.verifyFolderCreated(folderName);
     testLogger.info('Successfully created folder', { folderName });
 
+    // Use auto_playwright_stream - has fewer columns so 'log' is visible in dropdown
+    const triggerStreamName = 'auto_playwright_stream';
     await pm.alertsPage.navigateToFolder(folderName);
-    const alertName = await pm.alertsPage.createScheduledAlertWithSQL(streamName, createdDestinationName, sharedRandomValue);
+    const alertName = await pm.alertsPage.createScheduledAlertWithSQL(triggerStreamName, validationInfra.destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info('Successfully created scheduled alert', { alertName });
 
-    // Clean up
+    // TODO: Investigate scheduled alert trigger validation - currently disabled due to timing issues
+    // Scheduled alerts need evaluation cycles (1+ minute) which exceeds test timeout
+    testLogger.info('Scheduled alert created successfully - trigger validation skipped (needs investigation)', { alertName });
+
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
     await pm.alertsPage.deleteAlertByRow(alertName);
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
   });
 
-  /**
-   * Test: Alert Module UI Validations and Filters Check
-   * Tests UI validations and filter functionality
-   */
   test('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
-    // Ensure template exists
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(templateName);
     testLogger.info('Template ready for use', { templateName });
 
-    // Create destination
     const destinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await pm.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
-    testLogger.info('Created destination', { destinationName });
+    testLogger.info('Destination ready for use', { destinationName });
 
-    // Navigate to alerts page
     await pm.commonActions.navigateToAlerts();
 
-    // Create folder
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
     testLogger.info('Created folder', { folderName });
 
-    // Get initial alert counts
+    // Get initial counts to verify increase after alert creation
     await pm.commonActions.navigateToHome();
     const { scheduledAlertsCount, realTimeAlertsCount } = await pm.alertsPage.verifyAlertCounts();
     testLogger.info('Initial Active Scheduled Alerts Count', { count: scheduledAlertsCount });
     testLogger.info('Initial Active Real-time Alerts Count', { count: realTimeAlertsCount });
 
-    // Navigate to alerts and verify ui validations
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    testLogger.info('Navigated to folder', { folderName });
 
-    // Verify invalid alert name validation
     await pm.alertsPage.verifyInvalidAlertCreation();
-
-    // Verify field required validation
     await pm.alertsPage.verifyFieldRequiredValidation();
 
-    // Create a valid alert using existing function
+    // Use auto_playwright_stream - has fewer columns so 'log' is visible in dropdown
     const streamName = 'auto_playwright_stream';
-    const column = 'job';
+    const column = 'log';
     const value = 'test';
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     const alertName = await pm.alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info('Successfully created valid alert', { alertName });
-    await page.waitForTimeout(2000); // Add delay after alert creation
 
-    // Navigate back to home and verify alert count increased
     await pm.commonActions.navigateToHome();
     const { realTimeAlertsCount: newRealTimeAlertsCount } = await pm.alertsPage.verifyAlertCounts();
     testLogger.info('New Active Real-time Alerts Count', { count: newRealTimeAlertsCount });
-    
-    // Verify count increased by 1
+
     await pm.alertsPage.verifyAlertCountIncreased(realTimeAlertsCount, newRealTimeAlertsCount);
 
-    // Navigate back to alerts and verify clone validation
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
-    testLogger.info('Navigated back to folder', { folderName });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Verify alert is visible before clone validation
     await pm.alertsPage.verifyAlertCellVisible(alertName);
-    testLogger.info('Alert is visible before clone validation', { alertName });
-
-    // Now verify clone validation
     await pm.alertsPage.verifyCloneAlertUIValidation(alertName);
 
-    // Continue with rest of the test...
     await pm.alertsPage.verifyTabContents();
     await pm.alertsPage.verifyFolderSearch(folderName);
 
-    // Move alerts to target folder
     const targetFolderName = 'testfoldermove';
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
@@ -213,17 +172,14 @@ test.describe("Alerts UI Operations", () => {
     await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
-    // Verify alerts in target folder
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.dashboardFolder.searchFolder(targetFolderName);
     await pm.alertsPage.navigateToFolder(targetFolderName);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-    // Search and verify alert instance
     await pm.alertsPage.searchAlert(alertName);
     await pm.alertsPage.verifySearchResultsUIValidation(1);
 
-    // Delete the alert
     await pm.alertsPage.deleteAlertByRow(alertName);
   });
-}); 
+});
