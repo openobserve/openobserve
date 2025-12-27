@@ -4,69 +4,36 @@
  * Tests for:
  * 1. Advanced Conditions - Multiple conditions with AND/OR logic
  * 2. Bulk Operations - Bulk pause/unpause alerts
+ * 3. Deduplication Configuration - Scheduled alerts with dedup settings
  *
- * Note: PromQL alerts require metrics stream which may not be available in all environments.
- * Those tests are included but may be skipped if metrics data is not present.
+ * Note: Each test is independent and creates its own test data.
+ * Cleanup is handled by cleanup.spec.js via 'auto_' prefix patterns.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 
 const TEST_STREAM = 'e2e_automate';
 
-// Use a static unique suffix for this test run
-const RUN_SUFFIX = Math.random().toString(36).substring(2, 6);
-const DESTINATION_NAME = 'auto_dest_adv_' + RUN_SUFFIX;
-const TEMPLATE_NAME = 'auto_template_adv_' + RUN_SUFFIX;
+// Test timeout constants (in milliseconds)
+const UI_STABILIZATION_WAIT_MS = 2000;
+const SHORT_WAIT_MS = 1000;
+const NETWORK_IDLE_TIMEOUT_MS = 30000;
 
 test.describe("Alerts Advanced Coverage Tests", () => {
-    test.describe.configure({ mode: 'serial' });
     let pm;
-    let randomValue;
-    let createdAlerts = [];
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        randomValue = Math.random().toString(36).substring(2, 8);
 
-        // Navigate to alerts page
         const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
         await page.goto(alertsUrl);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await page.waitForTimeout(2000);
-
-        testLogger.info('Test setup completed');
-    });
-
-    // ==================== SETUP TEST ====================
-
-    test("Setup: Create template and destination for advanced tests", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@setup']
-    }, async ({ page }) => {
-        testLogger.info('Creating prerequisite template and destination');
-
-        // Navigate to templates tab
-        await pm.alertTemplatesPage.navigateToTemplates();
-        await page.waitForTimeout(1000);
-
-        // Create template
-        await pm.alertTemplatesPage.createTemplate(TEMPLATE_NAME);
-        await pm.alertTemplatesPage.verifyCreatedTemplateExists(TEMPLATE_NAME);
-        testLogger.info('Template created', { templateName: TEMPLATE_NAME });
-
-        // Navigate to destinations tab
-        await pm.alertDestinationsPage.navigateToDestinations();
-        await page.waitForTimeout(1000);
-
-        // Create destination (url, templateName, destinationName)
-        const webhookUrl = 'https://webhook.site/test-advanced';
-        await pm.alertDestinationsPage.createDestination(DESTINATION_NAME, webhookUrl, TEMPLATE_NAME);
-        await pm.alertDestinationsPage.verifyDestinationExists(DESTINATION_NAME);
-        testLogger.info('Destination created', { destinationName: DESTINATION_NAME });
+        await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     });
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
@@ -74,46 +41,55 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     test("Create alert with multiple AND conditions", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition']
     }, async ({ page }) => {
-        testLogger.info('Testing multi-condition alert creation');
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+        testLogger.info('Testing multi-condition alert creation', { uniqueSuffix });
 
-        // Wait for alerts page to fully load (already navigated in beforeEach)
-        await page.waitForTimeout(2000);
+        // This test focuses on UI validation of multi-condition alert creation
+        // Trigger verification is covered by e2e-flow and alerts-import tests
+        const templateName = 'auto_template_multicond_' + uniqueSuffix;
+        const destinationName = 'auto_dest_multicond_' + uniqueSuffix;
 
-        // Create alert with multiple conditions
+        await pm.alertTemplatesPage.navigateToTemplates();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        await pm.alertTemplatesPage.createTemplate(templateName);
+        testLogger.info('Template created', { templateName });
+
+        await pm.alertDestinationsPage.navigateToDestinations();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        const webhookUrl = 'https://webhook.site/test-multicond-' + uniqueSuffix;
+        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        testLogger.info('Destination created', { destinationName });
+
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        await page.goto(alertsUrl);
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
         const alertName = await pm.alertsPage.createAlertWithMultipleConditions(
             TEST_STREAM,
-            DESTINATION_NAME,
-            randomValue
+            destinationName,
+            uniqueSuffix
         );
-        createdAlerts.push(alertName);
 
-        // Verify alert was created
         await pm.alertsPage.verifyAlertCreated(alertName);
-        testLogger.info('Multi-condition alert created successfully', { alertName });
+        testLogger.info('Multi-condition alert created and verified successfully', { alertName });
     });
 
     test("Verify condition operator toggle (AND to OR)", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator']
     }, async ({ page }) => {
-        testLogger.info('Testing condition operator toggle');
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+        testLogger.info('Testing condition operator toggle', { uniqueSuffix });
 
-        // Wait for alerts page to fully load (already navigated in beforeEach)
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-        // Use page object method to test condition operator toggle
-        // This test verifies that:
-        // 1. Multiple conditions can be added
-        // 2. AND operator is default between conditions
-        // 3. Operator can be toggled to OR
-        const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, randomValue);
+        // Verifies: multiple conditions can be added, AND is default, can toggle to OR
+        const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
 
         if (result.toggleSuccessful) {
             testLogger.info('Successfully toggled condition operator from AND to OR');
         } else {
             testLogger.warn('Toggle operator test completed with warnings', { message: result.message });
         }
-
-        testLogger.info('Condition operator toggle test completed');
     });
 
     // ==================== BULK OPERATIONS TESTS ====================
@@ -121,106 +97,98 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     test("Bulk pause and unpause multiple alerts", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations']
     }, async ({ page }) => {
-        testLogger.info('Testing bulk pause/unpause operations');
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+        const templateName = 'auto_template_bulk_' + uniqueSuffix;
+        const destinationName = 'auto_dest_bulk_' + uniqueSuffix;
 
-        // Wait for alerts page to fully load (already navigated in beforeEach)
-        await page.waitForTimeout(2000);
+        testLogger.info('Testing bulk pause/unpause operations', { uniqueSuffix });
+
+        await pm.alertTemplatesPage.navigateToTemplates();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        await pm.alertTemplatesPage.createTemplate(templateName);
+        testLogger.info('Template created', { templateName });
+
+        await pm.alertDestinationsPage.navigateToDestinations();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        const webhookUrl = 'https://webhook.site/test-bulk-' + uniqueSuffix;
+        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        testLogger.info('Destination created', { destinationName });
+
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        await page.goto(alertsUrl);
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
         // Create two alerts for bulk operations
-        const alert1Name = 'auto_bulk_alert_1_' + randomValue;
-        const alert2Name = 'auto_bulk_alert_2_' + randomValue;
-
-        // Create first alert using createAlertWithDefaults which uses first available column
-        await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, DESTINATION_NAME, 'bulk1_' + randomValue);
-        await page.waitForTimeout(1000);
+        await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk1_' + uniqueSuffix);
+        await page.waitForTimeout(SHORT_WAIT_MS);
         const createdAlert1 = pm.alertsPage.currentAlertName;
-        createdAlerts.push(createdAlert1);
         testLogger.info('Created first alert for bulk test', { alertName: createdAlert1 });
 
-        // Create second alert
-        await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, DESTINATION_NAME, 'bulk2_' + randomValue);
-        await page.waitForTimeout(1000);
+        await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk2_' + uniqueSuffix);
+        await page.waitForTimeout(SHORT_WAIT_MS);
         const createdAlert2 = pm.alertsPage.currentAlertName;
-        createdAlerts.push(createdAlert2);
         testLogger.info('Created second alert for bulk test', { alertName: createdAlert2 });
 
-        // Select both alerts
         await pm.alertsPage.selectMultipleAlerts([createdAlert1, createdAlert2]);
-
-        // Verify bulk pause button is visible
         await pm.alertsPage.verifyBulkPauseButtonVisible();
-        testLogger.info('Bulk pause button visible after selection');
-
-        // Bulk pause
         await pm.alertsPage.bulkPauseAlerts();
         testLogger.info('Bulk pause completed');
 
-        // Wait for UI to update
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-        // Select both alerts again (selection may be cleared after operation)
+        // Selection cleared after operation, re-select
         await pm.alertsPage.selectMultipleAlerts([createdAlert1, createdAlert2]);
-
-        // Verify bulk unpause button is visible
         await pm.alertsPage.verifyBulkUnpauseButtonVisible();
-        testLogger.info('Bulk unpause button visible after pausing');
-
-        // Bulk unpause
         await pm.alertsPage.bulkUnpauseAlerts();
         testLogger.info('Bulk unpause completed');
 
         testLogger.info('Bulk operations test completed successfully');
     });
 
-    // ==================== CLEANUP TEST ====================
+    // ==================== DEDUPLICATION TESTS ====================
 
-    test("Cleanup: Delete created alerts, destination, and template", {
-        tag: ['@alertsAdvanced', '@all', '@alerts', '@cleanup']
+    test("Create scheduled alert with deduplication configuration", {
+        tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication']
     }, async ({ page }) => {
-        testLogger.info('Cleaning up test data');
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8);
+        testLogger.info('Testing scheduled alert with deduplication configuration', { uniqueSuffix });
 
-        // Wait for alerts page to fully load (already navigated in beforeEach)
-        await page.waitForTimeout(2000);
+        // This test focuses on UI validation of scheduled alert with deduplication settings
+        // Scheduled alert trigger verification is covered by alerts-ui-operations.spec.js
+        const templateName = 'auto_template_dedup_' + uniqueSuffix;
+        const destinationName = 'auto_dest_dedup_' + uniqueSuffix;
 
-        // Delete all created alerts using page object methods
-        for (const alertName of createdAlerts) {
-            try {
-                await pm.alertsPage.searchAlert(alertName);
-                // Use hasAlerts check with search already applied
-                const hasResults = await pm.alertsPage.hasAlerts();
-                if (hasResults) {
-                    await pm.alertsPage.deleteAlertByRow(alertName);
-                    testLogger.info('Deleted alert', { alertName });
-                }
-            } catch (e) {
-                testLogger.warn('Alert not found for deletion', { alertName, error: e.message });
-            }
-        }
+        await pm.alertTemplatesPage.navigateToTemplates();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        await pm.alertTemplatesPage.createTemplate(templateName);
+        testLogger.info('Template created', { templateName });
 
-        // Clear search using page object
-        await pm.alertsPage.searchAlert('');
-        await page.waitForTimeout(1000);
+        await pm.alertDestinationsPage.navigateToDestinations();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        const webhookUrl = 'https://webhook.site/test-dedup-' + uniqueSuffix;
+        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        testLogger.info('Destination created', { destinationName });
 
-        // Delete destination
-        try {
-            await pm.alertDestinationsPage.navigateToDestinations();
-            await page.waitForTimeout(1000);
-            await pm.alertDestinationsPage.deleteDestinationWithSearch(DESTINATION_NAME);
-            testLogger.info('Deleted destination', { destinationName: DESTINATION_NAME });
-        } catch (e) {
-            testLogger.warn('Destination deletion failed', { destinationName: DESTINATION_NAME, error: e.message });
-        }
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        await page.goto(alertsUrl);
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
-        // Delete template
-        try {
-            await pm.alertTemplatesPage.navigateToTemplates();
-            await page.waitForTimeout(1000);
-            await pm.alertTemplatesPage.deleteTemplateAndVerify(TEMPLATE_NAME);
-            testLogger.info('Deleted template', { templateName: TEMPLATE_NAME });
-        } catch (e) {
-            testLogger.warn('Template deletion failed', { templateName: TEMPLATE_NAME, error: e.message });
-        }
+        const dedupConfig = {
+            timeWindowMinutes: 30
+            // fingerprintFields left empty to test auto-detection
+        };
 
-        testLogger.info('Cleanup completed');
+        const alertName = await pm.alertsPage.createScheduledAlertWithDeduplication(
+            TEST_STREAM,
+            destinationName,
+            uniqueSuffix,
+            dedupConfig
+        );
+
+        await pm.alertsPage.verifyAlertCreated(alertName);
+        testLogger.info('Scheduled alert with deduplication created and verified successfully', {
+            alertName,
+            dedupConfig
+        });
     });
 });
