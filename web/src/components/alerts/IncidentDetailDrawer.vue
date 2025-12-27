@@ -108,9 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Incident Details -->
       <div class="incident-details-column tw-w-[400px] tw-flex-shrink-0 tw-flex tw-flex-col" :class="store.state.theme === 'dark' ? 'tw-border-r tw-border-gray-700' : 'tw-border-r tw-border-gray-200'">
 
-        <!-- Top Section (50% height) - Table of Contents -->
+        <!-- Top Section (52% height) - Table of Contents -->
         <div
-          style="height: 50%"
+          style="height: 52%"
           class="tw-border-b tw-p-4 tw-flex tw-flex-col"
           :class="store.state.theme === 'dark' ? 'tw-border-gray-700' : 'tw-border-gray-200'"
         >
@@ -256,8 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Bottom Section (50% height) - Timeline, Dimensions, Topology -->
-        <div style="height: 50%" class="tw-overflow-auto tw-p-4">
+        <!-- Bottom Section (48% height) - Timeline, Dimensions, Topology -->
+        <div style="height: 48%" class="tw-overflow-auto tw-p-4">
         <!-- Timeline with UTC timestamps -->
         <div
           id="timeline"
