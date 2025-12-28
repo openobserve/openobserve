@@ -940,8 +940,13 @@ export default defineComponent({
             text,
             level,
             children: [],
-            expanded: false
+            expanded: true // Changed from false to true to expand by default
           };
+
+          // Set expanded state to true for all sections by default, but only if not already set
+          if (expandedSections.value[id] === undefined) {
+            expandedSections.value[id] = true;
+          }
 
           // Adjust level for display (h2 becomes level 1, h3 becomes level 2)
           const displayLevel = level - 1;
