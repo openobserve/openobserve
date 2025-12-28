@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="col-auto">
         <q-btn
           data-test="incident-detail-close-btn"
-          v-close-popup="true"
+          @click="close"
           round
           flat
           icon="cancel"
@@ -614,6 +614,7 @@ import { defineComponent, ref, watch, computed, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import { getImageURL } from "@/utils/zincutils";
@@ -633,6 +634,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+    const router = useRouter();
 
     const loading = ref(false);
     const updating = ref(false);
@@ -700,10 +702,11 @@ export default defineComponent({
     };
 
     watch(
-      () => props.incident,
-      (incident) => {
-        if (incident) {
-          loadDetails(incident.id);
+      () => router.currentRoute.value.query.incident_id,
+      (incidentIdFromUrl) => {
+        // Only use URL incident_id - don't rely on props
+        if (incidentIdFromUrl) {
+          loadDetails(incidentIdFromUrl as string);
         }
       },
       { immediate: true }
@@ -1196,7 +1199,6 @@ export default defineComponent({
 
       // Debug: Check Timeline heading in HTML before DOMPurify
       const timelineMatch = html.match(/<h2[^>]*>Timeline<\/h2>/);
-      console.log('Timeline HTML before DOMPurify:', timelineMatch ? timelineMatch[0] : 'NOT FOUND');
 
       // Sanitize HTML to prevent XSS
       const sanitized = DOMPurify.sanitize(html, {
@@ -1209,7 +1211,6 @@ export default defineComponent({
 
       // Debug: Check Timeline heading after DOMPurify
       const timelineMatchAfter = sanitized.match(/<h2[^>]*>Timeline<\/h2>/);
-      console.log('Timeline HTML after DOMPurify:', timelineMatchAfter ? timelineMatchAfter[0] : 'NOT FOUND');
 
       // Wrap in container
       return `<div class="rca-report-content">${sanitized}</div>`;
