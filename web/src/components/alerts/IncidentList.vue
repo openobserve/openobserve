@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw-flex tw-justify-center">
+                <div class="tw-flex tw-justify-end">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat
@@ -117,6 +117,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </q-td>
+          </q-tr>
+        </template>
+
+        <template v-slot:header="props">
+          <q-tr :props="props">
+            <!-- Rendering the of the columns -->
+            <!-- here we can add the classes class so that the head will be sticky -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
           </q-tr>
         </template>
 
@@ -305,7 +321,8 @@ export default defineComponent({
         label: t("alerts.incidents.actions"),
         field: "actions",
         align: "center" as const,
-        style: "width: 200px",
+        style: "width: 100px",
+        classes:'actions-column'
       },
     ]);
 
