@@ -2170,7 +2170,6 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        console.log(row,'row here')
         await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
