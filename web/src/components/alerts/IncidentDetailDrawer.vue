@@ -1113,9 +1113,11 @@ export default defineComponent({
               }).join('').trim();
             }
 
-            // Fallback: strip HTML tags from parsed text
+            // Fallback: extract plain text from parsed HTML using DOM
             if (!rawText) {
-              rawText = parsedText.replace(/<[^>]*>/g, '').trim();
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = parsedText || '';
+              rawText = (tempDiv.textContent || tempDiv.innerText || '').trim();
             }
 
             const id = 'section-' + rawText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -1202,9 +1204,6 @@ export default defineComponent({
       // Parse markdown
       const html = marked.parse(processedContent) as string;
 
-      // Debug: Check Timeline heading in HTML before DOMPurify
-      const timelineMatch = html.match(/<h2[^>]*>Timeline<\/h2>/);
-
       // Sanitize HTML to prevent XSS
       const sanitized = DOMPurify.sanitize(html, {
         ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'hr', 'div', 'span'],
@@ -1213,9 +1212,6 @@ export default defineComponent({
         KEEP_CONTENT: true,
         RETURN_TRUSTED_TYPE: false
       });
-
-      // Debug: Check Timeline heading after DOMPurify
-      const timelineMatchAfter = sanitized.match(/<h2[^>]*>Timeline<\/h2>/);
 
       // Wrap in container
       return `<div class="rca-report-content">${sanitized}</div>`;
