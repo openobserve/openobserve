@@ -15,7 +15,7 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Schema, Set,
-    entity::prelude::*,
+    entity::prelude::*, sea_query::OnConflict,
 };
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -125,7 +125,7 @@ pub async fn add(record: DimensionValueRecord) -> Result<(), errors::Error> {
     // Generate KSUID for new record
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
 
-    let record = ActiveModel {
+    let active_record = ActiveModel {
         id: Set(id),
         org_id: Set(record.org_id),
         dimension_name: Set(record.dimension_name),
@@ -135,12 +135,41 @@ pub async fn add(record: DimensionValueRecord) -> Result<(), errors::Error> {
 
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::insert(record).exec(client).await;
+    let backend = client.get_database_backend();
+
+    // Use database-specific strategies to avoid logging errors
+    let res = match backend {
+        sea_orm::DatabaseBackend::Postgres | sea_orm::DatabaseBackend::Sqlite => {
+            // PostgreSQL and SQLite: Use ON CONFLICT DO NOTHING
+            // This prevents duplicate key errors from appearing in database logs
+            Entity::insert(active_record)
+                .on_conflict(
+                    OnConflict::columns([Column::OrgId, Column::DimensionName, Column::ValueHash])
+                        .do_nothing()
+                        .to_owned()
+                )
+                .exec(client)
+                .await
+        }
+        sea_orm::DatabaseBackend::MySql => {
+            // MySQL: Use ON DUPLICATE KEY UPDATE with a no-op update
+            // MySQL doesn't support ON CONFLICT DO NOTHING for multi-column unique indexes
+            // This workaround updates the id to itself, effectively doing nothing
+            Entity::insert(active_record)
+                .on_conflict(
+                    OnConflict::columns([Column::OrgId, Column::DimensionName, Column::ValueHash])
+                        .update_column(Column::Id)
+                        .to_owned()
+                )
+                .exec(client)
+                .await
+        }
+    };
 
     match res {
         Ok(_) => Ok(()),
         Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
-            // Unique violation is OK - value already tracked
+            // Fallback: If ON CONFLICT still fails, catch unique violation
             if e.is_unique_violation() {
                 Ok(())
             } else {
