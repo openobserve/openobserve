@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  TOOLTIP_SCROLL_STYLE,
+} from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
 /**
@@ -64,9 +68,9 @@ export class HeatmapConverter implements PromQLChartConverter {
         let timeString: string;
         if (formatted instanceof Date) {
           // Format as HH:MM:SS
-          const hours = String(formatted.getHours()).padStart(2, '0');
-          const minutes = String(formatted.getMinutes()).padStart(2, '0');
-          const seconds = String(formatted.getSeconds()).padStart(2, '0');
+          const hours = String(formatted.getHours()).padStart(2, "0");
+          const minutes = String(formatted.getMinutes()).padStart(2, "0");
+          const seconds = String(formatted.getSeconds()).padStart(2, "0");
           timeString = `${hours}:${minutes}:${seconds}`;
         } else {
           // ISO string - extract time portion
@@ -145,6 +149,7 @@ export class HeatmapConverter implements PromQLChartConverter {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
         },
+        enterable: true,
         backgroundColor:
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
@@ -152,15 +157,17 @@ export class HeatmapConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            const seriesName = seriesNames[params?.value[1]] || params?.seriesName;
-            const value = formatUnitValue(
-              getUnitValue(
-                params?.value?.[2],
-                config?.unit,
-                config?.unit_custom,
-                config?.decimals,
-              ),
-            ) || params?.value?.[2];
+            const seriesName =
+              seriesNames[params?.value[1]] || params?.seriesName;
+            const value =
+              formatUnitValue(
+                getUnitValue(
+                  params?.value?.[2],
+                  config?.unit,
+                  config?.unit_custom,
+                  config?.decimals,
+                ),
+              ) || params?.value?.[2];
             return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
           } catch (error) {
             return "";

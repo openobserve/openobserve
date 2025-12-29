@@ -109,13 +109,7 @@ const store = createStore({
       isDataIngested: false,
       allDashboardData: {},
       foldersByType: [],
-    },
-    streams: {
-      logs: {
-
-      }
     }
-
   },
   mutations: {
     login(state, payload) {
@@ -262,6 +256,28 @@ const store = createStore({
     },
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
+    },
+    clearPendingShortURL(state) {
+      // Mock mutation for tests - clears pending short URL state
+    },
+  },
+  modules: {
+    streams: {
+      namespaced: true,
+      state: {
+        streamMapping: {},
+      },
+      mutations: {
+        updateStreamIndexMapping(state: any, payload: any) {
+          // Mock mutation for updating stream index mapping
+          state.streamMapping = { ...state.streamMapping, ...payload };
+        },
+      },
+      actions: {
+        setStreams(context: any, payload: any) {
+          // Mock action for setting streams
+        },
+      },
     },
   },
   actions: {

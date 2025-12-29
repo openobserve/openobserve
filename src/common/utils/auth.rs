@@ -863,7 +863,7 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 });
             }
-            log::info!(
+            log::debug!(
                 "AuthExtractor::from_request took {} ms",
                 start.elapsed().as_millis()
             );

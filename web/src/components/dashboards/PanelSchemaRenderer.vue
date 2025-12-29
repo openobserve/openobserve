@@ -997,6 +997,15 @@ export default defineComponent({
       panelSchema,
       async () => {
         // Re-convert panel data when schema changes (for non-whitelisted config changes)
+        // Skip if queries length changed - let data watcher handle it after reload
+        const currentQueriesCount = panelSchema.value?.queries?.length || 0;
+        const dataArrayCount = data.value?.length || 0;
+
+        // Skip conversion if query count doesn't match data count - data is stale
+        if (currentQueriesCount !== dataArrayCount) {
+          return;
+        }
+
         if (
           !errorDetail?.value?.message &&
           validatePanelData?.value?.length === 0 &&

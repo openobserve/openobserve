@@ -83,6 +83,7 @@ mod m20251204_000001_create_alert_incidents_table;
 mod m20251207_000001_create_system_settings_table;
 mod m20251219_000001_add_org_id_to_search_queue;
 mod m20251221_000001_create_enrichment_table_urls;
+mod m20251226_000001_add_enrichment_table_urls_is_local_region;
 
 pub struct Migrator;
 
@@ -155,14 +156,24 @@ impl MigratorTrait for Migrator {
             Box::new(m20251207_000001_create_system_settings_table::Migration),
             Box::new(m20251219_000001_add_org_id_to_search_queue::Migration),
             Box::new(m20251221_000001_create_enrichment_table_urls::Migration),
+            Box::new(m20251226_000001_add_enrichment_table_urls_is_local_region::Migration),
         ]
     }
 }
 
-pub fn get_text_type() -> String {
+pub fn get_text_type() -> &'static str {
     let db_type = config::get_config().common.meta_store.as_str().into();
     match db_type {
-        MetaStore::MySQL => config::get_config().limit.db_text_data_type.clone(),
-        _ => "text".to_string(),
+        MetaStore::MySQL => "longtext",
+        _ => "text",
+    }
+}
+
+pub fn get_binary_type() -> &'static str {
+    let db_type = config::get_config().common.meta_store.as_str().into();
+    match db_type {
+        MetaStore::MySQL => "longblob",
+        MetaStore::Sqlite => "blob",
+        _ => "bytea",
     }
 }

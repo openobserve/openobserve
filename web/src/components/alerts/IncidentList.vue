@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw-flex tw-justify-center">
+                <div class="tw-flex tw-justify-end">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat
@@ -117,6 +117,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </q-td>
+          </q-tr>
+        </template>
+
+        <template v-slot:header="props">
+          <q-tr :props="props">
+            <!-- Rendering the of the columns -->
+            <!-- here we can add the classes class so that the head will be sticky -->
+            <q-th
+              v-for="col in props.cols"
+              :key="col.name"
+              :props="props"
+              :class="col.classes"
+              :style="col.style"
+            >
+              {{ col.label }}
+            </q-th>
           </q-tr>
         </template>
 
@@ -161,8 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :maximized="true"
     >
       <IncidentDetailDrawer
-        :incident="selectedIncident"
-        @close="showDetailDrawer = false"
+        @close="closeDrawer"
         @status-updated="onStatusUpdated"
       />
     </q-dialog>
@@ -174,6 +189,7 @@ import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, { Incident } from "@/services/incidents";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
@@ -199,13 +215,14 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+    const router = useRouter();
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
     const incidents = ref<Incident[]>([]);
     const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
     const showDetailDrawer = ref(false);
-    const selectedIncident = ref<Incident | null>(null);
+    const selectedIncident = ref<Incident | null>(null); // Keep for reference but not passed to drawer
 
     // Filter state for status and severity columns
     const statusFilter = ref<string[]>([]);
@@ -304,7 +321,8 @@ export default defineComponent({
         label: t("alerts.incidents.actions"),
         field: "actions",
         align: "center" as const,
-        style: "width: 200px",
+        style: "width: 100px",
+        classes:'actions-column'
       },
     ]);
 
@@ -405,7 +423,17 @@ export default defineComponent({
 
     const viewIncident = (incident: Incident) => {
       selectedIncident.value = incident;
-      showDetailDrawer.value = true;
+
+      // Add incident ID to URL and open drawer after navigation completes
+      router.push({
+        query: {
+          ...router.currentRoute.value.query,
+          incident_id: incident.id,
+        },
+      }).then(() => {
+        // Open drawer after URL is updated
+        showDetailDrawer.value = true;
+      });
     };
 
     const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
@@ -440,6 +468,17 @@ export default defineComponent({
 
     const onStatusUpdated = () => {
       loadIncidents();
+    };
+
+    const closeDrawer = () => {
+      // Close drawer immediately for better UX
+      showDetailDrawer.value = false;
+      selectedIncident.value = null;
+
+      // Remove incident_id from URL
+      const query = { ...router.currentRoute.value.query };
+      delete query.incident_id;
+      router.replace({ query }); // Use replace instead of push to not add history entry
     };
 
     const getStatusColor = (status: string) => {
@@ -497,8 +536,15 @@ export default defineComponent({
         .join(", ");
     };
 
-    onMounted(() => {
-      loadIncidents();
+    onMounted(async () => {
+      await loadIncidents();
+
+      // Check if there's an incident_id in the URL and open the drawer
+      const incidentIdFromUrl = router.currentRoute.value.query.incident_id as string;
+      if (incidentIdFromUrl) {
+        // Just open the drawer - the IncidentDetailDrawer will read the ID from URL
+        showDetailDrawer.value = true;
+      }
     });
 
     // Watch for search query changes and apply FE filter
@@ -512,6 +558,17 @@ export default defineComponent({
       const endIndex = pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
+    });
+
+    // Watch for drawer closing (handles ESC key, clicking outside, etc.)
+    watch(showDetailDrawer, (isOpen) => {
+      if (!isOpen && router.currentRoute.value.query.incident_id) {
+        // Drawer was closed but incident_id is still in URL - clean it up
+        const query = { ...router.currentRoute.value.query };
+        delete query.incident_id;
+        router.replace({ query });
+        selectedIncident.value = null;
+      }
     });
 
     // Filter toggle functions
@@ -580,6 +637,7 @@ export default defineComponent({
       loadIncidents,
       onRequest,
       viewIncident,
+      closeDrawer,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,

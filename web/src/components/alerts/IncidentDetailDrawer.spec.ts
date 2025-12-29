@@ -72,10 +72,15 @@ const createAlert = (overrides: Partial<IncidentAlert> = {}): IncidentAlert => (
 describe("IncidentDetailDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
 
-  const createWrapper = (props = {}, storeOverrides = {}) => {
+  const createWrapper = async (props = {}, storeOverrides = {}, incidentId?: string) => {
     // Update store state with overrides
     if (storeOverrides && Object.keys(storeOverrides).length > 0) {
       Object.assign(store.state, storeOverrides);
+    }
+
+    // Set router query param if incidentId is provided
+    if (incidentId) {
+      await router.push({ query: { incident_id: incidentId } });
     }
 
     return mount(IncidentDetailDrawer, {
@@ -92,7 +97,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Reset store state
@@ -141,41 +146,41 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should mount component successfully", () => {
-      wrapper = createWrapper();
+    it("should mount component successfully", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should show loading state initially", () => {
-      wrapper = createWrapper();
+    it("should show loading state initially", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should initialize with no incident details", () => {
-      wrapper = createWrapper();
+    it("should initialize with no incident details", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.vm.incidentDetails).toBeNull();
     });
 
-    it("should initialize empty triggers array", () => {
-      wrapper = createWrapper();
+    it("should initialize empty triggers array", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.vm.triggers).toEqual([]);
     });
 
-    it("should not be updating initially", () => {
-      wrapper = createWrapper();
+    it("should not be updating initially", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.vm.updating).toBe(false);
     });
   });
 
   describe("Props and Model Value", () => {
-    it("should accept incident prop", () => {
+    it("should accept incident prop", async () => {
       const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({ incident });
       expect(wrapper.props().incident).toEqual(incident);
     });
 
     it("should emit close when drawer closes", async () => {
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
 
       wrapper.vm.close();
       await nextTick();
@@ -183,10 +188,8 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.emitted("close")).toBeTruthy();
     });
 
-    it("should load details when incident prop is set", async () => {
-      const incident = createIncident({ id: "test-123" });
-
-      wrapper = createWrapper({ incident });
+    it("should load details when incident_id is in URL", async () => {
+      wrapper = await createWrapper({}, {}, "test-123");
       await flushPromises();
 
       expect(incidentsService.get).toHaveBeenCalledWith("default", "test-123");
@@ -206,8 +209,7 @@ describe("IncidentDetailDrawer.vue", () => {
         data: mockIncident,
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -218,8 +220,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should set loading state during fetch", async () => {
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
 
@@ -241,8 +242,7 @@ describe("IncidentDetailDrawer.vue", () => {
         data: createIncidentWithAlerts({ id: "test-123", triggers }),
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -254,24 +254,19 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should handle API error during load", async () => {
       (incidentsService.get as any).mockRejectedValue(new Error("API Error"));
 
-      const mockNotify = vi.fn();
-      const incident = createIncident({ id: "test-123" });
-
-      wrapper = createWrapper({ incident });
-      wrapper.vm.$q.notify = mockNotify;
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("negative");
+      // The error is handled internally, incident details remain null
+      expect(wrapper.vm.incidentDetails).toBeNull();
     });
 
     it("should stop loading on error", async () => {
       (incidentsService.get as any).mockRejectedValue(new Error("API Error"));
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -282,8 +277,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("Status Update Actions", () => {
     beforeEach(async () => {
-      const incident = createIncident({ id: "test-123", status: "open" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "1");
 
       await nextTick();
       await flushPromises();
@@ -382,8 +376,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("RCA Functionality", () => {
     beforeEach(async () => {
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "1");
 
       await nextTick();
       await flushPromises();
@@ -485,8 +478,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("SRE Chat Integration", () => {
     beforeEach(async () => {
-      const incident = createIncident({ id: "test-123", title: "Test Incident" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "1");
 
       await nextTick();
       await flushPromises();
@@ -544,8 +536,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Status Colors", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should return correct color for open status", () => {
@@ -566,8 +558,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Status Labels", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should return translated label for open status", () => {
@@ -594,8 +586,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Severity Colors", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should return correct color for P1 severity", () => {
@@ -620,8 +612,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Correlation Reason Colors", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should return correct color for service_discovery", () => {
@@ -642,8 +634,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Correlation Reason Labels", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should return translated label for service_discovery", () => {
@@ -670,8 +662,8 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - Timestamp Formatting", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
     it("should format timestamp in microseconds correctly", () => {
@@ -699,23 +691,24 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   describe("Utility Functions - RCA Content Formatting", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      wrapper = await createWrapper();
     });
 
-    it("should escape HTML in content", () => {
+    it("should sanitize malicious HTML content", () => {
       const malicious = '<script>alert("xss")</script>';
       const formatted = wrapper.vm.formatRcaContent(malicious);
 
+      // DOMPurify completely removes script tags (better than escaping)
       expect(formatted).not.toContain("<script>");
-      expect(formatted).toContain("&lt;script&gt;");
+      expect(formatted).not.toContain('alert("xss")');
     });
 
     it("should format bold text", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw-font-semibold tw-text-gray-900">bold</strong>');
+      expect(formatted).toContain('<strong class="tw-font-semibold">bold</strong>');
     });
 
     it("should format h2 headers", () => {
@@ -723,7 +716,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const formatted = wrapper.vm.formatRcaContent(content);
 
       expect(formatted).toContain("tw-font-bold");
-      expect(formatted).toContain("tw-text-sm");
+      expect(formatted).toContain("tw-text-lg");
       expect(formatted).toContain("tw-text-blue-600");
     });
 
@@ -738,7 +731,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "- Item 1\n- Item 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("•");
+      expect(formatted).toContain("rca-ul");
       expect(formatted).toContain("Item 1");
     });
 
@@ -746,31 +739,32 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "1. First item\n2. Second item";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">1.</span><span class="tw-flex-1">First item</span></div>');
-      expect(formatted).toContain('<div class="tw-flex tw-gap-2 tw-ml-2 tw-mb-2"><span class="tw-font-semibold tw-text-gray-600 tw-min-w-[20px]">2.</span><span class="tw-flex-1">Second item</span></div>');
+      expect(formatted).toContain("rca-ol");
+      expect(formatted).toContain("First item");
+      expect(formatted).toContain("Second item");
     });
 
     it("should format complex markdown", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw-font-semibold tw-text-gray-900">Issue</strong>');
+      expect(formatted).toContain('<strong class="tw-font-semibold">Issue</strong>');
       expect(formatted).toContain("tw-font-bold");
-      expect(formatted).toContain("•");
+      expect(formatted).toContain("rca-ul");
     });
   });
 
   describe("Theme Support", () => {
-    it("should detect dark mode", () => {
+    it("should detect dark mode", async () => {
       store.state.theme = "dark";
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
 
       expect(wrapper.vm.isDarkMode).toBe(true);
     });
 
-    it("should detect light mode", () => {
+    it("should detect light mode", async () => {
       store.state.theme = "light";
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
 
       expect(wrapper.vm.isDarkMode).toBe(false);
     });
@@ -793,8 +787,7 @@ describe("IncidentDetailDrawer.vue", () => {
         data: mockIncidentData,
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -817,8 +810,11 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("Edge Cases", () => {
     it("should handle incident without title", async () => {
-      const incident = createIncident({ id: "test-123", title: undefined });
-      wrapper = createWrapper({ incident });
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", title: undefined }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -831,8 +827,7 @@ describe("IncidentDetailDrawer.vue", () => {
         data: createIncidentWithAlerts({ id: "test-123", triggers: [] }),
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -841,8 +836,11 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should handle missing topology context", async () => {
-      const incident = createIncident({ id: "test-123", topology_context: undefined });
-      wrapper = createWrapper({ incident });
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", topology_context: undefined }),
+      });
+
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -856,8 +854,7 @@ describe("IncidentDetailDrawer.vue", () => {
         data: createIncidentWithAlerts({ id: "test-123", stable_dimensions: {} }),
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -874,8 +871,7 @@ describe("IncidentDetailDrawer.vue", () => {
         }),
       });
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper({ incident });
+      wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
       await flushPromises();
@@ -886,7 +882,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("Close Functionality", () => {
     it("should close drawer", async () => {
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
 
       wrapper.vm.close();
       await nextTick();
@@ -895,7 +891,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should emit update:modelValue on close", async () => {
-      wrapper = createWrapper();
+      wrapper = await createWrapper();
 
       wrapper.vm.close();
       await nextTick();
@@ -906,10 +902,10 @@ describe("IncidentDetailDrawer.vue", () => {
 
   describe("Organization Context", () => {
     it("should use correct organization from store", async () => {
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper(
-        { incident },
-        { selectedOrganization: { identifier: "custom-org" } }
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "custom-org" } },
+        "test-123"
       );
 
       await nextTick();
@@ -921,10 +917,10 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should use organization in status updates", async () => {
       (incidentsService.updateStatus as any).mockResolvedValue({});
 
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper(
-        { incident },
-        { selectedOrganization: { identifier: "org-123" } }
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "org-123" } },
+        "1"
       );
 
       await nextTick();
@@ -940,10 +936,10 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should use organization in RCA trigger", async () => {
-      const incident = createIncident({ id: "test-123" });
-      wrapper = createWrapper(
-        { incident },
-        { selectedOrganization: { identifier: "org-456" } }
+      wrapper = await createWrapper(
+        {},
+        { selectedOrganization: { identifier: "org-456" } },
+        "1"
       );
 
       await nextTick();
