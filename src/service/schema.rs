@@ -257,13 +257,11 @@ pub(crate) async fn handle_diff_schema(
     let _guard = local_lock.lock().await;
 
     // check if the schema has been updated by another thread
-    let read_cache = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(updated_schema) = read_cache.get(&cache_key)
+    if let Some(updated_schema) = STREAM_SCHEMAS_LATEST.pin().get(&cache_key)
         && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
     {
         return Ok(None);
     }
-    drop(read_cache);
 
     // first update thread cache
     if is_new {
@@ -444,9 +442,9 @@ pub(crate) async fn handle_diff_schema(
 
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), final_schema.clone());
-    drop(w);
+    STREAM_SCHEMAS_LATEST
+        .pin()
+        .insert(cache_key.clone(), final_schema.clone());
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;
     let index_all_values = stream_setting.index_all_values;

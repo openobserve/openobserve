@@ -345,9 +345,7 @@ pub async fn delete_enrichment_table(
     let mut w = STREAM_SCHEMAS.write().await;
     w.remove(&key);
     drop(w);
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
-    drop(w);
+    STREAM_SCHEMAS_LATEST.pin().remove(&key);
 
     // delete stream settings cache
     let mut w = STREAM_SETTINGS.write().await;

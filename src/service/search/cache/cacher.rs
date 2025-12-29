@@ -1194,13 +1194,10 @@ mod tests {
             Field::new("_timestamp", arrow_schema::DataType::Int64, false),
             Field::new("message", arrow_schema::DataType::Utf8, true),
         ]);
-        {
-            let mut w = STREAM_SCHEMAS_LATEST.write().await;
-            w.insert(
-                format!("{org_id}/{stream_type}/logs"),
-                SchemaCache::new(schema),
-            );
-        } // Lock is dropped here before calling check_cache
+        STREAM_SCHEMAS_LATEST.pin().insert(
+            format!("{org_id}/{stream_type}/logs"),
+            SchemaCache::new(schema),
+        );
 
         let mut req = Request {
             query: Query {

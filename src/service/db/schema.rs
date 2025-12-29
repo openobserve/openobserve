@@ -172,7 +172,7 @@ async fn list_stream_schemas(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Vec<StreamSchema> {
-    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let r = STREAM_SCHEMAS_LATEST.pin();
     if r.is_empty() {
         return vec![];
     }
@@ -211,12 +211,9 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if !r.is_empty() {
-        drop(r);
+    if !STREAM_SCHEMAS_LATEST.pin().is_empty() {
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
     }
-    drop(r);
 
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
@@ -374,12 +371,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.insert(item_key.to_string(), settings);
                 infra::schema::set_stream_settings_atomic(w.clone());
                 drop(w);
-                let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(
+                STREAM_SCHEMAS_LATEST.pin().insert(
                     item_key.to_string(),
                     SchemaCache::new(latest_schema.clone()),
                 );
-                drop(w);
                 // remove latest, already parsed it
                 _ = schema_versions.pop().unwrap();
                 // parse other versions
@@ -443,10 +438,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.remove(item_key);
                 w.shrink_to_fit();
                 drop(w);
-                let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                drop(w);
+                STREAM_SCHEMAS_LATEST.pin().remove(item_key);
                 {
                     STREAM_RECORD_ID_GENERATOR.remove(item_key);
                     STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
@@ -539,12 +531,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         w.insert(item_key.to_string(), settings);
         infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
-        let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(
+        STREAM_SCHEMAS_LATEST.pin().insert(
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),
         );
-        drop(w);
         let schema_versions = schema_versions
             .into_iter()
             .map(|(start_dt, data)| {
@@ -569,7 +559,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
-    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let r = STREAM_SCHEMAS_LATEST.pin();
     let mut tables = HashMap::new();
     let mut org_tables: HashMap<String, Vec<(String, String)>> = HashMap::new(); // org_id -> [(key, table_name)]
 
@@ -744,7 +734,7 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
 
 pub async fn list_organizations_from_cache() -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let r = STREAM_SCHEMAS_LATEST.pin();
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;
@@ -759,7 +749,7 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
 
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let r = STREAM_SCHEMAS_LATEST.pin();
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;

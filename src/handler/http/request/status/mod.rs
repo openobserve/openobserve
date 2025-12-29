@@ -632,7 +632,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         }
     }
     drop(r);
-    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let r = STREAM_SCHEMAS_LATEST.pin();
     for (key, schema) in r.iter() {
         mem_size += std::mem::size_of::<String>() + key.len();
         mem_size += schema.size();

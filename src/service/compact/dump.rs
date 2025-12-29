@@ -265,9 +265,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         StreamType::Filelist,
         dump_stream_name
     );
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    let schema = r.get(&dump_stream_key).cloned();
-    drop(r);
+    let schema = STREAM_SCHEMAS_LATEST.pin().get(&dump_stream_key).cloned();
     if schema
         .as_ref()
         .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
@@ -288,8 +286,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         }
 
         let cache = SchemaCache::new(FILE_LIST_SCHEMA.as_ref().to_owned());
-        let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(dump_stream_key, cache);
+        STREAM_SCHEMAS_LATEST.pin().insert(dump_stream_key, cache);
     }
 
     // calculate stats from files before they are moved

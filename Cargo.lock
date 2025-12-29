@@ -5292,6 +5292,7 @@ dependencies = [
  "object_store",
  "once_cell",
  "opentelemetry 0.31.0",
+ "papaya",
  "parking_lot 0.12.5",
  "parquet",
  "proto",

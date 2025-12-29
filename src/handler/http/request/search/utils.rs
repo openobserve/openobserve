@@ -270,7 +270,7 @@ mod tests {
 
         // Store schemas in cache
         {
-            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            let w = STREAM_SCHEMAS_LATEST.pin();
             w.insert(cache_key_a.clone(), SchemaCache::new(schema_a));
             w.insert(cache_key_b.clone(), SchemaCache::new(schema_b));
         }
@@ -313,7 +313,7 @@ JOIN "test1" AS b"#;
 
         // Cleanup
         {
-            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            let w = STREAM_SCHEMAS_LATEST.pin();
             w.remove(&cache_key_a);
             w.remove(&cache_key_b);
         }
@@ -374,7 +374,7 @@ mod validate_query_edge_cases {
         impl TestContext {
             pub(super) async fn cleanup(&self) {
                 {
-                    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                    let w = STREAM_SCHEMAS_LATEST.pin();
                     w.remove(&self.cache_key_oly);
                     w.remove(&self.cache_key_test1);
                 }
@@ -451,7 +451,7 @@ mod validate_query_edge_cases {
 
             // Setup schemas
             {
-                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                let w = STREAM_SCHEMAS_LATEST.pin();
                 w.insert(
                     cache_key_oly.clone(),
                     SchemaCache::new(create_olympic_schema()),

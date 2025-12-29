@@ -38,7 +38,7 @@ pub mod history;
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
+pub static STREAM_SCHEMAS_LATEST: Lazy<papaya::HashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
 /// Used for filtering records when a stream is configured to store original unflattened records
@@ -77,8 +77,7 @@ pub async fn get_stream_schema_from_cache(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
     STREAM_SCHEMAS_LATEST
-        .read()
-        .await
+        .pin()
         .get(cache_key)
         .map(|schema| schema.schema().as_ref().clone())
 }
@@ -99,7 +98,7 @@ pub async fn get_cache(
 ) -> Result<SchemaCache> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
-    if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
+    if let Some(schema) = STREAM_SCHEMAS_LATEST.pin().get(cache_key).cloned() {
         return Ok(schema);
     }
 
@@ -112,7 +111,7 @@ pub async fn get_cache(
     let schema = SchemaCache::new(db_schema);
 
     // Only acquire write lock after DB read is complete
-    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
+    let write_guard = STREAM_SCHEMAS_LATEST.pin();
     // Check again before inserting in case another thread updated while we were reading DB
     if let Some(schema) = write_guard.get(cache_key) {
         Ok(schema.clone())

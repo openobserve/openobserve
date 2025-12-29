@@ -203,8 +203,7 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     let mut logs_streams = 0;
     let mut metrics_streams = 0;
     let mut orgs = HashSet::new();
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    for key in r.keys() {
+    for key in STREAM_SCHEMAS_LATEST.pin().keys() {
         num_streams += 1;
         let stream_type = key.split('/').collect::<Vec<&str>>();
         orgs.insert(stream_type[0].to_string());
@@ -217,7 +216,6 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
             _ => (),
         }
     }
-    drop(r);
 
     let cfg = get_config();
     data.insert("num_org".to_string(), orgs.len().into());

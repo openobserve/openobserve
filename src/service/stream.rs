@@ -987,12 +987,8 @@ pub async fn stream_delete_inner(
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     log::warn!("Deleting schema cache for key: {key}");
-    let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
-    let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
-    drop(w);
+    STREAM_SCHEMAS.write().await.remove(&key);
+    STREAM_SCHEMAS_LATEST.pin().remove(&key);
 
     // delete stream settings cache
     let mut w = STREAM_SETTINGS.write().await;
