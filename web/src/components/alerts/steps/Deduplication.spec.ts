@@ -458,12 +458,12 @@ describe("Deduplication.vue", () => {
 
   describe("UI Rendering", () => {
     it("should render fingerprint fields label", () => {
-      const label = wrapper.find(".tw:font-semibold");
+      const label = wrapper.find(".tw\\:font-semibold");
       expect(label.exists()).toBe(true);
     });
 
     it("should render time window label", () => {
-      const labels = wrapper.findAll(".tw:font-semibold");
+      const labels = wrapper.findAll(".tw\\:font-semibold");
       expect(labels.length).toBeGreaterThan(1);
     });
 
