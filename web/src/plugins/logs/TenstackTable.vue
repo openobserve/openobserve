@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="parentRef"
-    class="container !tw-rounded-none tw-overflow-x-auto tw-relative table-container"
+    class="container tw:rounded-none! tw:overflow-x-auto tw:relative table-container"
   >
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
-      class="tw-w-full tw-table-auto logs-table"
+      class="tw:w-full tw:table-auto logs-table"
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <thead
-        class="tw-sticky tw-top-0 tw-z-10"
+        class="tw:sticky tw:top-0 tw:z-10"
         style="max-height: 44px; height: 22px"
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort="!isResizingHeader || !defaultColumns"
           handle=".table-head"
           :class="{
-            'tw-cursor-move': table.getState().columnOrder.length > 1,
+            'tw:cursor-move': table.getState().columnOrder.length > 1,
           }"
           :style="{
             width:
@@ -64,13 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="tw-flex items-center"
+          class="tw:flex items-center"
         >
           <th
             v-for="header in headerGroup.headers"
             :key="header.id"
             :id="header.id"
-            class="tw-px-2 tw-relative table-head tw-text-ellipsis"
+            class="tw:px-2 tw:relative table-head tw:text-ellipsis"
             :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
             :data-test="`log-search-result-table-th-${header.id}`"
           >
@@ -83,11 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :class="[
                 'resizer',
-                'tw-bg-[var(--o2-border-color)]',
+                'tw:bg-[var(--o2-border-color)]',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
-              class="tw-right-0"
+              class="tw:right-0"
             />
 
             <div
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.column.getToggleSortingHandler(),
                 )
               "
-              class="tw-overflow-hidden tw-text-ellipsis"
+              class="tw:overflow-hidden tw:text-ellipsis"
             >
               <FlexRender
                 :render="header.column.columnDef.header"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                class="tw-invisible tw-items-center tw-absolute tw-right-2 tw-top-0 tw-px-2 column-actions"
+                class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions"
                 :class="
                   store.state.theme === 'dark' ? 'field_overlay_dark' : ''
                 "
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </th>
         </vue-draggable>
 
-        <tr v-if="loading" class="tw-w-full">
+        <tr v-if="loading" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
             class="text-bold"
@@ -148,14 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <div
-              class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
+              class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
             >
               <q-spinner-hourglass size="20px" />
               {{ t("confirmDialog.loading") }}
             </div>
           </td>
         </tr>
-        <tr v-if="!loading && errMsg != ''" class="tw-w-full">
+        <tr v-if="!loading && errMsg != ''" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
             class="text-bold"
@@ -181,8 +181,8 @@ name="warning" class="q-mr-xs" />
               class="text-subtitle2 text-weight-bold q-pl-sm"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw-bg-yellow-600'
-                  : 'tw-bg-amber-300'
+                  ? 'tw:bg-yellow-600'
+                  : 'tw:bg-amber-300'
               "
             >
               <q-btn
@@ -208,8 +208,8 @@ name="warning" class="q-mr-xs" />
             class="q-px-sm"
             :class="
               store.state.theme === 'dark'
-                ? 'tw-bg-yellow-600'
-                : 'tw-bg-amber-300'
+                ? 'tw:bg-yellow-600'
+                : 'tw:bg-amber-300'
             "
           >
             <pre>{{ functionErrorMsg }}</pre>
@@ -219,7 +219,7 @@ name="warning" class="q-mr-xs" />
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
-        class="tw-relative"
+        class="tw:relative"
       >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
@@ -237,20 +237,20 @@ name="warning" class="q-mr-xs" />
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw-absolute tw-flex tw-w-max tw-items-center tw-justify-start tw-border-b tw-cursor-pointer hover:tw-bg-[var(--o2-hover-gray)]"
+            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
             :class="[
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'tw-table-row'
-                : 'tw-flex',
+                ? 'tw:table-row'
+                : 'tw:flex',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? store.state.theme === 'dark'
-                  ? 'tw-bg-zinc-700'
-                  : 'tw-bg-zinc-300'
+                  ? 'tw:bg-zinc-700'
+                  : 'tw:bg-zinc-300'
                 : '',
               'table-row-hover',
             ]"
@@ -266,7 +266,7 @@ name="warning" class="q-mr-xs" />
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
               "
-              class="tw-absolute tw-left-0 tw-inset-y-0 tw-w-1 tw-z-10"
+              class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
               :style="{
                 backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
               }"
@@ -278,12 +278,12 @@ name="warning" class="q-mr-xs" />
               "
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
-              class="tw-w-full tw-relative"
+              class="tw:w-full tw:relative"
             >
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
-                class="tw-py-[0.375rem]"
+                class="tw:py-[0.375rem]"
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
@@ -312,8 +312,8 @@ name="warning" class="q-mr-xs" />
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw-py-none tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
-                :class="[...tableCellClass, { 'tw-pl-4': cellIndex === 0 }]"
+                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
+                :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
                 :style="{
                   width:
                     cell.column.columnDef.id !== 'source' ||
@@ -376,7 +376,7 @@ name="warning" class="q-mr-xs" />
                     cell.column.columnDef.id ===
                     store.state.zoConfig.timestamp_column
                   "
-                  class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw-invisible tw--translate-y-1/2 ai-btn"
+                  class="tw:absolute tw:right-[16px] tw:top-1/2 tw:transform tw:invisible tw:-translate-y-1/2 ai-btn"
                   @send-to-ai-chat="
                     sendToAiChat(JSON.stringify(cell.row.original), true)
                   "
@@ -671,12 +671,12 @@ watch(
   () => {
     tableCellClass.value = [
       hasDefaultSourceColumn.value && !props.wrap
-        ? "tw-table-cell"
-        : "tw-block",
+        ? "tw:table-cell"
+        : "tw:block",
       !props.wrap
-        ? "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap"
+        ? "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
         : "",
-      props.wrap ? "tw-break-words" : "",
+      props.wrap ? "tw:break-words" : "",
     ];
   },
   {
