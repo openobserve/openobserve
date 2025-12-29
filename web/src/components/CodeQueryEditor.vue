@@ -465,7 +465,7 @@ export default defineComponent({
 
     onMounted(async () => {
       provider.value?.dispose();
-      if(props.language === "promql") {
+      if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
       }
       if (props.language === "vrl") {
