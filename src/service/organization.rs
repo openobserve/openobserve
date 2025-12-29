@@ -472,13 +472,17 @@ pub async fn create_org(
                             }
                         }
 
-                        // IMPORTANT: Do NOT mask the token in the creation response
-                        // The whole point of returning it is so automation can use it immediately
-                        // Token masking should only apply when viewing/retrieving tokens later
+                        // Return service account info with instructions to use assume_role API
+                        // Tokens are no longer returned directly for security reasons
                         Some(crate::common::meta::organization::ServiceAccountTokenInfo {
                             email: new_org_user.email.clone(),
-                            token: new_org_user.token.clone(),
+                            token: String::new(), // Not returned for security
                             role: format!("{}", new_org_user.role),
+                            message: format!(
+                                "Use POST /api/_meta/assume_role with org_id='{}' and role_name='{}' to obtain a temporary session token",
+                                org.identifier,
+                                get_openfga_config().assume_role_name
+                            ),
                         })
                     } else {
                         None
