@@ -6806,6 +6806,7 @@ dependencies = [
  "snafu 0.8.9",
  "snap",
  "sqlparser",
+ "sqlx",
  "strum 0.27.2",
  "svix-ksuid",
  "tantivy",

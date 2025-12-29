@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 19;
+pub const DB_SCHEMA_VERSION: u64 = 20;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1594,12 +1594,6 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
-    #[env_config(
-        name = "ZO_TEXT_DATA_TYPE",
-        default = "longtext",
-        help = "Default data type for LongText compliant DB's"
-    )]
-    pub db_text_data_type: String,
     #[env_config(
         name = "ZO_MAX_DASHBOARD_SERIES",
         default = 100,
