@@ -65,6 +65,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v5
         with:
           node-version: 22
