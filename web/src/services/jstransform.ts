@@ -114,9 +114,10 @@ const jstransform = {
     table_name: string,
     url: string,
     append_data: boolean,
+    resume: boolean = false,
   ) => {
     return http().post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}`,
+      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}`,
       { url },
     );
   },
