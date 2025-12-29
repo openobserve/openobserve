@@ -124,7 +124,7 @@ export class PipelinesPage {
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
         this.operatorLabels = page.locator('span.tw\\:lowercase');
-        this.firstConditionLabel = page.locator('.tw\\:flex.tw\\:items-start.tw\\:gap-1').first().locator('span').first();
+        this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
         this.noteContainer = page.locator('.note-container');
         this.noteHeading = page.locator('.note-heading');
         this.noteInfo = page.locator('.note-info');
