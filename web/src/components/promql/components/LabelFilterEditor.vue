@@ -34,8 +34,8 @@
                     borderless
                     stack-label
                     hide-bottom-space
-                    class="label-filter-label-select showLabelOnTop !tw-normal-case q-mb-sm"
-                    input-class="!tw-normal-case"
+                    class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
+                    input-class="tw:normal-case!"
                     use-input
                     fill-input
                     hide-selected
@@ -68,7 +68,7 @@
                     stack-label
                     hide-bottom-space
                     class="label-filter-operator-select showLabelOnTop q-mb-sm"
-                    input-class="!tw-normal-case"
+                    input-class="tw:normal-case!"
                     data-test="promql-operator-select"
                   />
 
@@ -82,7 +82,7 @@
                     stack-label
                     hide-bottom-space
                     class="label-filter-value-select showLabelOnTop"
-                    input-class="!tw-normal-case"
+                    input-class="tw:normal-case!"
                     use-input
                     fill-input
                     hide-selected

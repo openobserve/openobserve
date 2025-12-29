@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             outline
             padding="xs sm"
-            class="q-mr-sm tw-h-[36px] el-border"
+            class="q-mr-sm tw:h-[36px] el-border"
             no-caps
             label="Dashboard Tutorial"
             @click="showTutorial"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             outline
             padding="sm"
-            class="q-mr-sm tw-h-[36px] el-border"
+            class="q-mr-sm tw:h-[36px] el-border"
             no-caps
             icon="info_outline"
             @click="showViewPanel = true"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedDate"
             ref="dateTimePickerRef"
             :disable="disable"
-            class="tw-h-[36px]"
+            class="tw:h-[36px]"
             @hide="setTimeForVariables"
           />
           <q-btn
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="red"
             no-caps
             flat
-            class="o2-secondary-button tw-h-[36px] q-ml-md"
+            class="o2-secondary-button tw:h-[36px] q-ml-md"
             style="color: red !important"
             :class="
               store.state.theme === 'dark'
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-panel-discard"
           />
           <q-btn
-            class="o2-secondary-button tw-h-[36px] q-ml-md"
+            class="o2-secondary-button tw:h-[36px] q-ml-md"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-secondary-button-dark'
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="config.isEnterprise === 'false'"
               data-test="dashboard-apply"
-              class="tw-h-[36px] q-ml-md o2-primary-button"
+              class="tw:h-[36px] q-ml-md o2-primary-button"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn-group
               v-if="config.isEnterprise === 'true'"
-              class="tw-h-[36px] q-ml-md o2-primary-button"
+              class="tw:h-[36px] q-ml-md o2-primary-button"
               style="
                 padding-left: 0px !important ;
                 padding-right: 0px !important;
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <q-btn-dropdown
-                class="text-bold no-border tw-px-0"
+                class="text-bold no-border tw:px-0"
                 no-caps
                 auto-close
                 dropdown-icon="keyboard_arrow_down"
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <DashboardErrorsComponent
               :errors="errorData"
-              class="tw-flex-shrink-0"
+              class="tw:flex-shrink-0"
             />
           </div>
         </div>
@@ -528,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <DashboardErrorsComponent
               :errors="errorData"
-              class="tw-flex-shrink-0"
+              class="tw:flex-shrink-0"
             />
           </div>
         </div>

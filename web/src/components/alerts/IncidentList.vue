@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatTimestamp(props.row.last_alert_at) }}
               </template>
               <template v-else-if="col.name === 'actions'">
-                <div class="tw-flex tw-justify-end">
+                <div class="tw:flex tw:justify-end">
                   <q-btn
                     v-if="props.row.status === 'open'"
                     flat

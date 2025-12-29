@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <q-separator />
 
-                    <div v-if="isOutDated" class="tw-p-2">
+                    <div v-if="isOutDated" class="tw:p-2">
                       <div
                         :style="{
                           borderColor: '#c3920d',
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="tw-flex tw-justify-end tw-mr-2">
+                    <div class="tw:flex tw:justify-end tw:mr-2">
                       <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                         <span class="lastRefreshedAtIcon">🕑</span
                         ><RelativeTime
@@ -216,9 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </span>
                     </div>
-                    <div class="col tw-relative" >
+                    <div class="col tw:relative" >
                       <div
-                        class="tw-h-[calc(100vh-500px)] tw-min-h-[140px] tw-mt-[40px]"
+                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]"
                       >
                         <PanelSchemaRenderer
                           v-if="chartData"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <q-btn
                           size="md"
-                          class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+                          class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
                           no-caps
                           dense
                           style="padding: 2px 4px;"
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw-h-[calc(100vh-180px)]">
+                  <div class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw-h-[calc(100vh-180px)]">
+                  <div class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>

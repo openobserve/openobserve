@@ -99,7 +99,7 @@
                           input-debounce="300"
                           @filter="filterOperationLabels"
                           class="operation-label-selector showLabelOnTop no-case q-mb-sm"
-                          input-class="!tw-normal-case"
+                          input-class="tw:normal-case!"
                           :data-test="`promql-operation-param-${paramIndex}`"
                           :hint="
                             availableLabels.length
