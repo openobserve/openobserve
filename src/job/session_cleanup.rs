@@ -15,8 +15,6 @@
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 
-use crate::common::infra::cluster;
-
 /// Runs the periodic session cleanup job.
 ///
 /// This job periodically removes expired sessions from the database to prevent
@@ -45,7 +43,7 @@ pub fn run() {
         log::debug!("[SESSION_CLEANUP] Job kicked off");
 
         // Leader election: only the ingester with the smallest UUID runs cleanup
-        let is_leader = match cluster::get_cached_online_ingester_nodes().await {
+        let is_leader = match infra::cluster::get_cached_online_ingester_nodes().await {
             Some(mut nodes) => {
                 if nodes.is_empty() {
                     log::warn!("[SESSION_CLEANUP] No online ingester nodes found");
