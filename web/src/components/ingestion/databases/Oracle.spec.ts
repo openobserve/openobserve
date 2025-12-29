@@ -133,7 +133,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
       expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-      expect(wrapper.find('.tw:font-bold').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
     });
 
     it('should render CopyContent component', () => {
@@ -159,7 +159,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
 
     it('should render documentation text correctly', () => {
       wrapper = createWrapper();
-      const docText = wrapper.find('.tw:font-bold');
+      const docText = wrapper.find('.tw\\:font-bold');
       expect(docText.text()).toContain('Click');
       expect(docText.text()).toContain('here');
       expect(docText.text()).toContain('to check further documentation.');
@@ -168,7 +168,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render with proper component structure', () => {
       wrapper = createWrapper();
       expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
-      expect(wrapper.find('.tw:font-bold.tw:pt-6.tw:pb-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);
     });
   });
 
@@ -280,10 +280,10 @@ describe('Oracle.vue Comprehensive Coverage', () => {
 
     it('should render all required template elements', () => {
       wrapper = createWrapper();
-      
+
       // Test that all required template elements are present
       expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
-      expect(wrapper.find('.tw:font-bold').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
       expect(wrapper.findComponent(CopyContent).exists()).toBe(true);
       expect(wrapper.find('a').exists()).toBe(true);
     });
@@ -459,11 +459,11 @@ describe('Oracle.vue Comprehensive Coverage', () => {
   describe('Template Integration Tests', () => {
     it('should render all template elements correctly', () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
       expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
-      expect(wrapper.find('.tw:font-bold.tw:pt-6.tw:pb-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);
     });
 
     it('should pass correct CSS classes', () => {

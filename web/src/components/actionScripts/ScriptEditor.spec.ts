@@ -308,14 +308,14 @@ describe('ScriptEditor.vue', () => {
   describe('Component Structure', () => {
     it('has correct main wrapper structure', () => {
       wrapper = createWrapper();
-      
-      const mainDiv = wrapper.find('.tw:w-full.tw:h-full');
+
+      const mainDiv = wrapper.find('.tw\\:w-full.tw\\:h-full');
       expect(mainDiv.exists()).toBe(true);
     });
 
     it('has correct editor section structure', () => {
       wrapper = createWrapper();
-      
+
       const editorSection = wrapper.find('[data-test="test-function-input-editor-section"]');
       expect(editorSection.exists()).toBe(true);
       expect(editorSection.classes()).toContain('tw:border-[1px]');

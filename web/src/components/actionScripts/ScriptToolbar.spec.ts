@@ -365,8 +365,8 @@ describe('ScriptToolbar.vue', () => {
 
     it('has correct left section structure', () => {
       wrapper = createWrapper();
-      const leftSection = wrapper.find('.tw:flex.tw:items-center');
-      
+      const leftSection = wrapper.find('.tw\\:flex.tw\\:items-center');
+
       expect(leftSection.exists()).toBe(true);
     });
 

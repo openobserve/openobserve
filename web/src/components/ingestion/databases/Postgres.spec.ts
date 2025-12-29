@@ -147,7 +147,7 @@ describe('Postgres.vue Comprehensive Coverage', () => {
 
     it('should render documentation text correctly', () => {
       wrapper = createWrapper();
-      const docText = wrapper.find('.tw:font-bold');
+      const docText = wrapper.find('.tw\\:font-bold');
       expect(docText.text()).toContain('Click');
       expect(docText.text()).toContain('here');
       expect(docText.text()).toContain('to check further documentation.');
