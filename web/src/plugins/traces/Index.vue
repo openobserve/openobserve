@@ -139,13 +139,13 @@ style="min-height: auto">
                   </h5>
                 </div>
                 <div v-else-if="!isStreamSelected">
-                  <h5
+                  <div
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                   >
                     <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noStreamSelectedMessage") }}
-                  </h5>
+                </div>
                 </div>
                 <div
                   data-test="logs-search-result-not-found-text"

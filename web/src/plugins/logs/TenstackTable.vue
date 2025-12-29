@@ -237,7 +237,7 @@ name="warning" class="q-mr-xs" />
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
             :class="[
               defaultColumns &&
               !wrap &&

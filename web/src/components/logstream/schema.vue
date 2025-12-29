@@ -312,8 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="openDialog"
                       no-caps
                       :disable="isDialogOpen"
-                      class="o2-secondary-button tw:h-[36px] tw:w-[32px] q-my-sm"
-                      style="min-width: 0px !important; min-height: 0px !important;"
+                      class="o2-secondary-button tw:h-[36px] tw:w-[32px] q-my-sm tw:min-w-[32px]!"
                       flat
                       @click.stop="openDialog"
                       title="Add Field(s)"

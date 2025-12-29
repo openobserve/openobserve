@@ -1246,7 +1246,7 @@ class="q-pr-sm q-pt-xs" />
         round
         color="primary"
         @click="isFocused = !isFocused"
-        class="tw:absolute tw:top-[3.3rem] tw:right-[1.2rem] tw:z-50"
+        class="q-pa-xs tw:absolute! tw:top-[3.3rem]! tw:right-[1.2rem]! tw:z-50"
       >
       <Maximize size='0.8rem' v-if="!isFocused" />
       <Minimize size="0.8rem" v-else />

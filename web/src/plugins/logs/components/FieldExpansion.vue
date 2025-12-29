@@ -174,26 +174,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="theme === 'dark' ? 'text-white' : 'text-black'"
                 >
                   <q-btn
-                    class="o2-custom-button-hover tw:ml-[0.25rem] tw:mr-[0.25rem] tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="0.3125rem"
+                    class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                    size="0.25rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'include')"
                     title="Include Term"
                     round
                     :data-test="`log-search-subfield-list-equal-${field.name}-field-btn`"
                   >
-                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                       <EqualIcon></EqualIcon>
                     </q-icon>
                   </q-btn>
                   <q-btn
                     class="o2-custom-button-hover tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                    size="0.3125rem"
+                    size="0.25rem"
                     @click="handleAddSearchTerm(field.name, value.key, 'exclude')"
                     title="Exclude Term"
                     round
                     :data-test="`log-search-subfield-list-not-equal-${field.name}-field-btn`"
                   >
-                    <q-icon class="tw:h-[0.5rem] tw:w-[0.5rem]">
+                    <q-icon class="tw:h-[0.5rem]! tw:w-[0.5rem]! tw:m-[0.15rem]!">
                       <NotEqualIcon></NotEqualIcon>
                     </q-icon>
                   </q-btn>

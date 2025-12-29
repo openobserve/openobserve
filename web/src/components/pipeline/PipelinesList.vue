@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
                   class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                  padding="sm lg"
                   no-caps
                   flat
                   :label="t(`pipeline.import`)"
