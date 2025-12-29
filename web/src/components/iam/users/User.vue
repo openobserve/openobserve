@@ -66,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="qTable"
           :rows="visibleRows"
           :columns="columns"
-          row-key="id"
+          row-key="email"
+          selection="multiple"
+          v-model:selected="selectedUsers"
           :pagination="pagination"
           :filter="filterQuery"
           :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
@@ -75,8 +77,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #no-data>
             <NoData></NoData>
           </template>
+          <template v-slot:body-selection="scope">
+            <q-td auto-width>
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                class="o2-table-checkbox"
+                :disable="!scope.row.enableDelete"
+              />
+            </q-td>
+          </template>
           <template v-slot:header="props">
             <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th v-if="columns.length > 0" auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
+                />
+              </q-th>
+
               <q-th v-for="col in props.cols"
               :class="col.classes"
               :style="col.style"
@@ -133,9 +155,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #bottom="scope">
             <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[230px] tw-mr-md">
                 {{ resultTotal }} {{ t('user.header') }}
               </div>
+              <q-btn
+                v-if="selectedUsers.length > 0"
+                data-test="users-list-delete-users-btn"
+                class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-secondary-button-dark'
+                    : 'o2-secondary-button-light'
+                "
+                no-caps
+                dense
+                @click="openBulkDeleteDialog"
+              >
+                <q-icon name="delete" size="16px" />
+                <span class="tw-ml-2">Delete</span>
+              </q-btn>
               <QTablePagination
               :scope="scope"
               :resultTotal="resultTotal"
@@ -144,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:changeRecordPerPage="changePagination"
             />
             </div>
-            
+
           </template>
         </q-table>
         </div>
@@ -229,6 +267,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="confirmBulkDelete">
+      <q-card style="width: 280px">
+        <q-card-section class="confirmBody">
+          <div class="head">Delete Users</div>
+          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated
+            no-caps class="q-mr-sm">
+            Cancel
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="bulkDeleteUsers"
+          >
+            OK
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -297,6 +361,8 @@ export default defineComponent({
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
     };
+    const selectedUsers: any = ref([]);
+    const confirmBulkDelete = ref(false);
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
@@ -889,6 +955,55 @@ export default defineComponent({
       updateUserActions();
     };
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteUsers = async () => {
+      const userEmails = selectedUsers.value.map((user: any) => user.email);
+
+      try {
+        const res = await usersService.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          { ids: userEmails }
+        );
+        const { successful, unsuccessful } = res.data;
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            color: "positive",
+            message: `Successfully deleted ${successful.length} user(s)`,
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            color: "warning",
+            message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            color: "negative",
+            message: `Failed to delete ${unsuccessful.length} user(s)`,
+            timeout: 2000,
+          });
+        }
+
+        selectedUsers.value = [];
+        confirmBulkDelete.value = false;
+        await getOrgMembers();
+        updateUserActions();
+      } catch (err: any) {
+        if (err.response?.status != 403 || err?.status != 403) {
+          $q.notify({
+            color: "negative",
+            message: err.response?.data?.message || err?.message || "Error while deleting users",
+            timeout: 2000,
+          });
+        }
+      }
+    };
+
     const updateUserRole = (row: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -964,6 +1079,17 @@ export default defineComponent({
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+    // Watch selectedUsers to filter out disabled rows
+    watch(selectedUsers, (newSelectedUsers) => {
+      // Filter out any disabled rows (those with enableDelete = false)
+      const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
+
+      // If any disabled rows were selected, update to only include enabled ones
+      if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+        selectedUsers.value = onlyEnabledSelected;
+      }
+    });
+
     return {
       t,
       qTable,
@@ -1025,6 +1151,10 @@ export default defineComponent({
       fetchUserRoles,
       visibleRows,
       hasVisibleRows,
+      selectedUsers,
+      confirmBulkDelete,
+      openBulkDeleteDialog,
+      bulkDeleteUsers,
       // showAddUserBtn,
     };
   },

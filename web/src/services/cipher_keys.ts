@@ -62,6 +62,9 @@ const cipherKeys = {
   delete: (org_identifier: string, name: string) => {
     return http().delete(`/api/${org_identifier}/cipher_keys/${name}`);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/cipher_keys/bulk`, { data });
+  },
 };
 
 export default cipherKeys;
