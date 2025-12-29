@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
 pub mod actions;
 // #[cfg(feature = "enterprise")]
 pub mod agent;
@@ -59,3 +62,17 @@ pub mod users;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+
+// these are the common bulk delete req/res structs
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct BulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+}
