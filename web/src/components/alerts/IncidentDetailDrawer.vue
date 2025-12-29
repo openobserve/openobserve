@@ -1130,7 +1130,7 @@ export default defineComponent({
               'rca-h3 tw:font-semibold tw:text-base tw:mt-4 tw:mb-2',
               'rca-h4 tw:font-semibold tw:text-sm tw:mt-3 tw:mb-2 tw:text-gray-700',
             ];
-            return `<h${depth} id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</h${depth}>`;
+            return `<div id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</div>`;
           },
           code({ text }: any) {
             return `<div class="rca-code-block tw:bg-gray-100 tw:border tw:border-gray-300 tw:rounded tw:p-3 tw:my-3 tw:overflow-x-auto"><pre class="tw:text-xs tw:font-mono tw:whitespace-pre tw:m-0"><code>${text}</code></pre></div>`;
