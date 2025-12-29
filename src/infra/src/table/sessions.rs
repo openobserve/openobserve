@@ -33,6 +33,22 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
 
 /// Creates or updates a session atomically using upsert
 pub async fn set(session_id: &str, access_token: &str) -> Result<(), errors::Error> {
+    set_with_expiry(session_id, access_token, None).await
+}
+
+/// Creates or updates a session with optional expiration
+///
+/// # Arguments
+/// * `session_id` - Unique session identifier
+/// * `access_token` - Access token to store
+/// * `expires_at` - Optional expiration timestamp (seconds since epoch)
+///   - None: Session never expires (default for JWT/Dex sessions)
+///   - Some(timestamp): Session expires at this timestamp (for assumed role sessions)
+pub async fn set_with_expiry(
+    session_id: &str,
+    access_token: &str,
+    expires_at: Option<i64>,
+) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
@@ -42,12 +58,13 @@ pub async fn set(session_id: &str, access_token: &str) -> Result<(), errors::Err
         access_token: Set(access_token.to_string()),
         created_at: Set(now),
         updated_at: Set(now),
+        expires_at: Set(expires_at),
     };
 
     Entity::insert(active_model)
         .on_conflict(
             OnConflict::column(Column::SessionId)
-                .update_columns([Column::AccessToken, Column::UpdatedAt])
+                .update_columns([Column::AccessToken, Column::UpdatedAt, Column::ExpiresAt])
                 .to_owned(),
         )
         .exec(client)
@@ -71,4 +88,19 @@ pub async fn list() -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let sessions = Entity::find().all(client).await?;
     Ok(sessions)
+}
+
+/// Deletes all expired sessions from the database
+/// This is more efficient than deleting one at a time
+pub async fn delete_expired() -> Result<u64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp();
+
+    let result = Entity::delete_many()
+        .filter(Column::ExpiresAt.is_not_null())
+        .filter(Column::ExpiresAt.lt(now))
+        .exec(client)
+        .await?;
+
+    Ok(result.rows_affected)
 }

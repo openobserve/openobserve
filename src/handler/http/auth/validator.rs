@@ -1075,14 +1075,29 @@ pub(crate) async fn check_permissions(
 
             match ORG_USERS.get(&format!("{}/{user_id}", &auth_info.org_id)) {
                 Some(user) if user.is_meta_service_account && is_valid_meta_sa => {
-                    // Log privilege elevation for audit trail
-                    log::warn!(
-                        "Role elevated to Admin | user={} | org={} | is_meta_sa=true | validated=true",
-                        user_id,
-                        &auth_info.org_id
-                    );
-                    // Elevate to Admin for verified service accounts from _meta
-                    format!("{}", UserRole::Admin)
+                    // For meta service accounts, get the actual assigned role from DB
+                    match crate::service::db::org_users::get(&auth_info.org_id, user_id).await {
+                        Ok(org_user_record) => {
+                            log::debug!(
+                                "Meta SA using assigned role | user={} | org={} | role={:?} | is_meta_sa=true | validated=true",
+                                user_id,
+                                &auth_info.org_id,
+                                org_user_record.role
+                            );
+                            // Return the actual role from the target org
+                            format!("{}", org_user_record.role)
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to get role for meta SA | user={} | org={} | error={} | falling back to empty role",
+                                user_id,
+                                &auth_info.org_id,
+                                e
+                            );
+                            // Fallback to empty string to use OpenFGA tuples
+                            "".to_string()
+                        }
+                    }
                 }
                 Some(user) if user.is_meta_service_account && !is_valid_meta_sa => {
                     // Flag set but validation failed - possible attack
