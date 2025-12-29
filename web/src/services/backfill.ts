@@ -107,7 +107,26 @@ const backfill = {
   },
 
   /**
+   * Enable or disable a backfill job
+   * @param enable - true to enable/resume, false to disable/pause
+   */
+  enableBackfillJob: async ({
+    org_id,
+    job_id,
+    enable,
+  }: {
+    org_id: string;
+    job_id: string;
+    enable: boolean;
+  }): Promise<BackfillJobActionResponse> => {
+    const url = `/api/${org_id}/pipelines/backfill/${job_id}/enable?value=${enable}`;
+    const response = await http().put(url);
+    return response.data;
+  },
+
+  /**
    * Pause a running backfill job
+   * @deprecated Use enableBackfillJob with enable=false instead
    */
   pauseBackfillJob: async ({
     org_id,
@@ -116,13 +135,12 @@ const backfill = {
     org_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}/pause`;
-    const response = await http().post(url);
-    return response.data;
+    return backfill.enableBackfillJob({ org_id, job_id, enable: false });
   },
 
   /**
    * Resume a paused backfill job
+   * @deprecated Use enableBackfillJob with enable=true instead
    */
   resumeBackfillJob: async ({
     org_id,
@@ -131,9 +149,7 @@ const backfill = {
     org_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}/resume`;
-    const response = await http().post(url);
-    return response.data;
+    return backfill.enableBackfillJob({ org_id, job_id, enable: true });
   },
 
   /**

@@ -23,7 +23,7 @@ use config::{
 use sqlx::Row;
 
 use super::{
-    TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, TriggerWithCreatedAt,
+    TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus,
     get_scheduler_max_retries,
 };
 use crate::{
@@ -739,46 +739,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         } else {
             let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 ORDER BY id;"#;
             sqlx::query_as::<_, Trigger>(query)
-                .bind(org)
-                .fetch_all(&pool)
-                .await?
-        };
-        Ok(jobs)
-    }
-
-    async fn list_by_org_with_created_at(
-        &self,
-        org: &str,
-        module: Option<TriggerModule>,
-    ) -> Result<Vec<TriggerWithCreatedAt>> {
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs"])
-            .inc();
-        let jobs: Vec<TriggerWithCreatedAt> = if let Some(module) = module {
-            let query = r#"
-                SELECT id, org, module, module_key, next_run_at, is_realtime, is_silenced,
-                       status, start_time, end_time, retries, data,
-                       EXTRACT(EPOCH FROM created_at) * 1000000 as created_at
-                FROM scheduled_jobs
-                WHERE org = $1 AND module = $2
-                ORDER BY id;
-            "#;
-            sqlx::query_as::<_, TriggerWithCreatedAt>(query)
-                .bind(org)
-                .bind(module)
-                .fetch_all(&pool)
-                .await?
-        } else {
-            let query = r#"
-                SELECT id, org, module, module_key, next_run_at, is_realtime, is_silenced,
-                       status, start_time, end_time, retries, data,
-                       EXTRACT(EPOCH FROM created_at) * 1000000 as created_at
-                FROM scheduled_jobs
-                WHERE org = $1
-                ORDER BY id;
-            "#;
-            sqlx::query_as::<_, TriggerWithCreatedAt>(query)
                 .bind(org)
                 .fetch_all(&pool)
                 .await?

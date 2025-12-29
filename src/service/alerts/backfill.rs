@@ -362,9 +362,8 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
     // Fetch all backfill job configs from table
     let configs = infra::table::backfill_jobs::list_by_org(org_id).await?;
 
-    // Fetch all backfill triggers
-    let triggers =
-        db::scheduler::list_by_org_with_created_at(org_id, Some(TriggerModule::Backfill)).await?;
+    // Fetch all backfill triggers (no longer using list_by_org_with_created_at)
+    let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
 
     // Create a map of job_id -> trigger for quick lookup
     let mut trigger_map = std::collections::HashMap::new();
@@ -383,7 +382,7 @@ pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, 
                     trigger.status.clone(),
                     trigger.start_time,
                     &backfill_job,
-                    trigger.created_at,
+                    Some(config.created_at), // Use created_at from backfill_jobs table
                 )
                 .await?;
                 jobs.push(job_status);
@@ -412,7 +411,7 @@ pub async fn get_backfill_job(
             trigger.status,
             trigger.start_time,
             &backfill_job,
-            None, // get_backfill_job doesn't return created_at
+            Some(config.created_at), // Use created_at from backfill_jobs table
         )
         .await;
     }

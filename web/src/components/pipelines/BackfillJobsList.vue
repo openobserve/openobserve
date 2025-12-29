@@ -544,9 +544,10 @@ const confirmDeleteJob = (job: BackfillJob) => {
 
 const pauseJob = async (jobId: string) => {
   try {
-    await backfillService.pauseBackfillJob({
+    await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
       job_id: jobId,
+      enable: false,
     });
 
     $q.notify({
@@ -568,9 +569,10 @@ const pauseJob = async (jobId: string) => {
 
 const resumeJob = async (jobId: string) => {
   try {
-    await backfillService.resumeBackfillJob({
+    await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
       job_id: jobId,
+      enable: true,
     });
 
     $q.notify({

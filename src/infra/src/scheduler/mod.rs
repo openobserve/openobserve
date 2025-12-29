@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    triggers::{Trigger, TriggerId, TriggerModule, TriggerStatus, TriggerWithCreatedAt},
+    triggers::{Trigger, TriggerId, TriggerModule, TriggerStatus},
 };
 use once_cell::sync::Lazy;
 
@@ -75,11 +75,6 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
-    async fn list_by_org_with_created_at(
-        &self,
-        org: &str,
-        module: Option<TriggerModule>,
-    ) -> Result<Vec<TriggerWithCreatedAt>>;
     async fn clean_complete(&self) -> Result<()>;
     async fn watch_timeout(&self) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -224,15 +219,6 @@ pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
 #[inline]
 pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
     CLIENT.list_by_org(org, module).await
-}
-
-/// List the jobs for the given module with created_at timestamp
-#[inline]
-pub async fn list_by_org_with_created_at(
-    org: &str,
-    module: Option<TriggerModule>,
-) -> Result<Vec<TriggerWithCreatedAt>> {
-    CLIENT.list_by_org_with_created_at(org, module).await
 }
 
 #[inline]
