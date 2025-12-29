@@ -44,7 +44,6 @@ pub struct KeyInfo {
 pub struct KeyListResponse {
     pub keys: Vec<KeyInfo>,
 }
-
 #[cfg(test)]
 mod tests {
     use o2_enterprise::enterprise::cipher::http_repr::{HttpMechanism, HttpStore};

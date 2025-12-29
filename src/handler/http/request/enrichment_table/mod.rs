@@ -208,9 +208,14 @@ pub async fn save_enrichment_table_from_url(
     // ===== PARSE QUERY PARAMETERS =====
     // Extract append_data from query parameter to match file upload endpoint consistency.
     // This keeps both endpoints (file upload and URL) using the same parameter pattern.
+    // Also extract resume parameter to support resuming from last byte position on retry.
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let append_data = match query.get("append") {
         Some(append_str) => append_str.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
+    let resume = match query.get("resume") {
+        Some(resume_str) => resume_str.parse::<bool>().unwrap_or(false),
         None => false,
     };
 
@@ -282,7 +287,7 @@ pub async fn save_enrichment_table_from_url(
         }
     }
 
-    // ===== DUPLICATE JOB PREVENTION =====
+    // ===== DUPLICATE JOB PREVENTION & RESUME HANDLING =====
     // Check if there's already a job in progress for this table.
     // This prevents:
     // 1. Wasted resources from duplicate downloads
@@ -291,7 +296,7 @@ pub async fn save_enrichment_table_from_url(
     //
     // We allow replacing completed/failed jobs to support retrying with
     // different URLs or re-importing updated data.
-    match get_url_job(&org_id, &table_name).await {
+    let existing_job = match get_url_job(&org_id, &table_name).await {
         Ok(Some(existing_job)) => {
             // Only block if job is actively processing.
             // This check is eventually consistent (job could complete between
@@ -304,12 +309,13 @@ pub async fn save_enrichment_table_from_url(
                 )));
             }
             // If status is Completed or Failed, we allow creating a new job.
-            // This overwrites the old job state, which is intentional - users
-            // may want to re-import with updated data or a different URL.
+            // Store existing job for potential resume.
+            Some(existing_job)
         }
         Ok(None) => {
             // No existing job found - this is the common case for first-time
             // imports. Proceed with creating new job.
+            None
         }
         Err(e) => {
             // Database error while checking for existing job.
@@ -327,23 +333,68 @@ pub async fn save_enrichment_table_from_url(
                 "Failed to check job status",
             ));
         }
-    }
+    };
 
-    // ===== JOB CREATION =====
-    // Create a new job record with Pending status.
-    // This immediately makes the job visible to the status API, allowing
-    // the UI to start polling for updates even before processing begins.
-    let mut job = EnrichmentTableUrlJob::new(
-        org_id.clone(),
-        table_name.clone(),
-        request_body.url.clone(),
-        append_data,
-    );
+    // ===== JOB CREATION OR RESUME =====
+    // If resume=true and there's an existing failed job with Range support,
+    // preserve its progress (last_byte_position, etc.) and just reset to Pending.
+    // Otherwise, create a fresh job from scratch.
+    // Validate URL matches to prevent resuming from wrong position if user changes URL.
+    let mut job = if let Some(existing) = existing_job {
+        if resume
+            && existing.status == EnrichmentTableStatus::Failed
+            && existing.supports_range
+            && existing.url == request_body.url
+        {
+            log::info!(
+                "[ENRICHMENT::URL] Resuming job for {}/{} from byte {}",
+                org_id,
+                table_name,
+                existing.last_byte_position
+            );
+            let mut job = existing;
+            // Reset status to Pending but preserve progress
+            job.status = EnrichmentTableStatus::Pending;
+            job.error_message = None;
+            job.updated_at = chrono::Utc::now().timestamp_micros();
+            job
+        } else {
+            // Create a new job record with Pending status from scratch.
+            log::info!(
+                "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+                org_id,
+                table_name
+            );
+            EnrichmentTableUrlJob::new(
+                org_id.clone(),
+                table_name.clone(),
+                request_body.url.clone(),
+                append_data,
+            )
+        }
+    } else {
+        // No existing job - create a new job record with Pending status from scratch.
+        // This immediately makes the job visible to the status API, allowing
+        // the UI to start polling for updates even before processing begins.
+        log::info!(
+            "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+            org_id,
+            table_name
+        );
+        EnrichmentTableUrlJob::new(
+            org_id.clone(),
+            table_name.clone(),
+            request_body.url.clone(),
+            append_data,
+        )
+    };
 
     // ===== CHECK RANGE REQUEST SUPPORT =====
     // Check if the URL supports HTTP Range requests for resumable downloads.
     // This check is done once at job creation and cached in the database.
     // The processor will use this flag to decide whether to use Range requests on retry.
+    //
+    // Skip this check if we're resuming (we already have the cached value).
     //
     // Why check now instead of during processing:
     // 1. Fail fast - detect unsupported URLs before accepting the job
@@ -353,34 +404,36 @@ pub async fn save_enrichment_table_from_url(
     // Why we don't fail if check fails:
     // Range support is optional. If the check fails (network error, timeout),
     // we still create the job and assume no Range support (safer fallback).
-    let supports_range = {
-        use crate::service::enrichment_table::url_processor::check_range_support_for_url;
-        match check_range_support_for_url(&request_body.url, &org_id, &table_name).await {
-            Ok(true) => {
-                log::info!(
-                    "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
-                    request_body.url
-                );
-                true
+    if !resume || !job.supports_range {
+        let supports_range = {
+            use crate::service::enrichment_table::url_processor::check_range_support_for_url;
+            match check_range_support_for_url(&request_body.url, &org_id, &table_name).await {
+                Ok(true) => {
+                    log::info!(
+                        "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
+                        request_body.url
+                    );
+                    true
+                }
+                Ok(false) => {
+                    log::info!(
+                        "[ENRICHMENT::URL] URL {} does not support Range requests - will use delete-and-retry on failure",
+                        request_body.url
+                    );
+                    false
+                }
+                Err(e) => {
+                    log::warn!(
+                        "[ENRICHMENT::URL] Failed to check Range support for {}: {}. Assuming no support.",
+                        request_body.url,
+                        e
+                    );
+                    false
+                }
             }
-            Ok(false) => {
-                log::info!(
-                    "[ENRICHMENT::URL] URL {} does not support Range requests - will use delete-and-retry on failure",
-                    request_body.url
-                );
-                false
-            }
-            Err(e) => {
-                log::warn!(
-                    "[ENRICHMENT::URL] Failed to check Range support for {}: {}. Assuming no support.",
-                    request_body.url,
-                    e
-                );
-                false
-            }
-        }
-    };
-    job.supports_range = supports_range;
+        };
+        job.supports_range = supports_range;
+    }
 
     // ===== PERSIST JOB TO DATABASE =====
     // Save job to database before triggering processing.

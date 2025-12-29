@@ -2425,6 +2425,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         return;
       }
 
+      // Don't generate auto query for promql query type
+      if (dashboardPanelData?.data?.queryType === "promql") {
+        return;
+      }
+
       let query = "";
       if (dashboardPanelData.data.type == "geomap") {
         query = geoMapChart(dashboardPanelData);

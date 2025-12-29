@@ -46,6 +46,14 @@ const pipelines = {
     return http().delete(url);
   },
 
+  bulkDelete: (
+    org_identifier: string,
+    data: any
+  ) => {
+    const url = `/api/${org_identifier}/pipelines/bulk`;
+    return http().delete(url, { data });
+  },
+
   createPipeline: ({
     data,
     org_identifier,
