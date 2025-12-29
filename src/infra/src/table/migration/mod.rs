@@ -41,7 +41,6 @@ mod m20241227_000300_create_org_users_table;
 mod m20241227_000400_populate_users_table;
 // mod m20241227_000500_delete_meta_users_table;
 mod m20250107_160900_delete_bad_dashboards;
-mod m20250109_000001_create_backfill_jobs;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
 mod m20250121_120000_create_cipher_table;
@@ -85,6 +84,7 @@ mod m20251207_000001_create_system_settings_table;
 mod m20251219_000001_add_org_id_to_search_queue;
 mod m20251221_000001_create_enrichment_table_urls;
 mod m20251226_000001_add_enrichment_table_urls_is_local_region;
+mod m20251229_000001_create_backfill_jobs;
 
 pub struct Migrator;
 
@@ -158,7 +158,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251219_000001_add_org_id_to_search_queue::Migration),
             Box::new(m20251221_000001_create_enrichment_table_urls::Migration),
             Box::new(m20251226_000001_add_enrichment_table_urls_is_local_region::Migration),
-            Box::new(m20250109_000001_create_backfill_jobs::Migration),
+            Box::new(m20251229_000001_create_backfill_jobs::Migration),
         ]
     }
 }
