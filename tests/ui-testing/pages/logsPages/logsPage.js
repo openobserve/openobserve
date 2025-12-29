@@ -3370,8 +3370,7 @@ export class LogsPage {
                         `"severity":${sev},`,
                         `"severity":${sev}}`,
                         `"severity": ${sev}`,
-                        `severity: ${sev}`,
-                        `"severity":"${sev}"`
+                        `severity: ${sev}`
                     ];
 
                     if (patterns.some(pattern => text.includes(pattern))) {
