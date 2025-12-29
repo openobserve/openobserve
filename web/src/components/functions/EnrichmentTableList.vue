@@ -290,6 +290,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
     </q-dialog>
+
+    <!-- Retry Job Dialog -->
+    <RetryJobDialog
+      v-model="showRetryDialog"
+      :table-name="retryJobData.tableName"
+      :url="retryJobData.url"
+      :supports-range="retryJobData.supportsRange"
+      :last-byte-position="retryJobData.lastBytePosition"
+      @confirm="handleRetryConfirm"
+      @cancel="showRetryDialog = false"
+    />
   </q-page>
 </template>
 
@@ -317,12 +328,14 @@ import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
+import RetryJobDialog from "./RetryJobDialog.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
     QTablePagination,
     AddEnrichmentTable,
+    RetryJobDialog,
     NoData,
     ConfirmDialog,
     EnrichmentSchema,
@@ -346,6 +359,14 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const showEnrichmentSchema = ref<boolean>(false);
+    const showRetryDialog = ref<boolean>(false);
+    const retryJobData = reactive({
+      tableName: "",
+      url: "",
+      supportsRange: false,
+      lastBytePosition: 0,
+      appendData: false,
+    });
     const filterQuery = ref("");
     const { track } = useReo();
     const columns: any = ref<QTableProps["columns"]>([
@@ -787,43 +808,49 @@ export default defineComponent({
     };
 
     const retryUrlJob = (row: any) => {
-      $q.dialog({
-        title: 'Retry Job',
-        message: 'Retry fetching data from this URL?',
-        cancel: true,
-        persistent: true,
-      }).onOk(() => {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Creating retry job...",
-        });
+      // Populate retry job data and show the dialog
+      retryJobData.tableName = row.name;
+      retryJobData.url = row.urlJob.url;
+      retryJobData.supportsRange = row.urlJob.supports_range || false;
+      retryJobData.lastBytePosition = row.urlJob.last_byte_position || 0;
+      retryJobData.appendData = row.urlJob.append_data || false;
+      showRetryDialog.value = true;
+    };
 
-        jsTransformService
-          .create_enrichment_table_from_url(
-            store.state.selectedOrganization.identifier,
-            row.name,
-            row.urlJob.url,
-            row.urlJob.append_data
-          )
-          .then(() => {
-            dismiss();
-            $q.notify({
-              type: "positive",
-              message: "Retry job started. Processing in background...",
-            });
-            resetStreamType("enrichment_tables");
-            getLookupTables(true);
-          })
-          .catch((err: any) => {
-            dismiss();
-            if (err.response?.status != 403) {
-              $q.notify({
-                type: "negative",
-                message: err.response?.data?.message || "Failed to create retry job",
-              });
-            }
-          });
+    const handleRetryConfirm = (resumeFromLast: boolean) => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Creating retry job...",
       });
+
+      jsTransformService
+        .create_enrichment_table_from_url(
+          store.state.selectedOrganization.identifier,
+          retryJobData.tableName,
+          retryJobData.url,
+          retryJobData.appendData,
+          resumeFromLast
+        )
+        .then(() => {
+          dismiss();
+          $q.notify({
+            type: "positive",
+            message: resumeFromLast
+              ? "Retry job started. Resuming from last position..."
+              : "Retry job started. Processing from beginning...",
+          });
+          resetStreamType("enrichment_tables");
+          getLookupTables(true);
+        })
+        .catch((err: any) => {
+          dismiss();
+          if (err.response?.status != 403) {
+            $q.notify({
+              type: "negative",
+              message: err.response?.data?.message || "Failed to create retry job",
+            });
+          }
+        });
     };
 
     const filterData = (rows: any, terms: any) => {
@@ -897,6 +924,9 @@ export default defineComponent({
       selectedFilter,
       showFailedJobDetails,
       retryUrlJob,
+      handleRetryConfirm,
+      showRetryDialog,
+      retryJobData,
       formatSizeFromMB,
       filterTabs,
       updateActiveTab,
