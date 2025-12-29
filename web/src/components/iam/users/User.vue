@@ -19,21 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-    <div class="card-container tw-mb-[0.625rem]">
-      <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+    <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div
-          class="q-table__title tw-font-[600]"
+          class="q-table__title tw:font-[600]"
           data-test="user-title-text"
         >
           {{ t("iam.basicUsers") }}
         </div>
-        <div class="full-width tw-flex tw-justify-end">
+        <div class="full-width tw:flex tw:justify-end">
           <q-input
               v-model="filterQuery"
               borderless
               dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('user.search')"
             >
               <template #prepend>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-6" v-else>
             <q-btn
-              class="q-ml-sm o2-primary-button tw-h-[36px]"
+              class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
               no-caps
               :label="t(`user.add`)"
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
     </div>
-    <div class="tw-w-full tw-h-full">
-      <div class="card-container tw-h-[calc(100vh-127px)]">
+    <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-[calc(100vh-127px)]">
         <q-table
           ref="qTable"
           :rows="visibleRows"
@@ -154,14 +154,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
           <template #bottom="scope">
-            <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-              <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[230px] tw-mr-md">
+            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
                 {{ resultTotal }} {{ t('user.header') }}
               </div>
               <q-btn
                 v-if="selectedUsers.length > 0"
                 data-test="users-list-delete-users-btn"
-                class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-secondary-button-dark'
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="openBulkDeleteDialog"
               >
                 <q-icon name="delete" size="16px" />
-                <span class="tw-ml-2">Delete</span>
+                <span class="tw:ml-2">Delete</span>
               </q-btn>
               <QTablePagination
               :scope="scope"

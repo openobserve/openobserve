@@ -1,21 +1,21 @@
 <template>
   <div
-    class="tw-absolute tw-top-0 tw-left-0 tw-w-full tw-z-[999] tw-transition-opacity tw-duration-500 tw-ease-out"
+    class="tw:absolute tw:top-0 tw:left-0 tw:w-full tw:z-[999] tw:transition-opacity tw:duration-500 tw:ease-out"
     :class="{
-      'tw-opacity-0': !loading && !isFadingOut,
-      'tw-opacity-100': loading || isFadingOut,
+      'tw:opacity-0': !loading && !isFadingOut,
+      'tw:opacity-100': loading || isFadingOut,
     }"
   >
     <div
-      class="tw-w-full tw-h-[2px] tw-relative tw-overflow-x-hidden"
+      class="tw:w-full tw:h-[2px] tw:relative tw:overflow-x-hidden"
       :class="
-        store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-gray-200'
+        store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-200'
       "
     >
       <div
-        class="tw-h-full tw-relative tw-overflow-hidden"
+        class="tw:h-full tw:relative tw:overflow-hidden"
         :class="
-          store.state.theme === 'dark' ? 'tw-bg-[#5960B2]' : 'tw-bg-[#5960B2]'
+          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
         "
         :style="{
           width: `${displayPercentage}%`,
@@ -25,11 +25,11 @@
         }"
       >
         <div
-          class="tw-absolute tw-inset-0 tw-bg-gradient-to-r tw-from-transparent tw-to-transparent "
+          class="tw:absolute tw:inset-0 tw:bg-gradient-to-r tw:from-transparent tw:to-transparent "
           :class="
             store.state.theme === 'dark'
-              ? 'tw-via-gray-300/40'
-              : 'tw-via-white/40'
+              ? 'tw:via-gray-300/40'
+              : 'tw:via-white/40'
           "
           :style="{
             animation: 'shimmer 1.5s infinite linear',
@@ -40,9 +40,9 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="tw-absolute tw-top-0 tw-w-[3px] tw-h-[2px] tw-rounded-full tw-shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] tw-transform tw-translate-x-[-50%]"
+        class="tw:absolute tw:top-0 tw:w-[3px] tw:h-[2px] tw:rounded-full tw:shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] tw:transform tw:translate-x-[-50%]"
         :class="
-          store.state.theme === 'dark' ? 'tw-bg-[#5960B2]' : 'tw-bg-[#5960B2]'
+          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
         "
         :style="{
           left: `${displayPercentage}%`,
@@ -52,11 +52,11 @@
         }"
       >
         <div
-          class="tw-absolute tw-inset-0 tw-rounded-full tw-animate-pulse"
+          class="tw:absolute tw:inset-0 tw:rounded-full tw:animate-pulse"
           :class="
             store.state.theme === 'dark'
-              ? 'tw-bg-gray-300/20'
-              : 'tw-bg-white/20'
+              ? 'tw:bg-gray-300/20'
+              : 'tw:bg-white/20'
           "
         ></div>
       </div>
@@ -161,7 +161,7 @@ export default defineComponent({
   }
 }
 
-.tw-animate-pulse {
+.tw:animate-pulse {
   animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

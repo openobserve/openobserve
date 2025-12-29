@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-    <div class="card-container tw-mb-[0.8rem]">
-      <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-pl-4 tw-pr-2 tw-h-[68px]">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+    <div class="card-container tw:mb-[0.8rem]">
+      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
             ref="functionsToolbarRef"
@@ -28,16 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @cancel="cancelAddFunction"
             @open:chat="openChat"
             :is-add-function-component="isAddFunctionComponent"
-            class="tw-pr-4"
+            class="tw:pr-4"
           />
       </div>
     </div>
   
-    <div class="tw-flex">
+    <div class="tw:flex">
 
 
       <div
-        class="tw-flex tw-overflow-auto "
+        class="tw:flex tw:overflow-auto "
         :style="{
           width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
         }"
@@ -45,22 +45,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-splitter
           v-model="splitterModel"
           :limits="[30, Infinity]"
-          class="tw-overflow-hidden tw-w-full"
+          class="tw:overflow-hidden tw:w-full"
           reverse
         >
           <template v-slot:before>
-            <div class="q-px-md q-pt-sm q-pb-md tw-h-max card-container tw-h-[calc(100vh-128px)]">
+            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
               <q-form id="addFunctionForm" ref="addJSTransformForm">
                 <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
                     :label="t('function.jsfunction') + '*'"
-                    class="tw-mt-1"
+                    class="tw:mt-1"
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw-border-[1px] tw-border-gray-200"
+                    class="tw:border-[1px] tw:border-gray-200"
                   >
                     <query-editor
                       data-test="logs-vrl-function-editor"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="function"
                         v-model:is-expanded="expandState.functionError"
                         :label="t('function.errorDetails')"
-                        labelClass="tw-text-red-600"
+                        labelClass="tw:text-red-600"
                       />
                       <div
                         v-if="expandState.functionError"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="q-px-md q-pt-sm q-pb-md tw-h-max q-ml-sm card-container">
+            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"

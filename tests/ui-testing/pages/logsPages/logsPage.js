@@ -3333,7 +3333,7 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+                const colorDiv = row.querySelector('div[class*="tw:absolute"][class*="tw:left-0"]');
 
                 if (!colorDiv) continue;
 

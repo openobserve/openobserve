@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page>
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-mb-[0.625rem]">
-          <div class="tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-h-[68px]">
-            <div class="q-table__title tw-font-[600]">
+      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+        <div class="card-container tw:mb-[0.625rem]">
+          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
+            <div class="q-table__title tw:font-[600]">
                 {{ t("function.header") }}
               </div>
               <div class="q-ml-auto" data-test="functions-list-search-input">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <q-btn
-                  class="q-ml-sm o2-primary-button tw-h-[36px]"
+                  class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
                 no-caps
                 :label="t(`function.add`)"
@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
           </div>
         </div>
-        <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-          <div class="card-container tw-h-[calc(100vh-127px)]">
+        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+          <div class="card-container tw:h-[calc(100vh-127px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
@@ -121,14 +121,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
                         {{ resultTotal }} {{ t('function.header') }}
                       </div>
                   <q-btn
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-secondary-button-dark'
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="openBulkDeleteDialog"
                   >
                     <q-icon name="delete" size="16px" />
-                    <span class="tw-ml-2">Delete</span>
+                    <span class="tw:ml-2">Delete</span>
                   </q-btn>
                   <QTablePagination
                   :scope="scope"
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="confirmForceDelete" persistent>
       <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
         <q-card-section
-          class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center"
+          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
         >
           <div>
             Pipelines Associated with
