@@ -102,6 +102,8 @@ pub async fn get_cache(
         return Ok(schema);
     }
 
+    log::warn!("get_cache: cache missing and get from db for key: {cache_key}");
+
     // Get from DB without holding any locks
     let db_schema = get_from_db(org_id, stream_name, stream_type).await?;
     // if the schema is empty, return an empty schema , Don't write to cache
@@ -743,7 +745,7 @@ pub fn get_merge_schema_changes(
 #[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
     schema: SchemaRef,
-    fields_map: HashMap<String, usize>,
+    fields_map: Arc<HashMap<String, usize>>,
     hash_key: String,
     is_derived: bool,
 }
@@ -755,12 +757,14 @@ impl SchemaCache {
 
     pub fn new_from_arc(schema: Arc<Schema>) -> Self {
         let hash_key = schema.hash_key();
-        let fields_map = schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.name().to_owned(), i))
-            .collect();
+        let fields_map = Arc::new(
+            schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect(),
+        );
         Self {
             schema,
             fields_map,

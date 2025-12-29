@@ -59,7 +59,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
         pipeline::batch_execution::ExecutablePipeline,
-        schema::{check_for_schema, stream_schema_exists},
+        schema::{check_for_schema, stream_schema_exists_with_cost},
         search as search_service,
         self_reporting::report_request_usage_stats,
     },
@@ -197,6 +197,8 @@ pub async fn remote_write(
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
     let mut preload_schema_time = 0u128;
+    let mut preload_schema_get_from_lock_time = 0u128;
+    let mut preload_schema_get_others_time = 0u128;
     let mut preload_partition_time = 0u128;
     let mut preload_alerts_time = 0u128;
 
@@ -244,13 +246,15 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !metric_schema_map.contains_key(stream_name_str) {
-                let _schema_exists = stream_schema_exists(
+                let (_schema_chk, get_from_lock, get_others) = stream_schema_exists_with_cost(
                     &stream.org_id,
                     &stream.stream_name,
                     stream.stream_type,
                     &mut metric_schema_map,
                 )
                 .await;
+                preload_schema_get_from_lock_time += get_from_lock;
+                preload_schema_get_others_time += get_others;
             }
         }
         preload_schema_time = t.elapsed().as_micros();
@@ -442,13 +446,15 @@ pub async fn remote_write(
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
-            preload_total={:.1}ms (unique_metrics={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            preload_total={:.1}ms (unique_metrics={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms (get_from_lock={:.1}ms, get_others={:.1}ms), partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
             preload_unique_metrics_time as f64 / 1000.0,
             preload_pipeline_time as f64 / 1000.0,
             preload_uds_time as f64 / 1000.0,
             preload_schema_time as f64 / 1000.0,
+            preload_schema_get_from_lock_time as f64 / 1000.0,
+            preload_schema_get_others_time as f64 / 1000.0,
             preload_partition_time as f64 / 1000.0,
             preload_alerts_time as f64 / 1000.0,
             label_processing_time as f64 / 1000.0,
