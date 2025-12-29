@@ -933,7 +933,7 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "showAllLegends": "Show All Legends",
-    "legendsOfCharts": "Legends of charts",
+    "legendsOfCharts": "Legends",
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "No legends available",
     "wraptext": "Wrap table cells",
