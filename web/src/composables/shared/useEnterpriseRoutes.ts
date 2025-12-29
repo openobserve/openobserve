@@ -69,6 +69,16 @@ const useEnterpriseRoutes = () => {
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
+            // Check if service accounts are enabled
+            const store = (window as any).store;
+            const serviceAccountEnabled = store?.state?.zoConfig?.service_account_enabled ?? true;
+
+            if (!serviceAccountEnabled) {
+              // Redirect to users page if service accounts are disabled
+              next({ name: "users", query: to.query });
+              return;
+            }
+
             routeGuard(to, from, next);
           },
         },
