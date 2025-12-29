@@ -339,25 +339,41 @@ pub async fn save_enrichment_table_from_url(
     // If resume=true and there's an existing failed job with Range support,
     // preserve its progress (last_byte_position, etc.) and just reset to Pending.
     // Otherwise, create a fresh job from scratch.
-    let mut job = if resume
-        && existing_job.is_some()
-        && existing_job.as_ref().unwrap().status == EnrichmentTableStatus::Failed
-        && existing_job.as_ref().unwrap().supports_range
-    {
-        log::info!(
-            "[ENRICHMENT::URL] Resuming job for {}/{} from byte {}",
-            org_id,
-            table_name,
-            existing_job.as_ref().unwrap().last_byte_position
-        );
-        let mut existing = existing_job.unwrap();
-        // Reset status to Pending but preserve progress
-        existing.status = EnrichmentTableStatus::Pending;
-        existing.error_message = None;
-        existing.updated_at = chrono::Utc::now().timestamp_micros();
-        existing
+    // Validate URL matches to prevent resuming from wrong position if user changes URL.
+    let mut job = if let Some(existing) = existing_job {
+        if resume
+            && existing.status == EnrichmentTableStatus::Failed
+            && existing.supports_range
+            && existing.url == request_body.url
+        {
+            log::info!(
+                "[ENRICHMENT::URL] Resuming job for {}/{} from byte {}",
+                org_id,
+                table_name,
+                existing.last_byte_position
+            );
+            let mut job = existing;
+            // Reset status to Pending but preserve progress
+            job.status = EnrichmentTableStatus::Pending;
+            job.error_message = None;
+            job.updated_at = chrono::Utc::now().timestamp_micros();
+            job
+        } else {
+            // Create a new job record with Pending status from scratch.
+            log::info!(
+                "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+                org_id,
+                table_name
+            );
+            EnrichmentTableUrlJob::new(
+                org_id.clone(),
+                table_name.clone(),
+                request_body.url.clone(),
+                append_data,
+            )
+        }
     } else {
-        // Create a new job record with Pending status from scratch.
+        // No existing job - create a new job record with Pending status from scratch.
         // This immediately makes the job visible to the status API, allowing
         // the UI to start polling for updates even before processing begins.
         log::info!(
