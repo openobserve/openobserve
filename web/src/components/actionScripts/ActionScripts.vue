@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
-      <div class="card-container tw-mb-[0.625rem]">
-        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
-          <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
+    <div v-if="!showAddActionScriptDialog" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]">
+          <div class="tw:font-[600] tw:text-[20px]" data-test="alerts-list-title">
                   {{ t("actions.header") }}
                 </div>
-                <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
+                <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
                   <q-input
                     v-model="filterQuery"
                     borderless
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-input>
                 <q-btn
                   data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw-h-[36px]"
+                  class="q-ml-sm o2-primary-button tw:h-[36px]"
                   flat
                   no-caps
                   :label="t(`actions.add`)"
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
         </div>
       </div>
-      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-124px)]">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-124px)]">
           <q-table
             data-test="action-scripts-table"
             ref="qTable"
@@ -123,15 +123,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                <div class="tw-flex tw-items-center tw-gap-2">
-                  <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[80px] tw-mr-md">
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md">
                     {{ resultTotal }} {{ t('actions.header') }}
                   </div>
                   <q-btn
                     v-if="selectedActionScripts.length > 0"
                     data-test="action-scripts-bulk-delete-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-secondary-button-dark'
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="openBulkDeleteDialog"
                   >
                     <q-icon name="delete" size="16px" />
-                    <span class="tw-ml-2">Delete</span>
+                    <span class="tw:ml-2">Delete</span>
                   </q-btn>
                 </div>
                 <QTablePagination
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <template v-else>
-      <div class="tw-w-full">
+      <div class="tw:w-full">
         <EditScript
           :isUpdated="isUpdated"
           @update:list="refreshList"

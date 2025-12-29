@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page>
     <div v-if="!showAddJSTransformDialog">
-      <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-        <div class="card-container tw-mb-[0.625rem]">
-          <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-h-[68px]">
-            <div class="q-table__title tw-font-[600]" data-test="enrichment-tables-list-title">
+      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+        <div class="card-container tw:mb-[0.625rem]">
+          <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
+            <div class="q-table__title tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
-            <div class="tw-flex tw-items-center q-ml-auto">
-              <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+            <div class="tw:flex tw:items-center q-ml-auto">
+              <div class="app-tabs-container tw:h-[36px] q-mr-sm">
                 <app-tabs
                   data-test="enrichment-tables-list-tabs"
                   class="tabs-selection-container"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-input>
               <q-btn
-                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
                 no-caps
                 :label="t(`function.addEnrichmentTable`)"
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-          <div class="card-container tw-h-[calc(100vh-127px)]">
+        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+          <div class="card-container tw:h-[calc(100vh-127px)]">
             <q-table
               ref="qTable"
               :rows="visibleRows"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-slot:body-cell-type="props">
                 <q-td :props="props">
-                  <div class="tw-flex tw-items-center tw-gap-2">
+                  <div class="tw:flex tw:items-center tw:gap-2">
                     <span v-if="!props.row.urlJob">File</span>
                     <template v-else>
                       <span>Url</span>
@@ -239,15 +239,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom="scope">
-                <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                  <div class="tw-flex tw-items-center tw-gap-2">
-                    <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('function.enrichmentTables') }}
                     </div>
                     <q-btn
                       v-if="selectedEnrichmentTables.length > 0"
                       data-test="enrichment-tables-bulk-delete-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                       :class="
                         store.state.theme === 'dark'
                           ? 'o2-secondary-button-dark'
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="openBulkDeleteDialog"
                     >
                       <q-icon name="delete" size="16px" />
-                      <span class="tw-ml-2">Delete</span>
+                      <span class="tw:ml-2">Delete</span>
                     </q-btn>
                   </div>
                   <QTablePagination

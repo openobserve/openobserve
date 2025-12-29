@@ -21,15 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="!showDestinationEditor">
       <div
-        class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
         <div
-          class="q-table__title tw-font-[600]"
+          class="q-table__title tw:font-[600]"
           data-test="alert-destinations-list-title"
         >
           {{ t("pipeline_destinations.header") }}
         </div>
-        <div class="tw-flex tw-justify-end">
+        <div class="tw:flex tw:justify-end">
           <q-input
             v-model="filterQuery"
             borderless
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-btn
             data-test="pipeline-destination-list-add-btn"
-            class="o2-primary-button q-ml-sm tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
             no-caps
             flat
             :label="t(`alert_destinations.add`)"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <div class="tw-flex tw-justify-center tw-items-center">
+            <div class="tw:flex tw:justify-center tw:items-center">
               <q-btn
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
                 padding="sm"
@@ -108,14 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[230px] tw-mr-md">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
                   {{ resultTotal }} {{ t('pipeline_destinations.header') }}
                 </div>
             <q-btn
               v-if="selectedDestinations.length > 0"
               data-test="pipeline-destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openBulkDeleteDialog"
             >
               <q-icon name="delete" size="16px" />
-              <span class="tw-ml-2">Delete</span>
+              <span class="tw:ml-2">Delete</span>
             </q-btn>
           <QTablePagination
             :scope="scope"

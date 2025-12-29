@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog" >
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
             <div
-              class="q-table__title tw-font-[600]"
+              class="q-table__title tw:font-[600]"
               data-test="cipher-keys-list-title"
             >
               {{ t("cipherKey.header") }}
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-input>
               <q-btn
-                class="o2-primary-button q-ml-sm tw-h-[36px]"
+                class="o2-primary-button q-ml-sm tw:h-[36px]"
                 no-caps
                 flat
                 :label="t(`cipherKey.add`)"
@@ -93,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[150px] tw-mr-md">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
               {{ resultTotal }} {{ t('cipherKey.header') }}
             </div>
             <q-btn
               v-if="selectedKeys.length > 0"
               data-test="cipher-keys-list-delete-keys-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openBulkDeleteDialog"
             >
               <q-icon name="delete" size="16px" />
-              <span class="tw-ml-2">Delete</span>
+              <span class="tw:ml-2">Delete</span>
             </q-btn>
             <QTablePagination
               :scope="scope"

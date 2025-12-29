@@ -38,6 +38,7 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
+        this.nextPageButton = 'button:has(mat-icon:text("chevron_right")), button:has-text("chevron_right")';
     }
 
     async navigateToDestinations() {
@@ -87,9 +88,9 @@ export class AlertDestinationsPage {
                 testLogger.info('Found destination', { destinationName });
             } catch (error) {
                 // Check if there's a next page button and if it's enabled
-                const nextPageButton = this.page.getByRole('button').filter({ hasText: 'chevron_right' }).first();
-                if (await nextPageButton.isVisible() && await nextPageButton.isEnabled()) {
-                    await nextPageButton.click();
+                const nextPageBtn = this.page.locator(this.nextPageButton).first();
+                if (await nextPageBtn.isVisible() && await nextPageBtn.isEnabled()) {
+                    await nextPageBtn.click();
                     await this.page.waitForTimeout(2000);
                 } else {
                     isLastPage = true;
@@ -370,6 +371,101 @@ export class AlertDestinationsPage {
         // Wait for either the error item or the count message to be visible
         await expect(errorItem.or(countMessage)).toBeVisible({ timeout: 10000 });
         testLogger.debug('Destination count/error message verified');
+    }
+
+    /**
+     * Create destination with custom headers
+     * Used for self-referential alert validation where destination points to OpenObserve's own ingestion API
+     * @param {string} destinationName - Name of the destination
+     * @param {string} url - URL for the destination (e.g., OpenObserve ingestion endpoint)
+     * @param {string} templateName - Name of the template to use
+     * @param {Object} headers - Object with header key-value pairs (e.g., { 'Authorization': 'Basic xxx' })
+     */
+    async createDestinationWithHeaders(destinationName, url, templateName, headers = {}) {
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(2000);
+
+        await this.page.locator(this.addDestinationButton).click();
+        await this.page.locator(this.destinationNameInput).click();
+        await this.page.locator(this.destinationNameInput).fill(destinationName);
+        await this.page.waitForTimeout(1000);
+
+        // Handle template selection with retry logic for race conditions
+        // Templates might not appear in dropdown immediately after creation
+        let templateFound = false;
+        const maxRetries = 3;
+
+        for (let attempt = 1; attempt <= maxRetries && !templateFound; attempt++) {
+            try {
+                await this.page.locator(this.templateSelect).click();
+                await this.page.waitForTimeout(2000);
+                await this.commonActions.scrollAndFindOption(templateName, 'template');
+                templateFound = true;
+                testLogger.info('Template found in dropdown', { templateName, attempt });
+            } catch (error) {
+                testLogger.warn('Template not found in dropdown, retrying...', {
+                    templateName,
+                    attempt,
+                    maxRetries,
+                    error: error.message
+                });
+
+                // Close dropdown by clicking elsewhere
+                await this.page.keyboard.press('Escape');
+                await this.page.waitForTimeout(500);
+
+                if (attempt < maxRetries) {
+                    // Navigate away and back to refresh template list
+                    await this.navigateToDestinations();
+                    await this.page.waitForTimeout(2000);
+
+                    // Re-open the add destination form
+                    await this.page.locator(this.addDestinationButton).click();
+                    await this.page.locator(this.destinationNameInput).click();
+                    await this.page.locator(this.destinationNameInput).fill(destinationName);
+                    await this.page.waitForTimeout(1000);
+                } else {
+                    throw new Error(`Template ${templateName} not found in dropdown after ${maxRetries} attempts`);
+                }
+            }
+        }
+
+        await this.page.waitForTimeout(1000);
+
+        // Fill URL
+        await this.page.locator(this.urlInput).click();
+        await this.page.locator(this.urlInput).fill(url);
+        await this.page.waitForTimeout(1000);
+
+        // Add custom headers
+        for (const [headerKey, headerValue] of Object.entries(headers)) {
+            // Click add header button
+            await this.page.locator('[data-test="add-destination-add-header-btn"]').click();
+            await this.page.waitForTimeout(500);
+
+            // Fill header key - use .last() to target the most recently added empty input
+            // This handles cases where there might be pre-existing empty header rows
+            const keyInput = this.page.locator('[data-test="add-destination-header--key-input"]').last();
+            await keyInput.click();
+            await keyInput.fill(headerKey);
+            await this.page.waitForTimeout(500);
+
+            // Fill header value (after key is filled, selector becomes add-destination-header-{key}-value-input)
+            const valueInput = this.page.locator(`[data-test="add-destination-header-${headerKey}-value-input"]`);
+            await valueInput.click();
+            await valueInput.fill(headerValue);
+            await this.page.waitForTimeout(300);
+
+            testLogger.debug('Added header to destination', { headerKey, destinationName });
+        }
+
+        // Submit destination
+        await this.page.locator(this.submitButton).click();
+        await expect(this.page.getByText(this.successMessage)).toBeVisible();
+
+        // Verify the destination exists
+        await this.verifyDestinationExists(destinationName);
+        testLogger.info('Created destination with headers', { destinationName, url, headerCount: Object.keys(headers).length });
     }
 
     /**

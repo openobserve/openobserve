@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
       class="collapsible-section card-container"
       :style="previewSectionStyle"
     >
       <div
-        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="togglePreview"
       >
-        <span class="tw-text-sm tw-font-semibold">Preview</span>
+        <span class="tw:text-sm tw:font-semibold">Preview</span>
         <q-btn
           flat
           dense
@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="summarySectionStyle"
     >
       <div
-        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw-text-sm tw-font-semibold">Summary</span>
+        <span class="tw:text-sm tw:font-semibold">Summary</span>
         <q-btn
           flat
           dense

@@ -2,7 +2,7 @@
   <div style="width: 100%">
     <div class="query-section">
       <div class="query-label">Query</div>
-      <div class="query-label tw-text-xs">
+      <div class="query-label tw:text-xs">
         Write a SQL query for complex actions.
       </div>
 

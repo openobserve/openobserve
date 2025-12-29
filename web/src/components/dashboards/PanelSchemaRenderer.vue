@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           v-if="
             showLegendsButton &&
+            noData !== 'No Data' &&
             ![
               'table',
               'html',
