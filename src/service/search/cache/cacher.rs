@@ -157,7 +157,7 @@ pub async fn check_cache(
     // requiring us to scan all hits to find the actual time range.
     let is_histogram_non_ts_order = is_histogram_query
         && !order_by.is_empty()
-        && has_non_timestamp_ordering(order_by, &result_ts_col);
+        && has_non_timestamp_ordering(order_by, result_ts_col);
 
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
