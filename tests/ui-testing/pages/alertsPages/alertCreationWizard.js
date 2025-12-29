@@ -1021,4 +1021,259 @@ export class AlertCreationWizard {
     getCurrentAlertName() {
         return this.currentAlertName;
     }
+
+    /**
+     * Create a scheduled alert with deduplication for validation testing
+     * Uses custom columns (city) and configures for quick evaluation cycles
+     * @param {string} streamName - Name of the stream (with custom columns)
+     * @param {string} column - Column name for condition (e.g., 'city')
+     * @param {string} value - Value for condition (e.g., 'bangalore')
+     * @param {string} destinationName - Name of the destination (validation destination)
+     * @param {string} randomValue - Random string for unique naming
+     * @param {Object} dedupConfig - Deduplication configuration
+     * @param {number} [dedupConfig.timeWindowMinutes] - Time window in minutes (default: 5)
+     * @param {string[]} [dedupConfig.fingerprintFields] - Fields for fingerprinting (default: [column])
+     */
+    async createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig = {}) {
+        const randomAlertName = 'auto_dedup_val_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        // Default dedup config for validation testing
+        const timeWindowMinutes = dedupConfig.timeWindowMinutes || 5;
+        const fingerprintFields = dedupConfig.fingerprintFields || [column];
+
+        testLogger.info('Creating scheduled alert with deduplication for validation', {
+            streamName,
+            column,
+            value,
+            destinationName,
+            alertName: randomAlertName,
+            dedupConfig: { timeWindowMinutes, fingerprintFields }
+        });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        await this.page.locator(this.locators.addAlertButton).click();
+        await this.page.waitForLoadState('networkidle');
+        await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Add alert dialog opened');
+
+        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        testLogger.info('Filled alert name', { alertName: randomAlertName });
+
+        // Select stream type (logs)
+        await this.page.locator(this.locators.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'logs' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected stream type: logs');
+
+        // Select stream name
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.streamNameDropdown).click();
+        try {
+            await expect(this.page.getByText(streamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+        }
+        await this.page.getByText(streamName, { exact: true }).click();
+        testLogger.info('Selected stream name', { streamName });
+
+        // Select Scheduled alert type
+        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        testLogger.info('Selected scheduled alert type');
+
+        // ==================== STEP 2: CONDITIONS (SQL) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2: Conditions');
+
+        const sqlTab = this.page.locator('[data-test="tab-sql"]');
+        await sqlTab.waitFor({ state: 'visible', timeout: 10000 });
+        await sqlTab.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Switched to SQL tab');
+
+        const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
+        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await viewEditorBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Opened SQL Editor dialog');
+
+        // Use SQL query that selects data matching our condition
+        // Use same query format as working createScheduledAlertWithSQL method
+        const sqlQuery = `SELECT ${column} FROM "${streamName}" WHERE ${column} = '${value}'`;
+        const sqlEditor = this.page.locator(this.locators.sqlEditorDialog).locator('.inputarea');
+        await this.page.locator(this.locators.viewLineLocator).first().click();
+        await sqlEditor.fill(sqlQuery);
+        testLogger.info('Entered SQL query', { sqlQuery });
+
+        await this.page.locator(this.locators.runQueryButton).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Ran SQL query');
+
+        // Close dialog - use same approach as working createScheduledAlertWithSQL method
+        // The close button may be intercepted by backdrop, so use Escape as fallback
+        try {
+            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
+            if (await closeButton.isVisible({ timeout: 3000 })) {
+                await closeButton.click();
+            } else {
+                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
+            }
+        } catch (error) {
+            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+
+        // Verify SQL editor dialog is closed by waiting for it to be hidden
+        const sqlEditorDialog = this.page.locator(this.locators.sqlEditorDialog);
+        const dialogHidden = await sqlEditorDialog.isHidden({ timeout: 5000 }).catch(() => true);
+        if (!dialogHidden) {
+            testLogger.warn('SQL Editor dialog still visible, pressing Escape');
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(1000);
+        }
+        testLogger.info('Closed SQL Editor dialog');
+
+        // ==================== STEP 3: COMPARE WITH PAST ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 3: Compare with Past');
+
+        // Add time range comparison (same as working createScheduledAlertWithSQL method)
+        const addTimeRangeBtn = this.page.locator(this.locators.multiTimeRangeAddButton);
+        if (await addTimeRangeBtn.isVisible({ timeout: 3000 })) {
+            await addTimeRangeBtn.click();
+            await this.page.waitForTimeout(1000);
+            await this.page.locator('[data-test="date-time-btn"]').click();
+            await this.page.locator('[data-test="date-time-relative-30-m-btn"]').click();
+            testLogger.info('Added 30-minute time range comparison');
+        } else {
+            testLogger.info('Time range button not visible, skipping');
+        }
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Alert Settings');
+
+        // First wait for the step container to be visible
+        const stepContainer = this.page.locator(this.locators.stepAlertConditions);
+        await stepContainer.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Step 4 container visible');
+
+        const thresholdOperator = this.page.locator(this.locators.stepAlertConditionsQSelect).first();
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdOperator.click();
+        await this.page.waitForTimeout(500);
+        await this.page.getByText('>=', { exact: true }).click();
+        testLogger.info('Set threshold operator: >=');
+
+        const thresholdInput = this.page.locator(this.locators.stepAlertConditionsNumberInput).first();
+        await thresholdInput.waitFor({ state: 'visible', timeout: 10000 });
+        await thresholdInput.fill('1');
+        testLogger.info('Set threshold value: 1');
+
+        // Set shortest period (1 minute) for faster testing
+        const periodInput = this.page.locator('input[type="number"]').nth(1);
+        await this.page.waitForTimeout(500);
+        if (await periodInput.isVisible({ timeout: 5000 })) {
+            await periodInput.fill('1');
+            testLogger.info('Set period: 1 minute (shortest)');
+        }
+
+        const destinationRow = this.page.locator(this.locators.alertSettingsRow).filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        // Use visible menu selector for destination
+        const visibleDestMenu = this.page.locator('.q-menu:visible');
+        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
+        let destFound = false;
+        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOption.click();
+            destFound = true;
+            testLogger.info('Selected destination via visible menu', { destinationName });
+        }
+
+        if (!destFound) {
+            // Try scrolling to find the destination
+            try {
+                await this.commonActions.scrollAndFindOption(destinationName, 'template');
+                testLogger.info('Found destination by scrolling', { destinationName });
+            } catch (scrollError) {
+                await visibleDestMenu.locator('.q-item').first().click();
+                testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+            }
+        }
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination', { destinationName });
+
+        // ==================== STEP 5: DEDUPLICATION ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 5: Deduplication');
+
+        const dedupContainer = this.page.locator(this.locators.stepDeduplication);
+        await expect(dedupContainer).toBeVisible({ timeout: 5000 });
+        testLogger.info('Deduplication step container visible');
+
+        // Configure fingerprint fields
+        if (fingerprintFields && fingerprintFields.length > 0) {
+            const fingerprintSelect = this.page.locator(this.locators.stepDeduplicationFingerprintSelect);
+            await fingerprintSelect.waitFor({ state: 'visible', timeout: 5000 });
+
+            for (const field of fingerprintFields) {
+                await fingerprintSelect.click();
+                await this.page.waitForTimeout(500);
+                await fingerprintSelect.locator('input').fill(field);
+                await this.page.waitForTimeout(500);
+
+                const fieldOption = this.page.getByRole('option', { name: field }).first();
+                if (await fieldOption.isVisible({ timeout: 2000 })) {
+                    await fieldOption.click();
+                } else {
+                    await this.page.keyboard.press('Enter');
+                }
+                await this.page.waitForTimeout(300);
+            }
+            await this.page.keyboard.press('Escape');
+            testLogger.info('Configured fingerprint fields', { fields: fingerprintFields });
+        }
+
+        // Configure time window
+        const timeWindowInput = this.page.locator(this.locators.stepDeduplicationTimeWindowInput);
+        await timeWindowInput.waitFor({ state: 'visible', timeout: 5000 });
+        await timeWindowInput.clear();
+        await timeWindowInput.fill(String(timeWindowMinutes));
+        testLogger.info('Set dedup time window', { minutes: timeWindowMinutes });
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 6: Advanced (skipping)');
+
+        // ==================== SUBMIT ALERT ====================
+        await this.page.locator(this.locators.alertSubmitButton).click();
+        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created scheduled alert with deduplication for validation', { alertName: randomAlertName });
+
+        return randomAlertName;
+    }
 }

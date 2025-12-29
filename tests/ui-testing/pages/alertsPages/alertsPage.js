@@ -145,6 +145,8 @@ export class AlertsPage {
             // Table locators
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
+            tableCheckbox: '.o2-table-checkbox',
+            headerCheckbox: '[data-test="alert-list-table"] thead .o2-table-checkbox',
 
             // Alert settings inline locators
             silenceNotificationInput: '.silence-notification-input input',
@@ -209,6 +211,12 @@ export class AlertsPage {
 
     async createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig = {}) {
         const result = await this.creationWizard.createScheduledAlertWithDeduplication(streamName, destinationName, randomValue, dedupConfig);
+        this.currentAlertName = result;
+        return result;
+    }
+
+    async createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig = {}) {
+        const result = await this.creationWizard.createScheduledAlertWithDedupForValidation(streamName, column, value, destinationName, randomValue, dedupConfig);
         this.currentAlertName = result;
         return result;
     }

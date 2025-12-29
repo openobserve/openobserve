@@ -10,7 +10,7 @@
  * Cleanup is handled by cleanup.spec.js via 'auto_' prefix patterns.
  */
 
-const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
@@ -21,6 +21,7 @@ const TEST_STREAM = 'e2e_automate';
 const UI_STABILIZATION_WAIT_MS = 2000;
 const SHORT_WAIT_MS = 1000;
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
+const SCHEDULED_ALERT_WAIT_MS = 90000; // Wait for scheduled alert evaluation cycle
 
 test.describe("Alerts Advanced Coverage Tests", () => {
     let pm;
@@ -189,6 +190,157 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Scheduled alert with deduplication created and verified successfully', {
             alertName,
             dedupConfig
+        });
+    });
+
+    /**
+     * Deduplication Validation Test with Trigger Verification
+     *
+     * NOTE: This test is currently skipped because:
+     * 1. Scheduled alert trigger validation has timing issues (known limitation)
+     * 2. Deduplication is an enterprise-only feature (requires enterprise build)
+     * 3. UI configuration testing is covered by "Create scheduled alert with deduplication configuration"
+     *
+     * To enable this test:
+     * - Ensure enterprise features are enabled in the build
+     * - Consider using longer timeouts or API-based validation
+     * - May need to adjust scheduled alert query time ranges
+     *
+     * Test design:
+     * 1. Creates unique source stream with custom columns
+     * 2. Creates scheduled alert with deduplication configured
+     * 3. Ingests data to trigger first alert - verifies notification appears
+     * 4. Ingests more data (same fingerprint, within time window)
+     * 5. Verifies NO NEW notification - dedup suppressed the duplicate
+     */
+    test.skip("Deduplication validation - verify duplicate alerts are suppressed", {
+        tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise', '@skip']
+    }, async ({ page }) => {
+        test.slow(); // Mark as slow test due to scheduled alert evaluation cycles
+
+        // Generate unique suffix (lowercase for API compatibility)
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8).toLowerCase();
+        testLogger.info('Starting deduplication validation test', { uniqueSuffix });
+
+        // Create unique source stream with custom columns (same approach as e2e-flow)
+        const sourceStreamName = `dedup_src_${uniqueSuffix}`.toLowerCase();
+        const column = 'city';        // Custom column from our test stream
+        const value = 'bangalore';    // Value that triggers the alert condition
+
+        // Initialize the source stream with custom columns
+        await pm.commonActions.initializeAlertTestStream(sourceStreamName);
+        testLogger.info('Initialized source stream with custom columns', {
+            sourceStreamName,
+            columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+        });
+
+        // Create validation infrastructure (template + destination pointing to validation stream)
+        const validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, uniqueSuffix);
+        testLogger.info('Validation infrastructure ready', validationInfra);
+
+        // Navigate to alerts page - refresh to ensure new stream appears
+        await pm.commonActions.navigateToAlerts();
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
+        // Create scheduled alert with deduplication for validation
+        const dedupConfig = {
+            timeWindowMinutes: 5,           // 5-minute dedup window
+            fingerprintFields: [column]     // Fingerprint based on city column
+        };
+
+        const alertName = await pm.alertsPage.createScheduledAlertWithDedupForValidation(
+            sourceStreamName,
+            column,
+            value,
+            validationInfra.destinationName,
+            uniqueSuffix,
+            dedupConfig
+        );
+        await pm.alertsPage.verifyAlertCreated(alertName);
+        testLogger.info('Created scheduled alert with deduplication', {
+            alertName,
+            dedupConfig,
+            stream: sourceStreamName
+        });
+
+        // Wait for alert to register
+        testLogger.info('Waiting for alert registration...');
+        await page.waitForTimeout(30000); // 30s for registration
+
+        // ===== TRIGGER #1: Ingest data to trigger first alert =====
+        testLogger.info('Ingesting first batch of data to trigger alert...');
+        await pm.commonActions.ingestTestDataWithUniqueId(sourceStreamName, `trigger1_${uniqueSuffix}`, column, value);
+        testLogger.info('First data ingestion complete');
+
+        // Wait for scheduled alert evaluation cycle (1 min period + buffer)
+        testLogger.info('Waiting for first scheduled alert evaluation cycle...');
+        await page.waitForTimeout(SCHEDULED_ALERT_WAIT_MS);
+
+        // Verify first notification appears in validation stream
+        const firstCheck = await pm.commonActions.waitForAlertInValidationStream(
+            validationInfra.streamName,
+            alertName,
+            150,  // max 150 seconds (2.5 min for scheduled alert to fire)
+            10    // poll every 10 seconds
+        );
+
+        expect(firstCheck.found, `First alert notification should appear in validation stream for ${alertName}`).toBe(true);
+        testLogger.info('First notification verified in validation stream', {
+            alertName,
+            found: firstCheck.found,
+            attempts: firstCheck.attempts
+        });
+
+        // Get initial notification count
+        const initialCount = await pm.commonActions.countAlertNotificationsInStream(
+            validationInfra.streamName,
+            alertName,
+            15
+        );
+        testLogger.info('Initial notification count', {
+            count: initialCount.count,
+            alertName
+        });
+
+        // ===== TRIGGER #2: Additional data ingestion (same fingerprint, within window) =====
+        testLogger.info('Ingesting second batch of data (should be suppressed by dedup)...');
+        await pm.commonActions.ingestTestDataWithUniqueId(sourceStreamName, `trigger2_${uniqueSuffix}`, column, value);
+        testLogger.info('Second data ingestion complete');
+
+        // Wait for another evaluation cycle
+        testLogger.info('Waiting for second scheduled alert evaluation cycle...');
+        await page.waitForTimeout(SCHEDULED_ALERT_WAIT_MS);
+
+        // Small additional wait to ensure processing completes
+        await page.waitForTimeout(10000);
+
+        // ===== VALIDATION: Check that dedup suppressed the duplicate =====
+        const finalCount = await pm.commonActions.countAlertNotificationsInStream(
+            validationInfra.streamName,
+            alertName,
+            15
+        );
+        testLogger.info('Final notification count after second trigger', {
+            initialCount: initialCount.count,
+            finalCount: finalCount.count,
+            alertName
+        });
+
+        // The key assertion: count should NOT have increased
+        // If dedup is working, we should have same count as before
+        expect(
+            finalCount.count,
+            `Dedup should suppress duplicate: expected ${initialCount.count} notifications, got ${finalCount.count}`
+        ).toBe(initialCount.count);
+
+        testLogger.info('DEDUPLICATION VALIDATION PASSED', {
+            alertName,
+            dedupConfig,
+            firstTriggerCount: initialCount.count,
+            secondTriggerCount: finalCount.count,
+            duplicateSuppressed: true
         });
     });
 });

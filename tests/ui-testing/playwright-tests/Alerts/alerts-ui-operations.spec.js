@@ -5,7 +5,6 @@ const testLogger = require('../utils/test-logger.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
-const ALERT_REGISTRATION_WAIT_MS = 15000; // Wait longer for alert to be registered and active
 const UI_STABILIZATION_WAIT_MS = 2000;
 
 test.describe("Alerts UI Operations", () => {

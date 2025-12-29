@@ -38,6 +38,7 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
+        this.nextPageButton = 'button:has(mat-icon:text("chevron_right")), button:has-text("chevron_right")';
     }
 
     async navigateToDestinations() {
@@ -87,9 +88,9 @@ export class AlertDestinationsPage {
                 testLogger.info('Found destination', { destinationName });
             } catch (error) {
                 // Check if there's a next page button and if it's enabled
-                const nextPageButton = this.page.getByRole('button').filter({ hasText: 'chevron_right' }).first();
-                if (await nextPageButton.isVisible() && await nextPageButton.isEnabled()) {
-                    await nextPageButton.click();
+                const nextPageBtn = this.page.locator(this.nextPageButton).first();
+                if (await nextPageBtn.isVisible() && await nextPageBtn.isEnabled()) {
+                    await nextPageBtn.click();
                     await this.page.waitForTimeout(2000);
                 } else {
                     isLastPage = true;

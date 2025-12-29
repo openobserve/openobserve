@@ -29,7 +29,7 @@ export class AlertBulkOperations {
 
         for (const alertName of alertNames) {
             const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
-            const checkbox = alertRow.locator('.o2-table-checkbox');
+            const checkbox = alertRow.locator(this.locators.tableCheckbox);
 
             // Wait for alert to be visible with a longer timeout
             try {
@@ -135,7 +135,7 @@ export class AlertBulkOperations {
      */
     async moveAllAlertsToFolder(targetFolderName) {
         // Select all alerts using the header checkbox
-        const headerCheckbox = this.page.locator('[data-test="alert-list-table"] thead .o2-table-checkbox').first();
+        const headerCheckbox = this.page.locator(this.locators.headerCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox');

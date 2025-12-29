@@ -128,24 +128,22 @@ export class CommonActions {
      * This allows us to identify specific test data in the validation stream
      * @param {string} streamName - Name of the stream to ingest data into
      * @param {string} uniqueId - Unique identifier for this test run (e.g., randomValue)
-     * @param {string} triggerField - Field name that the alert condition will check (default: 'job')
-     * @param {string} triggerValue - Value that will trigger the alert condition (default: 'test')
+     * @param {string} triggerField - Field name that the alert condition will check (default: 'city')
+     * @param {string} triggerValue - Value that will trigger the alert condition (default: 'bangalore')
      * @returns {Promise<{uniqueId: string, timestamp: number}>}
      */
-    async ingestTestDataWithUniqueId(streamName, uniqueId, triggerField = 'job', triggerValue = 'test') {
+    async ingestTestDataWithUniqueId(streamName, uniqueId, triggerField = 'city', triggerValue = 'bangalore') {
         const timestamp = Date.now();
-        // Include trigger values in ALL string fields so any column selection will match
-        // This ensures multi-condition alerts with arbitrary columns will still trigger
-        const triggerString = `test validation alert trigger - run_id: ${uniqueId} - timestamp: ${timestamp}`;
+        // Use custom, predictable columns that we control
+        // This eliminates dependency on existing stream columns
         const testData = {
-            level: `info test validation`,
-            [triggerField]: `${triggerValue} validation trigger`,
-            test_run_id: `${uniqueId} test validation`,
+            city: triggerField === 'city' ? triggerValue : 'mumbai',
+            country: 'india',
+            status: 'active',
+            age: 25,
+            test_run_id: uniqueId,
             test_timestamp: timestamp,
-            log: `Alert trigger validation test - run_id: ${uniqueId} - timestamp: ${timestamp}`,
-            message: triggerString,
-            stream: `test validation stream`,
-            code: `test validation code`
+            message: `Alert trigger test - run_id: ${uniqueId}`
         };
 
         const baseUrl = process.env["ZO_BASE_URL"];
@@ -155,7 +153,7 @@ export class CommonActions {
 
         const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/${streamName}/_json" -d '${JSON.stringify([testData])}'`;
 
-        console.log(`Ingesting test data with unique ID: ${uniqueId}`);
+        console.log(`Ingesting test data with unique ID: ${uniqueId}`, { streamName, triggerField, triggerValue });
 
         return new Promise((resolve, reject) => {
             exec(curlCommand, (error, stdout, stderr) => {
@@ -167,6 +165,52 @@ export class CommonActions {
                 console.log('Ingested test data response:', stdout);
                 console.log(`Successfully ingested test data with unique ID: ${uniqueId}`);
                 resolve({ uniqueId, timestamp });
+            });
+        });
+    }
+
+    /**
+     * Create and initialize a dedicated alert test stream with custom columns
+     * This ensures we have predictable columns for alert condition testing
+     * @param {string} streamName - Name of the stream to create/initialize
+     * @returns {Promise<{streamName: string, columns: string[]}>}
+     */
+    async initializeAlertTestStream(streamName) {
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = process.env["ORGNAME"];
+        const username = process.env["ZO_ROOT_USER_EMAIL"];
+        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+
+        // Ingest initial data to create stream with our custom schema
+        const initialData = [
+            {
+                city: 'delhi',
+                country: 'india',
+                status: 'inactive',
+                age: 30,
+                test_run_id: 'init',
+                test_timestamp: Date.now(),
+                message: 'Stream initialization record'
+            }
+        ];
+
+        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/${streamName}/_json" -d '${JSON.stringify(initialData)}'`;
+
+        console.log(`Initializing alert test stream: ${streamName}`);
+
+        return new Promise((resolve, reject) => {
+            exec(curlCommand, (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Error initializing alert test stream:', error);
+                    reject(error);
+                    return;
+                }
+                console.log('Stream initialization response:', stdout);
+                console.log(`Successfully initialized stream: ${streamName}`);
+                resolve({
+                    streamName,
+                    columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+                });
             });
         });
     }
@@ -349,5 +393,104 @@ export class CommonActions {
     static generateBasicAuthHeader(username, password) {
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');
         return `Basic ${credentials}`;
+    }
+
+    /**
+     * Count alert notifications in validation stream
+     * Used for deduplication testing to verify suppression of duplicate alerts
+     * @param {string} validationStreamName - Name of the validation stream to query
+     * @param {string} alertName - Alert name to search for (partial match)
+     * @param {number} timeRangeMinutes - How far back to search (default: 15 minutes)
+     * @returns {Promise<{success: boolean, count: number, data: any[]}>}
+     */
+    async countAlertNotificationsInStream(validationStreamName, alertName, timeRangeMinutes = 15) {
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const orgName = process.env["ORGNAME"];
+        const username = process.env["ZO_ROOT_USER_EMAIL"];
+        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+
+        // Query for notifications matching the alert name
+        const query = `SELECT * FROM "${validationStreamName}" WHERE str_match_ignore_case(text, '${alertName}')`;
+
+        // Calculate time range (last N minutes)
+        const endTime = Date.now() * 1000; // microseconds
+        const startTime = endTime - (timeRangeMinutes * 60 * 1000 * 1000); // microseconds
+
+        const searchPayload = {
+            query: {
+                sql: query,
+                start_time: startTime,
+                end_time: endTime,
+                from: 0,
+                size: 1000
+            }
+        };
+
+        const curlCommand = `curl -s -u ${username}:${password} -k "${baseUrl}/api/${orgName}/_search?type=logs" -H "Content-Type: application/json" -d '${JSON.stringify(searchPayload)}'`;
+
+        return new Promise((resolve) => {
+            exec(curlCommand, (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Error counting notifications in stream:', error);
+                    resolve({ success: false, count: 0, data: [] });
+                    return;
+                }
+
+                try {
+                    const response = JSON.parse(stdout);
+                    const hits = response.hits || [];
+                    const count = hits.length;
+                    console.log(`Count notifications for "${alertName}" in ${validationStreamName}: found ${count} notifications`);
+                    resolve({
+                        success: true,
+                        count: count,
+                        data: hits
+                    });
+                } catch (parseError) {
+                    console.error('Error parsing notification count response:', parseError);
+                    console.log('Raw response:', stdout);
+                    resolve({ success: false, count: 0, data: [] });
+                }
+            });
+        });
+    }
+
+    /**
+     * Wait for exact notification count in validation stream
+     * Used for deduplication testing to verify the expected number of notifications
+     * @param {string} validationStreamName - Name of the validation stream
+     * @param {string} alertName - Alert name to search for
+     * @param {number} expectedCount - Expected number of notifications
+     * @param {number} maxWaitSeconds - Maximum time to wait (default: 120 seconds)
+     * @param {number} pollIntervalSeconds - How often to poll (default: 10 seconds)
+     * @returns {Promise<{match: boolean, actualCount: number, attempts: number}>}
+     */
+    async waitForExactNotificationCount(validationStreamName, alertName, expectedCount, maxWaitSeconds = 120, pollIntervalSeconds = 10) {
+        const maxAttempts = Math.ceil(maxWaitSeconds / pollIntervalSeconds);
+
+        console.log(`Waiting for exactly ${expectedCount} notifications for "${alertName}" in "${validationStreamName}" (max ${maxWaitSeconds}s)...`);
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const result = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
+
+            if (result.success && result.count === expectedCount) {
+                console.log(`Found expected ${expectedCount} notifications after ${attempt * pollIntervalSeconds}s`);
+                return { match: true, actualCount: result.count, attempts: attempt };
+            }
+
+            if (result.count > expectedCount) {
+                console.log(`Found more notifications than expected: ${result.count} > ${expectedCount}`);
+                return { match: false, actualCount: result.count, attempts: attempt };
+            }
+
+            if (attempt < maxAttempts) {
+                console.log(`Attempt ${attempt}/${maxAttempts}: Found ${result.count} notifications, expected ${expectedCount}, waiting ${pollIntervalSeconds}s...`);
+                await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
+            }
+        }
+
+        const finalResult = await this.countAlertNotificationsInStream(validationStreamName, alertName, 15);
+        console.log(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
+        return { match: finalResult.count === expectedCount, actualCount: finalResult.count, attempts: maxAttempts };
     }
 } 

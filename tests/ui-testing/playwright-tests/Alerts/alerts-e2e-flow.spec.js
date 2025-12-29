@@ -5,9 +5,9 @@ const testLogger = require('../utils/test-logger.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
-const ALERT_REGISTRATION_WAIT_MS = 15000; // Wait longer for alert to be registered and active
+const ALERT_REGISTRATION_WAIT_MS = 30000; // Wait for alert to fully register and become active
 const UI_STABILIZATION_WAIT_MS = 2000;
-const ALERT_TRIGGER_TIMEOUT_MS = 60000; // Give alert more time to process and fire
+const ALERT_TRIGGER_TIMEOUT_MS = 90000; // Real-time alerts need time to process and fire
 
 test.describe("Alerts E2E Flow", () => {
   // Shared test variables
@@ -16,12 +16,13 @@ test.describe("Alerts E2E Flow", () => {
   let createdDestinationName;
   let sharedRandomValue;
   let validationInfra; // Stores unique validation infrastructure per test
+  let testStreamName; // Unique stream with custom columns for this test run
 
   /**
    * Setup for each test
    * - Logs in
    * - Generates shared random value
-   * - Ingests test data (except for scheduled alert test)
+   * - Initializes dedicated test stream with custom columns
    * - Navigates to alerts page
    */
   test.beforeEach(async ({ page }, testInfo) => {
@@ -29,16 +30,30 @@ test.describe("Alerts E2E Flow", () => {
 
     // Generate shared random value if not already generated
     if (!sharedRandomValue) {
-      sharedRandomValue = pm.alertsPage.generateRandomString();
+      // Lowercase to match API behavior (stream names are lowercased)
+      sharedRandomValue = pm.alertsPage.generateRandomString().toLowerCase();
       testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-    await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
+    // Create unique test stream name for this test run (lowercase to match API behavior)
+    testStreamName = `alert_e2e_${sharedRandomValue}`.toLowerCase();
 
-    // Navigate to alerts page first
+    // Initialize the test stream with custom columns (city, country, status, age, etc.)
+    // This ensures we have predictable columns for alert condition testing
+    await pm.commonActions.initializeAlertTestStream(testStreamName);
+    testLogger.info('Initialized test stream with custom columns', {
+      testStreamName,
+      columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+    });
+
+    // Navigate to alerts page - stream will be available after page load
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
+
+    // Refresh page to ensure newly created stream appears in dropdowns
+    await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
   /**
@@ -59,10 +74,11 @@ test.describe("Alerts E2E Flow", () => {
     // This E2E flow covers many operations and needs more than the default 3-minute timeout
     test.slow();
 
-    // Use auto_playwright_stream - has fewer columns so 'log' is visible in dropdown
-    const streamName = 'auto_playwright_stream';
-    const column = 'log';
-    const value = 'test';
+    // Use the dedicated test stream initialized in beforeEach with custom columns
+    // This provides predictable columns (city, country, status, age) for alert conditions
+    const streamName = testStreamName;
+    const column = 'city';        // Custom column from our test stream
+    const value = 'bangalore';    // Value that triggers the alert condition
 
     // Ensure prerequisites exist
     validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
@@ -89,10 +105,21 @@ test.describe("Alerts E2E Flow", () => {
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info('Successfully created alert', { alertName });
 
-    // TODO: Investigate alert trigger validation - currently disabled due to timing issues
-    // The test-level timeout (300s) isn't being applied, global timeout (180s) takes precedence
-    // Need to investigate why real-time alerts don't fire within expected timeframe
-    testLogger.info('Alert created successfully - trigger validation skipped (needs investigation)', { alertName });
+    // Wait for alert to register in the system before triggering
+    await page.waitForTimeout(ALERT_REGISTRATION_WAIT_MS);
+
+    // Trigger and validate alert fires (self-referential destination approach)
+    const triggerResult = await pm.alertsPage.verifyAlertTrigger(
+      pm,
+      alertName,
+      triggerStreamName,
+      column,
+      value,
+      ALERT_TRIGGER_TIMEOUT_MS,
+      validationInfra.streamName
+    );
+    expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
+    testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
 
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
