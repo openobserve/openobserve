@@ -95,12 +95,11 @@ pub async fn remote_write(
     // End get user defined schema
 
     // associated pipeline
-    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
-        HashMap::new();
+    let stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> = HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, Vec<(json::Value, i64)>> = HashMap::new();
 
     // realtime alerts
-    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
+    let stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let decoded = snap::raw::Decoder::new()
@@ -194,6 +193,7 @@ pub async fn remote_write(
         }
     }
 
+    let mut preload_unique_metrics_time = 0u128;
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
     let mut preload_schema_time = 0u128;
@@ -201,6 +201,7 @@ pub async fn remote_write(
     let mut preload_alerts_time = 0u128;
 
     if !unique_metrics.is_empty() {
+        let t = std::time::Instant::now();
         let streams: Vec<StreamParams> = unique_metrics
             .iter()
             .map(|name| StreamParams {
@@ -209,21 +210,22 @@ pub async fn remote_write(
                 stream_type: StreamType::Metrics,
             })
             .collect();
+        preload_unique_metrics_time = t.elapsed().as_micros();
 
         // Preload pipelines
         let t = std::time::Instant::now();
-        for stream in &streams {
-            let stream_name_str: &str = stream.stream_name.as_ref();
-            if !stream_executable_pipelines.contains_key(stream_name_str) {
-                let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
-                    &stream.org_id,
-                    &stream.stream_name,
-                    &stream.stream_type,
-                )
-                .await;
-                stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
-            }
-        }
+        // for stream in &streams {
+        //     let stream_name_str: &str = stream.stream_name.as_ref();
+        //     if !stream_executable_pipelines.contains_key(stream_name_str) {
+        //         let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
+        //             &stream.org_id,
+        //             &stream.stream_name,
+        //             &stream.stream_type,
+        //         )
+        //         .await;
+        //         stream_executable_pipelines.insert(stream.stream_name.to_string(),
+        // pipeline_params);     }
+        // }
         preload_pipeline_time = t.elapsed().as_micros();
 
         // Preload UDS
@@ -271,7 +273,7 @@ pub async fn remote_write(
 
         // Preload alerts
         let t = std::time::Instant::now();
-        crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
+        // crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
         preload_alerts_time = t.elapsed().as_micros();
     }
     let total_preload_time = preload_start.elapsed().as_micros();
@@ -440,9 +442,10 @@ pub async fn remote_write(
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
-            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
+            preload_total={:.1}ms (unique_metrics={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
+            preload_unique_metrics_time as f64 / 1000.0,
             preload_pipeline_time as f64 / 1000.0,
             preload_uds_time as f64 / 1000.0,
             preload_schema_time as f64 / 1000.0,
