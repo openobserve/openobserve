@@ -91,7 +91,7 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 pub static GEOIP_ENT_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
-pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, ExecutablePipeline>> =
+pub static STREAM_EXECUTABLE_PIPELINES: Lazy<papaya::HashMap<StreamParams, ExecutablePipeline>> =
     Lazy::new(Default::default);
 pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
     Lazy::new(Default::default);

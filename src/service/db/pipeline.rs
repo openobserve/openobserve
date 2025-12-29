@@ -96,8 +96,7 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
 /// Used for pipeline execution.
 pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
     STREAM_EXECUTABLE_PIPELINES
-        .read()
-        .await
+        .pin()
         .get(stream_params)
         .cloned()
 }
@@ -146,7 +145,7 @@ pub async fn get_scheduled_pipelines_cache_size() -> usize {
 
 /// Returns cache statistics for monitoring.
 pub async fn get_cache_stats() -> (usize, usize) {
-    let realtime_count = STREAM_EXECUTABLE_PIPELINES.read().await.len();
+    let realtime_count = STREAM_EXECUTABLE_PIPELINES.len();
     let scheduled_count = SCHEDULED_PIPELINES.read().await.len();
     (realtime_count, scheduled_count)
 }
@@ -202,7 +201,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         log::info!("[PIPELINE:CACHE] done waiting");
     }
     let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
-    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    let stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.pin();
     let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
     // clear the cache first in case of a refresh
     pipeline_stream_mapping_cache.clear();
@@ -328,7 +327,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
                         let mut pipeline_stream_mapping_cache =
                             PIPELINE_STREAM_MAPPING.write().await;
-                        let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
                         if pipeline.enabled {
                             match ExecutablePipeline::new(&pipeline).await {
                                 Err(e) => {
@@ -343,7 +341,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 Ok(exec_pl) => {
                                     pipeline_stream_mapping_cache
                                         .insert(pipeline_id.to_string(), stream_params.clone());
-                                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                                    STREAM_EXECUTABLE_PIPELINES
+                                        .pin()
+                                        .insert(stream_params.clone(), exec_pl);
                                     log::info!(
                                         "[Pipeline::watch]: realtime pipeline {} added to cache.",
                                         &pipeline.id
@@ -352,7 +352,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             };
                         } else if let Some(removed) =
                             pipeline_stream_mapping_cache.remove(pipeline_id)
-                            && stream_exec_pl.remove(&removed).is_some()
+                            && STREAM_EXECUTABLE_PIPELINES.pin().remove(&removed).is_some()
                         {
                             // remove pipeline from cache if the update is to disable
                             log::info!(
@@ -381,11 +381,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
-                    && STREAM_EXECUTABLE_PIPELINES
-                        .write()
-                        .await
-                        .remove(&removed)
-                        .is_some()
+                    && STREAM_EXECUTABLE_PIPELINES.pin().remove(&removed).is_some()
                 {
                     log::info!(
                         "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."

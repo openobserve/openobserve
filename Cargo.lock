@@ -6775,6 +6775,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
+ "papaya",
  "parking_lot 0.12.5",
  "parquet",
  "pin-project-lite",
@@ -7061,6 +7062,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ad9b889f1b12e0b9ee24db044b5129150d5eada288edc800f789928dc8c0e3"
 dependencies = [
  "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "papaya"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f92dd0b07c53a0a0c764db2ace8c541dc47320dad97c2200c2a637ab9dd2328f"
+dependencies = [
+ "equivalent",
+ "seize",
 ]
 
 [[package]]
@@ -9369,6 +9380,16 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "time",
+]
+
+[[package]]
+name = "seize"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b55fb86dfd3a2f5f76ea78310a88f96c4ea21a3031f8d212443d56123fd0521"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

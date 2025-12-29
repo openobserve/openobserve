@@ -116,6 +116,7 @@ opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
+papaya.workspace = true
 prometheus.workspace = true
 promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 prost.workspace = true
@@ -320,6 +321,7 @@ opentelemetry-proto = { version = "0.31", features = [
     "trace",
 ] }
 parking_lot = "0.12"
+papaya = "0.2.3"
 prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14.1"
 prost-wkt-types = "0.7"
