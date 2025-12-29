@@ -54,6 +54,9 @@ use crate::{
 pub mod geoip;
 pub mod url_processor;
 
+// Re-export the initialization function for easy access
+pub use url_processor::init_url_processor;
+
 pub async fn save_enrichment_data(
     org_id: &str,
     table_name: &str,

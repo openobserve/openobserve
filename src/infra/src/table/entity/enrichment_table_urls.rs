@@ -20,6 +20,7 @@ pub struct Model {
     pub append_data: bool,
     pub last_byte_position: i64,
     pub supports_range: bool,
+    pub is_local_region: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
