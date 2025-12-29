@@ -43,11 +43,13 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             let bytes = msg
                 .value
                 .ok_or(Error::Message("Message missing value".to_string()))?;
-            let enrichment_url_job: enrichment_table_urls::EnrichmentTableUrlRecord = json::from_slice(&bytes).inspect_err(|e| {
+            let mut enrichment_url_job: enrichment_table_urls::EnrichmentTableUrlRecord = json::from_slice(&bytes).inspect_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:PIPELINE] Failed to deserialize message value to pipeline: {e}"
                 );
             })?;
+            // Jobs received from other regions should not be processed by stale job recovery
+            enrichment_url_job.is_local_region = false;
             enrichment_table_urls::put(enrichment_url_job).await?;
         }
         MessageType::EnrichmentUrlDelete => {
