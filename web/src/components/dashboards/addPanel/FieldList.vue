@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot:prepend
         >
           <q-icon
-            style="margin-top: 14px"
+            style="margin-top: 24px"
             size="xs"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />

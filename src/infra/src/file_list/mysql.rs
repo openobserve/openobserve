@@ -34,7 +34,7 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index, delete_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, delete_index},
     },
     errors::{DbError, Error, Result},
     file_list::FileRecord,
@@ -2185,7 +2185,7 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
     org             VARCHAR(100) not null,
     stream          VARCHAR(256) not null,
     date            VARCHAR(16) not null,
-    file            VARCHAR(512) not null,
+    file            VARCHAR(496) not null,
     file_num        BIGINT default 0 not null,
     min_ts          BIGINT default 0 not null,
     max_ts          BIGINT default 0 not null,
@@ -2399,37 +2399,6 @@ pub async fn create_table_index() -> Result<()> {
         log::warn!("[MYSQL] create table index(file_list_stream_file_idx) successfully");
     }
 
-    Ok(())
-}
-
-async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
-    let pool = CLIENT_DDL.clone();
-    let check_sql = format!(
-        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
-    );
-    let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
-        .fetch_one(&pool)
-        .await?;
-    if has_column > 0 {
-        return Ok(());
-    }
-
-    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
-    let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await
-        && !e.to_string().contains("Duplicate column name")
-    {
-        // Check for the specific MySQL error code for duplicate column
-        log::error!("[MYSQL] Unexpected error in adding column {column}: {e}");
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {e}");
-        }
-        return Err(e.into());
-    }
-    if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {e}");
-        return Err(e.into());
-    };
     Ok(())
 }
 

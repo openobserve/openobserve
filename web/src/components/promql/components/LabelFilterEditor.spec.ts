@@ -58,6 +58,7 @@ describe("LabelFilterEditor", () => {
     labels: mockLabels,
     metric: "http_requests_total",
     dashboardData: mockDashboardData,
+    dashboardPanelData: mockDashboardData,
   };
 
   beforeEach(() => {
@@ -322,9 +323,9 @@ describe("LabelFilterEditor", () => {
       expect(
         wrapper.find('[data-test="promql-add-label-filter"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-label-filter-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(
+        true,
+      );
       expect(
         wrapper.find('[data-test="promql-label-filter-remove-0"]').exists(),
       ).toBe(true);
@@ -348,7 +349,7 @@ describe("LabelFilterEditor", () => {
           },
         },
       };
-      wrapper = createWrapper({ dashboardData: loadingData });
+      wrapper = createWrapper({ dashboardPanelData: loadingData });
 
       expect(wrapper.vm.loadingLabels).toBe(true);
     });
