@@ -1298,7 +1298,6 @@ const bulkDeletePipelines = async () => {
 
   resetConfirmDialog();
 };
-};
 
 const openBackfillDialog = (pipeline: any) => {
   // Extract schedule frequency from pipeline source (for scheduled pipelines)
