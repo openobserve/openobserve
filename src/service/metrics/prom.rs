@@ -400,33 +400,33 @@ pub async fn remote_write(
             );
 
             // ready to be buffered for downstream processing
-            if stream_executable_pipelines
-                .get(&metric_name)
-                .unwrap()
-                .is_some()
-            {
-                // buffer to pipeline for batch processing
-                stream_pipeline_inputs
-                    .entry(metric_name.to_owned())
-                    .or_default()
-                    .push((value, timestamp));
-            } else {
-                // get json object
-                let mut local_val = match value.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
+            // if stream_executable_pipelines
+            //     .get(&metric_name)
+            //     .unwrap()
+            //     .is_some()
+            // {
+            //     // buffer to pipeline for batch processing
+            //     stream_pipeline_inputs
+            //         .entry(metric_name.to_owned())
+            //         .or_default()
+            //         .push((value, timestamp));
+            // } else {
+            // get json object
+            let mut local_val = match value.take() {
+                json::Value::Object(val) => val,
+                _ => unreachable!(),
+            };
 
-                if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
-                }
-
-                // buffer to downstream processing directly
-                json_data_by_stream
-                    .entry(metric_name.clone())
-                    .or_default()
-                    .push((local_val, timestamp));
+            if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
+                local_val = crate::service::ingestion::refactor_map(local_val, fields);
             }
+
+            // buffer to downstream processing directly
+            json_data_by_stream
+                .entry(metric_name.clone())
+                .or_default()
+                .push((local_val, timestamp));
+            // }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
     }
