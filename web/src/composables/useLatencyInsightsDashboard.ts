@@ -335,11 +335,18 @@ export function useLatencyInsightsDashboard() {
       // Determine unit and decimals
       let unit = "microseconds";
       let decimals = 2;
-      if (isVolumeAnalysis) {
+
+      if (config.streamType === "logs") {
+        unit = "numbers";
+      } else if (isVolumeAnalysis) {
         unit = "traces";
-        decimals = 0;
       } else if (isErrorAnalysis) {
         unit = "percent";
+      }
+
+      if (isVolumeAnalysis) {
+        decimals = 0;
+      } else if (isErrorAnalysis) {
         decimals = 2;
       }
 
