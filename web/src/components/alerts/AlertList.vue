@@ -535,8 +535,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template> -->
 
                 <template #bottom="scope">
-                  <div class="bottom-btn tw-h-[48px]">
-                   <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                  <div class="bottom-btn tw:h-[48px]">
+                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('alerts.header') }}
                     </div>
 
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] q-mr-sm tw-w-[180px]"
+                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[180px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
@@ -591,14 +591,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
-                      class="tw-flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px] tw-ml-sm"
+                      class="tw:flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px] tw:ml-sm"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
                       @click="openBulkDeleteDialog"
                     >
                       <q-icon name="delete" size="16px" />
-                      <span class="tw-ml-2">Delete</span>
+                      <span class="tw:ml-2">Delete</span>
                   </q-btn>
                     <QTablePagination
                       :scope="scope"

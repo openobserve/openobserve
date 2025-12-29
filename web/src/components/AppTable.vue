@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template v-slot:header="props">
-        <q-tr :props="props" class="!tw-bg-[var(--o2-table-header-bg)]">
+        <q-tr :props="props" class="!tw:bg-[var(--o2-table-header-bg)]">
           <!-- Add checkbox header when selection is enabled -->
           <q-th auto-width v-if="selection === 'multiple'">
             <q-checkbox
@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
        <template #top="scope" v-if="!hideTopPagination">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  ">
-          <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full q-py-xs  ">
+          <span class="tw:font-bold tw:text-[14px] tw:w-full q-pa-none">
           {{ rows.length }} {{ title }}
         </span>
         <QTablePagination
@@ -147,9 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
       <template  #bottom="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div class="tw-flex tw-items-center tw-gap-2">
-            <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
               {{ resultTotal }} {{ title }}
             </div>
             <slot name="bottom-actions" :scope="scope"></slot>

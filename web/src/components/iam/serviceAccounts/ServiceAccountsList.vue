@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAccounts.length > 0"
                   data-test="service-accounts-list-delete-accounts-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-secondary-button-dark'
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="openBulkDeleteDialog"
                 >
                   <q-icon name="delete" size="16px" />
-                  <span class="tw-ml-2">Delete</span>
+                  <span class="tw:ml-2">Delete</span>
                 </q-btn>
                 <QTablePagination
                   :scope="scope"

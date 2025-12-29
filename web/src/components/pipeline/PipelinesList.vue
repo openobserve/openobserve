@@ -275,8 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template> -->
 
             <template #bottom="scope">
-              <div class="bottom-btn tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+              <div class="bottom-btn tw:h-[48px]">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('pipeline.header') }}
                     </div>
                 <q-btn
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-resume-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px] tw-w-[180px]"
+                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px] tw:w-[180px]"
                   no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -318,14 +318,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-delete-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw-h-[36px]"
+                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
                   no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="openBulkDeleteDialog"
                 >
                   <q-icon name="delete" size="16px" />
-                  <span class="tw-ml-2">Delete</span>
+                  <span class="tw:ml-2">Delete</span>
                 </q-btn>
                 <QTablePagination
                   :scope="scope"
