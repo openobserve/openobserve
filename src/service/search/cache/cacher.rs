@@ -126,8 +126,7 @@ pub async fn check_cache(
 
     // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
     // are now done in prepare_cache_response() before calling this function.
-    // We just use the refined result_ts_col that was passed in.
-    let result_ts_col = result_ts_col.to_string();
+    // just use the refined result_ts_col that was passed in.
 
     // Check ts_col again, if it is still empty, return default
     if result_ts_col.is_empty() {
@@ -185,7 +184,7 @@ pub async fn check_cache(
                 q_start_time: req.query.start_time,
                 q_end_time: req.query.end_time,
                 is_aggregate,
-                ts_column: result_ts_col.clone(),
+                ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
                 is_histogram_non_ts_order,
@@ -248,7 +247,7 @@ pub async fn check_cache(
         }
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit;
-        multi_resp.ts_column = result_ts_col;
+        multi_resp.ts_column = result_ts_col.to_string();
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by.clone();
@@ -262,7 +261,7 @@ pub async fn check_cache(
                 q_start_time: req.query.start_time,
                 q_end_time: req.query.end_time,
                 is_aggregate,
-                ts_column: result_ts_col.clone(),
+                ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
                 is_histogram_non_ts_order,
@@ -345,7 +344,7 @@ pub async fn check_cache(
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit;
-        multi_resp.ts_column = result_ts_col;
+        multi_resp.ts_column = result_ts_col.to_string();
         multi_resp.file_path = file_path.to_string();
         multi_resp.order_by = order_by.clone();
         multi_resp.is_aggregate = is_aggregate;
