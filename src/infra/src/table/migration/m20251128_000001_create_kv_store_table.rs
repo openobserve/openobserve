@@ -15,6 +15,8 @@
 
 use sea_orm_migration::prelude::*;
 
+use super::get_binary_type;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -35,12 +37,17 @@ impl MigrationTrait for Migration {
 
 /// Statement to create kv_store table.
 fn create_table_stmt() -> TableCreateStatement {
+    let binary_type = get_binary_type();
     Table::create()
         .table(KvStore::Table)
         .if_not_exists()
         .col(ColumnDef::new(KvStore::OrgId).string_len(256).not_null())
         .col(ColumnDef::new(KvStore::Key).string_len(256).not_null())
-        .col(ColumnDef::new(KvStore::Value).binary().not_null())
+        .col(
+            ColumnDef::new(KvStore::Value)
+                .custom(Alias::new(binary_type))
+                .not_null(),
+        )
         .col(ColumnDef::new(KvStore::CreatedAt).big_integer().not_null())
         .col(ColumnDef::new(KvStore::UpdatedAt).big_integer().not_null())
         .primary_key(Index::create().col(KvStore::OrgId).col(KvStore::Key))
@@ -65,25 +72,37 @@ mod tests {
 
     #[test]
     fn postgres() {
+        let binary_type = super::get_binary_type();
         collapsed_eq!(
             &create_table_stmt().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" bytea NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
+            &format!(
+                r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" {} NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#,
+                binary_type
+            )
         );
     }
 
     #[test]
     fn mysql() {
+        let binary_type = super::get_binary_type();
         collapsed_eq!(
             &create_table_stmt().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` binary(1) NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#
+            &format!(
+                r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` {} NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#,
+                binary_type
+            )
         );
     }
 
     #[test]
     fn sqlite() {
+        let binary_type = super::get_binary_type();
         collapsed_eq!(
             &create_table_stmt().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" blob(1) NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#
+            &format!(
+                r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" {} NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#,
+                binary_type
+            )
         );
     }
 }

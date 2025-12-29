@@ -142,7 +142,7 @@ fn create_system_settings_table(backend: DbBackend) -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(SystemSettings::Description)
-                .custom(Alias::new(&text_type))
+                .custom(Alias::new(text_type))
                 .null(),
         )
         .col(
@@ -179,7 +179,7 @@ fn create_system_settings_table(backend: DbBackend) -> TableCreateStatement {
         _ => {
             table.col(
                 ColumnDef::new(SystemSettings::SettingValue)
-                    .custom(Alias::new(&text_type))
+                    .custom(Alias::new(text_type))
                     .not_null(),
             );
         }
