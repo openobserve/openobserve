@@ -146,7 +146,7 @@ pub async fn add(record: DimensionValueRecord) -> Result<(), errors::Error> {
                 .on_conflict(
                     OnConflict::columns([Column::OrgId, Column::DimensionName, Column::ValueHash])
                         .do_nothing()
-                        .to_owned()
+                        .to_owned(),
                 )
                 .exec(client)
                 .await
@@ -159,7 +159,7 @@ pub async fn add(record: DimensionValueRecord) -> Result<(), errors::Error> {
                 .on_conflict(
                     OnConflict::columns([Column::OrgId, Column::DimensionName, Column::ValueHash])
                         .update_column(Column::Id)
-                        .to_owned()
+                        .to_owned(),
                 )
                 .exec(client)
                 .await
