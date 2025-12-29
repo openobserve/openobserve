@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="date-time-table relative column">
               <div
-                class="relative-row q-px-md q-py-sm"
+                class="relative-row q-pl-md q-py-sm"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -212,8 +212,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="selectedTime.startTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
+                        hide-bottom-space
                         :rules="['fulltime']"
                         @blur="
                           resetTime(
@@ -251,9 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="selectedTime.endTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
                         :rules="['fulltime']"
+                        hide-bottom-space
                         @blur="
                           resetTime(
                             selectedTime.startTime,
@@ -1333,8 +1335,10 @@ export default defineComponent({
   }
 }
 .startEndTime {
-  .q-field {
-    padding-bottom: 0.125rem;
+  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  .q-field__control-container{
+    min-height: 32px;
+    height: 32px;
   }
   .label {
     font-size: 0.75rem;
@@ -1377,5 +1381,6 @@ export default defineComponent({
   .q-item:nth-child(2) {
     border-bottom: 1px solid #dcdcdc;
   }
+  margin: 0.5rem 0.4rem 0.5rem 0.4rem;
 }
 </style>

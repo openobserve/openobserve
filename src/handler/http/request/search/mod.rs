@@ -174,6 +174,7 @@ async fn can_use_distinct_stream(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
+        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
     ),
     request_body(content = inline(Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -262,6 +263,7 @@ pub async fn search(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    let validate_query = utils::get_bool_from_request(&query.0, "validate");
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -356,6 +358,15 @@ pub async fn search(
                     "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
             }
+        }
+
+        // Validate query fields if requested
+        if validate_query
+            && let Err(e) =
+                utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
+                    .await
+        {
+            return Ok(map_error_to_http_response(&e, Some(trace_id)));
         }
 
         // Check permissions on stream
@@ -1204,9 +1215,6 @@ async fn values_v1(
 
     req.use_cache = get_use_cache_from_request(query);
 
-    // Get the size from query parameter for limiting results
-    let size = req.query.size;
-
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
@@ -1252,11 +1260,11 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
             )
         };
         let mut req = req.clone();
@@ -1299,6 +1307,7 @@ async fn values_v1(
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
 
+    let size = req.query.size;
     for (key, ret) in query_results {
         let mut top_hits: Vec<(String, i64)> = Vec::with_capacity(size as usize);
         for row in ret.hits {

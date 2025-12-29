@@ -18,17 +18,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <q-bar
       class="row sql-bar"
-      style="display: flex; justify-content: space-between"
+      style="display: flex; justify-content: space-between; align-items: center"
       @click.stop="onDropDownClick"
     >
       <div
         style="display: flex; flex-direction: row; align-items: center"
+        :style="
+          promqlMode || dashboardPanelData.data.type == 'geomap'
+            ? 'flex: 1; min-width: 0'
+            : ''
+        "
         data-test="dashboard-query-data"
       >
-        <q-space />
-        <div style="max-width: 600px">
+        <q-space
+          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+        />
+        <span
+          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+          class="text-subtitle2 text-weight-bold"
+          >{{ t("panel.sql") }}</span
+        >
+        <div
+          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          style="max-width: 600px; overflow: hidden"
+        >
           <q-tabs
-            v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
             v-model="dashboardPanelData.layout.currentQueryIndex"
             narrow-indicator
             dense
@@ -48,6 +62,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
+              <q-icon
+                v-if="promqlMode"
+                :name="
+                  dashboardPanelData.layout.hiddenQueries.includes(index)
+                    ? 'visibility_off'
+                    : 'visibility'
+                "
+                class="q-ml-xs dashboard-query-visibility-icon"
+                @click.stop="toggleQueryVisibility(index)"
+                style="cursor: pointer"
+                size="18px"
+                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+              >
+                <q-tooltip>
+                  {{
+                    dashboardPanelData.layout.hiddenQueries.includes(index)
+                      ? "Show query results"
+                      : "Hide query results"
+                  }}
+                </q-tooltip>
+              </q-icon>
               <q-icon
                 v-if="
                   index > 0 ||
@@ -70,11 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                 </div> -->
         </div>
-        <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold"
-          >{{ t("panel.sql") }}</span
-        >
         <q-btn
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           round
@@ -85,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
       </div>
-      <div style="display: flex; gap: 4px">
+      <div style="display: flex; gap: 4px; flex-shrink: 0">
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -93,9 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
-          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2 "
-        size="xs"
-        :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"        />
+          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2"
+          size="xs"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-xs-dark'
+              : 'o2-toggle-button-xs-light'
+          "
+        />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </q-bar>
@@ -218,7 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       option-value="function"
                       @update:modelValue="onFunctionSelect"
                       style="width: 100%"
-                     hide-bottom-space>
+                      hide-bottom-space
+                    >
                       <template #no-option>
                         <q-item>
                           <q-item-section>
@@ -415,6 +451,21 @@ export default defineComponent({
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
+      // For metrics page: when switching from custom to builder in PromQL, set sample query
+      if (
+        dashboardPanelData.data.queryType === "promql" &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      ) {
+        const streamName =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = `${streamName}{}`;
+      }
     };
 
     const updatePromQLQuery = async (value, event) => {
@@ -472,6 +523,19 @@ export default defineComponent({
       )
         dashboardPanelData.layout.currentQueryIndex -= 1;
       removeQuery(index);
+    };
+
+    const toggleQueryVisibility = (index) => {
+      const hiddenQueries = dashboardPanelData.layout.hiddenQueries;
+      const queryIndex = hiddenQueries.indexOf(index);
+
+      if (queryIndex > -1) {
+        // Query is currently hidden, show it
+        hiddenQueries.splice(queryIndex, 1);
+      } else {
+        // Query is currently visible, hide it
+        hiddenQueries.push(index);
+      }
     };
 
     // toggle show query view
@@ -566,6 +630,7 @@ export default defineComponent({
       onUpdateToggle,
       addTab,
       removeTab,
+      toggleQueryVisibility,
       promqlAutoCompleteKeywords,
       sqlAutoCompleteKeywords,
       sqlAutoCompleteSuggestions,
@@ -596,6 +661,11 @@ export default defineComponent({
 }
 
 .dashboard-query-remove-icon:hover {
+  background-color: #eaeaeaa5;
+  border-radius: 50%;
+}
+
+.dashboard-query-visibility-icon:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
 }

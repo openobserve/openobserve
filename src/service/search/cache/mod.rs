@@ -35,7 +35,7 @@ use config::{
         hash::Sum64,
         json,
         sql::{is_aggregate_query, is_eligible_for_histogram},
-        time::{format_duration, second_micros},
+        time::{format_duration, now_micros, second_micros},
     },
 };
 use infra::{
@@ -59,6 +59,7 @@ use crate::{
             cache::{cacher::check_cache, result_utils::extract_timestamp_range},
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+            sql::RE_SELECT_FROM,
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
@@ -69,7 +70,7 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v2";
+const CACHE_VERSION: &str = "v3";
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
@@ -525,7 +526,38 @@ pub async fn prepare_cache_response(
         .as_ref()
         .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
-    // calculate hash for the query with version
+    // Parse SQL first to get metadata needed for normalization
+    let query: SearchQuery = req.query.clone().into();
+    let sql = match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return Ok((MultiCachedQueryResponse::default(), true));
+        }
+    };
+
+    // Normalize histogram interval in SQL before computing hash
+    // This ensures the hash is consistent regardless of when handle_histogram is called
+    if is_aggregate && sql.histogram_interval.is_some() {
+        let mut req_time_range = (req.query.start_time, req.query.end_time);
+        // If end_time is 0, it means "now" (current time)
+        if req_time_range.1 == 0 {
+            req_time_range.1 = now_micros();
+        }
+
+        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
+        let q_time_range =
+            if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
+                Some(req_time_range)
+            } else {
+                sql.time_range
+            };
+        cacher::handle_histogram(&mut origin_sql, q_time_range, req.query.histogram_interval);
+    }
+
+    // calculate hash for the query with version (after normalizing histogram interval)
     let mut hash_body = vec![CACHE_VERSION.to_string(), origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
@@ -542,44 +574,69 @@ pub async fn prepare_cache_response(
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
+    let (mut ts_column, mut is_descending) =
+        cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
+
+    // Refine ts_column for non-aggregate queries with SELECT * or missing _timestamp
+    // Also modify the SQL to add _timestamp to SELECT clause if missing
+    if !is_aggregate && origin_sql.contains('*') {
+        ts_column = TIMESTAMP_COL_NAME.to_string();
+    } else if !is_aggregate
+        && sql.group_by.is_empty()
+        && sql.order_by.is_empty()
+        && !origin_sql.contains('*')
+        && let Some(caps) = RE_SELECT_FROM.captures(&origin_sql)
+        && let Some(cap) = caps.get(1)
+    {
+        let cap_str = cap.as_str();
+        if !cap_str.contains(TIMESTAMP_COL_NAME) {
+            // Add _timestamp to SELECT clause
+            origin_sql =
+                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
+            req.query.sql = origin_sql.clone();
+            ts_column = TIMESTAMP_COL_NAME.to_string();
+        }
+    }
+
+    // Refine is_descending for histogram queries with non-timestamp ORDER BY
+    is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
+
+    // Compute the complete file path once for both branches
+    let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
+    let file_path = cacher::compute_cache_file_path(
+        &base_file_path,
+        is_aggregate,
+        sql.histogram_interval,
+        &ts_column,
+    );
+
     let mut should_exec_query = true;
 
-    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let resp = if use_cache {
         // if cache is used, we need to check the cache
         check_cache(
             trace_id,
             org_id,
-            stream_type,
             req,
             &mut origin_sql,
-            &mut file_path,
+            &file_path,
             is_aggregate,
+            &sql,
+            &ts_column,
+            is_descending,
             &mut should_exec_query,
         )
         .await
     } else {
-        // if cache is not used, we need to parse the sql to get the ts column and is descending
-        let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
-            Ok(v) => {
-                let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
-                        .unwrap_or_default();
-
-                MultiCachedQueryResponse {
-                    ts_column,
-                    is_aggregate,
-                    is_descending,
-                    order_by: v.order_by,
-                    limit: v.limit,
-                    ..Default::default()
-                }
-            }
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                MultiCachedQueryResponse::default()
-            }
+        // if cache is not used, return the parsed metadata
+        MultiCachedQueryResponse {
+            ts_column,
+            is_aggregate,
+            is_descending,
+            order_by: sql.order_by,
+            limit: sql.limit,
+            file_path,
+            ..Default::default()
         }
     };
     Ok((resp, should_exec_query))

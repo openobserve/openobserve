@@ -33,6 +33,7 @@ import {
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
 } from "./legendConfiguration";
+import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 
 let moment: any;
 let momentInitialized = false;
@@ -79,7 +80,9 @@ export const convertPromQLData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   annotations: any,
+  metadata: any = null,
 ) => {
+
   // console.time("convertPromQLData");
 
   // Set gridlines visibility based on config.show_gridlines (default: true)
@@ -99,6 +102,53 @@ export const convertPromQLData = async (
     // console.timeEnd("convertPromQLData");
     return { options: null };
   }
+
+  // ========== NEW MODULAR CHART SYSTEM ==========
+  // Delegate to new modular converter for newly supported chart types
+  const NEW_CHART_TYPES = [
+    "pie",
+    "donut",
+    "table",
+    "heatmap",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "geomap",
+    "maps",
+  ];
+
+  if (NEW_CHART_TYPES.includes(panelSchema.type)) {
+
+    try {
+      const result = await convertPromQLChartData(searchQueryData, {
+        panelSchema,
+        store,
+        chartPanelRef,
+        hoveredSeriesState,
+        annotations,
+        metadata,
+      });
+
+      // Apply annotations if present (only for ECharts-based charts)
+      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+        const annotationResults = await getAnnotationsData(
+          annotations,
+          store,
+          panelSchema,
+        );
+        if (annotationResults && result.options) {
+          result.options.annotations = annotationResults;
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error(`Error converting ${panelSchema.type} chart:`, error);
+      console.error("Error stack:", error);
+      // Fall back to legacy system if new system fails
+      console.warn(`Falling back to legacy converter for ${panelSchema.type}`);
+    }
+  }
+  // ========== END NEW MODULAR CHART SYSTEM ==========
 
   // Initialize extras object
   let extras: any = {};
@@ -152,14 +202,27 @@ export const convertPromQLData = async (
   // add all series timestamp
   limitedSearchQueryData.forEach((queryData: any) => {
     if (queryData && queryData.result) {
-      queryData.result.forEach((result: any) =>
-        result.values.forEach((value: any) => xAxisData.add(value[0])),
-      );
+      queryData.result.forEach((result: any) => {
+        if (result.values) {
+          result.values.forEach((value: any) => xAxisData.add(value[0]));
+        } else if (result.value) {
+          xAxisData.add(result.value[0]);
+        }
+      });
     }
   });
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
+
+  // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
+  if (metadata?.queries?.[0]?.endTime) {
+    const endTimeInSeconds = Math.floor(metadata.queries[0].endTime / 1000000); // Convert from microseconds to seconds
+    // Only add if end time is not already in the data
+    if (!xAxisData.includes(endTimeInSeconds)) {
+      xAxisData.push(endTimeInSeconds);
+    }
+  }
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
@@ -583,17 +646,66 @@ export const convertPromQLData = async (
             return seriesObj;
           }
           case "vector": {
-            const traces = it?.result?.map((metric: any) => {
+            const seriesObj = it?.result?.map((metric: any) => {
               const values = [metric.value];
+
+              const seriesName = getPromqlLegendName(
+                metric.metric,
+                panelSchema.queries[index].config.promql_legend,
+              );
+
               return {
-                name: JSON.stringify(metric.metric),
-                x: values.map((value: any) =>
-                  moment(value[0] * 1000).toISOString(true),
-                ),
-                y: values.map((value: any) => value[1]),
+                name: seriesName,
+                label: {
+                  show: panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
+                smooth:
+                  panelSchema.config?.line_interpolation === "smooth" ||
+                  panelSchema.config?.line_interpolation == null,
+                step: ["step-start", "step-end", "step-middle"].includes(
+                  panelSchema.config?.line_interpolation,
+                )
+                  ? panelSchema.config.line_interpolation.replace("step-", "")
+                  : false,
+                showSymbol: panelSchema.config?.show_symbol ?? false,
+                zlevel: 2,
+                itemStyle: {
+                  color: (() => {
+                    try {
+                      return getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        values.map((value: any) => value[1]),
+                        chartMin,
+                        chartMax,
+                        store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
+                      );
+                    } catch (error) {
+                      console.warn("Failed to get series color:", error);
+                      return undefined;
+                    }
+                  })(),
+                },
+                data: values.map((value: any) => [
+                  store.state.timezone != "UTC"
+                    ? toZonedTime(value[0] * 1000, store.state.timezone)
+                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                  value[1],
+                ]),
+                ...seriesPropsBasedOnChartType,
+                markLine: {
+                  silent: true,
+                  animation: false,
+                  data: getMarkLineData(panelSchema),
+                },
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
-            return traces;
+            return seriesObj;
           }
         }
       }
@@ -840,6 +952,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+
+  // For metric chart type, only show one metric value (from last query with data)
+  if (panelSchema.type === "metric" && options.series.length > 1) {
+    options.series = options.series.slice(-1);
+  }
+
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
     options.series,

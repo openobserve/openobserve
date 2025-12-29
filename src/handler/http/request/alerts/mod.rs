@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
+use std::str::FromStr;
+
+use actix_web::{
+    HttpRequest, HttpResponse, delete, get,
+    http::StatusCode,
+    patch, post, put,
+    web::{self, Query},
+};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     triggers::{Trigger, TriggerModule},
@@ -21,27 +28,38 @@ use config::meta::{
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
-
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use {
+    crate::common::utils::auth::check_permissions,
+    crate::handler::http::request::search::utils::check_stream_permissions,
+};
+
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
         models::alerts::{
             requests::{
-                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery,
-                MoveAlertsRequestBody, UpdateAlertRequestBody,
+                AlertBulkEnableRequest, CreateAlertRequestBody, EnableAlertQuery,
+                GenerateSqlRequestBody, ListAlertsQuery, MoveAlertsRequestBody,
+                UpdateAlertRequestBody,
             },
             responses::{
-                AlertBulkEnableResponse, EnableAlertResponseBody, GetAlertResponseBody,
-                ListAlertsResponseBody,
+                AlertBulkEnableResponse, EnableAlertResponseBody, GenerateSqlMetadata,
+                GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
             },
         },
-        request::dashboards::{get_folder, is_overwrite},
+        request::{
+            BulkDeleteRequest, BulkDeleteResponse,
+            dashboards::{get_folder, is_overwrite},
+        },
     },
     service::{
-        alerts::alert::{self, AlertError},
+        alerts::{
+            ConditionListExt,
+            alert::{self, AlertError},
+            build_sql,
+        },
         db::scheduler,
     },
 };
@@ -305,6 +323,86 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     }
 }
 
+/// DeleteAlertBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "DeleteAlertBulk",
+    summary = "Delete multiple alerts",
+    description = "Permanently removes multiple alerts and all their configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alerts.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+    )
+)]
+#[delete("/v2/{org_id}/alerts/bulk")]
+async fn delete_alert_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+    let _folder_id = crate::common::utils::http::get_folder(&query);
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if Ksuid::from_str(id).is_err() {
+            return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
+        };
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "alerts",
+            "DELETE",
+            Some(&_folder_id),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for id in req.ids {
+        // already checked this is valid, so ok to unwrap
+        let alert_id = Ksuid::from_str(&id).unwrap();
+        match alert::delete_by_id(client, &org_id, alert_id).await {
+            Ok(_) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting alert {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string())
+            }
+        }
+    }
+
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
 /// ListAlerts
 #[utoipa::path(
     context_path = "/api",
@@ -457,10 +555,8 @@ async fn enable_alert_bulk(
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) =
-                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT").await
-            {
-                return res;
+            if !check_permissions(&id.to_string(), &org_id, user_id, "alerts", "PUT", None).await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
     }
@@ -574,5 +670,143 @@ async fn move_alerts(
             MetaHttpResponse::ok(message)
         }
         Err(e) => e.into(),
+    }
+}
+
+/// GenerateSql
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GenerateSql",
+    summary = "Generate SQL from alert query parameters",
+    description = "Generates a SQL query string based on alert query parameters including stream, aggregations, and conditions. This endpoint is useful for testing alert queries and understanding the SQL that will be executed.",
+    security(("Authorization"= [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = inline(GenerateSqlRequestBody),
+        description = "SQL generation parameters",
+        content_type = "application/json"
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(GenerateSqlResponseBody)),
+        (status = 400, description = "Bad request - invalid parameters", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal server error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"}))
+    )
+)]
+#[post("/v2/{org_id}/alerts/generate_sql")]
+pub async fn generate_sql(
+    path: web::Path<String>,
+    req_body: web::Json<GenerateSqlRequestBody>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
+    _req: HttpRequest,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let req_body = req_body.into_inner();
+
+    // Convert HTTP models to internal types
+    let stream_type: config::meta::stream::StreamType = req_body.stream_type.into();
+    let query_condition: config::meta::alerts::QueryCondition = req_body.query_condition.into();
+
+    #[cfg(feature = "enterprise")]
+    {
+        // Check stream permissions for enterprise builds
+        if let Some(response) = check_stream_permissions(
+            &req_body.stream_name,
+            &org_id,
+            &user_email.user_id,
+            &stream_type,
+        )
+        .await
+        {
+            return response;
+        }
+    }
+
+    // Validate that the stream exists
+    match infra::schema::get(&org_id, &req_body.stream_name, stream_type).await {
+        Err(e) => {
+            log::warn!(
+                "Stream validation failed for org {} stream {} ({}): {}",
+                org_id,
+                req_body.stream_name,
+                stream_type,
+                e
+            );
+            return MetaHttpResponse::bad_request(format!(
+                "Stream '{}' of type '{}' does not exist",
+                req_body.stream_name, stream_type
+            ));
+        }
+        Ok(schema) if schema.fields().is_empty() => {
+            log::warn!(
+                "Stream '{}' of type '{}' in org {} has no schema (does not exist)",
+                req_body.stream_name,
+                stream_type,
+                org_id
+            );
+            return MetaHttpResponse::bad_request(format!(
+                "Stream '{}' of type '{}' does not exist",
+                req_body.stream_name, stream_type
+            ));
+        }
+        Ok(_) => {
+            // Stream exists and has a schema, continue
+        }
+    }
+
+    // Extract conditions from query_condition or use default empty conditions
+    let conditions = query_condition.conditions.clone().unwrap_or(
+        config::meta::alerts::AlertConditionParams::V1(
+            config::meta::alerts::ConditionList::LegacyConditions(vec![]),
+        ),
+    );
+
+    // Call the existing build_sql function from service layer
+    match build_sql(
+        &org_id,
+        &req_body.stream_name,
+        stream_type,
+        &query_condition,
+        &conditions,
+    )
+    .await
+    {
+        Ok(sql) => {
+            // Calculate metadata
+            let has_agg = query_condition.aggregation.is_some();
+            let has_conds = conditions.len().await > 0;
+            let has_group = has_agg
+                && query_condition
+                    .aggregation
+                    .as_ref()
+                    .map(|a| a.group_by.is_some() && !a.group_by.as_ref().unwrap().is_empty())
+                    .unwrap_or(false);
+
+            let response = GenerateSqlResponseBody {
+                sql,
+                metadata: Some(GenerateSqlMetadata {
+                    has_aggregation: has_agg,
+                    has_conditions: has_conds,
+                    has_group_by: has_group,
+                }),
+            };
+            MetaHttpResponse::json(response)
+        }
+        Err(e) => {
+            let error_msg = e.to_string();
+            log::warn!(
+                "Failed to generate SQL for org {} stream {}: {}",
+                org_id,
+                req_body.stream_name,
+                error_msg
+            );
+            MetaHttpResponse::bad_request(format!("Failed to generate SQL: {}", error_msg))
+        }
     }
 }

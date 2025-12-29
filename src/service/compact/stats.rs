@@ -19,9 +19,9 @@ use config::{
     metrics,
     utils::time::{day_micros, get_ymdh_from_micros, now_micros},
 };
-use infra::{dist_lock, file_list as infra_file_list};
+use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::service::db;
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     let latest_updated_at = infra_file_list::get_max_update_at()

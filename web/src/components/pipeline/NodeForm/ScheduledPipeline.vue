@@ -1210,8 +1210,7 @@ size="md" />
                     "
                     class="no-border q-ml-md o2-primary-button tw-h-[36px]"
                     no-caps
-                    type="submit"
-                    @click="$emit('submit:form')"
+                    @click.prevent="$emit('submit:form')"
                     :disable="validatingSqlQuery"
                   />
                 </div>
@@ -1278,7 +1277,7 @@ import {
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar, copyToClipboard } from "quasar";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
@@ -1734,9 +1733,12 @@ const updateFrequency = async () => {
 
 function convertCronToMinutes(cronExpression: string) {
   cronJobError.value = "";
-  // Parse the cron expression using cron-parser
+  // Parse the cron expression using cron-parser v5
   try {
-    const interval = cronParser.parseExpression(cronExpression);
+    const interval = CronExpressionParser.parse(cronExpression, {
+      currentDate: new Date(),
+      utc: true,
+    });
     // Get the first and second execution times
     const firstExecution = interval.next();
     const secondExecution = interval.next();
@@ -2051,9 +2053,9 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if (tab.value === "sql" && query.value == "") {
+        if (tab.value === "sql") {
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && query.value == "") {
+        } else if (tab.value === "promql") {
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
@@ -2197,6 +2199,7 @@ const runQuery = async () => {
           org_identifier: store.state.selectedOrganization.identifier,
           query: { query: queryReq },
           page_type: selectedStreamType.value,
+          validate: true,
         },
         "derived_stream",
       )

@@ -2741,7 +2741,7 @@ export default defineComponent({
       searchObj.data.actionId = actionId.id;
     };
 
-    const populateFunctionImplementation = (fnValue, flag = false) => {
+    const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
         $q.notify({
           type: "positive",
@@ -2750,8 +2750,10 @@ export default defineComponent({
         });
       }
 
-      searchObj.meta.showTransformEditor = true;
-      searchObj.config.fnSplitterModel = 60;
+      if (openEditor) {
+        searchObj.meta.showTransformEditor = true;
+        searchObj.config.fnSplitterModel = 60;
+      }
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
@@ -2979,9 +2981,10 @@ export default defineComponent({
                 populateFunctionImplementation(
                   {
                     name: "",
-                    function: searchObj.data.tempFunctionContent,
+                    function: extractedObj.data.tempFunctionContent,
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -2996,6 +2999,7 @@ export default defineComponent({
                     function: "",
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // No function content, so don't open editor
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -3192,9 +3196,10 @@ export default defineComponent({
                 populateFunctionImplementation(
                   {
                     name: "",
-                    function: searchObj.data.tempFunctionContent,
+                    function: extractedObj.data.tempFunctionContent,
                   },
                   false,
+                  extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -3206,6 +3211,7 @@ export default defineComponent({
                     function: "",
                   },
                   false,
+                  false, // No function content, so don't open editor
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -3225,7 +3231,8 @@ export default defineComponent({
               }
             }
 
-            if (searchObj.meta.toggleFunction == false) {
+            // Only reset function content if there's no function in the saved view
+            if (searchObj.meta.toggleFunction == false && !extractedObj.data.tempFunctionContent) {
               searchObj.config.fnSplitterModel = 100;
               resetFunctionContent();
             }

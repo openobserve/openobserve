@@ -70,9 +70,10 @@ describe("Alert List", async () => {
       .find("thead")
       .find("tr")
       .findAll("th");
-    expect(tableData[0].text()).toBe("#");
-    expect(tableData[1].text()).toContain("Name");
-    expect(tableData[2].text()).toContain("Actions");
+    // Index 0 is the checkbox column, so actual columns start at index 1
+    expect(tableData[1].text()).toBe("#");
+    expect(tableData[2].text()).toContain("Name");
+    expect(tableData[3].text()).toContain("Actions");
   });
 
   it("Should display table row data", async () => {
@@ -82,8 +83,9 @@ describe("Alert List", async () => {
       .find("tbody")
       .find("tr")
       .findAll("td");
-    expect(tableData[0].text()).toBe("01");
-    expect(tableData[1].text()).toBe("Template2");
+    // Index 0 is the checkbox column, so actual columns start at index 1
+    expect(tableData[1].text()).toBe("01");
+    expect(tableData[2].text()).toBe("Template2");
   });
 
 
@@ -138,3 +140,4 @@ describe("Alert List", async () => {
     });
   });
 });
+

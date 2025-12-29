@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::sqlite::{CLIENT_RO, CLIENT_RW},
+    db::sqlite::{CLIENT_RO, CLIENT_RW, drop_column},
     errors::{DbError, Error, Result},
 };
 
@@ -62,13 +62,16 @@ CREATE TABLE IF NOT EXISTS pipeline
     stream_type     VARCHAR(50),
     derived_stream  TEXT,
     nodes           TEXT,
-    edges           TEXT,
-    created_at      TIMESTAMP default CURRENT_TIMESTAMP
+    edges           TEXT
 );
             "#,
         )
         .execute(&*client)
         .await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column(&client, "pipeline", "created_at").await?;
+
         Ok(())
     }
 

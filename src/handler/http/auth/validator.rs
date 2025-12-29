@@ -36,7 +36,6 @@ use url::Url;
 
 use crate::{
     common::{
-        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
@@ -170,7 +169,13 @@ pub async fn validate_credentials(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(e) => {
@@ -351,7 +356,13 @@ pub async fn validate_credentials_ext(
                 if all_users.is_empty() {
                     None
                 } else {
-                    all_users.first().cloned()
+                    // For organizations endpoint, specifically look for user in _meta org
+                    // since permission check at line 966 expects the user to be in _meta
+                    all_users
+                        .iter()
+                        .find(|u| u.org == config::META_ORG_ID)
+                        .cloned()
+                        .or_else(|| all_users.first().cloned())
                 }
             }
             Err(_) => None,
@@ -886,7 +897,7 @@ pub async fn validator_proxy_url(
 pub async fn validate_http_internal(
     req: ServiceRequest,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let router_nodes = cluster::get_cached_online_router_nodes()
+    let router_nodes = infra::cluster::get_cached_online_router_nodes()
         .await
         .unwrap_or_default();
 

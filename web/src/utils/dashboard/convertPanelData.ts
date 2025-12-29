@@ -73,6 +73,7 @@ export const convertPanelData = async (
             chartPanelRef,
             hoveredSeriesState,
             annotations,
+            metadata,
           )),
         };
       } else {
@@ -99,22 +100,73 @@ export const convertPanelData = async (
       }
     }
     case "table": {
-      return {
-        chartType: panelSchema.type,
-        ...convertTableData(panelSchema, data, store),
-      };
+      // Check if PromQL query type
+      if (panelSchema?.queryType == "promql") {
+        return {
+          chartType: panelSchema.type,
+          ...(await convertPromQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            annotations,
+            metadata,
+          )),
+        };
+      } else {
+        // SQL query type
+        return {
+          chartType: panelSchema.type,
+          ...convertTableData(panelSchema, data, store),
+        };
+      }
     }
     case "geomap": {
-      return {
-        chartType: panelSchema.type,
-        ...convertGeoMapData(panelSchema, data),
-      };
+      // Check if PromQL query type
+      if (panelSchema?.queryType == "promql") {
+        return {
+          chartType: panelSchema.type,
+          ...(await convertPromQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            annotations,
+            metadata,
+          )),
+        };
+      } else {
+        // SQL query type
+        return {
+          chartType: panelSchema.type,
+          ...convertGeoMapData(panelSchema, data),
+        };
+      }
     }
     case "maps": {
-      return {
-        chartType: panelSchema.type,
-        ...convertMapsData(panelSchema, data),
-      };
+      // Check if PromQL query type
+      if (panelSchema?.queryType == "promql") {
+        return {
+          chartType: panelSchema.type,
+          ...(await convertPromQLData(
+            panelSchema,
+            data,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            annotations,
+            metadata,
+          )),
+        };
+      } else {
+        // SQL query type
+        return {
+          chartType: panelSchema.type,
+          ...convertMapsData(panelSchema, data),
+        };
+      }
     }
     case "sankey": {
       return {

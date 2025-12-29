@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 17;
+pub const DB_SCHEMA_VERSION: u64 = 21;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1343,9 +1343,18 @@ pub struct Limit {
     pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
-    // default equal to query_timeout
+    #[env_config(
+        name = "ZO_QUERY_INGESTER_TIMEOUT",
+        default = 0,
+        help = "Timeout for ingester query, default equal to query_timeout"
+    )]
     pub query_ingester_timeout: u64,
+    #[env_config(
+        name = "ZO_QUERY_QUERIER_TIMEOUT",
+        default = 0,
+        help = "Timeout for querier query, default equal to query_timeout"
+    )]
+    pub query_querier_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
@@ -1568,6 +1577,12 @@ pub struct Limit {
     )]
     pub inverted_index_max_token_length: usize,
     #[env_config(
+        name = "ZO_INDEX_ALL_MAX_VALUE_LENGTH",
+        default = 0,
+        help = "Maximum length of a value in the index all feature."
+    )]
+    pub index_all_max_value_length: usize,
+    #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
         help = "unit: Days. Global default max query range for all streams. If set to a value > 0, this will be used as the default max query range. Can be overridden by stream settings."
@@ -1579,12 +1594,6 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
-    #[env_config(
-        name = "ZO_TEXT_DATA_TYPE",
-        default = "longtext",
-        help = "Default data type for LongText compliant DB's"
-    )]
-    pub db_text_data_type: String,
     #[env_config(
         name = "ZO_MAX_DASHBOARD_SERIES",
         default = 100,
@@ -2171,6 +2180,54 @@ pub struct EnrichmentTable {
         help = "Background sync interval in seconds"
     )]
     pub merge_interval: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_MAX_SIZE",
+        default = 500,
+        help = "Maximum size of each batch when fetching from URL (in MB). Batches are saved to reduce database checkpoint frequency."
+    )]
+    pub url_fetch_max_size_mb: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_FETCH_TIMEOUT",
+        default = 7200,
+        help = "Timeout for URL fetch operations (in seconds)"
+    )]
+    pub url_fetch_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_HEADER_FETCH_SIZE",
+        default = 8192,
+        help = "Size of initial fetch for CSV headers when resuming (in bytes). Should be large enough to contain the header row."
+    )]
+    pub url_header_fetch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_MAX_RETRIES",
+        default = 3,
+        help = "Maximum retry attempts for failed URL fetches"
+    )]
+    pub url_max_retries: u32,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RETRY_DELAY",
+        default = 5,
+        help = "Delay between retry attempts (in seconds)"
+    )]
+    pub url_retry_delay_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_STALE_JOB_THRESHOLD",
+        default = 600,
+        help = "Jobs stuck in Processing status for longer than this are considered stale (in seconds). Used for automatic recovery."
+    )]
+    pub url_stale_job_threshold_secs: i64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_CHECK_INTERVAL",
+        default = 120,
+        help = "Interval between stale job recovery checks (in seconds). Each ingester will attempt to claim one stale job per interval."
+    )]
+    pub url_recovery_check_interval_secs: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_URL_RECOVERY_JOBS_PER_CHECK",
+        default = 1,
+        help = "Number of stale jobs each ingester attempts to claim per recovery check. Higher values allow faster recovery but may cause uneven distribution."
+    )]
+    pub url_recovery_jobs_per_check: usize,
 }
 
 pub fn init() -> Config {
@@ -2369,6 +2426,17 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+
+    // check query timeout
+    if cfg.limit.query_timeout == 0 {
+        cfg.limit.query_timeout = 600;
+    }
+    if cfg.limit.query_ingester_timeout == 0 {
+        cfg.limit.query_ingester_timeout = cfg.limit.query_timeout;
+    }
+    if cfg.limit.query_querier_timeout == 0 {
+        cfg.limit.query_querier_timeout = cfg.limit.query_timeout;
     }
 
     // check for uds

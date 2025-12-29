@@ -33,10 +33,7 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Template prefixes to clean up
       [
-        'auto_email_template_',
-        'auto_webhook_template_',
-        'auto_playwright_template_',
-        'auto_url_webhook_template_',
+        'auto_',
         'sanitytemp-',
         'newtemp_',
         'email_tmpl_',
@@ -58,6 +55,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupReports();
 
     // Clean up all dashboards owned by automation user
+    // This includes: Joins_Test_* (dashboard joins parallel tests), and other test dashboards
     await pm.apiCleanup.cleanupDashboards();
 
     // Clean up all pipelines for e2e_automate streams
@@ -136,7 +134,12 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up enrichment tables matching test patterns
     await pm.apiCleanup.cleanupEnrichmentTables([
-      /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/  // protocols_<uuid>_csv
+      /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
+      /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
+      /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
+      /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
+      /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
+      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/      // delete_test_<uuid>_csv (delete confirmation test)
     ]);
 
     // Clean up streams matching test patterns
@@ -163,7 +166,13 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_universal_(src|dest)_\d+$/,     // Test 9: Universal condition test streams
         /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
-        /^e2e_stream_(a|b)_\d+$/              // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
+        /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
+        /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
+        /^func_test_[a-z0-9]+$/,                       // Dashboard functions test streams (func_test_<testId>)
+        /^join_manual_test$/,                          // Manual join test stream
+        /^test_app_users$/,                            // Test app users stream
+        /^test_sessions$/,                             // Test sessions stream
+        /^test_web_requests$/                          // Test web requests stream
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']

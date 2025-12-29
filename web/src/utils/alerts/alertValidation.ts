@@ -4,7 +4,7 @@
  */
 
 import searchService from "@/services/search";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 
@@ -325,7 +325,6 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
 export interface ValidationContext {
   q: any;
   store: any;
-  scheduledAlertRef: any;
   validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
   vrlFunctionError: any;
@@ -373,7 +372,7 @@ export const validateInputs = (
   context: ValidationContext,
   notify: boolean = true,
 ): boolean => {
-  const { q, scheduledAlertRef } = context;
+  const { q } = context;
 
   if (isNaN(Number(input.trigger_condition.silence))) {
     notify &&
@@ -434,26 +433,46 @@ export const validateInputs = (
     return false;
   }
 
+  // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
-      cronParser.parseExpression(input.trigger_condition.cron!);
+      CronExpressionParser.parse(input.trigger_condition.cron!, {
+        currentDate: new Date(),
+        utc: true,
+      });
     } catch (err) {
       console.log(err);
-      scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
-      return;
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Invalid cron expression!",
+          timeout: 1500,
+        });
+      return false;
     }
-  }
 
-  scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
-
-  if (scheduledAlertRef.value.cronJobError) {
-    notify &&
-      q.notify({
-        type: "negative",
-        message: scheduledAlertRef.value.cronJobError,
-        timeout: 1500,
-      });
-    return false;
+    // Validate timezone is set for cron
+    if (!input.trigger_condition.timezone || input.trigger_condition.timezone.trim() === '') {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Timezone is required for cron schedule",
+          timeout: 1500,
+        });
+      return false;
+    }
+  } else if (input.trigger_condition.frequency_type === "minutes") {
+    // Validate frequency for minutes type
+    const frequency = Number(input.trigger_condition.frequency);
+    if (isNaN(frequency) || frequency < 1) {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Frequency should be greater than 0",
+          timeout: 1500,
+        });
+      return false;
+    }
   }
 
   return true;
@@ -475,6 +494,12 @@ export const validateSqlQuery = async (
 
   // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
   await new Promise((resolve) => setTimeout(resolve, 300));
+
+  // Skip validation if SQL query is empty or only whitespace
+  if (!formData.query_condition.sql || formData.query_condition.sql.trim() === '') {
+    sqlQueryErrorMsg.value = "";
+    return;
+  }
 
   if (!getParser(formData.query_condition.sql)) {
     return;
@@ -503,6 +528,7 @@ export const validateSqlQuery = async (
         org_identifier: store.state.selectedOrganization.identifier,
         query,
         page_type: formData.stream_type,
+        validate: true,
       })
       .then((res: any) => {
         sqlQueryErrorMsg.value = "";
@@ -524,14 +550,8 @@ export const validateSqlQuery = async (
           ? err.response?.data?.message
           : "Invalid SQL Query";
 
-        // Show error only if it is not real time alert
-        // This case happens when user enters invalid query and then switches to real time alert
-        if (formData.query_condition.type === "sql")
-          q.notify({
-            type: "negative",
-            message: "Invalid SQL Query : " + err.response?.data?.message,
-            timeout: 3000,
-          });
+        // Error message is displayed inline below the editor
+        // No need for toast notification as it's redundant
 
         reject("sql_error");
       });

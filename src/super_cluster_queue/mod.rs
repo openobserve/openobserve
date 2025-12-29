@@ -24,6 +24,7 @@ mod distinct_values;
 mod domain_management;
 mod enrichment_table;
 mod folders;
+mod kv;
 mod meta;
 mod org_user;
 mod organization;
@@ -64,6 +65,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_domain_management_msg: domain_management::process,
         on_compactor_manual_job_msg: compactor_manual_jobs::process,
         on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
+        on_kv_msg: kv::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

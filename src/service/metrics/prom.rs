@@ -196,7 +196,7 @@ pub async fn remote_write(
             .collect();
 
         let metric_name = match labels.get(NAME_LABEL) {
-            Some(v) => v.to_owned(),
+            Some(v) => format_stream_name(v.to_string()),
             None => continue,
         };
 

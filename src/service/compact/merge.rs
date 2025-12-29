@@ -42,6 +42,7 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
+    cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -58,17 +59,14 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{
-        db, file_list,
-        schema::generate_schema_for_defined_schema_fields,
-        search::{
-            DATAFUSION_RUNTIME,
-            datafusion::exec::{self, MergeParquetResult, TableBuilder},
-        },
-        tantivy::create_tantivy_index,
+use crate::service::{
+    db, file_list,
+    schema::generate_schema_for_defined_schema_fields,
+    search::{
+        DATAFUSION_RUNTIME,
+        datafusion::exec::{self, MergeParquetResult, TableBuilder},
     },
+    tantivy::create_tantivy_index,
 };
 
 /// Generate merging job by stream
@@ -823,6 +821,9 @@ pub async fn merge_files(
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
+    // Keep original schema for index generation (has all stream fields)
+    let stream_schema_for_index = Arc::new(latest_schema.clone());
+    // Create filtered schema for parquet merging (only fields in parquet files)
     let latest_schema = Arc::new(latest_schema.retain(all_fields));
     let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
     for field in latest_schema.fields() {
@@ -980,6 +981,7 @@ pub async fn merge_files(
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
+                    stream_schema_for_index.clone(),
                     &buf,
                 )
                 .await?;
@@ -1020,6 +1022,7 @@ pub async fn merge_files(
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
+                        stream_schema_for_index.clone(),
                         &buf,
                     )
                     .await?;
@@ -1050,15 +1053,16 @@ async fn generate_inverted_index(
     index_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
+    latest_schema: Arc<Schema>,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
+    let (_parquet_schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
         full_text_search_fields,
         index_fields,
-        schema,
+        latest_schema, // Use stream schema to include all configured fields
         reader,
     )
     .await
@@ -1401,98 +1405,63 @@ async fn process_single_parquet_buffer(
         ),
     );
 
-    // Get config values for channel/batch sizes
+    // Get config values for channel capacity
     let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
     let channel_capacity = ss_config.channel_capacity;
-    let batch_size = ss_config.record_batch_size;
 
     // Use bounded channel with backpressure for memory control
-    let (tx, mut rx) = mpsc::channel::<Vec<std::collections::HashMap<String, serde_json::Value>>>(
-        channel_capacity,
-    );
+    // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
 
     let org_id_owned = org_id.to_string();
     let stream_name_owned = stream_name.to_string();
 
-    // Spawn producer task to convert batches to records in batches
+    // Spawn producer task to send Arrow batches directly through channel
+    // ARROW-NATIVE: No HashMap conversion! Sends RecordBatch directly.
     let producer_handle = tokio::spawn(async move {
-        let mut current_batch: Vec<std::collections::HashMap<String, serde_json::Value>> =
-            Vec::with_capacity(batch_size);
         let mut records_sent: u64 = 0;
         let mut records_dropped: u64 = 0;
 
         for batch in batches {
-            let records = match record_batch_to_hashmap(&batch) {
-                Ok(r) => r,
-                Err(e) => {
-                    log::warn!(
-                        "[COMPACTOR] Failed to convert record batch to hashmap: {}",
-                        e
-                    );
-                    continue;
+            let num_rows = batch.num_rows();
+            if num_rows == 0 {
+                continue;
+            }
+
+            // Send Arrow batch directly (no conversion!)
+            match tx.try_send(batch) {
+                Ok(()) => {
+                    records_sent += num_rows as u64;
                 }
-            };
-
-            for record in records {
-                // Convert hashbrown::HashMap to std::collections::HashMap
-                let std_map: std::collections::HashMap<String, serde_json::Value> =
-                    record.into_iter().collect();
-                current_batch.push(std_map);
-
-                // When batch is full, send it through channel
-                if current_batch.len() >= batch_size {
-                    let batch_len = current_batch.len() as u64;
-                    let batch_to_send =
-                        std::mem::replace(&mut current_batch, Vec::with_capacity(batch_size));
-
-                    // Use try_send for backpressure - drop if channel is full
-                    match tx.try_send(batch_to_send) {
-                        Ok(()) => {
-                            records_sent += batch_len;
-                        }
-                        Err(mpsc::error::TrySendError::Full(_)) => {
-                            records_dropped += batch_len;
-                            if records_dropped.is_multiple_of(1000) {
-                                log::warn!(
-                                    "[COMPACTOR] Service streams channel full, dropped {} records so far",
-                                    records_dropped
-                                );
-                            }
-                        }
-                        Err(mpsc::error::TrySendError::Closed(_)) => {
-                            return (records_sent, records_dropped);
-                        }
+                Err(mpsc::error::TrySendError::Full(dropped_batch)) => {
+                    let dropped = dropped_batch.num_rows() as u64;
+                    records_dropped += dropped;
+                    if records_dropped.is_multiple_of(1000) {
+                        log::warn!(
+                            "[COMPACTOR] Service streams channel full, dropped {} records so far",
+                            records_dropped
+                        );
                     }
                 }
-            }
-        }
-
-        // Send remaining records
-        if !current_batch.is_empty() {
-            let batch_len = current_batch.len() as u64;
-            match tx.try_send(current_batch) {
-                Ok(()) => {
-                    records_sent += batch_len;
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    return (records_sent, records_dropped);
                 }
-                Err(mpsc::error::TrySendError::Full(_)) => {
-                    records_dropped += batch_len;
-                }
-                Err(mpsc::error::TrySendError::Closed(_)) => {}
             }
         }
 
         (records_sent, records_dropped)
     });
 
-    // Consumer: process batches as they arrive
+    // Consumer: process Arrow batches as they arrive
+    // ARROW-NATIVE: Process RecordBatch directly (no HashMap conversion!)
     let mut total_services = 0u64;
-    while let Some(records) = rx.recv().await {
-        if records.is_empty() {
+    while let Some(batch) = rx.recv().await {
+        if batch.num_rows() == 0 {
             continue;
         }
 
         let services = processor
-            .process_records(stream_type, &stream_name_owned, &records)
+            .process_arrow_batch(&batch, stream_type, &stream_name_owned)
             .await;
 
         if !services.is_empty() {
@@ -1524,66 +1493,6 @@ async fn process_single_parquet_buffer(
     }
 
     Ok(())
-}
-
-/// Convert RecordBatch to Vec<HashMap<String, Value>> for service streams processing
-#[cfg(feature = "enterprise")]
-fn record_batch_to_hashmap(
-    batch: &RecordBatch,
-) -> Result<Vec<HashMap<String, serde_json::Value>>, anyhow::Error> {
-    use arrow::{array::*, datatypes::DataType};
-
-    let mut records = Vec::with_capacity(batch.num_rows());
-    let field_names: Vec<String> = batch
-        .schema()
-        .fields()
-        .iter()
-        .map(|f| f.name().clone())
-        .collect();
-
-    for row_idx in 0..batch.num_rows() {
-        let mut record = HashMap::new();
-
-        for (col_idx, field_name) in field_names.iter().enumerate() {
-            let column = batch.column(col_idx);
-
-            if column.is_null(row_idx) {
-                record.insert(field_name.clone(), serde_json::Value::Null);
-                continue;
-            }
-
-            // Convert arrow value to JSON based on type
-            let value = match column.data_type() {
-                DataType::Utf8 => {
-                    let array = column.as_any().downcast_ref::<StringArray>().unwrap();
-                    serde_json::Value::String(array.value(row_idx).to_string())
-                }
-                DataType::Int64 => {
-                    let array = column.as_any().downcast_ref::<Int64Array>().unwrap();
-                    serde_json::Value::Number(array.value(row_idx).into())
-                }
-                DataType::Float64 => {
-                    let array = column.as_any().downcast_ref::<Float64Array>().unwrap();
-                    serde_json::json!(array.value(row_idx))
-                }
-                DataType::Boolean => {
-                    let array = column.as_any().downcast_ref::<BooleanArray>().unwrap();
-                    serde_json::Value::Bool(array.value(row_idx))
-                }
-                // Add more types as needed
-                _ => {
-                    // Skip complex types for now
-                    continue;
-                }
-            };
-
-            record.insert(field_name.clone(), value);
-        }
-
-        records.push(record);
-    }
-
-    Ok(records)
 }
 
 #[cfg(test)]

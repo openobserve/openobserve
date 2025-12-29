@@ -21,24 +21,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw-w-full tw-h-[68px] tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
           class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
         >
-          <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
-            {{ t("alerts.header") }}
+          <div class="tw-flex tw-items-center tw-gap-4">
+            <!-- Icon-only View Mode Tabs -->
+            <div class="view-mode-tabs">
+              <q-btn
+                flat
+                dense
+                :class="viewMode === 'alerts' ? 'active-tab' : 'inactive-tab'"
+                class="view-tab-btn"
+                @click="onViewModeChange('alerts')"
+                data-test="alerts-view-btn"
+              >
+                <q-icon name="notifications_active" size="18px" />
+                <q-tooltip>{{ t('alerts.header') }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                flat
+                dense
+                :class="viewMode === 'incidents' ? 'active-tab' : 'inactive-tab'"
+                class="view-tab-btn"
+                @click="onViewModeChange('incidents')"
+                data-test="incidents-view-btn"
+              >
+                <q-icon name="crisis_alert" size="18px" />
+                <q-tooltip>{{ t('alerts.incidents.title') }}</q-tooltip>
+              </q-btn>
+            </div>
+
+            <!-- Page Title -->
+            <div
+              class="page-title tw-font-[600] tw-text-[20px]"
+              :data-test="viewMode === 'alerts' ? 'alerts-list-title' : 'incidents-list-title'"
+            >
+              {{ viewMode === 'alerts' ? t('alerts.header') : t('alerts.incidents.title') }}
+            </div>
           </div>
           <div class="flex q-ml-auto tw-ps-2 items-center">
-            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+            <!-- Tabs only visible in Alerts view -->
+            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw-h-[36px] q-mr-sm">
               <app-tabs
               class="tabs-selection-container"
-              :tabs="tabs"
+              :tabs="alertTabs"
               v-model:active-tab="activeTab"
               @update:active-tab="filterAlertsByTab"
             />
             </div>
+            <!-- Search for Alerts view -->
             <q-input
+              v-if="viewMode === 'alerts'"
               v-model="dynamicQueryModel"
               dense
               borderless
@@ -50,14 +85,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-
               class="o2-search-input"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <div class="tw-mb-2">
+            <!-- Search for Incidents view -->
+            <q-input
+              v-if="viewMode === 'incidents'"
+              v-model="incidentSearchQuery"
+              dense
+              borderless
+              placeholder="Search incidents..."
+              data-test="incident-search-input"
+              clearable
+              class="o2-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <!-- All Folders toggle (only for alerts view) -->
+            <div v-if="viewMode === 'alerts'" class="tw-mb-2">
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
@@ -85,16 +135,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-insights-btn"
             icon="insights"
           />
+          <!-- Import button (only for alerts view) -->
           <q-btn
+            v-if="viewMode === 'alerts'"
             class="q-ml-sm o2-secondary-button tw-h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
-
           />
+          <!-- Add Alert button (only for alerts view) -->
           <q-btn
+            v-if="viewMode === 'alerts'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw-h-[36px]"
             no-caps
@@ -112,7 +165,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="full-width alert-list-table"
       style="height: calc(100vh - 116px)"
     >
+      <!-- Incidents View (no folders) -->
+      <div v-if="viewMode === 'incidents'" class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
+        <IncidentList :searchQuery="incidentSearchQuery" />
+      </div>
+
+      <!-- Alerts View (with folders) -->
       <q-splitter
+        v-else
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
@@ -132,11 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
             <div class="tw-h-full card-container">
-              <!-- Incidents List (shown when incidents tab is active) -->
-              <IncidentList v-if="activeTab === 'incidents'" />
               <!-- Alert List Table -->
               <q-table
-                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -204,12 +261,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-if="col.name === 'name'">
                         <div class="tw-flex tw-items-center tw-gap-1">
                           <span>{{ computedName(props.row[col.field]) }}</span>
-                          <O2AIContextAddBtn
-                            @sendToAiChat="openSREChat(props.row)"
-                            :size="'6px'"
-                            :imageHeight="'16px'"
-                            :imageWidth="'16px'"
-                          />
                         </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
@@ -485,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #bottom="scope">
                   <div class="bottom-btn tw-h-[48px]">
-                    <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                   <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
                       {{ resultTotal }} {{ t('alerts.header') }}
                     </div>
 
@@ -528,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-sm tw-w-[141px]"
+                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] q-mr-sm tw-w-[180px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
@@ -536,6 +587,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-icon name="play_arrow" size="16px" />
                       <span class="tw-ml-2">Resume</span>
+                  </q-btn>
+                  <q-btn
+                      v-if="selectedAlerts.length > 0"
+                      data-test="alert-list-delete-alerts-btn"
+                      class="tw-flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px] tw-ml-sm"
+                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      no-caps
+                      dense
+                      @click="openBulkDeleteDialog"
+                    >
+                      <q-icon name="delete" size="16px" />
+                      <span class="tw-ml-2">Delete</span>
                   </q-btn>
                     <QTablePagination
                       :scope="scope"
@@ -579,6 +642,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
+    />
+
+    <ConfirmDialog
+      title="Delete Alerts"
+      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      @update:ok="bulkDeleteAlerts"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
     />
 
     <!-- Alert Details Drawer -->
@@ -859,6 +930,7 @@ import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import IncidentList from "@/components/alerts/IncidentList.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -996,7 +1068,52 @@ export default defineComponent({
 
     const triggerExpand = (props: any) => {
       // Open drawer instead of inline expansion
-      selectedAlertDetails.value = props.row;
+      const alert = props.row;
+
+      // LAZY CONVERSION: Convert conditions on-demand only when expanding
+      // This improves performance by avoiding conversion of all alerts on list load
+      let displayConditions = "--";
+      if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
+        if (alert.rawCondition.type == 'custom') {
+          const conditionData = alert.rawCondition.conditions;
+
+          // Detect format by structure, not by version field (more reliable)
+          if (conditionData?.filterType === 'group') {
+            // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+            displayConditions = transformV2ToExpression(conditionData);
+          } else if (conditionData?.version === 2 && conditionData?.conditions) {
+            // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
+            displayConditions = transformV2ToExpression(conditionData.conditions);
+          } else if (conditionData?.or || conditionData?.and) {
+            // V1 format: {or: [...]} or {and: [...]}
+            displayConditions = transformToExpression(conditionData);
+          } else if (Array.isArray(conditionData) && conditionData.length > 0) {
+            // V0 format (legacy): flat array [{column, operator, value}, ...]
+            // V0 had implicit AND between all conditions (no groups)
+            const parts = conditionData.map((item: any) => {
+              const column = item.column || 'field';
+              const operator = item.operator || '=';
+              const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
+              return `${column} ${operator} ${value}`;
+            });
+            displayConditions = parts.length > 0 ? `(${parts.join(' AND ')})` : '--';
+          } else {
+            // Unknown format or empty
+            displayConditions = typeof conditionData === 'string' ? conditionData : '--';
+          }
+        } else if (alert.rawCondition.sql) {
+          displayConditions = alert.rawCondition.sql;
+        } else if (alert.rawCondition.promql) {
+          displayConditions = alert.rawCondition.promql;
+        }
+      }
+
+      // Set selectedAlertDetails with converted conditions
+      selectedAlertDetails.value = {
+        ...alert,
+        conditions: displayConditions
+      };
+
       showAlertDetailsDrawer.value = true;
       // Fetch history for this alert
       if(config.isCloud == "false"){
@@ -1044,11 +1161,36 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
+    // Initialize viewMode from URL query parameter
+    const viewMode = ref(
+      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
+    );
+
     // Initialize activeTab from URL query parameter, default to "all"
     const activeTab = ref(
       (router.currentRoute.value.query.tab as string) || "all"
     );
 
+    // Incident search query
+    const incidentSearchQuery = ref("");
+
+    // Tabs for alerts view only (removed incidents tab)
+    const alertTabs = reactive([
+      {
+        label: t("alerts.all"),
+        value: "all",
+      },
+      {
+        label: t("alerts.scheduled"),
+        value: "scheduled",
+      },
+      {
+        label: t("alerts.realTime"),
+        value: "realTime",
+      },
+    ]);
+
+    // Keep old tabs for backward compatibility if needed
     const tabs = reactive([
       {
         label: t("alerts.all"),
@@ -1067,6 +1209,26 @@ export default defineComponent({
         value: "incidents",
       },
     ]);
+
+    const onViewModeChange = (newMode: string) => {
+      // Update viewMode immediately
+      viewMode.value = newMode;
+
+      // Update URL query parameter
+      router.push({
+        query: {
+          ...router.currentRoute.value.query,
+          view: newMode,
+          // Reset tab to 'all' when switching to alerts view
+          tab: newMode === "alerts" ? "all" : undefined,
+        },
+      });
+
+      // Reset active tab when switching to alerts view
+      if (newMode === "alerts") {
+        activeTab.value = "all";
+      }
+    };
 
     const columns = computed(() => {
       const baseColumns: any = [
@@ -1293,34 +1455,9 @@ export default defineComponent({
           }
           //general alerts that we use to display (formatting the alerts into the table format)
           //localAllAlerts is the alerts that we use to store
+          // PERFORMANCE OPTIMIZATION: Store raw condition data without conversion
+          // Conversion happens lazily only when user expands an alert (in triggerExpand)
           localAllAlerts = localAllAlerts.map((data: any) => {
-            let conditions = "--";
-
-            // Handle different condition formats based on structure
-            if (Object.keys(data.condition).length && data.condition.type == 'custom') {
-              const conditionData = data.condition.conditions;
-
-              // Detect format by structure, not by version field (more reliable)
-              if (conditionData?.filterType === 'group') {
-                // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-                // This works whether or not there's a version field
-                conditions = transformV2ToExpression(conditionData);
-              } else if (conditionData?.version === 2 && conditionData?.conditions) {
-                // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-                conditions = transformV2ToExpression(conditionData.conditions);
-              } else if (conditionData?.or || conditionData?.and) {
-                // V1 format: {or: [...]} or {and: [...]}
-                conditions = transformToExpression(conditionData);
-              } else {
-                // V0 format (legacy query_condition) or other formats
-                // Try to display as-is if it's a string, otherwise show placeholder
-                conditions = typeof conditionData === 'string' ? conditionData : '--';
-              }
-            } else if (data.condition.sql) {
-              conditions = data.condition.sql;
-            } else if (data.condition.promql) {
-              conditions = data.condition.promql;
-            }
             let frequency = "";
             if (data.trigger_condition?.frequency_type == "cron") {
               frequency = data.trigger_condition.cron;
@@ -1336,7 +1473,8 @@ export default defineComponent({
               stream_name: data.stream_name ? data.stream_name : "--",
               stream_type: data.stream_type,
               enabled: data.enabled,
-              conditions: conditions,
+              conditions: "--", // Placeholder - will be converted on-demand in triggerExpand
+              rawCondition: data.condition, // Store raw condition for lazy conversion
               description: data.description,
               uuid: data.uuid,
               owner: data.owner,
@@ -2052,7 +2190,6 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        console.log(row,'row here')
         await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
@@ -2343,43 +2480,16 @@ export default defineComponent({
       }
 
       // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
+      // Uses shared buildConditionsString utility for consistency
       function transformV2ToExpression(group: any, isRoot = true): string {
-        if (!group || !group.conditions || group.conditions.length === 0) {
-          return '';
-        }
-
-        const parts: string[] = [];
-
-        group.conditions.forEach((item: any, index: number) => {
-          if (item.filterType === 'group') {
-            // Nested group - recursively build expression
-            const nestedExpr = transformV2ToExpression(item, false);
-            if (nestedExpr) {
-              // Use parent group's logicalOperator for the operator before nested groups
-              if (index > 0) {
-                parts.push(`${group.logicalOperator} (${nestedExpr})`);
-              } else {
-                parts.push(`(${nestedExpr})`);
-              }
-            }
-          } else {
-            // Condition
-            const column = item.column || 'field';
-            const operator = item.operator || '=';
-            const value = typeof item.value === 'string' ? `'${item.value}'` : item.value;
-            const conditionStr = `${column} ${operator} ${value}`;
-
-            // Add operator before condition (except for first item)
-            if (index > 0 && item.logicalOperator) {
-              parts.push(`${item.logicalOperator} ${conditionStr}`);
-            } else {
-              parts.push(conditionStr);
-            }
-          }
+        const result = buildConditionsString(group, {
+          sqlMode: false,        // Display format (lowercase operators)
+          addWherePrefix: false,
+          formatValues: false,   // Simple display without type-aware formatting
         });
 
-        const joined = parts.join(' ');
-        return isRoot ? `(${joined})` : joined;
+        // Wrap in parentheses if it's the root level and has content
+        return isRoot && result ? `(${result})` : result;
       }
       //this function is used to filter the alerts by the local search not the global search
       //this will be used when the user is searching for the alerts in the same folder
@@ -2464,6 +2574,104 @@ export default defineComponent({
         });
       }
     };
+
+  const confirmBulkDelete = ref<boolean>(false);
+
+  const openBulkDeleteDialog = () => {
+    confirmBulkDelete.value = true;
+  };
+
+  const bulkDeleteAlerts = async () => {
+    const dismiss = $q.notify({
+      spinner: true,
+      message: "Deleting alerts...",
+      timeout: 0,
+    });
+
+    try {
+      if (selectedAlerts.value.length === 0) {
+        $q.notify({
+          type: "negative",
+          message: "No alerts selected for deletion",
+          timeout: 2000,
+        });
+        dismiss();
+        return;
+      }
+
+      // Extract alert ids
+      const payload = {
+        ids: selectedAlerts.value.map((a: any) => a.alert_id),
+      };
+
+      const response = await alertsService.bulkDelete(
+        store.state.selectedOrganization.identifier,
+        payload,
+        activeFolderId.value
+      );
+
+      dismiss();
+
+      // Handle response based on successful/unsuccessful arrays
+      if (response.data) {
+        const { successful = [], unsuccessful = [] } = response.data;
+        const successCount = successful.length;
+        const failCount = unsuccessful.length;
+
+        if (failCount > 0 && successCount > 0) {
+          // Partial success
+          $q.notify({
+            type: "warning",
+            message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+            timeout: 5000,
+          });
+        } else if (failCount > 0) {
+          // All failed
+          $q.notify({
+            type: "negative",
+            message: `Failed to delete ${failCount} alert(s)`,
+            timeout: 3000,
+          });
+        } else {
+          // All successful
+          $q.notify({
+            type: "positive",
+            message: `${successCount} alert(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+      } else {
+        // Fallback success message
+        $q.notify({
+          type: "positive",
+          message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+
+      selectedAlerts.value = [];
+      // Refresh alerts
+      await getAlertsFn(store, activeFolderId.value);
+
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
+    } catch (error: any) {
+      dismiss();
+
+      // Show error message from response if available
+      const errorMessage = error.response?.data?.message || error?.message || "Error deleting alerts. Please try again.";
+      if (error.response?.status != 403 || error?.status != 403) {
+        $q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 3000,
+        });
+      }
+    }
+
+    confirmBulkDelete.value = false;
+  };
 
     const openSREChat = (alert?: any) => {
       store.state.sreChatContext = {
@@ -2578,6 +2786,10 @@ export default defineComponent({
       computedName,
       computedOwner,
       tabs,
+      alertTabs,
+      viewMode,
+      onViewModeChange,
+      incidentSearchQuery,
       filterAlertsByTab,
       showHistoryDrawer,
       selectedHistoryAlertId,
@@ -2588,6 +2800,9 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      openBulkDeleteDialog,
+      bulkDeleteAlerts,
+      confirmBulkDelete,
       symOutlinedSoundSampler,
       openSREChat,
       config,
@@ -2597,6 +2812,75 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.view-mode-tabs {
+  display: flex;
+  gap: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 4px;
+
+  .view-tab-btn {
+    min-width: 32px;
+    min-height: 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+
+    &.active-tab {
+      background: var(--q-primary);
+      color: white;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+      .q-icon {
+        color: white;
+      }
+    }
+
+    &.inactive-tab {
+      color: rgba(0, 0, 0, 0.54);
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.04);
+      }
+
+      .q-icon {
+        color: rgba(0, 0, 0, 0.54);
+      }
+    }
+  }
+}
+
+.page-title {
+  color: rgba(0, 0, 0, 0.87);
+  line-height: 1.2;
+}
+
+// Dark mode support
+.body--dark {
+  .view-mode-tabs {
+    border-color: rgba(255, 255, 255, 0.12);
+
+    .view-tab-btn {
+      &.inactive-tab {
+        color: rgba(255, 255, 255, 0.7);
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        .q-icon {
+          color: rgba(255, 255, 255, 0.7);
+        }
+      }
+    }
+  }
+
+  .page-title {
+    color: rgba(255, 255, 255, 0.87);
+  }
+}
+
 .bottom-btn {
   display: flex;
   width: 100%;

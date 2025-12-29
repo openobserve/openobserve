@@ -161,6 +161,13 @@ const alerts = {
     const url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
     return http().post(url, data);
   },
+  bulkDelete: (org_identifier: string, data: any, folder_id?: string) => {
+    let url = `/api/v2/${org_identifier}/alerts/bulk`;
+    if (folder_id) {
+      url += `?folder=${folder_id}`;
+    }
+    return http().delete(url, { data });
+  },
   get_by_alert_id: (
     org_identifier: string,
     alert_id: string,
@@ -227,6 +234,15 @@ const alerts = {
       url += `?folder=${folder_id}`;
     }
     return http().patch(url);
+  },
+  generate_sql: (
+    org_identifier: string,
+    data: any,
+  ) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts/generate_sql`,
+      data,
+    );
   },
 };
 

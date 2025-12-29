@@ -30,6 +30,13 @@ vi.mock('@/services/segment_analytics', () => ({
   },
 }));
 
+// Mock jstransform service
+vi.mock('@/services/jstransform', () => ({
+  default: {
+    get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
+  },
+}));
+
 // Mock useStreams composable
 const mockGetStreams = vi.fn(() => Promise.resolve({
   list: [],

@@ -12,7 +12,7 @@ test.use({
   }
 });
 
-test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
+test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
     let loginPage, pipelinesEP, ingestionPage, pipelineDestinations;
 
     test.beforeEach(async ({ page }) => {
@@ -88,9 +88,8 @@ test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
         await pipelinesEP.importPipeline();
          //file name to be used for import
          const fileContentPathRealTimePipeline = "../test-data/pipelineRealTime.json";
-         // Locate the file input field and set the JSON file
-        const inputFile = await page.locator('input[type="file"]');
-        await inputFile.setInputFiles(fileContentPathRealTimePipeline);
+         // Set the JSON file using page object method
+        await pipelinesEP.setFileInput(fileContentPathRealTimePipeline);
         await page.waitForTimeout(5000);
         await pipelinesEP.importJsonButtonPipeline();
         await pipelinesEP.fillPipelineDetails(randomPipeline, randomFirstFunction, randomSecondFunction);
@@ -153,8 +152,7 @@ test.describe("Pipeline Import", { tag: '@enterprise' }, () => {
         await pipelinesEP.gotoPipelinesPageEP();
         await pipelinesEP.importPipeline();
         const fileContentPathScheduledPipeline = "../test-data/pipelineScheduled.json";
-        const inputFile = await page.locator('input[type="file"]');
-        await inputFile.setInputFiles(fileContentPathScheduledPipeline);
+        await pipelinesEP.setFileInput(fileContentPathScheduledPipeline);
         await page.waitForTimeout(5000);
         await pipelinesEP.importJsonButtonPipeline();
 

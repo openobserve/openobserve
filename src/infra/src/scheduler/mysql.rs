@@ -29,7 +29,7 @@ use super::{
 use crate::{
     db::{
         self, IndexStatement,
-        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
     data         LONGTEXT not null
 );
             "#,
@@ -80,15 +79,11 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
         .await?;
 
         // create data column for old version <= 0.10.9
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "information_schema.columns"])
-            .inc();
-        let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
-            .fetch_one(&pool)
-            .await?;
-        if has_data_column == 0 {
-            add_data_column().await?;
-        }
+        add_column("scheduled_jobs", "data", "LONGTEXT NOT NULL DEFAULT ''").await?;
+
+        // drop created_at column for old version <= 0.40.0
+        drop_column("scheduled_jobs", "created_at").await?;
+
         Ok(())
     }
 
@@ -927,22 +922,4 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
-}
-
-async fn add_data_column() -> Result<()> {
-    log::info!("[MYSQL] Adding data column to scheduled_jobs table");
-    let pool = CLIENT_DDL.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["alter", "scheduled_jobs"])
-        .inc();
-    if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
-        .execute(&pool)
-        .await
-        && !e.to_string().contains("Duplicate column name")
-    {
-        // Check for the specific MySQL error code for duplicate column
-        log::error!("[MYSQL] Unexpected error in adding column: {e}");
-        return Err(e.into());
-    }
-    Ok(())
 }
