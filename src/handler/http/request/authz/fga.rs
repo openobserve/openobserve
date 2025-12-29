@@ -276,11 +276,7 @@ pub async fn delete_role_bulk(
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
-pub async fn delete_role(
-    _path: web::Path<String>,
-    Headers(_user_email): Headers<UserEmail>,
-    _req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
+pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
@@ -1277,7 +1273,6 @@ mod tests {
             let req = test::TestRequest::delete()
                 .uri("/test_org/roles/test_role")
                 .to_request();
-
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 403); // Forbidden in non-enterprise
         }
