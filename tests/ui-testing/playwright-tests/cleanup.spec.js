@@ -177,6 +177,10 @@ test.describe("Pre-Test Cleanup", () => {
         /^alert_trigger_validation$/,                  // Alert trigger validation stream (self-referential POC)
         /^alert_val_[a-zA-Z0-9]+$/,                    // Unique validation streams per test (alert_val_<suffix>)
         /^severity_test_\d+$/,                         // Severity test streams (severity_test_<timestamp>)
+        /^alert_e2e_/,                                 // Alert e2e test streams (alert_e2e_*)
+        /^alert_import_/,                              // Alert import test streams (alert_import_*)
+        /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
+        /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/                     // Auto playwright stream
       ],
