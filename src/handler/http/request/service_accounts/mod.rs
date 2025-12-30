@@ -73,7 +73,7 @@ pub async fn list(
 ) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let org_id = org_id.into_inner();
@@ -144,7 +144,7 @@ pub async fn save(
 ) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let org_id = org_id.into_inner();
@@ -200,7 +200,7 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let (org_id, email_id) = params.into_inner();
@@ -291,7 +291,7 @@ pub async fn delete(
 ) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let (org_id, email_id) = path.into_inner();
@@ -328,7 +328,7 @@ pub async fn delete_bulk(
 ) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let org_id = path.into_inner();
@@ -411,7 +411,7 @@ pub async fn delete_bulk(
 pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
-        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Supported"));
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let (org, user_id) = path.into_inner();
