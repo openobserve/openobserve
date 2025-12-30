@@ -708,8 +708,9 @@ export class SanityPage {
 
         // Click the input to open/focus the dropdown
         await streamSelectInput.click();
-        // Wait for dropdown menu to appear instead of fixed delay
-        await this.page.waitForSelector('.q-menu', { state: 'visible', timeout: 10000 });
+        // Wait for any stream toggle to appear (indicates dropdown has opened and populated)
+        // Using data-test attribute with starts-with selector for robustness
+        await this.page.waitForSelector('[data-test^="log-search-index-list-stream-toggle-"]', { state: 'visible', timeout: 10000 });
 
         // Fill the input to filter streams - this is critical for finding the stream quickly
         await streamSelectInput.fill('e2e_automate');
