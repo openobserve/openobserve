@@ -19,7 +19,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
 
     test('4.1: Global variable commit updates URL with var-name format', async ({ page }) => {
         await dashboardPage.createDashboard();
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_g', 'constant', null, null, null, false, null, false, 'global');
         await variables.selectValueFromScopedVariable('v_g', 'val1', 'global');
         await dashboardPage.clickGlobalRefresh();
@@ -33,7 +33,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
         const tabDataTest = await tabNameLocator.getAttribute('data-test');
         const tabId = tabDataTest.match(/dashboard-tab-(.+)-name/)[1];
 
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_t', 'constant', null, null, null, false, null, false, 'tabs', ['Tab_A']);
         await tabs.switchTab('Tab_A');
         await variables.selectValueFromScopedVariable('v_t', 'val2', 'tabs');
@@ -44,7 +44,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
     test('4.3: Panel-scoped variable commit updates URL with name.p.panelId format', async ({ page }) => {
         await dashboardPage.createDashboard();
         const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_p', 'constant', null, null, null, false, null, false, 'panels', [], [panel1Id]);
         await variables.selectValueFromScopedVariable('v_p', 'val3', 'panels', panel1Id);
         await dashboardPage.clickPanelRefresh(panel1Id);
@@ -53,7 +53,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
 
     test('4.4: Multi-select URL encoding (Commas)', async ({ page }) => {
         await dashboardPage.createDashboard();
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_m', 'query_values', 'logs', 'e2e_automate', 'level', true);
         
         await page.locator('[data-test="dashboard-variable-v_m-container"]').click();
@@ -74,7 +74,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
         const tabDataTest = await tabNameLocator.getAttribute('data-test');
         const tabId = tabDataTest.match(/dashboard-tab-(.+)-name/)[1];
 
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_g', 'constant', null, null, null, false, null, false, 'global');
         await variables.addDashboardVariable('v_t', 'constant', null, null, null, false, null, false, 'tabs', ['Tab_X']);
         await variables.addDashboardVariable('v_p', 'constant', null, null, null, false, null, false, 'panels', ['Tab_X'], [panel1Id]);
@@ -90,7 +90,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
 
     test('4.6: Special character encoding in URL', async ({ page }) => {
         await dashboardPage.createDashboard();
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('v_spec', 'constant', null, null, null);
         
         await variables.selectValueFromScopedVariable('v_spec', 'val with space!', 'global');
@@ -104,7 +104,7 @@ test.describe('Dashboard Variables: URL Synchronization', () => {
         await dashboardPage.createDashboard();
         const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
         await tabs.addTab('Tab_Y');
-        await page.locator('[data-test="dashboard-settings-btn"]').click();
+        await page.locator('[data-test="dashboard-setting-btn"]').click();
         await variables.addDashboardVariable('status', 'constant', null, null, null, false, null, false, 'global');
         await variables.addDashboardVariable('status', 'constant', null, null, null, false, null, false, 'tabs', ['Tab_Y']);
         await variables.addDashboardVariable('status', 'constant', null, null, null, false, null, false, 'panels', ['Tab_Y'], [panel1Id]);

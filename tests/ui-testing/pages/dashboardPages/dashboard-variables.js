@@ -35,7 +35,7 @@ export default class DashboardVariables {
     await variableTab.click();
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:5000});
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({timeout:5000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type
@@ -357,7 +357,7 @@ export default class DashboardVariables {
   async selectValueFromScopedVariable(name, value, scope = 'global', targetId = null) {
     const selector = this.page.locator(`[data-test="variable-selector-${name}"]`).first();
     await selector.scrollIntoViewIfNeeded();
-    
+
     // Check if it's a q-input or q-select (VariableQueryValueSelector uses q-select)
     const input = selector.locator('input');
     await input.click();
@@ -366,5 +366,206 @@ export default class DashboardVariables {
     const option = this.page.getByRole("option", { name: value, exact: true });
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
+  }
+
+  // Method to check if variable API was called
+  async waitForVariableApiCall(fieldName, timeout = 10000) {
+    return await this.page.waitForResponse(
+      response => response.url().includes('/_values') && response.url().includes(fieldName),
+      { timeout }
+    );
+  }
+
+  // Method to track multiple API calls for dependencies
+  setupApiTracking() {
+    const apiCalls = [];
+    this.page.on('response', async (response) => {
+      if (response.url().includes('/_values')) {
+        apiCalls.push({
+          url: response.url(),
+          status: response.status(),
+          timestamp: Date.now()
+        });
+      }
+    });
+    return apiCalls;
+  }
+
+  // Method to verify variable is visible in specific scope
+  async verifyVariableVisibleInScope(name, scope = 'global', targetId = null) {
+    let locator;
+    if (scope === 'global') {
+      locator = this.page.locator('[data-test="global-variables-selector"]').locator(`[data-test="dashboard-variable-${name}-container"]`);
+    } else if (scope === 'tab') {
+      locator = this.page.locator('[data-test="tab-variables-selector"]').locator(`[data-test="dashboard-variable-${name}-container"]`);
+    } else if (scope === 'panel') {
+      locator = this.page.locator(`[data-test-panel-id="${targetId}"]`).locator(`[data-test="dashboard-variable-${name}-container"]`);
+    }
+    await expect(locator).toBeVisible({ timeout: 10000 });
+  }
+
+  // Method to verify variable is NOT visible
+  async verifyVariableNotVisible(name, scope = 'global', targetId = null) {
+    let locator;
+    if (scope === 'global') {
+      locator = this.page.locator('[data-test="global-variables-selector"]').locator(`[data-test="dashboard-variable-${name}-container"]`);
+    } else if (scope === 'tab') {
+      locator = this.page.locator('[data-test="tab-variables-selector"]').locator(`[data-test="dashboard-variable-${name}-container"]`);
+    } else if (scope === 'panel') {
+      locator = this.page.locator(`[data-test-panel-id="${targetId}"]`).locator(`[data-test="dashboard-variable-${name}-container"]`);
+    }
+    await expect(locator).not.toBeVisible();
+  }
+
+  // Method to get variable value from UI
+  async getVariableValue(name, scope = 'global', targetId = null) {
+    let locator;
+    if (scope === 'global') {
+      locator = this.page.locator('[data-test="global-variables-selector"]').locator(`[data-test="variable-selector-${name}"]`);
+    } else if (scope === 'tab') {
+      locator = this.page.locator('[data-test="tab-variables-selector"]').locator(`[data-test="variable-selector-${name}"]`);
+    } else if (scope === 'panel') {
+      locator = this.page.locator(`[data-test-panel-id="${targetId}"]`).locator(`[data-test="variable-selector-${name}"]`);
+    }
+    const input = locator.locator('input');
+    return await input.inputValue();
+  }
+
+  // Method to check if global refresh indicator is visible
+  async verifyGlobalRefreshIndicator(shouldBeVisible = true) {
+    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+    if (shouldBeVisible) {
+      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
+    } else {
+      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
+    }
+  }
+
+  // Method to verify panel refresh indicator
+  async verifyPanelRefreshIndicator(panelId, shouldBeVisible = true) {
+    const panel = this.page.locator(`[data-test-panel-id="${panelId}"]`);
+    const refreshBtn = panel.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    if (shouldBeVisible) {
+      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
+    } else {
+      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
+    }
+  }
+
+  // Method to verify circular dependency error
+  async verifyCircularDependencyError() {
+    const errorText = this.page.locator('text=/Variables has cycle|Circular dependency detected/i');
+    await expect(errorText).toBeVisible({ timeout: 5000 });
+  }
+
+  // Method to verify variable loading error
+  async verifyVariableError(name, scope = 'global', targetId = null) {
+    let prefix = '';
+    if (scope === 'panel') prefix = `panel-${targetId}-`;
+
+    const errorIndicator = this.page.locator(`[data-test="${prefix}variable-${name}-error"]`);
+    await expect(errorIndicator).toBeVisible({ timeout: 10000 });
+  }
+
+  // Method to check URL contains variable value
+  async verifyVariableInUrl(varName, value, scope = 'global', targetId = null) {
+    const url = this.page.url();
+    let expectedPattern;
+
+    if (scope === 'global') {
+      expectedPattern = `v-${varName}=${value}`;
+    } else if (scope === 'tab') {
+      expectedPattern = `v-${varName}.t.${targetId}=${value}`;
+    } else if (scope === 'panel') {
+      expectedPattern = `v-${varName}.p.${targetId}=${value}`;
+    }
+
+    expect(url).toContain(expectedPattern);
+  }
+
+  // Method to delete a variable
+  async deleteVariable(name) {
+    await this.page.locator('[data-test="dashboard-setting-btn"]').click();
+    await this.page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+
+    const variableRow = this.page.locator(`[data-test="dashboard-variable-settings-draggable-row"]:has-text("${name}")`);
+    await variableRow.locator('[data-test="dashboard-variable-settings-delete-btn"]').click();
+
+    await this.page.locator('[data-test="confirm-button"]').click();
+    await this.page.locator('[data-test="dashboard-settings-close-btn"]').click();
+  }
+
+  // Method to edit a variable
+  async editVariable(name, updates = {}) {
+    await this.page.locator('[data-test="dashboard-setting-btn"]').click();
+    await this.page.locator('[data-test="dashboard-settings-variable-tab"]').click();
+
+    const variableRow = this.page.locator(`[data-test="dashboard-variable-settings-draggable-row"]:has-text("${name}")`);
+    await variableRow.locator('[data-test="dashboard-variable-settings-edit-btn"]').click();
+
+    // Apply updates as needed
+    if (updates.filterConfig) {
+      await this.page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+      const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
+      await filterNameSelector.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameSelector.click();
+      await filterNameSelector.fill(updates.filterConfig.filterName);
+
+      const filterNameOption = this.page.getByRole("option", { name: updates.filterConfig.filterName });
+      await filterNameOption.waitFor({ state: "visible", timeout: 10000 });
+      await filterNameOption.click();
+
+      const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
+      await operatorSelector.waitFor({ state: "visible", timeout: 10000 });
+      await operatorSelector.click();
+
+      const operatorOption = this.page.getByRole("option", { name: updates.filterConfig.operator, exact: true }).locator("div").nth(2);
+      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
+      await operatorOption.click();
+
+      const autoComplete = this.page.locator('[data-test="common-auto-complete"]');
+      await autoComplete.waitFor({ state: "visible", timeout: 10000 });
+      await autoComplete.click();
+      await autoComplete.fill(updates.filterConfig.value);
+    }
+
+    await this.page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  // Method to verify dependent variables in filter dropdown
+  async verifyDependentVariablesInFilter(expectedVars = [], notExpectedVars = []) {
+    await this.page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+    const filterValueInput = this.page.locator('input[placeholder="Enter Value"]');
+    await filterValueInput.fill('$');
+    await this.page.waitForTimeout(500);
+
+    for (const varName of expectedVars) {
+      await expect(this.page.getByRole('option', { name: varName })).toBeVisible();
+    }
+
+    for (const varName of notExpectedVars) {
+      await expect(this.page.getByRole('option', { name: varName })).not.toBeVisible();
+    }
+  }
+
+  // Method to wait for variable to finish loading
+  async waitForVariableLoaded(name, scope = 'global', targetId = null, timeout = 15000) {
+    let prefix = '';
+    if (scope === 'panel') prefix = `panel-${targetId}-`;
+
+    const loadedIndicator = this.page.locator(`[data-test="${prefix}variable-${name}-loaded"]`);
+    await loadedIndicator.waitFor({ state: "visible", timeout });
+  }
+
+  // Method to verify lazy loading (panel variable should not load until visible)
+  async verifyPanelVariableNotLoadedYet(panelId, apiCallsArray) {
+    // Check that no API calls were made for this panel's variables
+    const panelVariableCalls = apiCallsArray.filter(call =>
+      call.url.includes('panel') && call.url.includes(panelId)
+    );
+    expect(panelVariableCalls.length).toBe(0);
   }
 }

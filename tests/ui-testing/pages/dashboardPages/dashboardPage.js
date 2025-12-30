@@ -333,6 +333,15 @@ export class DashboardPage {
     await this.page.locator('[data-test="dashboard-refresh-btn"]').click();
   }
 
+  async verifyGlobalRefreshIndicator(shouldBeVisible = true) {
+    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+    if (shouldBeVisible) {
+      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
+    } else {
+      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
+    }
+  }
+
   async verifyPanelRefreshIndicator(panelId, visible = true) {
     const panel = this.page.locator(`[data-test-panel-id="${panelId}"]`);
     const refreshBtn = panel.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
@@ -347,6 +356,21 @@ export class DashboardPage {
   async clickPanelRefresh(panelId) {
     const panel = this.page.locator(`[data-test-panel-id="${panelId}"]`);
     await panel.locator('[data-test="dashboard-panel-refresh-panel-btn"]').click();
+  }
+
+  async getPanelId(panelIndex = 0) {
+    const panels = await this.page.locator('[data-test-panel-id]').all();
+    if (panels.length > panelIndex) {
+      return await panels[panelIndex].getAttribute('data-test-panel-id');
+    }
+    return null;
+  }
+
+  async addPanel(panelName = null) {
+    await this.page.locator('[data-test="dashboard-add-panel-btn"]').click();
+    if (panelName) {
+      await this.page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
+    }
   }
 }
 
