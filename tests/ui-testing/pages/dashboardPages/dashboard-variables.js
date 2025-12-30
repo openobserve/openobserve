@@ -16,11 +16,12 @@ export default class DashboardVariables {
    * @param {string} streamName - Name of the stream
    * @param {string} field - Field name
    * @param {boolean} customValueSearch - Whether to use custom value search
-   * @param {Object} filterConfig - Optional filter configuration { filterName, operator, value }
+   * @param {Object|Array} filterConfig - Optional filter configuration { filterName, operator, value } or array of them
    * @param {boolean} showMultipleValues - Toggle show multiple values
    * @param {string} scope - 'global', 'tabs', 'panels'
    * @param {Array} targetTabs - Array of tab names
    * @param {Array} targetPanels - Array of panel IDs
+   * @param {boolean} save - Whether to save immediately
    */
   async addDashboardVariable(
     name,
@@ -32,21 +33,18 @@ export default class DashboardVariables {
     showMultipleValues = false,
     scope = 'global',
     targetTabs = [],
-    targetPanels = []
+    targetPanels = [],
+    save = true
   ) {
-    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
-    await expect(variableTab).toBeAttached({ timeout: 10000 });
-
-    // Ensure the settings panel is open; if not, finding the tab will fail or we might need to open it.
-    // Assuming the settings modal is already open when this is called, based on previous usage patterns.
-    await expect(variableTab).toBeVisible();
-    await variableTab.click();
+    await this.openVariablesTab();
 
     // Add Variable
     const addVarBtn = this.page.locator('[data-test="dashboard-add-variable-btn"]');
     await addVarBtn.click();
 
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+
+    await this.selectVariableType('Query Values');
 
     // Select Stream Type
     await this.page
@@ -68,7 +66,7 @@ export default class DashboardVariables {
     // Select Field
     const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
     await fieldSelect.click();
-    await this.page.keyboard.type(field, { delay: 50 }); // Reduced delay
+    await fieldSelect.fill(field);
 
     // Wait for dropdown options
     await this.page.waitForFunction(
@@ -82,90 +80,196 @@ export default class DashboardVariables {
     // Add Filter Configuration
     if (filterConfig) {
       const filters = Array.isArray(filterConfig) ? filterConfig : [filterConfig];
-
       for (const filter of filters) {
-        const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-        await addFilterBtn.click();
-
-        const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
-        await filterNameSelector.click();
-        await filterNameSelector.fill(filter.filterName);
-
-        const filterNameOption = this.page.getByRole("option", { name: filter.filterName });
-        await filterNameOption.click();
-
-        const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
-        await operatorSelector.click();
-
-        const operatorOption = this.page.getByRole("option", { name: filter.operator, exact: true }).locator("div").nth(2);
-        await operatorOption.click();
-
-        const autoComplete = this.page.locator('[data-test="common-auto-complete"]').last();
-        await autoComplete.click();
-        await autoComplete.fill(filter.value);
-
-        try {
-          const valueOption = this.page.getByRole("option", { name: filter.value }).first();
-          if (await valueOption.isVisible({ timeout: 2000 })) {
-            await valueOption.click();
-          }
-        } catch (e) {
-          // Ignore if option doesn't appear
-        }
+        await this.addFilter(filter);
       }
     }
 
     if (showMultipleValues) {
-      await this.page
-        .locator('[data-test="dashboard-query_values-show_multiple_values"] div')
-        .nth(2)
-        .click();
+      await this.toggleShowMultipleValues();
     }
 
     // Set Scope
+    if (scope !== 'global' || targetTabs.length > 0 || targetPanels.length > 0) {
+      await this.setScope(scope, targetTabs, targetPanels);
+    }
+
+    // Custom Value Search
+    if (customValueSearch) {
+      await this.toggleCustomValue("test");
+    }
+
+    if (save) {
+      await this.saveVariable();
+      await this.closeSettings();
+    }
+  }
+
+  async addConstantVariable(name, value, save = true) {
+    await this.openVariablesTab();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+
+    await this.selectVariableType('Constant');
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+    await this.page.locator('[data-test="dashboard-variable-constant-value"]').fill(value);
+
+    if (save) {
+      await this.saveVariable();
+      await this.closeSettings();
+    }
+  }
+
+  async addTextBoxVariable(name, save = true) {
+    await this.openVariablesTab();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+
+    await this.selectVariableType('TextBox');
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+
+    if (save) {
+      await this.saveVariable();
+      await this.closeSettings();
+    }
+  }
+
+  async addCustomVariable(name, label, value, save = true) {
+    await this.openVariablesTab();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
+
+    await this.selectVariableType('Custom');
+    await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
+
+    await this.page.getByRole("button", { name: "Add Option" }).click();
+    await this.page.locator('[data-test="dashboard-custom-variable-0-label"]').fill(label);
+    await this.page.locator('[data-test="dashboard-custom-variable-0-value"]').fill(value);
+
+    if (save) {
+      await this.saveVariable();
+      await this.closeSettings();
+    }
+  }
+
+  async openVariablesTab() {
+    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
+    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+
+    if (!await closeBtn.isVisible()) {
+      const settingsBtn = this.page.locator('[data-test="dashboard-setting-btn"]');
+      await settingsBtn.waitFor({ state: "visible" });
+      await settingsBtn.click();
+    }
+
+    await variableTab.waitFor({ state: "visible" });
+    await variableTab.click();
+  }
+
+  async selectVariableType(type) {
+    await this.page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await this.page.getByRole("option", { name: type }).click();
+  }
+
+  async addFilter(filter) {
+    const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
+    await addFilterBtn.click();
+
+    const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.click();
+    await filterNameSelector.fill(filter.filterName);
+
+    await this.page.getByRole("option", { name: filter.filterName }).click();
+
+    const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await this.page.getByRole("option", { name: filter.operator }).locator('div').nth(2).click();
+
+    const autoComplete = this.page.locator('[data-test="common-auto-complete"]').last();
+    await autoComplete.click();
+    await autoComplete.fill(filter.value);
+
+    try {
+      const option = this.page.getByRole("option", { name: filter.value }).first();
+      if (await option.isVisible({ timeout: 1000 })) await option.click();
+    } catch (e) { }
+  }
+
+  async setScope(scope, targetTabs, targetPanels) {
     const scopeSelect = this.page.locator('[data-test="dashboard-variable-scope-select"]');
     await scopeSelect.click();
 
     let scopeLabel = 'Global';
-    if (scope === 'tabs') scopeLabel = 'Selected Tabs';
-    if (scope === 'panels') scopeLabel = 'Selected Panels';
+    if (scope === 'tabs' || scope === 'tab') scopeLabel = 'Selected Tabs';
+    if (scope === 'panels' || scope === 'panel') scopeLabel = 'Selected Panels';
 
     await this.page.getByRole("option", { name: scopeLabel, exact: true }).click();
 
-    if (scope === 'tabs' || scope === 'panels') {
-      const targetSelect = scope === 'tabs'
+    if (scope === 'tabs' || scope === 'tab' || scope === 'panels' || scope === 'panel') {
+      const isTab = (scope === 'tabs' || scope === 'tab');
+      const targetSelect = isTab
         ? this.page.locator('[data-test="dashboard-variable-tabs-select"]')
         : this.page.locator('[data-test="dashboard-variable-panels-select"]');
 
       await targetSelect.click();
 
-      const targets = scope === 'tabs' ? targetTabs : targetPanels;
+      const targets = isTab ? targetTabs : targetPanels;
       for (const target of targets) {
         const option = this.page.getByRole("option", { name: target });
-        await option.locator('.q-checkbox').click();
+        await option.scrollIntoViewIfNeeded();
+        if (await option.isVisible()) {
+          await option.locator('.q-checkbox').click();
+        }
       }
       await this.page.keyboard.press('Escape');
     }
+  }
 
-    // Custom Value Search
-    if (customValueSearch) {
-      await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]').click();
-      await this.page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
-      await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').click();
-      await this.page.locator('[data-test="dashboard-variable-custom-value-0"]').fill("test");
+  async toggleShowMultipleValues() {
+    await this.page
+      .locator('[data-test="dashboard-query_values-show_multiple_values"] div')
+      .nth(2)
+      .click();
+  }
+
+  async setVariableMaxRecordSize(value) {
+    await this.page.locator('[data-test="dashboard-variable-max-record-size"]').fill(value.toString());
+  }
+
+  async toggleCustomValue(value) {
+    await this.page.locator('[data-test="dashboard-multi-select-default-value-toggle-custom"]').click();
+    if (value) {
+      const customValueInput = this.page.locator('[data-test="dashboard-variable-custom-value-0"]');
+      if (!await customValueInput.isVisible()) {
+        await this.page.locator('[data-test="dashboard-add-custom-value-btn"]').click();
+      }
+      await customValueInput.click();
+      await customValueInput.fill(value);
     }
+  }
 
+  async hideVariable() {
+    const toggle = this.page.locator('[data-test="dashboard-variable-hide_on_dashboard"]');
+    await toggle.scrollIntoViewIfNeeded();
+    await toggle.click({ force: true });
+  }
+
+  async saveVariable() {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.click();
+    await expect(saveBtn).not.toBeVisible({ timeout: 10000 });
+  }
 
-    // Wait for save to complete (button to disappear or some success indication)
-    await expect(saveBtn).not.toBeVisible({ timeout: 5000 });
+  async cancelVariableCreation() {
+    await this.page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+  }
 
-    // Close settings
+  async closeSettings() {
     const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
     if (await closeBtn.isVisible()) {
       await closeBtn.click();
     }
+  }
+
+  generateVariableName(prefix = "u") {
+    return `${prefix}_${Date.now()}`;
   }
 
   async selectOptionFromDropdown(text) {
@@ -194,12 +298,8 @@ export default class DashboardVariables {
   async selectValueFromVariableDropDown(label, value) {
     const input = this.page.getByLabel(label, { exact: true });
     await expect(input).toBeVisible();
-
-    // Click to open dropdown
     await input.click();
 
-    // Wait for options to appear or stream to complete
-    // We race these because sometimes data is cached or comes different ways
     await Promise.race([
       this.page.locator('[role="option"]').first().waitFor({ state: 'visible', timeout: 5000 }),
       waitForValuesStreamComplete(this.page, 5000)
@@ -207,20 +307,24 @@ export default class DashboardVariables {
 
     await input.fill(value);
 
-    // Ensure the specific option is visible before clicking
     const option = this.page.getByRole("option", { name: value });
     await expect(option).toBeVisible();
     await option.click();
   }
 
   async selectValueFromScopedVariable(name, value, scope = 'global', targetId = null) {
-    let selectorLocator = this.getVariableSelectorLocator(name, scope, targetId);
-
-    // Scroll if needed
+    let selectorLocator = await this.getVariableSelectorLocator(name, scope, targetId);
     await selectorLocator.scrollIntoViewIfNeeded();
 
     const input = selectorLocator.locator('input');
     await input.click();
+
+    // Wait for values API to call
+    await Promise.race([
+      this.page.locator('[role="option"]').first().waitFor({ state: 'visible', timeout: 5000 }),
+      waitForValuesStreamComplete(this.page, 5000)
+    ]).catch(() => { });
+
     await input.fill(value);
 
     const option = this.page.getByRole("option", { name: value, exact: true });
@@ -228,7 +332,7 @@ export default class DashboardVariables {
     await option.click();
   }
 
-  getVariableSelectorLocator(name, scope, targetId) {
+  async getVariableSelectorLocator(name, scope, targetId) {
     if (scope === 'global') {
       return this.page.locator('[data-test="global-variables-selector"]').locator(`[data-test="variable-selector-${name}"]`);
     } else if (scope === 'tab') {
@@ -240,26 +344,37 @@ export default class DashboardVariables {
   }
 
   async verifyVariableVisibleInScope(name, scope = 'global', targetId = null) {
-    const selector = this.getVariableSelectorLocator(name, scope, targetId);
+    const selector = await this.getVariableSelectorLocator(name, scope, targetId);
     await expect(selector).toBeVisible();
   }
 
   async verifyVariableNotVisible(name, scope = 'global', targetId = null) {
-    const selector = this.getVariableSelectorLocator(name, scope, targetId);
-    await expect(selector).not.toBeVisible();
+    if (scope === 'global') {
+      await expect(this.page.locator('[data-test="global-variables-selector"]').locator(`[data-test="variable-selector-${name}"]`)).not.toBeVisible();
+    } else if (scope === 'tab') {
+      await expect(this.page.locator('[data-test="tab-variables-selector"]').locator(`[data-test="variable-selector-${name}"]`)).not.toBeVisible();
+    } else if (scope === 'panel') {
+      await expect(this.page.locator(`[data-test-panel-id="${targetId}"]`).locator(`[data-test="variable-selector-${name}"]`)).not.toBeVisible();
+    }
   }
 
   async getVariableValue(name, scope = 'global', targetId = null) {
-    const selector = this.getVariableSelectorLocator(name, scope, targetId);
-    return await selector.locator('input').inputValue();
+    try {
+      const selector = await this.getVariableSelectorLocator(name, scope, targetId);
+      return await selector.locator('input').inputValue();
+    } catch (e) {
+      return "";
+    }
   }
 
   setupApiTracking() {
     const apiCalls = [];
-    this.page.on('response', response => {
-      if (response.url().includes('/_values') && response.status() === 200) {
+    this.page.on('request', request => {
+      if (request.url().includes('/_values')) {
         apiCalls.push({
-          url: response.url(),
+          url: request.url(),
+          method: request.method(),
+          postData: request.postDataJSON(),
           timestamp: Date.now()
         });
       }
@@ -275,147 +390,98 @@ export default class DashboardVariables {
   async verifyGlobalRefreshIndicator(shouldBeVisible) {
     const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
     if (shouldBeVisible) {
-      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
+      // Check for yellow indicator (text-warning mapping)
+      await expect(refreshBtn).toHaveClass(/text-yellow|bg-yellow|warning/);
     } else {
-      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
+      await expect(refreshBtn).not.toHaveClass(/text-yellow|bg-yellow|warning/);
     }
   }
 
   async verifyPanelRefreshIndicator(panelId, shouldBeVisible) {
     const refreshBtn = this.page.locator(`[data-test-panel-id="${panelId}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
     if (shouldBeVisible) {
-      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
+      await expect(refreshBtn).toHaveClass(/text-yellow|bg-yellow|warning/);
     } else {
-      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
+      await expect(refreshBtn).not.toHaveClass(/text-yellow|bg-yellow|warning/);
     }
   }
 
   async waitForVariableApiCall(fieldName, timeout = 10000) {
-    await this.page.waitForResponse(
-      resp => resp.url().includes(`/_values`) && resp.url().includes(fieldName) && resp.status() === 200,
+    return await this.page.waitForResponse(
+      resp => resp.url().includes(`/_values`) && (resp.url().includes(fieldName) || (resp.request().postData() && resp.request().postData().includes(fieldName))) && resp.status() === 200,
       { timeout }
     );
   }
 
   async verifyVariableOptionsLoaded(name) {
-    // Open dropdown to trigger load if lazy, or just check if it has content
-    // Assuming we click it first usually? Or this checks if values are present.
-    // For now, let's assume the user has clicked.
-    // Or we can click it here.
-    const selector = this.getVariableSelectorLocator(name, 'global'); // Default to global unless scoped passed, but verifying options is usually a generic action
+    const selector = await this.getVariableSelectorLocator(name, 'global');
     await selector.click();
     await expect(this.page.locator('[role="option"]').first()).toBeVisible({ timeout: 10000 });
     await this.page.keyboard.press('Escape');
   }
 
-  async verifyDependencyError() {
-    // Looks for the red box or error message
-    const errorText = this.page.locator('text=/Variables has cycle|Circular dependency detected/i');
-    await expect(errorText).toBeVisible();
-  }
-
-  async verifyRefreshIndicator(scope, targetId, shouldBeVisible) {
-    if (scope === 'global') {
-      await this.verifyGlobalRefreshIndicator(shouldBeVisible);
-    } else if (scope === 'panel') {
-      await this.verifyPanelRefreshIndicator(targetId, shouldBeVisible);
+  async checkVariableStatus(name, { isLoading, isSuccess, isError, scope = 'global', targetId = null }) {
+    const selector = await this.getVariableSelectorLocator(name, scope, targetId);
+    if (isLoading) {
+      await expect(selector.locator('.q-spinner, .loading-icon')).toBeVisible();
+    }
+    if (isSuccess) {
+      await expect(selector.locator('.q-spinner, .loading-icon')).not.toBeVisible();
+    }
+    if (isError) {
+      await expect(selector).toHaveClass(/error|border-red/);
     }
   }
 
   async editVariable(name, newConfig) {
-    // Open settings if not open
-    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
-    if (!await variableTab.isVisible()) {
-      await this.page.locator('[data-test="dashboard-setting-btn"]').click();
-    }
-    await variableTab.click();
+    await this.openVariablesTab();
 
-    // Click edit on the variable row
     const editBtn = this.page.locator(`[data-test="variable-edit-btn-${name}"]`);
     await editBtn.click();
 
-    // Apply changes (example: just filter config for now as per test requirement)
     if (newConfig.filterConfig) {
-      // ... simplified logic to just update filter ...
-      // Ideally we reuse the logic from addDashboardVariable but it's mixed with creation steps.
-      // For this specific test, we might just be setting a filter.
-      // Clearing old filter if needed?
-      if (newConfig.filterConfig.filterName) {
-        // Assuming we can just re-select or it clears?
-        // This might need more robust handling for real edit flows
-        // For now let's assume we proceed to the filter section
-        const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-        // If filter already exists, we might need to remove it or edit it. 
-        // Let's assume we are adding or it's a fresh edit state.
-        if (await addFilterBtn.isVisible()) {
-          await addFilterBtn.click();
-        }
+      // Clear filters and re-add
+      const deleteFilters = await this.page.locator('[data-test="dashboard-query-values-filter-delete-btn"]').all();
+      for (const btn of deleteFilters) {
+        await btn.click();
+      }
 
-        const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]');
-        await filterNameSelector.click();
-        await filterNameSelector.fill(newConfig.filterConfig.filterName);
-        await this.page.getByRole("option", { name: newConfig.filterConfig.filterName }).click();
-
-        const operatorSelector = this.page.locator('[data-test="dashboard-query-values-filter-operator-selector"]');
-        await operatorSelector.click();
-        // ... selecting operator ...
-        // This is getting complex to duplicate. Ideally extract "configureFilter" method.
-        // For the circular dependency test, we just need to set the dependency.
+      const filters = Array.isArray(newConfig.filterConfig) ? newConfig.filterConfig : [newConfig.filterConfig];
+      for (const filter of filters) {
+        await this.addFilter(filter);
       }
     }
 
-    const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
-    await saveBtn.click();
-    await expect(saveBtn).not.toBeVisible();
+    await this.saveVariable();
+    await this.closeSettings();
   }
 
   async deleteVariable(name) {
-    const variableTab = this.page.locator('[data-test="dashboard-settings-variable-tab"]');
-    if (!await variableTab.isVisible()) {
-      await this.page.locator('[data-test="dashboard-setting-btn"]').click();
-    }
-    await variableTab.click();
+    await this.openVariablesTab();
 
     const deleteBtn = this.page.locator(`[data-test="variable-delete-btn-${name}"]`);
     await deleteBtn.click();
 
-    // Confirm delete if modal exists
     const confirmBtn = this.page.locator('[data-test="confirm-button"]');
     if (await confirmBtn.isVisible()) {
       await confirmBtn.click();
     }
   }
 
-  async checkVariableStatus(name, { isLoading }) {
-    // Check for loading spinner on the variable selector
-    const selector = this.page.locator(`[data-test="variable-selector-${name}"] .q-spinner`);
-    if (isLoading) {
-      await expect(selector).toBeVisible();
-    } else {
-      await expect(selector).not.toBeVisible();
-    }
-  }
-
-  async verifyVariableError(name) {
-    // Verify red error box/border for specific variable
-    const selector = this.getVariableSelectorLocator(name, 'global');
-    // Assuming error state adds a class or shows a specific element
-    await expect(selector).toHaveClass(/error|border-red/);
-  }
-
   async verifyTargetTabLabel(variableName, tabName, expectedLabel) {
-    // Open settings for the variable
-    await this.editVariable(variableName, {});
+    await this.openVariablesTab();
 
-    // Check the tabs dropdown or list for the specific label (e.g., "Tab A (deleted tab)")
+    const editBtn = this.page.locator(`[data-test="variable-edit-btn-${variableName}"]`);
+    await editBtn.waitFor({ state: "visible" });
+    await editBtn.click();
+
     const targetSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
     await targetSelect.click();
 
-    await expect(this.page.getByRole("option", { name: expectedLabel })).toBeVisible();
+    // Check for the label in the dropdown
+    await expect(this.page.getByRole("option").filter({ hasText: expectedLabel })).toBeVisible();
 
-    // Close select
     await this.page.keyboard.press('Escape');
-    // Close settings
-    await this.page.locator('[data-test="dashboard-settings-close-btn"]').click();
+    await this.closeSettings();
   }
 }

@@ -16,6 +16,7 @@ import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import DashboardTabs from "./dashboardPages/dashboard-tabs";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
@@ -87,6 +88,7 @@ class PageManager {
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.dashboardTabs = new DashboardTabs(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
@@ -139,4 +141,5 @@ class PageManager {
   }
 }
 
+PageManager.default = PageManager;
 module.exports = PageManager;
