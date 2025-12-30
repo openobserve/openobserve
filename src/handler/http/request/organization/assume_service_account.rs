@@ -17,7 +17,7 @@
 use actix_web::{HttpResponse, post, web};
 // Re-export shared types from config crate for OpenAPI
 #[cfg(feature = "enterprise")]
-pub use config::meta::session::{AssumeRoleRequest, AssumeRoleResponse};
+pub use config::meta::session::{AssumeServiceAccountRequest, AssumeServiceAccountResponse};
 
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -28,26 +28,26 @@ use crate::{
     handler::http::extractors::Headers,
 };
 
-/// Assume a role in a target organization
+/// Assume a service account in a target organization
 ///
 /// This endpoint allows meta service accounts to obtain temporary session tokens
-/// for accessing a target organization with a specific role. The session automatically
-/// expires after the specified duration.
+/// for accessing a target organization as a specific service account. The session
+/// automatically expires after the specified duration.
 ///
 /// # Security
 /// - Only meta service accounts can call this endpoint
 /// - The service account must exist in both _meta and target organization
-/// - The service account must have the requested role in the target organization
+/// - The service account must have the appropriate role in the target organization
 /// - Maximum session duration is capped at 24 hours
 ///
 /// # Example
 /// ```bash
-/// curl -X POST http://localhost:5080/api/_meta/assume_role \
+/// curl -X POST http://localhost:5080/api/_meta/assume_service_account \
 ///   -H "Authorization: Bearer <meta_sa_token>" \
 ///   -H "Content-Type: application/json" \
 ///   -d '{
 ///     "org_id": "customer1",
-///     "role_name": "tenant_admin",
+///     "service_account": "tenant_admin_sa",
 ///     "duration_seconds": 3600
 ///   }'
 /// ```
@@ -55,7 +55,7 @@ use crate::{
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
-    operation_id = "AssumeRole",
+    operation_id = "AssumeServiceAccount",
     security(
         ("Authorization" = [])
     ),
@@ -63,55 +63,63 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name (must be _meta)"),
     ),
     request_body(
-        content = AssumeRoleRequest,
-        description = "Assume role request",
+        content = AssumeServiceAccountRequest,
+        description = "Assume service account request",
         content_type = "application/json"
     ),
     responses(
-        (status = StatusCode::OK, description = "Session created successfully", body = AssumeRoleResponse),
-        (status = StatusCode::FORBIDDEN, description = "Not authorized or role not assigned"),
+        (status = StatusCode::OK, description = "Session created successfully", body = AssumeServiceAccountResponse),
+        (status = StatusCode::FORBIDDEN, description = "Not authorized or service account not assigned"),
         (status = StatusCode::BAD_REQUEST, description = "Invalid request"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error"),
     ),
 )]
 #[cfg(feature = "enterprise")]
-#[post("/{org_id}/organizations/assume_role")]
-pub async fn assume_role(
+#[post("/{org_id}/organizations/assume_service_account")]
+pub async fn assume_service_account(
     org_id: web::Path<String>,
-    req: web::Json<AssumeRoleRequest>,
+    req: web::Json<AssumeServiceAccountRequest>,
     _auth: AuthExtractor,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let org_id = org_id.into_inner();
-    let req = req.into_inner();
+    let mut req = req.into_inner();
     let user_email = user_email.user_id;
 
+    // Default service_account to caller's user_id if not specified
+    let target_service_account = req
+        .service_account
+        .clone()
+        .unwrap_or_else(|| user_email.clone());
+
     log::info!(
-        "Assume role request: user='{}', target_org='{}', role='{}', duration={:?}",
+        "Assume service account request: user='{}', target_org='{}', service_account='{}', duration={:?}",
         user_email,
         req.org_id,
-        req.role_name,
+        target_service_account,
         req.duration_seconds
     );
 
     // Step 1: Verify the request is for _meta org
     if org_id != config::META_ORG_ID {
         log::warn!(
-            "Assume role rejected: API must be called on _meta org, got '{}'",
+            "Assume service account rejected: API must be called on _meta org, got '{}'",
             org_id
         );
         return Ok(MetaHttpResponse::bad_request(
-            "Assume role API must be called on _meta organization",
+            "Assume service account API must be called on _meta organization",
         ));
     }
 
     // Step 2: Call enterprise implementation
     use crate::service::{db, users};
 
-    // Request is already in the correct format (config::meta::session::AssumeRoleRequest)
+    // Set the service_account field to the resolved value
+    req.service_account = Some(target_service_account);
+
     let enterprise_req = req;
 
-    let result = o2_enterprise::enterprise::assume_role::process_assume_role(
+    let result = o2_enterprise::enterprise::assume_service_account::process_assume_service_account(
         &user_email,
         enterprise_req,
         |org_id, email| {
@@ -137,14 +145,13 @@ pub async fn assume_role(
                     );
                     e.to_string()
                 })?;
-                log::debug!(
-                    "Found org_user: is_meta_service_account={}",
-                    record.is_meta_service_account
-                );
-                Ok(o2_enterprise::enterprise::assume_role::OrgUserInfo {
-                    token: record.token,
-                    is_meta_service_account: record.is_meta_service_account,
-                })
+                log::debug!("Found org_user: role={:?}", record.role);
+                Ok(
+                    o2_enterprise::enterprise::assume_service_account::OrgUserInfo {
+                        token: record.token,
+                        role: format!("{}", record.role),
+                    },
+                )
             })
         },
         |session_id, token, expires_at| {
@@ -159,19 +166,23 @@ pub async fn assume_role(
             })
         },
     )
-    .await
-    .map_err(|e| {
-        log::error!("Assume role failed: {}", e);
-        if let Some(msg) = e.strip_prefix("BADREQUEST:") {
-            actix_web::error::ErrorBadRequest(msg.to_string())
-        } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
-            actix_web::error::ErrorForbidden(msg.to_string())
-        } else {
-            actix_web::error::ErrorForbidden(e)
-        }
-    })?;
+    .await;
 
-    Ok(HttpResponse::Ok().json(AssumeRoleResponse {
+    let result = match result {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Assume service account failed: {}", e);
+            if let Some(msg) = e.strip_prefix("BADREQUEST:") {
+                return Ok(MetaHttpResponse::bad_request(msg));
+            } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
+                return Ok(MetaHttpResponse::forbidden(msg));
+            } else {
+                return Ok(MetaHttpResponse::forbidden(e));
+            }
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(AssumeServiceAccountResponse {
         session_id: result.session_id,
         org_id: result.org_id,
         role_name: result.role_name,

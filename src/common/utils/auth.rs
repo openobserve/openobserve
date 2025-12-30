@@ -361,8 +361,8 @@ impl FromRequest for AuthExtractor {
                 let entity = match (key, path_columns[1]) {
                     ("organizations", "extend_trial_period") => "_all__meta".to_string(),
                     ("organizations", "organizations") => {
-                        // Special case: assume_role endpoint should check org:_all__meta
-                        if url_len == 3 && path_columns[2] == "assume_role" {
+                        // Special case: assume_service_account endpoint should check org:_all__meta
+                        if url_len == 3 && path_columns[2] == "assume_service_account" {
                             format!("_all_{}", path_columns[0])
                         } else {
                             path_columns[0].to_string()
@@ -959,7 +959,7 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
                     log::debug!("Session '{}' resolved to token", session_key);
                     // Check if token already has auth prefix
                     if token.starts_with("Basic ") || token.starts_with("Bearer ") {
-                        // Already has prefix (e.g., assume_role sessions)
+                        // Already has prefix (e.g., assume_service_account sessions)
                         token
                     } else {
                         // Plain JWT token from Dex/OAuth, needs Bearer prefix
@@ -988,7 +988,7 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
                         log::debug!("Session '{}' resolved to token from header", session_key);
                         // Check if token already has auth prefix
                         if token.starts_with("Basic ") || token.starts_with("Bearer ") {
-                            // Already has prefix (e.g., assume_role sessions)
+                            // Already has prefix (e.g., assume_service_account sessions)
                             token
                         } else {
                             // Plain JWT token from Dex/OAuth, needs Bearer prefix
@@ -1060,7 +1060,7 @@ pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
                             if token_value.starts_with("Basic ")
                                 || token_value.starts_with("Bearer ")
                             {
-                                // Already has prefix (e.g., assume_role sessions)
+                                // Already has prefix (e.g., assume_service_account sessions)
                                 token_value
                             } else {
                                 // Plain JWT token, needs Bearer prefix

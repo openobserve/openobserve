@@ -16,31 +16,32 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Request to assume a role in a target organization
+/// Request to assume a service account in a target organization
 ///
 /// This allows meta service accounts to obtain temporary session tokens
-/// for accessing a target organization with a specific role.
+/// for accessing a target organization as a specific service account.
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
-pub struct AssumeRoleRequest {
+pub struct AssumeServiceAccountRequest {
     /// Target organization ID
     pub org_id: String,
-    /// Role name to assume (must be assigned to the service account in the target org)
-    pub role_name: String,
+    /// Service account email to assume (optional, defaults to caller's user_id)
+    #[serde(default)]
+    pub service_account: Option<String>,
     /// Optional duration in seconds (default: 3600, max: 86400)
     #[serde(default)]
     pub duration_seconds: Option<u64>,
 }
 
-/// Response from assume role operation
+/// Response from assume service account operation
 ///
 /// Contains the session credentials needed to access the target organization.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct AssumeRoleResponse {
+pub struct AssumeServiceAccountResponse {
     /// Session ID to use for authentication
     pub session_id: String,
     /// Target organization ID
     pub org_id: String,
-    /// Assumed role name
+    /// Assumed service account role
     pub role_name: String,
     /// Expiration timestamp (ISO 8601)
     pub expires_at: String,

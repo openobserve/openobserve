@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -26,10 +26,10 @@ impl MigrationTrait for Migration {
                 Table::alter()
                     .table(OrgUsers::Table)
                     .add_column(
-                        ColumnDef::new(OrgUsers::IsMetaServiceAccount)
+                        ColumnDef::new(OrgUsers::AllowStaticToken)
                             .boolean()
                             .not_null()
-                            .default(false),
+                            .default(true),
                     )
                     .to_owned(),
             )
@@ -41,7 +41,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(OrgUsers::Table)
-                    .drop_column(OrgUsers::IsMetaServiceAccount)
+                    .drop_column(OrgUsers::AllowStaticToken)
                     .to_owned(),
             )
             .await
@@ -51,5 +51,5 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum OrgUsers {
     Table,
-    IsMetaServiceAccount,
+    AllowStaticToken,
 }

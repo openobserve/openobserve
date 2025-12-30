@@ -101,6 +101,47 @@ pub async fn add_with_flag(
     Ok(())
 }
 
+pub async fn add_with_flags(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+    is_meta_service_account: bool,
+    allow_static_token: bool,
+) -> Result<(), anyhow::Error> {
+    let user_email = user_email.to_lowercase();
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+    org_users::add_with_flags(
+        org_id,
+        &user_email,
+        role.clone(),
+        token,
+        rum_token.clone(),
+        is_meta_service_account,
+        allow_static_token,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to add user to org: {e}"))?;
+
+    log::debug!("Put into db_coordinator: {user_email}");
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_add(
+        &key,
+        &OrgUserPut {
+            org_id: org_id.to_string(),
+            email: user_email.to_string(),
+            role,
+            token: token.to_string(),
+            rum_token,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn update(
     org_id: &str,
     user_email: &str,
@@ -349,6 +390,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 rum_token: item.rum_token.clone(),
                                 created_at: item.created_at,
                                 is_meta_service_account: item.is_meta_service_account,
+                                allow_static_token: item.allow_static_token,
                             },
                         );
                         if let Some(rum_token) = &item.rum_token {
@@ -362,6 +404,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     rum_token: item.rum_token,
                                     created_at: item.created_at,
                                     is_meta_service_account: item.is_meta_service_account,
+                                    allow_static_token: item.allow_static_token,
                                 },
                             );
                         }

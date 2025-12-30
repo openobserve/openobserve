@@ -49,6 +49,7 @@ pub struct OrgUserRecord {
     pub rum_token: Option<String>,
     pub created_at: i64,
     pub is_meta_service_account: bool,
+    pub allow_static_token: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -76,6 +77,7 @@ impl OrgUserRecord {
             rum_token,
             created_at: chrono::Utc::now().timestamp_micros(),
             is_meta_service_account: false,
+            allow_static_token: true, // Default to true for backward compatibility
         }
     }
 }
@@ -90,6 +92,7 @@ impl From<Model> for OrgUserRecord {
             rum_token: model.rum_token,
             created_at: model.created_at,
             is_meta_service_account: model.is_meta_service_account.unwrap_or(false),
+            allow_static_token: model.allow_static_token,
         }
     }
 }
@@ -105,6 +108,7 @@ pub struct UserOrgExpandedRecord {
     pub org_name: String,
     pub org_type: OrganizationType,
     pub is_meta_service_account: bool,
+    pub allow_static_token: bool,
 }
 
 impl FromQueryResult for UserOrgExpandedRecord {
@@ -119,6 +123,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
         let org_type: i16 = result.try_get(pre, "org_type")?;
         let is_meta_service_account: Option<bool> =
             result.try_get(pre, "is_meta_service_account").ok();
+        let allow_static_token: bool = result.try_get(pre, "allow_static_token").unwrap_or(true);
 
         Ok(Self {
             email,
@@ -130,6 +135,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
             org_name,
             org_type: org_type.into(),
             is_meta_service_account: is_meta_service_account.unwrap_or(false),
+            allow_static_token,
         })
     }
 }
@@ -211,7 +217,7 @@ pub async fn add(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
-    add_with_flag(org_id, user_email, role, token, rum_token, false).await
+    add_with_flags(org_id, user_email, role, token, rum_token, false, true).await
 }
 
 pub async fn add_with_flag(
@@ -221,6 +227,27 @@ pub async fn add_with_flag(
     token: &str,
     rum_token: Option<String>,
     is_meta_service_account: bool,
+) -> Result<(), errors::Error> {
+    add_with_flags(
+        org_id,
+        user_email,
+        role,
+        token,
+        rum_token,
+        is_meta_service_account,
+        true,
+    )
+    .await
+}
+
+pub async fn add_with_flags(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+    is_meta_service_account: bool,
+    allow_static_token: bool,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let role: i16 = role.into();
@@ -234,6 +261,7 @@ pub async fn add_with_flag(
         updated_at: Set(now),
         id: Set(ider::uuid()),
         is_meta_service_account: Set(Some(is_meta_service_account)),
+        allow_static_token: Set(allow_static_token),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
