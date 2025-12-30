@@ -1,6 +1,8 @@
 // Dashboard Setting Page Object
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
 export default class DashboardSetting {
   constructor(page) {
     this.page = page;
@@ -223,6 +225,7 @@ export default class DashboardSetting {
       await streamOption.click();
       streamSelected = true;
     } catch (e) {
+      testLogger.warn(`Stream selection strategy 1 (exact match) failed for "${Stream}": ${e.message}`);
       // Strategy 2: Try partial match
       try {
         const streamOption = this.page.getByRole("option", { name: Stream, exact: false }).first();
@@ -230,6 +233,7 @@ export default class DashboardSetting {
         await streamOption.click();
         streamSelected = true;
       } catch (e2) {
+        testLogger.warn(`Stream selection strategy 2 (partial match) failed for "${Stream}": ${e2.message}`);
         // Strategy 3: Use keyboard navigation
         try {
           await this.page.keyboard.press('ArrowDown');
@@ -237,7 +241,7 @@ export default class DashboardSetting {
           await this.page.keyboard.press('Enter');
           streamSelected = true;
         } catch (e3) {
-          streamSelected = false;
+          testLogger.warn(`Stream selection strategy 3 (keyboard) failed for "${Stream}": ${e3.message}`);
         }
       }
     }
