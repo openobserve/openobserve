@@ -200,7 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :dashboardName="dashboardName"
                   :folderName="folderName"
-                  :panelVariablesConfig="getPanelVariablesConfig(item.id)"
                   :allowAlertCreation="allowAlertCreation"
                   :showLegendsButton="showLegendsButton"
                   @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -1223,7 +1222,14 @@ export default defineComponent({
     border-radius: 4px;
     overflow: visible;
     border-radius: inherit;
+    height: 100%;
   }
+}
+
+.panel-with-variables {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* GridStack theme overrides */
@@ -1265,10 +1271,5 @@ export default defineComponent({
 .grid-stack-item,
 .grid-stack-item-content {
   box-sizing: border-box;
-}
-
-/* Ensure grid item content and panel container fill full height */
-.grid-stack-item-content {
-  height: 100% !important;
 }
 </style>
