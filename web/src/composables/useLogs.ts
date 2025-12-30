@@ -262,8 +262,7 @@ const useLogs = () => {
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean =
-        searchObj.data.stream.selectedStream.length > 0 ? true : false;
+      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
 
       await getStreamList();
       await getFunctions();
