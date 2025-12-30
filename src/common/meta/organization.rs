@@ -34,13 +34,17 @@ pub struct Organization {
     pub name: String,
     #[serde(default)]
     pub org_type: String,
+    /// Optional service account email to add to the organization
+    /// When specified, only this service account will be added (not the API caller)
+    #[serde(default)]
+    pub service_account: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct ServiceAccountTokenInfo {
     pub email: String,
     /// Token is no longer returned directly for security reasons
-    /// Use the assume_role API to obtain temporary session tokens
+    /// Use the assume_service_account API to obtain temporary session tokens
     #[serde(skip_serializing)]
     pub token: String,
     pub role: String,

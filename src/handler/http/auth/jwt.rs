@@ -838,6 +838,7 @@ pub async fn check_and_add_to_org(
                 identifier: ider::uuid(),
                 name: DEFAULT_ORG.to_string(),
                 org_type: USER_DEFAULT.to_owned(),
+                service_account: None,
             };
             match db::organization::save_org(&org).await {
                 Ok(_) => {

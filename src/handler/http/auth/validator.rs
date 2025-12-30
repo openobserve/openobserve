@@ -149,94 +149,9 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     }
 }
 
-/// Validates that a meta service account flag is legitimate
-/// by re-checking the service account's presence in _meta org and OpenFGA permissions
-///
-/// ### Args:
-/// - user_email: Email of the service account to validate
-///
-/// ### Returns:
-/// - `true` if the account is a valid meta service account with proper permissions
-/// - `false` if validation fails (account not in _meta, not a SA, or no permissions)
-#[cfg(feature = "enterprise")]
-async fn validate_meta_service_account_flag(user_email: &str) -> bool {
-    // Check if user exists in _meta organization
-    let meta_user = match crate::service::db::org_users::get(config::META_ORG_ID, user_email).await
-    {
-        Ok(user) => user,
-        Err(_) => {
-            log::debug!(
-                "Meta SA validation: User not found in _meta | user={}",
-                user_email
-            );
-            return false;
-        }
-    };
-
-    // Verify the user is actually a ServiceAccount in _meta
-    if !meta_user.role.eq(&UserRole::ServiceAccount) {
-        log::debug!(
-            "Meta SA validation: User is not a ServiceAccount in _meta | user={} | role={:?}",
-            user_email,
-            meta_user.role
-        );
-        return false;
-    }
-
-    // Re-validate OpenFGA permission every time (no caching)
-    #[cfg(feature = "enterprise")]
-    {
-        use o2_openfga::{authorizer::authz::is_allowed, config::get_config as get_openfga_config};
-
-        if get_openfga_config().enabled {
-            // Check if service account has POST permission on organizations object
-            match is_allowed(
-                config::META_ORG_ID,
-                user_email,
-                "POST",
-                "org:organizations",
-                user_email,
-                &UserRole::ServiceAccount.to_string(),
-            )
-            .await
-            {
-                true => {
-                    log::debug!(
-                        "Meta SA validation: OpenFGA permission granted | user={}",
-                        user_email
-                    );
-                    true
-                }
-                false => {
-                    log::warn!(
-                        "Meta SA validation: OpenFGA permission denied | user={}",
-                        user_email
-                    );
-                    false
-                }
-            }
-        } else {
-            // If OpenFGA is disabled in enterprise mode, DENY elevation
-            // This closes the security hole where disabling OpenFGA bypasses all checks
-            log::warn!(
-                "Meta SA validation: OpenFGA disabled in enterprise mode - denying elevation | user={}",
-                user_email
-            );
-            false
-        }
-    }
-
-    // In non-enterprise builds, DENY meta SA privilege escalation
-    // This prevents the auto-true behavior that creates privilege escalation vulnerability
-    #[cfg(not(feature = "enterprise"))]
-    {
-        log::warn!(
-            "Meta SA validation: Non-enterprise build - meta SA privilege escalation disabled | user={}",
-            user_email
-        );
-        false
-    }
-}
+// The validate_meta_service_account_flag function has been removed as the is_meta_service_account
+// concept has been deprecated. All service accounts are now treated uniformly, with permissions
+// controlled via OpenFGA.
 
 pub async fn validate_credentials(
     user_id: &str,
@@ -359,6 +274,26 @@ pub async fn validate_credentials(
     }
 
     if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+        // Check if static token is allowed for this service account
+        if let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
+            && !org_user.allow_static_token
+        {
+            log::warn!(
+                "Service account '{}' in org '{}' attempted to use static token but allow_static_token=false. Use assume_service_account API instead.",
+                user.email,
+                user.org
+            );
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
@@ -1068,52 +1003,7 @@ pub(crate) async fn check_permissions(
             None => "".to_string(),
         }
     } else {
-        // Check if this is a service account that originated from _meta org
-        if role.eq(&UserRole::ServiceAccount) {
-            // Validate meta SA flag with runtime checks
-            let is_valid_meta_sa = validate_meta_service_account_flag(user_id).await;
-
-            match ORG_USERS.get(&format!("{}/{user_id}", &auth_info.org_id)) {
-                Some(user) if user.is_meta_service_account && is_valid_meta_sa => {
-                    // For meta service accounts, get the actual assigned role from DB
-                    match crate::service::db::org_users::get(&auth_info.org_id, user_id).await {
-                        Ok(org_user_record) => {
-                            log::debug!(
-                                "Meta SA using assigned role | user={} | org={} | role={:?} | is_meta_sa=true | validated=true",
-                                user_id,
-                                &auth_info.org_id,
-                                org_user_record.role
-                            );
-                            // Return the actual role from the target org
-                            format!("{}", org_user_record.role)
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Failed to get role for meta SA | user={} | org={} | error={} | falling back to empty role",
-                                user_id,
-                                &auth_info.org_id,
-                                e
-                            );
-                            // Fallback to empty string to use OpenFGA tuples
-                            "".to_string()
-                        }
-                    }
-                }
-                Some(user) if user.is_meta_service_account && !is_valid_meta_sa => {
-                    // Flag set but validation failed - possible attack
-                    log::error!(
-                        "Meta SA flag set but validation failed | user={} | org={} | stored_flag=true | validated=false | POSSIBLE PRIVILEGE ESCALATION ATTEMPT",
-                        user_id,
-                        &auth_info.org_id
-                    );
-                    // Deny elevation - treat as regular service account
-                    format!("{role}")
-                }
-                _ => format!("{role}"),
-            }
-        } else {
-            format!("{role}")
-        }
+        format!("{role}")
     };
     let org_id = if auth_info.org_id.eq("organizations") {
         if auth_info.method.eq("POST") {

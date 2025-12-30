@@ -583,85 +583,16 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         let token = generate_random_string(16);
         let rum_token = format!("rum{}", generate_random_string(16));
 
-        // Check if user is a service account in _meta org with organizations permission
-        let is_meta_service_account = if let Ok(meta_user) =
-            crate::service::db::org_users::get(config::META_ORG_ID, user_email).await
-        {
-            if meta_user.role == UserRole::ServiceAccount {
-                // Check if this service account has permission to create organizations
-                #[cfg(feature = "enterprise")]
-                {
-                    use o2_openfga::{
-                        authorizer::authz::is_allowed, config::get_config as get_openfga_config,
-                    };
+        // Assign Admin role by default
+        let role = UserRole::Admin;
 
-                    if get_openfga_config().enabled {
-                        // Check if service account has POST permission on organizations object
-                        is_allowed(
-                            config::META_ORG_ID,
-                            user_email,
-                            "POST",
-                            "org:organizations",
-                            user_email,
-                            &UserRole::ServiceAccount.to_string(),
-                        )
-                        .await
-                    } else {
-                        // If OpenFGA is disabled in enterprise mode, DENY
-                        // meta SA This prevents privilege escalation when
-                        // OpenFGA is disabled
-                        log::warn!(
-                            "Meta SA flag denied - OpenFGA disabled | user={} | org={}",
-                            user_email,
-                            org_id
-                        );
-                        false
-                    }
-                }
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    // In non-enterprise builds, DENY meta SA privilege
-                    // escalation This prevents auto-granting Admin privileges
-                    // without proper authorization system
-                    log::warn!(
-                        "Meta SA flag denied - non-enterprise build | user={} | org={}",
-                        user_email,
-                        org_id
-                    );
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        // Determine the role to assign
-        let role = if is_meta_service_account {
-            UserRole::ServiceAccount
-        } else {
-            UserRole::Admin
-        };
-
-        // Audit log when meta SA flag is set
-        if is_meta_service_account {
-            log::warn!(
-                "Meta service account flag set | sa_email={} | org={} | role={:?} | is_meta_sa=true",
-                user_email,
-                org_id,
-                role
-            );
-        }
-
-        // Add user to the organization with the flag
-        crate::service::db::org_users::add_with_flag(
+        // Add user to the organization
+        crate::service::db::org_users::add(
             org_id,
             user_email,
             role.clone(),
             &token,
             Some(rum_token),
-            is_meta_service_account,
         )
         .await?;
 
@@ -845,6 +776,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
             rum_token: user_from_db.rum_token.clone(),
             created_at: 0,
             is_meta_service_account: false,
+            allow_static_token: true,
         };
         if is_root_user(&user_from_db.email) {
             USERS_RUM_TOKEN
@@ -1822,4 +1754,41 @@ mod tests {
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
     }
+}
+
+/// Creates a service account user record if it doesn't already exist
+/// This is used when creating organizations with a specified service account
+pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
+    // Check if user already exists
+    if db::user::get_user_record(email).await.is_ok() {
+        log::debug!("Service account '{}' already exists", email);
+        return Ok(());
+    }
+
+    log::info!("Creating new service account user record for '{}'", email);
+
+    // Create the user record in the users table
+    let random_password = generate_random_string(32);
+    let salt = ider::uuid();
+    let password_hash = get_hash(&random_password, &salt);
+    let cfg = get_config();
+    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let now = chrono::Utc::now().timestamp_micros();
+    let user_record = infra::table::users::UserRecord {
+        email: email.to_string(),
+        first_name: email.split('@').next().unwrap_or("Service").to_string(),
+        last_name: "Account".to_string(),
+        password: password_hash.clone(),
+        salt,
+        is_root: false,
+        password_ext: Some(password_ext),
+        user_type: config::meta::user::UserType::Internal,
+        created_at: now,
+        updated_at: now,
+    };
+
+    infra::table::users::add(user_record).await?;
+    log::info!("Service account user record created for '{}'", email);
+
+    Ok(())
 }
