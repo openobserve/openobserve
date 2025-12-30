@@ -190,14 +190,61 @@ export default class DashboardSetting {
     await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
     await streamTypeOption.click();
 
-    await this.page
-      .locator('[data-test="dashboard-variable-stream-select"]')
-      .click();
+    // Click the stream selector to open and focus it
+    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelector.click();
 
-    // Wait for the stream option to be visible before clicking
-    const streamOption = this.page.getByText(Stream, { exact: true });
-    await streamOption.waitFor({ state: "visible", timeout: 10000 });
-    await streamOption.click();
+    // Wait for the dropdown to open
+    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 10000 });
+
+    // The stream dropdown supports search filtering via use-input
+    // Type the stream name to filter the list using keyboard
+    await this.page.keyboard.type(Stream, { delay: 50 });
+
+    // Wait a moment for filtering to complete
+    await this.page.waitForTimeout(500);
+
+    // Wait for dropdown to have options available after filtering
+    await this.page.waitForFunction(
+      () => {
+        const options = document.querySelectorAll('[role="option"]');
+        return options.length > 0;
+      },
+      { timeout: 10000, polling: 100 }
+    );
+
+    // Select the stream from filtered dropdown options
+    let streamSelected = false;
+
+    // Strategy 1: Try exact match option
+    try {
+      const streamOption = this.page.getByRole("option", { name: Stream, exact: true });
+      await streamOption.waitFor({ state: "visible", timeout: 5000 });
+      await streamOption.click();
+      streamSelected = true;
+    } catch (e) {
+      // Strategy 2: Try partial match
+      try {
+        const streamOption = this.page.getByRole("option", { name: Stream, exact: false }).first();
+        await streamOption.waitFor({ state: "visible", timeout: 5000 });
+        await streamOption.click();
+        streamSelected = true;
+      } catch (e2) {
+        // Strategy 3: Use keyboard navigation
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          await this.page.waitForTimeout(200);
+          await this.page.keyboard.press('Enter');
+          streamSelected = true;
+        } catch (e3) {
+          streamSelected = false;
+        }
+      }
+    }
+
+    if (!streamSelected) {
+      throw new Error(`Failed to select stream: ${Stream}`);
+    }
 
     // Wait for field data to load after stream selection
     await this.page.waitForTimeout(1000);
