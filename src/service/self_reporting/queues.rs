@@ -56,7 +56,7 @@ fn create_reporting_queue(
     let timeout = time::Duration::from_secs(publish_interval);
 
     let (msg_sender, msg_receiver) =
-        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num));
+        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num) * 2);
     let msg_receiver = Arc::new(Mutex::new(msg_receiver));
 
     for thread_id in 0..thread_num {
@@ -148,7 +148,7 @@ async fn self_reporting_ingest_job(
                         if reporting_runner.should_process() {
                             let buffered = reporting_runner.take_batch();
                             update_queue_depth_metrics(&buffered);
-                            ingest_buffered_data(thread_id, buffered).await;
+                            tokio::task::spawn(ingest_buffered_data(thread_id, buffered));
                         }
                     }
                     None => break, // channel closed
@@ -158,7 +158,7 @@ async fn self_reporting_ingest_job(
                 if reporting_runner.should_process() {
                     let buffered = reporting_runner.take_batch();
                     update_queue_depth_metrics(&buffered);
-                    ingest_buffered_data(thread_id, buffered).await;
+                    tokio::task::spawn(ingest_buffered_data(thread_id, buffered));
                 }
             }
         }
