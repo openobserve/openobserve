@@ -329,29 +329,51 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Open dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(3000);
+        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+        await dropdownArrow.click();
+        await this.page.waitForTimeout(2000);
 
-        // Select first stream with explicit wait
+        // Use search box to filter for first stream (much faster than scrolling)
+        const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const searchVisible = await searchInput.isVisible({ timeout: 3000 }).catch(() => false);
+
+        // Select first stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamA}`);
+            await searchInput.click();
+            await searchInput.fill(streamA);
+            await this.page.waitForTimeout(1500);
+        }
+
         const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
         const streamAToggle = this.page.locator(streamASelector).first();
-        await streamAToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamAToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
         await this.page.waitForTimeout(1000);
 
-        // Select second stream (dropdown stays open after first selection)
+        // Clear search and filter for second stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
+            await searchInput.click();
+            await searchInput.clear();
+            await searchInput.fill(streamB);
+            await this.page.waitForTimeout(1500);
+        }
+
+        // Select second stream
         const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
         const streamBToggle = this.page.locator(streamBSelector).first();
-        await streamBToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamBToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
         await this.page.waitForTimeout(1000);
 
         // Close dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await dropdownArrow.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
