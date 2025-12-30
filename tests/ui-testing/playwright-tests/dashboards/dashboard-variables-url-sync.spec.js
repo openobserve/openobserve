@@ -42,17 +42,17 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(singleVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(singleVar);
     await page.locator('[data-test="variable-custom-options"]').fill('value1\nvalue2');
     await pm.dashboardSetting.saveVariable();
 
     // Add multi-select global variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(multiVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(multiVar);
     await page.locator('[data-test="variable-custom-options"]').fill('optA\noptB\noptC');
     await page.locator('[data-test="variable-multiselect-checkbox"]').check();
     await pm.dashboardSetting.saveVariable();
@@ -108,9 +108,9 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
@@ -171,9 +171,9 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
@@ -229,16 +229,16 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(globalVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(globalVar);
     await page.locator('[data-test="variable-custom-options"]').fill('g1\ng2\ng3');
     await pm.dashboardSetting.saveVariable();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
@@ -303,9 +303,9 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
@@ -370,17 +370,17 @@ test.describe("Dashboard Variables URL Synchronization", () => {
 
     // Global
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(globalVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(globalVar);
     await page.locator('[data-test="variable-custom-options"]').fill('g1\ng2');
     await pm.dashboardSetting.saveVariable();
 
     // Tab
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
@@ -390,9 +390,9 @@ test.describe("Dashboard Variables URL Synchronization", () => {
 
     // Panel
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
@@ -444,9 +444,9 @@ test.describe("Dashboard Variables URL Synchronization", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="variable-custom-options"]').fill('value with space\nvalue-with-dash\nvalue_with_underscore');
     await pm.dashboardSetting.saveVariable();
     await pm.dashboardSetting.closeSettingWindow();
