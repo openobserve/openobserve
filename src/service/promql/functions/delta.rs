@@ -49,3 +49,77 @@ impl RangeFunc for DeltaFunc {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
+    use super::*;
+
+    // Test helper
+    fn delta_test_helper(data: Value, eval_ts: i64) -> Result<Value> {
+        let eval_ctx = EvalContext::new(eval_ts, eval_ts, 0, "test".to_string());
+        delta(data, &eval_ctx)
+    }
+
+    #[test]
+    fn test_delta_function_single_sample() {
+        // Single sample should return empty or None
+        let samples = vec![Sample::new(1000, 10.0)];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = delta_test_helper(matrix, 3000).unwrap();
+
+        match result {
+            Value::Matrix(m) => {
+                // With single sample, delta should return empty result
+                assert_eq!(m.len(), 0);
+            }
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+
+    #[test]
+    fn test_delta_function_no_samples() {
+        // Empty samples should return empty result
+        let samples = vec![];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = delta_test_helper(matrix, 3000).unwrap();
+
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 0);
+            }
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+
+    #[test]
+    fn test_delta_function_name() {
+        let func = DeltaFunc::new();
+        assert_eq!(func.name(), "delta");
+    }
+}
