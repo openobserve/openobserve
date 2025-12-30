@@ -764,7 +764,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="add-variable-drawer-overlay"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw-px-4 tw-pt-4">
+      <div class="add-variable-drawer-panel tw:px-4 tw:pt-4">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"
