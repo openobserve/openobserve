@@ -10,17 +10,47 @@ export class DashboardPage {
     const randomSuffix = Math.floor(Math.random() * 10000);
     this.dashboardName = `dash${timestamp}${randomSuffix}`;
     this.panelName = `p${timestamp}${randomSuffix}`;
+
+    // Navigation & Menu locators
     this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
+    this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
+    this.signOutButton = page.getByText('Sign Out');
+    this.logoutMenuItem = page.locator('[data-test="menu-link-logout-item"]');
+
+    // Dashboard list locators
     this.addDashboardButton = page.locator('[data-test="dashboard-add"]');
+    this.dashboardSearch = page.locator('[data-test="dashboard-search"]');
+    this.dashboardTable = page.locator('[data-test="dashboard-table"]');
+    this.dashboardDelete = page.locator('[data-test="dashboard-delete"]');
+    this.confirmButton = page.locator('[data-test="confirm-button"]');
+    this.searchAcrossFoldersToggle = page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2);
+
+    // Dashboard create dialog locators
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
     this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-submit"]');
-    this.savePanelButton = page.locator('[data-test="dashboard-panel-save"]');
+
+    // Dashboard view/edit locators
+    this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
     this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name"]');
+    this.savePanelButton = page.locator('[data-test="dashboard-panel-save"]');
+    this.applyButton = page.locator('[data-test="dashboard-apply"]');
+    this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
+
+    // Stream & field selection locators
+    this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
+    this.fieldSearchInput = page.locator('[data-test="index-field-search-input"]');
+
+    // Date/Time locators
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
-    this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
-    this.signOutButton = page.getByText('Sign Out');
+
+    // Organization locators
+    this.orgDropdown = page.locator('[data-test="navbar-organizations-select"]');
+
+    // Custom chart locators
+    this.customChartItem = page.locator('[data-test="selected-chart-custom_chart-item"]');
+    this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor-query-editor"]');
   }
   async navigateToDashboards() {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
@@ -31,10 +61,13 @@ export class DashboardPage {
     await this.page.waitForSelector('[data-test="dashboard-add"]', { timeout: 10000 });
   }
   async createDashboard() {
+    // Wait for the dashboard page to be fully loaded
     await this.page.waitForSelector('[data-test="dashboard-add"]');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
     await this.addDashboardButton.click();
 
-    // Ensure dashboard name field is visible before entering name
+    // Wait for dialog with retry mechanism
     let isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
 
     if (!isNameFieldVisible) {
@@ -44,91 +77,124 @@ export class DashboardPage {
       await this.page.waitForTimeout(2000);
       isNameFieldVisible = await this.dashboardNameInput.isVisible().catch(() => false);
 
-      // If still not visible, fail with a clear error message
       if (!isNameFieldVisible) {
         throw new Error('Dashboard name field is not visible after clicking the add dashboard button twice');
       }
     }
 
+    // Wait for the input to be fully ready
+    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Fill the dashboard name
     await this.dashboardNameInput.fill(this.dashboardName);
-    await this.page.waitForSelector('[data-test="dashboard-add-submit"]');
-    await this.dashboardSubmitButton.click();
-    await this.page.waitForTimeout(2000);
-    await this.page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .click();
-    await this.page.waitForTimeout(3000);
-    await this.page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
-    // Refine the locator for 'e2e_automate'
-    await this.page
-      .locator("span")
-      .filter({ hasText: /^e2e_automate$/ })
-      .click();
 
-    // Scroll within the field list dropdown to find kubernetes_container_hash
-    const fieldLocator = this.page.locator(
-      '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
-    );
-
-    // Wait for field list to load and scroll multiple times to find the element
+    // Wait for Vue to process the input and enable the button
     await this.page.waitForTimeout(1000);
-    let found = false;
-    for (let i = 0; i < 10; i++) {
-      const isVisible = await fieldLocator.isVisible();
-      if (isVisible) {
-        found = true;
-        break;
-      }
-      // Scroll down within the field list container
-      await this.page.mouse.wheel(0, 300);
-      await this.page.waitForTimeout(300);
-    }
 
-    if (!found) {
-      throw new Error('Could not find kubernetes_container_hash field after scrolling');
-    }
+    // Wait for submit button to be visible
+    await this.dashboardSubmitButton.waitFor({ state: 'visible', timeout: 30000 });
 
-    await fieldLocator.click();
-    await this.page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
-    await this.page.waitForSelector('[data-test="dashboard-panel-name"]');
-    await this.page.locator('[data-test="dashboard-panel-name"]').click();
-    await this.page.locator('[data-test="dashboard-panel-name"]').fill(this.panelName);
-    await this.page.locator('[data-test="dashboard-panel-name"]').press('Enter');
-    await expect(this.page.locator('[data-test="dashboard-apply"]')).toBeVisible();
-    await this.page.locator('[data-test="dashboard-apply"]').click();
+    // Use Playwright's built-in expect to wait for button to be enabled
+    await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });
+
+    // Click submit button
+    await this.dashboardSubmitButton.click();
+
+    // Wait for the success notification to confirm dashboard was created
+    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+
+    // Wait for navigation to the new dashboard view page
+    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+
+    // Wait for the page to be fully loaded
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Wait for Vue components to mount
+    await this.page.waitForTimeout(2000);
+
+    // Wait for and click the "Add Panel" button
+    await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
+    await this.addPanelBtn.click();
+
+    // Wait for panel configuration to load
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await this.page.waitForTimeout(3000);
+
+    // Click on Stream dropdown - use data-test selector used in other dashboard tests
+    await this.streamDropdown.click();
+    await this.page.waitForTimeout(500);
+
+    // Type stream name to filter
+    await this.streamDropdown.press("Control+a");
+    await this.streamDropdown.fill("e2e_automate");
+    await this.page.waitForTimeout(1500);
+
+    // Select e2e_automate stream option
+    const streamOption = this.page
+      .getByRole("option", { name: "e2e_automate", exact: true })
+      .locator("div")
+      .nth(2);
+    await streamOption.waitFor({ state: "visible", timeout: 15000 });
+    await streamOption.click();
+
+    // Use search to find fields - more reliable than scrolling
+    await this.fieldSearchInput.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Search for kubernetes_container_hash and add to Y-axis
+    await this.fieldSearchInput.click();
+    await this.fieldSearchInput.fill('kubernetes_container_hash');
+    await this.page.waitForTimeout(1000);
+
+    const yFieldButton = this.page.locator('[data-test^="field-list-item-"][data-test$="-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]').first();
+    await yFieldButton.waitFor({ state: 'visible', timeout: 10000 });
+    await yFieldButton.click();
+
+    // Clear search and add kubernetes_container_image to B-axis (breakdown)
+    await this.fieldSearchInput.fill('');
+    await this.fieldSearchInput.fill('kubernetes_container_image');
+    await this.page.waitForTimeout(1000);
+
+    const bFieldButton = this.page.locator('[data-test^="field-list-item-"][data-test$="-kubernetes_container_image"] [data-test="dashboard-add-b-data"]').first();
+    await bFieldButton.waitFor({ state: 'visible', timeout: 10000 });
+    await bFieldButton.click();
+
+    // Clear search
+    await this.fieldSearchInput.fill('');
+    await this.dashboardPanelNameInput.waitFor({ state: 'visible', timeout: 10000 });
+    await this.dashboardPanelNameInput.click();
+    await this.dashboardPanelNameInput.fill(this.panelName);
+    await this.dashboardPanelNameInput.press('Enter');
+    await expect(this.applyButton).toBeVisible();
+    await this.applyButton.click();
     await this.page.waitForTimeout(5000);
   }
   async deleteDashboard() {
     await this.page.reload();
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForTimeout(5000);
-    
+
     // Search for the dashboard before deleting
-    await this.page.locator('[data-test="dashboard-search"]').fill(this.dashboardName);
+    await this.dashboardSearch.fill(this.dashboardName);
     await this.page.waitForTimeout(2000);
-    
-    await this.page.locator('[data-test="dashboard-delete"]').click({ force: true });
+
+    await this.dashboardDelete.click({ force: true });
     await this.page.waitForTimeout(2000);
-    await this.page.locator('[data-test="confirm-button"]:visible').click();
+    await this.confirmButton.filter({ has: this.page.locator(':visible') }).first().click();
     await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
   }
 
   async deleteSearchedDashboard(dashboardName) {
     // First search for the dashboard
-    await this.page.locator('[data-test="dashboard-search"]').click();
-    await this.page.locator('[data-test="dashboard-search"]').fill(dashboardName);
+    await this.dashboardSearch.click();
+    await this.dashboardSearch.fill(dashboardName);
     await this.page.waitForTimeout(1000);
-    
+
     // Find the dashboard row and click the delete button
     const dashboardRow = this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
     await dashboardRow.locator('[data-test="dashboard-delete"]').click();
-    
+
     // Confirm deletion
-    await this.page.locator('[data-test="confirm-button"]').click();
+    await this.confirmButton.click();
     await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
   }
 
@@ -142,7 +208,7 @@ export class DashboardPage {
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
   async verifyShareDashboardLink(randomDashboardName){
-    await this.page.locator('[data-test="dashboard-share-btn"]').click();
+    await this.shareButton.click();
     await expect(this.page.getByText('Link copied successfully')).toBeVisible();
     const copiedUrl = await this.page.evaluate(() => navigator.clipboard.readText());
     await this.page.goto(copiedUrl);
@@ -165,7 +231,7 @@ export class DashboardPage {
   }
 
   async dashboardPageDefaultMultiOrg() {
-    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.orgDropdown.getByText('arrow_drop_down').click();
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
   }
 
@@ -186,81 +252,74 @@ export class DashboardPage {
 
   async loggedOut() {
     // Click on the profile icon
-    await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
+    await this.profileButton.click({ force: true });
 
-    // Wait for the logout menu item to be attached to the DOM with shorter timeout
-    const logoutItem = this.page.locator('[data-test="menu-link-logout-item"]');
-    
-    // Wait for the logout item to be present in the DOM with reasonable timeout
-    await logoutItem.waitFor({ state: 'attached', timeout: 10000 });
+    // Wait for the logout menu item to be present in the DOM with reasonable timeout
+    await this.logoutMenuItem.waitFor({ state: 'attached', timeout: 10000 });
 
     // Wait for element to be visible instead of hard wait
-    await logoutItem.waitFor({ state: 'visible', timeout: 5000 });
+    await this.logoutMenuItem.waitFor({ state: 'visible', timeout: 5000 });
 
     // Now click the logout item
-    await logoutItem.click({ force: true });
-}
+    await this.logoutMenuItem.click({ force: true });
+  }
 
-async notAvailableDashboard() {
-  // Wait for the dashboard add button to be visible
-  await this.page.waitForSelector('[data-test="dashboard-add"]');
+  async notAvailableDashboard() {
+    // Wait for the dashboard add button to be visible
+    await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
 
-  // Click on the search input
-  await this.page.locator('[data-test="dashboard-search"]').click();
+    // Click on the search input
+    await this.dashboardSearch.click();
 
-  // Fill the search input with the dashboard name
-  await this.page.locator('[data-test="dashboard-search"]').fill(this.dashboardName);
+    // Fill the search input with the dashboard name
+    await this.dashboardSearch.fill(this.dashboardName);
 
-  // Check that the dashboard table contains the text 'No data available'
-  await expect(this.page.locator('[data-test="dashboard-table"]')).toContainText('No data available');
+    // Check that the dashboard table contains the text 'No data available'
+    await expect(this.dashboardTable).toContainText('No data available');
 
-  // Click on the toggle for searching across folders
-  await this.page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2).click();
+    // Click on the toggle for searching across folders
+    await this.searchAcrossFoldersToggle.click();
 
-  // Check again that the dashboard table contains the text 'No data available'
-  await expect(this.page.locator('[data-test="dashboard-table"]')).toContainText('No data available');
+    // Check again that the dashboard table contains the text 'No data available'
+    await expect(this.dashboardTable).toContainText('No data available');
 
-  // Click on the toggle again
-  await this.page.locator('[data-test="dashboard-search-across-folders-toggle"] div').nth(2).click();
+    // Click on the toggle again
+    await this.searchAcrossFoldersToggle.click();
 
-  // Final check that the dashboard table still contains the text 'No data available'
-  await expect(this.page.locator('[data-test="dashboard-table"]')).toContainText('No data available');
-}
+    // Final check that the dashboard table still contains the text 'No data available'
+    await expect(this.dashboardTable).toContainText('No data available');
+  }
 
-async addCustomChart(page, pictorialJSON) {
-  await this.page.waitForSelector('[data-test="menu-link-\/dashboards-item"]');
-  await this.page.locator('[data-test="menu-link-\/dashboards-item"]').click();
+  async addCustomChart(pictorialJSON) {
+    await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
+    await this.dashboardsMenuItem.click();
 
-  await this.page.waitForSelector('[data-test="dashboard-add"]');
-  await this.page.waitForTimeout(2000);
-  await this.page.locator('[data-test="dashboard-add"]').click();
-  await this.page.waitForTimeout(2000);
-  await this.page.locator('[data-test="add-dashboard-name"]').fill("Customcharts");
-  await this.page.locator('[data-test="dashboard-add-submit"]').click();
+    await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForTimeout(2000);
+    await this.addDashboardButton.click();
+    await this.page.waitForTimeout(2000);
+    await this.dashboardNameInput.fill("Customcharts");
+    await this.dashboardSubmitButton.click();
 
-  await this.page.waitForSelector('[data-test="dashboard-if-no-panel-add-panel-btn"]');
-  await this.page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-  await this.page.waitForSelector('[data-test="selected-chart-custom_chart-item"]');
-  await this.page.locator('[data-test="selected-chart-custom_chart-item"]').click();
-  
-  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"] .monaco-editor');
+    await this.addPanelBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await this.addPanelBtn.click();
+    await this.customChartItem.waitFor({ state: 'visible', timeout: 10000 });
+    await this.customChartItem.click();
 
-  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"] .monaco-editor').click();
+    await this.markdownEditor.locator('.monaco-editor').waitFor({ state: 'visible', timeout: 10000 });
+    await this.markdownEditor.locator('.monaco-editor').click();
 
-  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
-  await this.page.keyboard.press(`${modifier}+A`);
-  
-  await this.page.keyboard.press("Backspace");
-  
-  console.log("Pictorial JSON", pictorialJSON);
-  
-  // First clear any existing content
-  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"]');
-  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"]').click();
-  await this.page.keyboard.press(`${modifier}+A`);
-  await this.page.keyboard.press('Delete');
-}
+    await this.page.keyboard.press(`${modifier}+A`);
+    await this.page.keyboard.press("Backspace");
+
+    // First clear any existing content
+    await this.markdownEditor.waitFor({ state: 'visible', timeout: 10000 });
+    await this.markdownEditor.click();
+    await this.page.keyboard.press(`${modifier}+A`);
+    await this.page.keyboard.press('Delete');
+  }
 
 
 }
