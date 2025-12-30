@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 21;
+pub const DB_SCHEMA_VERSION: u64 = 22;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -645,6 +645,14 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    /// Session cleanup interval in seconds (default: 3600 = 1 hour)
+    /// How often to run the background job that deletes expired sessions
+    #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]
+    pub session_cleanup_interval: u64,
+    /// Default session expiry in hours for migration (default: 24 hours)
+    /// Used for existing sessions when migrating to add expires_at column
+    #[env_config(name = "ZO_SESSION_DEFAULT_EXPIRY_HOURS", default = 24)]
+    pub session_default_expiry_hours: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

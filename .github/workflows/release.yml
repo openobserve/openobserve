@@ -72,11 +72,27 @@ jobs:
           npm install
           npm run build
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "21.12"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Protoc for linux
+        if: contains(matrix.arch, 'linux')
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
+  
+      - name: Install Protoc for windows
+        if: contains(matrix.arch, 'windows')
+        shell: bash
+        run: |
+          curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
+          unzip protoc-21.12-win64.zip -d protoc
+          cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
+          cp -r protoc/include/google C:/windows/system32/
+  
+      - name: Install Protoc for macos
+        if: contains(matrix.arch, 'darwin')
+        run: |
+          brew install protobuf coreutils boost
 
       - name: Install dependencies for linux-gnu
         if: contains(matrix.arch, 'linux-gnu')
