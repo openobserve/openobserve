@@ -64,7 +64,7 @@ pub struct OrganizationCreationResponse {
 pub struct ServiceAccountTokenInfo {
     pub email: String,
     /// Token is no longer returned directly for security reasons
-    /// Use the assume_role API to obtain temporary session tokens
+    /// Use the assume_service_account API to obtain temporary session tokens
     #[serde(skip_serializing)]
     pub token: String,
     pub role: String,
