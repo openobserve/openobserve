@@ -149,8 +149,12 @@ describe("useSearchPagination", () => {
 
     it("should handle errors gracefully", () => {
       // Use mockState directly
-      // Intentionally corrupt the state to trigger error
-      delete (mockState.searchObj.meta.resultGrid as any).rowsPerPage;
+      // Intentionally corrupt the state to trigger error by making resultGrid throw on access
+      Object.defineProperty(mockState.searchObj.meta, "resultGrid", {
+        get() {
+          throw new Error("Test error");
+        },
+      });
 
       const result = pagination.refreshPagination();
 
