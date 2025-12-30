@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="legend-item q-px-sm q-py-xs"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex items-center no-wrap">
+            <div class="flex items-center legend-row">
               <div
                 class="legend-color-box"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import {
   getSeriesColor,
@@ -118,7 +118,6 @@ export default defineComponent({
   emits: ["close"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const copiedLegendIndices = ref(new Set<number>());
     const isAllCopied = ref(false);
@@ -256,19 +255,6 @@ export default defineComponent({
           setTimeout(() => {
             copiedLegendIndices.value.delete(index);
           }, 3000);
-
-          $q.notify({
-            type: "positive",
-            message: "Copied to clipboard",
-            timeout: 1000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy",
-            timeout: 1000,
-          });
         });
     };
 
@@ -280,19 +266,6 @@ export default defineComponent({
           setTimeout(() => {
             isAllCopied.value = false;
           }, 3000);
-
-          $q.notify({
-            type: "positive",
-            message: "All legends copied to clipboard",
-            timeout: 1000,
-          });
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy all legends",
-            timeout: 1000,
-          });
         });
     };
 
@@ -334,6 +307,11 @@ export default defineComponent({
       border-bottom: none;
     }
 
+    .legend-row {
+      flex-wrap: nowrap;
+      width: 100%;
+    }
+
     .legend-color-box {
       width: 20px;
       height: 12px;
@@ -343,8 +321,8 @@ export default defineComponent({
     }
 
     .legend-text {
-      word-wrap: break-word;
-      overflow-wrap: break-word;
+      word-break: break-all;
+      overflow-wrap: anywhere;
       white-space: normal;
       line-height: 1.4;
       font-size: 12px;
@@ -353,6 +331,7 @@ export default defineComponent({
     .copy-btn {
       opacity: 0;
       transition: opacity 0.2s ease-in-out;
+      flex-shrink: 0;
     }
 
     &:hover .copy-btn {
