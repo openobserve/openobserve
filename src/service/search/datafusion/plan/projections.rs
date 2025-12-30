@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(extractor.timeseries, Some("ts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("ts".to_string()));
-        assert!(extractor.group_by.is_empty(),);
+        assert!(extractor.group_by.is_empty());
         assert_eq!(extractor.projections, vec!["namespace", "ts"]);
 
         let sql = r#"WITH FilteredLogs AS (
@@ -503,7 +503,7 @@ mod tests {
         assert_eq!(extractor.timeseries, Some("tts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
-        assert!(extractor.group_by.is_empty(),);
+        assert!(extractor.group_by.is_empty());
         assert_eq!(extractor.projections, vec!["ns", "tts"]);
 
         let sql = r#"SELECT histogram(_timestamp) as "x_axis_1", k8s_namespace_name as "x_axis_2", 

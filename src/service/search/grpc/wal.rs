@@ -163,7 +163,7 @@ pub async fn search_parquet(
         Err(err) => {
             // release all files
             wal::release_files(&lock_files);
-            log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}");
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 "calculate files size error".to_string(),
             )));

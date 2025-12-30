@@ -783,7 +783,7 @@ pub async fn check_and_add_to_org(
     if db_user.is_none() {
         is_new_user = true;
         if let Err(e) = o2_enterprise::enterprise::cloud::email::check_email(user_email).await {
-            log::info!("blocking user with email {user_email} as domain blocked with : {e}",);
+            log::info!("blocking user with email {user_email} as domain blocked with : {e}");
             return Err(anyhow::anyhow!("Email Domain not allowed"));
         }
         match create_new_user(DBUser {

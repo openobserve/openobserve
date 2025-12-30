@@ -243,7 +243,14 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     };
 
     if !usages.is_empty() {
+        let start = time::Instant::now();
         super::ingestion::ingest_usages(usages).await;
+        let took = start.elapsed().as_millis();
+        if took > 200 {
+            log::warn!(
+                "(slow!) [SELF-REPORTING] thread_{thread_id} ingest usage data took {took} ms"
+            );
+        }
     }
 
     if !triggers.is_empty() {

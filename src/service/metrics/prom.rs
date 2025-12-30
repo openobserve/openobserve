@@ -144,7 +144,7 @@ pub async fn remote_write(
     }
     let elapsed_ms = step_start.elapsed().as_millis();
     if elapsed_ms > 200 {
-        log::info!("[remote_write] org: {org_id}, parse metadata took: {elapsed_ms} ms",);
+        log::warn!("(slow!) [remote_write] org: {org_id}, parse metadata took: {elapsed_ms} ms");
     }
 
     // maybe empty, we can return immediately
@@ -443,8 +443,8 @@ pub async fn remote_write(
             - sample_processing_time
             - (ha_check_total_time * 1000.0) as u128;
 
-        log::info!(
-            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
+        log::warn!(
+            "(slow!) [remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
             preload_total={:.1}ms (unique_metrics={:.1}ms, pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms (get_from_lock={:.1}ms, get_others={:.1}ms), partition={:.1}ms, alerts={:.1}ms), label_proc={:.1}ms, sample_proc={:.1}ms, ha={:.1}ms, other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
@@ -635,8 +635,8 @@ pub async fn remote_write(
     }
     let elapsed_ms = step_start.elapsed().as_millis();
     if elapsed_ms > 200 {
-        log::info!(
-            "[remote_write] org: {org_id}, build records and schema check took: {elapsed_ms} ms",
+        log::warn!(
+            "(slow!) [remote_write] org: {org_id}, build records and schema check took: {elapsed_ms} ms",
         );
     }
 
@@ -717,8 +717,8 @@ pub async fn remote_write(
             - report_stats_time
             - deletion_check_time;
 
-        log::info!(
-            "[remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms (streams: {stream_count}) | \
+        log::warn!(
+            "(slow!) [remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms (streams: {stream_count}) | \
             breakdown: deletion_check={:.1}ms, get_writer={:.1}ms, write_file={:.1}ms, report_stats={:.1}ms, other={:.1}ms",
             deletion_check_time as f64 / 1000.0,
             get_writer_time as f64 / 1000.0,
@@ -759,7 +759,7 @@ pub async fn remote_write(
 
     let total_ms = start.elapsed().as_millis();
     if total_ms > 1000 {
-        log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms",);
+        log::warn!("(slow!) [remote_write] org: {org_id}, total time: {total_ms} ms");
     }
 
     Ok(())

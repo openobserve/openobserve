@@ -102,18 +102,11 @@ impl ReportingQueue {
             .send(ReportingMessage::Data(reporting_data))
             .await;
 
-        let elapsed = start.elapsed();
-        if elapsed.as_millis() > 100 {
+        let took = start.elapsed().as_millis();
+        if took > 100 {
             log::warn!(
-                "[SELF-REPORTING] enqueue: Queued {} data after {:?} (slow! indicates queue was full and blocked)",
+                "(slow!) [SELF-REPORTING] enqueue: Queued {} data after {took} ms (indicates queue was full and blocked)",
                 data_type,
-                elapsed
-            );
-        } else {
-            log::trace!(
-                "[SELF-REPORTING] enqueue: Queued {} data after {:?}",
-                data_type,
-                elapsed
             );
         }
 

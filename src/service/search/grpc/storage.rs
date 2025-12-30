@@ -142,7 +142,7 @@ pub async fn search(
     let mut scan_stats = match file_list::calculate_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] calculate files size error: {err}",);
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}");
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 "calculate files size error".to_string(),
             )));

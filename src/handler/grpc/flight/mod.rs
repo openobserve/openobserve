@@ -102,7 +102,7 @@ impl FlightService for FlightServiceImpl {
         );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
-        log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
+        log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s");
 
         // Note: all async should in this place, otherwise it will break tracing
         // https://docs.rs/tracing/latest/tracing/span/struct.Span.html#in-asynchronous-code

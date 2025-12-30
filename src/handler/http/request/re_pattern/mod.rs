@@ -321,7 +321,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         if !pattern_usage.is_empty() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Cannot delete pattern, associated with {pattern_streams:?}{extra}",),
+                format!("Cannot delete pattern, associated with {pattern_streams:?}{extra}"),
             )));
         }
         match crate::service::db::re_pattern::remove(&id).await {

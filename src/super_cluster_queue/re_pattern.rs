@@ -84,7 +84,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         .await?;
                 }
                 RePatternsMessage::Update { id, pattern } => {
-                    log::info!("[SUPER_CLUSTER:DB] updating pattern {id}",);
+                    log::info!("[SUPER_CLUSTER:DB] updating pattern {id}");
                     infra::table::re_pattern::update_pattern(&id, &pattern).await?;
 
                     let mgr = get_pattern_manager().await?;
