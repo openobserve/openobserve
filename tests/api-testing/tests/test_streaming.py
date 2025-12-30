@@ -213,7 +213,7 @@ def test_histogram(
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(minutes=15)).timestamp() * 1000000)  # Increased to 15 minutes to ensure data coverage
+    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)  # Increased to 1 hour to ensure data coverage across test runs
     json_data_hist = {
         "query": {
             "sql": hist_query,
@@ -929,7 +929,7 @@ def test_streaming_histogram(
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(minutes=15)).timestamp() * 1000000)  # Increased to 15 minutes to ensure data coverage
+    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)  # Increased to 1 hour to ensure data coverage across test runs
     json_data_hist = {
         "query": {
             "sql": hist_query,

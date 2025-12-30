@@ -52,13 +52,10 @@ class="tw:mx-1 tw:text-red-500" />
       >
         <span class="chip-label"
           >{{ filter.panelTitle }}
-          <span v-if="filter.panelTitle === 'Rate'">
+          <span v-if="filter.panelTitle === 'Rate' || filter.panelTitle === 'Errors'">
             : {{ t('latencyInsights.timeRangeSelected') }}
           </span>
-          <span v-else-if="filter.panelTitle === 'Errors'">
-            >= {{ filter.start }}
-          </span>
-          <span v-else-if="filter.panelTitle === 'Duration'">
+          <span v-if="filter.panelTitle === 'Duration'">
             <span v-if="filter.start !== null && filter.end !== null">
               {{ formatTimeWithSuffix(filter.start) }} -
               {{ formatTimeWithSuffix(filter.end) }}
