@@ -708,17 +708,16 @@ export class SanityPage {
 
         // Click the input to open/focus the dropdown
         await streamSelectInput.click();
-        await waitUtils.smartWait(this.page, 2000, 'stream dropdown to open');
+        // Wait for dropdown menu to appear instead of fixed delay
+        await this.page.waitForSelector('.q-menu', { state: 'visible', timeout: 10000 });
 
         // Fill the input to filter streams - this is critical for finding the stream quickly
         await streamSelectInput.fill('e2e_automate');
-        await waitUtils.smartWait(this.page, 2000, 'stream filter to apply');
 
-        // Wait for the specific stream toggle to become visible after filtering
+        // Wait for the specific stream toggle to become visible after filtering (condition-based wait)
         const streamToggleSelector = '[data-test="log-search-index-list-stream-toggle-e2e_automate"]';
         try {
             await this.page.waitForSelector(`${streamToggleSelector} div`, { state: 'visible', timeout: 10000 });
-            await waitUtils.smartWait(this.page, 1000, 'stream toggle visible');
             await this.page.locator(`${streamToggleSelector} div`).first().click();
             testLogger.info('Stream e2e_automate selected successfully via toggle');
         } catch (error) {
@@ -738,6 +737,9 @@ export class SanityPage {
                 }
             }
         }
+
+        // Clear the filter input to prevent state persistence issues for subsequent operations
+        await streamSelectInput.clear();
 
         // Wait for stream selection to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
