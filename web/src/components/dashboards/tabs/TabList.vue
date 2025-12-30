@@ -137,13 +137,15 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .q-tabs {
+  .q-tab {
+    text-transform: none;
+  }
   &--vertical {
     margin: 5px;
     .q-tab {
       justify-content: flex-start;
       padding: 0 1rem 0 1.25rem;
       border-radius: 0.5rem;
-      text-transform: capitalize;
       &__content.tab_content {
         .q-tab {
           &__icon + &__label {
