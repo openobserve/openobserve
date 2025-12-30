@@ -1443,6 +1443,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div
+        style="width: 100%; display: flex; gap: 16px"
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+      >
+        <q-input
+          v-model.number="dashboardPanelData.data.config.axis_label_rotate"
+          label="Label Rotate"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="0"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.axis_label_rotate =
+                value !== '' ? value : 0)
+          "
+          data-test="dashboard-config-axis-label-rotate"
+        >
+        </q-input>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
+          label="Label Truncate"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="0"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.axis_label_truncate_width =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-axis-label-truncate-width"
+        >
+        </q-input>
+      </div>
+
+      <div class="space"></div>
+
       <q-select
         v-if="
           ['area', 'area-stacked', 'line'].includes(
@@ -1884,6 +1945,11 @@ export default defineComponent({
       ) {
         dashboardPanelData.data.config.show_gridlines = true;
       }
+
+      // Initialize axis_label_truncate_width if not set
+      // if (dashboardPanelData.data.config.axis_label_truncate_width === undefined) {
+      //   dashboardPanelData.data.config.axis_label_truncate_width = null;
+      // }
     });
 
     const legendWidthValue = computed({

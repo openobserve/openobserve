@@ -942,10 +942,26 @@ export const convertSQLData = async (
         showAxisLabel = options.xAxis.length - gridData.gridNoOfCol <= index;
       }
 
+      // Calculate dynamic nameGap for non-horizontal charts when label rotation is applied
+      const axisLabelRotation = it.axisLabel?.rotate || 0;
+      const axisLabelWidth = it.axisLabel?.width || 120;
+      const axisLabelFontSize = showAxisLabel ? 12 : 10;
+      const axisLabelMargin = showAxisLabel ? 8 : 0;
+
+      const dynamicNameGap = isHorizontalChart
+        ? yAxisNameGap
+        : calculateDynamicNameGap(
+            axisLabelRotation,
+            axisLabelWidth,
+            axisLabelFontSize,
+            25,
+            axisLabelMargin,
+          );
+
       it.axisTick.length = showAxisLabel ? 5 : 0;
-      it.nameGap = showAxisLabel ? (isHorizontalChart ? yAxisNameGap : 25) : 0;
-      it.axisLabel.margin = showAxisLabel ? 8 : 0;
-      it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
+      it.nameGap = showAxisLabel ? dynamicNameGap : 0;
+      it.axisLabel.margin = axisLabelMargin;
+      it.axisLabel.fontSize = axisLabelFontSize;
       it.nameTextStyle.fontSize = 12;
       it.axisLabel.show = showAxisLabel;
 
@@ -974,6 +990,17 @@ export const convertSQLData = async (
     panelSchema.queries[0]?.fields?.y?.length == 1 &&
     panelSchema.queries[0]?.fields?.y[0]?.label;
 
+  // Calculate additional spacing needed for rotated labels
+  const labelRotation = panelSchema.config?.axis_label_rotate || 0;
+  const labelWidth = panelSchema.config?.axis_label_truncate_width || 120; // Use configured truncate width or default to 120
+  const labelFontSize = 12;
+  const additionalBottomSpace = calculateRotatedLabelBottomSpace(
+    labelRotation,
+    labelWidth,
+    labelFontSize,
+    hasXAxisName,
+  );
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -984,20 +1011,22 @@ export const convertSQLData = async (
       top: "15",
       bottom: hasXAxisName
         ? (() => {
-            if (
+            const baseBottom =
               legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
-            ) {
-              return panelSchema.config?.axis_width == null ? 50 : 60;
-            } else {
-              return panelSchema.config?.axis_width == null ? 35 : 40;
-            }
+                ? (panelSchema.config?.axis_width == null ? 50 : 60)
+                : (panelSchema.config?.axis_width == null ? 35 : 40);
+            return baseBottom + additionalBottomSpace;
           })()
-        : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-          ? 0
-          : breakDownKeys.length > 0
-            ? 25
-            : 0,
+        : (() => {
+            const baseBottom =
+              legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+                ? 0
+                : breakDownKeys.length > 0
+                  ? 25
+                  : 0;
+            return baseBottom + additionalBottomSpace;
+          })(),
     },
     tooltip: {
       trigger: "axis",
@@ -1160,6 +1189,11 @@ export const convertSQLData = async (
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
+      const labelRotation = panelSchema.config?.axis_label_rotate || 0;
+      const labelWidth = panelSchema.config?.axis_label_truncate_width || 120;
+      const labelFontSize = 12;
+      const labelMargin = 10;
+
       return {
         type: "category",
         position: panelSchema.type == "h-bar" ? "left" : "bottom",
@@ -1172,7 +1206,13 @@ export const convertSQLData = async (
           rotate: panelSchema.config?.label_option?.rotate || 0,
         },
         nameLocation: "middle",
-        nameGap: 25,
+        nameGap: calculateDynamicNameGap(
+          labelRotation,
+          labelWidth,
+          labelFontSize,
+          25,
+          labelMargin,
+        ),
         nameTextStyle: {
           fontWeight: "bold",
           fontSize: 14,
@@ -1192,8 +1232,9 @@ export const convertSQLData = async (
               : "truncate",
           // hide axis label if overlaps
           hideOverlap: true,
-          width: 120,
-          margin: 10,
+          width: labelWidth,
+          margin: labelMargin,
+          rotate: labelRotation,
         },
         splitLine: {
           show: showGridlines,
@@ -1572,9 +1613,19 @@ export const convertSQLData = async (
             }
           },
         };
-        options.xAxis[0].axisLabel = {};
+        const xAxisLabelRotation = panelSchema.config?.axis_label_rotate || 0;
+        const xAxisLabelWidth = panelSchema.config?.axis_label_truncate_width || 120;
+        options.xAxis[0].axisLabel = {
+          rotate: xAxisLabelRotation,
+        };
         options.xAxis[0].axisTick = {};
-        options.xAxis[0].nameGap = 25;
+        options.xAxis[0].nameGap = calculateDynamicNameGap(
+          xAxisLabelRotation,
+          xAxisLabelWidth,
+          12,
+          25,
+          options.xAxis[0].axisLabel?.margin || 10,
+        );
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
@@ -1721,11 +1772,21 @@ export const convertSQLData = async (
             ) + 10;
         });
 
-        (options.xAxis.name =
+        options.xAxis.name =
           panelSchema.queries[0]?.fields?.y?.length >= 1
             ? panelSchema.queries[0]?.fields?.y[0]?.label
-            : ""),
-          (options.xAxis.nameGap = 20);
+            : "";
+        // For h-bar, xAxis is the bottom axis after swap
+        // Apply dynamic nameGap calculation if rotation is configured
+        const hBarXAxisRotation = options.xAxis.axisLabel?.rotate || 0;
+        const hBarXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
+        options.xAxis.nameGap = calculateDynamicNameGap(
+          hBarXAxisRotation,
+          hBarXAxisWidth,
+          12,
+          20,
+          options.xAxis.axisLabel?.margin || 10,
+        );
       }
 
       break;
@@ -2014,10 +2075,20 @@ export const convertSQLData = async (
           }
         },
       };
+      const stackedXAxisRotation = options.xAxis[0].axisLabel?.rotate || 0;
+      const stackedXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
       options.xAxis[0].axisLabel.margin = 5;
-      options.xAxis[0].axisLabel = {};
+      options.xAxis[0].axisLabel = {
+        rotate: stackedXAxisRotation,
+      };
       options.xAxis[0].axisTick = {};
-      options.xAxis[0].nameGap = 25;
+      options.xAxis[0].nameGap = calculateDynamicNameGap(
+        stackedXAxisRotation,
+        stackedXAxisWidth,
+        12,
+        25,
+        5,
+      );
 
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
@@ -2245,7 +2316,17 @@ export const convertSQLData = async (
           10;
       });
 
-      options.xAxis.nameGap = 25;
+      // For h-stacked, xAxis is actually the original yAxis (bottom axis after swap)
+      // Apply dynamic nameGap calculation if rotation is configured
+      const hStackedXAxisRotation = options.xAxis.axisLabel?.rotate || 0;
+      const hStackedXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
+      options.xAxis.nameGap = calculateDynamicNameGap(
+        hStackedXAxisRotation,
+        hStackedXAxisWidth,
+        12,
+        25,
+        options.xAxis.axisLabel?.margin || 10,
+      );
 
       break;
     }
@@ -2948,6 +3029,23 @@ export const convertSQLData = async (
     panelSchema?.config?.color?.colorBySeries,
     store.state.theme,
   );
+
+  // Apply label truncation to x-axis only
+  if (panelSchema.config?.axis_label_truncate_width) {
+    if (Array.isArray(options.xAxis)) {
+      options.xAxis.forEach((axis: any) => {
+        if (!axis.axisLabel) axis.axisLabel = {};
+        axis.axisLabel.width = panelSchema.config.axis_label_truncate_width;
+        axis.axisLabel.overflow = "truncate";
+      });
+    } else if (options.xAxis) {
+      if (!options.xAxis.axisLabel) options.xAxis.axisLabel = {};
+      options.xAxis.axisLabel.width =
+        panelSchema.config.axis_label_truncate_width;
+      options.xAxis.axisLabel.overflow = "truncate";
+    }
+  }
+
   return {
     options,
     extras: {
@@ -2972,6 +3070,91 @@ const largestLabel = (data: any) => {
   }, "");
 
   return largestlabel;
+};
+
+/**
+ * Calculates the dynamic nameGap for x-axis based on label rotation and truncate width.
+ * When labels are rotated, we need more space between the labels and the axis name.
+ *
+ * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
+ * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
+ * @param {number} fontSize - The font size of the labels in pixels (default: 12).
+ * @param {number} defaultNameGap - The default nameGap to use when rotation is 0 (default: 25).
+ * @param {number} axisLabelMargin - The margin between axis and labels (default: 10).
+ * @return {number} The calculated nameGap value.
+ */
+const calculateDynamicNameGap = (
+  rotate: number = 0,
+  labelWidth: number = 120,
+  fontSize: number = 12,
+  defaultNameGap: number = 25,
+  axisLabelMargin: number = 10,
+): number => {
+  // If no rotation, return the default nameGap
+  if (rotate === 0) {
+    return defaultNameGap;
+  }
+
+  // Convert rotation to radians
+  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
+
+  // Calculate the vertical height occupied by rotated label
+  // When a label of width W is rotated by angle θ:
+  // - The vertical height = W * sin(θ) + fontSize * cos(θ)
+  const verticalHeight =
+    labelWidth * Math.sin(rotationInRadians) +
+    fontSize * Math.cos(rotationInRadians);
+
+  // Calculate nameGap: vertical height + axis label margin + small buffer (5px)
+  // The buffer ensures there's slight spacing between label tip and axis name
+  const calculatedNameGap = Math.ceil(verticalHeight + axisLabelMargin + 5);
+
+  // Return the maximum of calculated and default to ensure minimum spacing
+  return Math.max(calculatedNameGap, defaultNameGap);
+};
+
+/**
+ * Calculates the additional bottom spacing needed for rotated x-axis labels.
+ * This ensures rotated labels don't overlap with legends or get cut off.
+ *
+ * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
+ * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
+ * @param {number} fontSize - The font size of the labels in pixels (default: 12).
+ * @param {boolean} hasAxisName - Whether the axis has a name/title (default: false).
+ * @return {number} The additional spacing needed in pixels.
+ */
+const calculateRotatedLabelBottomSpace = (
+  rotate: number = 0,
+  labelWidth: number = 120,
+  fontSize: number = 12,
+  hasAxisName: boolean = false,
+): number => {
+  // If no rotation, no additional space needed
+  if (rotate === 0) {
+    return 0;
+  }
+
+  // Convert rotation to radians
+  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
+
+  // Calculate the vertical height occupied by rotated label
+  const verticalHeight =
+    labelWidth * Math.sin(rotationInRadians) +
+    fontSize * Math.cos(rotationInRadians);
+
+  // If there's an axis name, the nameGap already accounts for the label height
+  // The default bottom spacing (35-60px) is already generous, so we only need
+  // to add space if the rotated labels extend significantly beyond normal
+  if (hasAxisName) {
+    // Default bottom already has ~35-60px which covers nameGap + some buffer
+    // Only add extra if the label height significantly exceeds the default nameGap (25px)
+    const excessHeight = verticalHeight - 25; // 25px is the default nameGap
+    return Math.max(0, Math.ceil(excessHeight * 0.4)); // Only add 40% of excess as buffer
+  } else {
+    // Without axis name, add some space but account for existing bottom spacing
+    // The vertical height already includes fontSize, so we subtract it to avoid double-counting
+    return Math.max(0, Math.ceil((verticalHeight - fontSize) * 0.5));
+  }
 };
 
 const showTrellisConfig = (type: string) => {
