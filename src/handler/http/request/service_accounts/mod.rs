@@ -71,6 +71,11 @@ pub async fn list(
     _req: HttpRequest,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let org_id = org_id.into_inner();
     let user_id = &user_email.user_id;
     let mut _user_list_from_rbac = None;
@@ -137,6 +142,11 @@ pub async fn save(
     service_account: web::Json<ServiceAccountRequest>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let org_id = org_id.into_inner();
     let initiator_id = user_email.user_id;
     let service_account = service_account.into_inner();
@@ -188,6 +198,11 @@ pub async fn update(
     Headers(user_email): Headers<UserEmail>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_lowercase();
     let query = match web::Query::<HashMap<String, String>>::from_query(req.query_string()) {
@@ -274,6 +289,11 @@ pub async fn delete(
     path: web::Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
@@ -306,6 +326,11 @@ pub async fn delete_bulk(
     Headers(user_email): Headers<UserEmail>,
     req: web::Json<BulkDeleteRequest>,
 ) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let org_id = path.into_inner();
     let req = req.into_inner();
     let initiator_id = user_email.user_id;
@@ -384,6 +409,11 @@ pub async fn delete_bulk(
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
 pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
+    }
+
     let (org, user_id) = path.into_inner();
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
