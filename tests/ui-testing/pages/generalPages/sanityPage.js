@@ -698,27 +698,44 @@ export class SanityPage {
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle');
 
-        // Select stream again after reload using existing locator
+        // Select stream again after reload using the search-and-filter approach
         testLogger.debug('Selecting e2e_automate stream after reload');
-        const streamDropdown = this.page.locator(this.streamSelectDropdown);
-        await this.page.waitHelpers.waitForElementVisible(streamDropdown, {
-            description: 'stream select dropdown after reload'
+        const streamSelectInput = this.page.locator(this.streamSelectDropdown);
+        await this.page.waitHelpers.waitForElementVisible(streamSelectInput, {
+            description: 'stream select input after reload',
+            timeout: 15000
         });
 
-        await streamDropdown.click();
-        await waitUtils.smartWait(this.page, 1000, 'stream dropdown to open');
+        // Click the input to open/focus the dropdown
+        await streamSelectInput.click();
+        await waitUtils.smartWait(this.page, 2000, 'stream dropdown to open');
 
-        // Try to select e2e_automate stream
+        // Fill the input to filter streams - this is critical for finding the stream quickly
+        await streamSelectInput.fill('e2e_automate');
+        await waitUtils.smartWait(this.page, 2000, 'stream filter to apply');
+
+        // Wait for the specific stream toggle to become visible after filtering
+        const streamToggleSelector = '[data-test="log-search-index-list-stream-toggle-e2e_automate"]';
         try {
-            await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
-            testLogger.info('Stream e2e_automate selected successfully');
+            await this.page.waitForSelector(`${streamToggleSelector} div`, { state: 'visible', timeout: 10000 });
+            await waitUtils.smartWait(this.page, 1000, 'stream toggle visible');
+            await this.page.locator(`${streamToggleSelector} div`).first().click();
+            testLogger.info('Stream e2e_automate selected successfully via toggle');
         } catch (error) {
-            testLogger.warn('First stream selection method failed, trying toggle');
+            testLogger.warn(`First stream selection method failed: ${error.message}, trying alternate approaches`);
+            // Try clicking the toggle itself
             try {
-                await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] .q-toggle__inner').click({ timeout: 5000 });
-                testLogger.info('Stream selected via toggle');
+                await this.page.locator(streamToggleSelector).click({ timeout: 5000 });
+                testLogger.info('Stream selected via toggle element');
             } catch (toggleError) {
-                testLogger.warn('Stream selection failed after reload, continuing anyway');
+                // Last resort: try by text
+                try {
+                    await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
+                    testLogger.info('Stream selected via text');
+                } catch (textError) {
+                    testLogger.error(`Stream selection failed after reload: ${textError.message}`);
+                    throw new Error('Failed to select e2e_automate stream - pagination test cannot proceed');
+                }
             }
         }
 
@@ -735,13 +752,14 @@ export class SanityPage {
         await refreshButton.click({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 25000 });
 
-        // Wait and click on the pagination dropdown
-        testLogger.debug('Opening logs results pagination dropdown');
-        const paginationDropdown = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
-        await this.page.waitHelpers.waitForElementClickable(paginationDropdown, {
-            description: 'logs results pagination dropdown'
+        // Wait for pagination to be visible (wait for the first page button as indicator)
+        testLogger.debug('Waiting for schema pagination to be visible');
+        const firstPageBtn = this.page.locator(this.schemaFirstPageButton);
+        await this.page.waitHelpers.waitForElementVisible(firstPageBtn, {
+            description: 'schema pagination first page button',
+            timeout: 30000
         });
-        await paginationDropdown.click({ timeout: 10000 });
+        testLogger.debug('Schema pagination is now visible');
 
         // Verify last page button is visible
         testLogger.debug('Verifying schema last page button is visible');
