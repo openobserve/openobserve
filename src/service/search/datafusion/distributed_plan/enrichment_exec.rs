@@ -253,7 +253,7 @@ async fn fetch_from_memory_cache(
     metrics: EnrichmentMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let fetch_data_timer = metrics.fetch_data_time.timer();
-    let enrichment_data = match ENRICHMENT_TABLES.get(&key) {
+    let enrichment_data = match ENRICHMENT_TABLES.pin().get(&key) {
         Some(stream_table) => {
             log::info!(
                 "[trace_id {trace_id}] EnrichmentExec found enrichment table data for key: {key}, data length: {}",

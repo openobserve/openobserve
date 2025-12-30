@@ -29,7 +29,7 @@ const SHORT_URL_GC_INTERVAL: i64 = 1; // days
 const SHORT_URL_CACHE_LIMIT: i64 = 10_000; // records
 
 pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
-    if let Some(v) = SHORT_URLS.get(short_id) {
+    if let Some(v) = SHORT_URLS.pin().get(short_id) {
         return Ok(v.original_url.to_string());
     }
 
@@ -37,7 +37,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
         .await
         .map_err(|_| anyhow!("Short URL not found in db"))?;
     let original_url = val.original_url.clone();
-    SHORT_URLS.insert(short_id.to_string(), val);
+    SHORT_URLS.pin().insert(short_id.to_string(), val);
     Ok(original_url)
 }
 
@@ -89,11 +89,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                SHORT_URLS.insert(item_key.to_string(), item_value);
+                SHORT_URLS.pin().insert(item_key.to_string(), item_value);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                SHORT_URLS.remove(item_key);
+                SHORT_URLS.pin().remove(item_key);
             }
             Event::Empty => {}
         }
@@ -103,10 +103,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 /// Preload all short URLs from the database into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = short_urls::list(Some(SHORT_URL_CACHE_LIMIT)).await?;
+    let map = SHORT_URLS.pin();
     for row in ret.into_iter() {
-        SHORT_URLS.insert(row.short_id.to_owned(), row);
+        map.insert(row.short_id.to_owned(), row);
     }
-    log::info!("[SHORT_URLS] Cached with len: {}", SHORT_URLS.len());
+    log::info!("[SHORT_URLS] Cached with len: {}", map.len());
     Ok(())
 }
 

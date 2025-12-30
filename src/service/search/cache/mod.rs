@@ -950,17 +950,21 @@ pub async fn write_results(
                 if success {
                     // success: true, cache to disk success
                     // success: false, cache to disk already exists, skipping caching
-                    QUERY_RESULT_CACHE
-                        .write()
-                        .await
-                        .entry(query_key)
-                        .or_insert_with(Vec::new)
-                        .push(ResultCacheMeta {
-                            start_time: accept_start_time,
-                            end_time: accept_end_time,
-                            is_aggregate,
-                            is_descending,
-                        });
+                    let item = ResultCacheMeta {
+                        start_time: accept_start_time,
+                        end_time: accept_end_time,
+                        is_aggregate,
+                        is_descending,
+                    };
+                    QUERY_RESULT_CACHE.pin().update_or_insert(
+                        query_key.to_string(),
+                        |v| {
+                            let mut items = v.clone();
+                            items.push(item.clone());
+                            items
+                        },
+                        vec![item.clone()],
+                    );
                 }
             }
             Err(e) => {

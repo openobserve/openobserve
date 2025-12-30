@@ -263,8 +263,7 @@ impl Partition {
                     .trim_start_matches('/')
                     .to_string();
                 super::WAL_PARQUET_METADATA
-                    .write()
-                    .await
+                    .pin()
                     .insert(file_key, file_meta);
 
                 // update metrics

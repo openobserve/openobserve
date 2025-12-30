@@ -94,11 +94,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
+                QUERY_FUNCTIONS
+                    .pin()
+                    .insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                QUERY_FUNCTIONS.remove(item_key);
+                QUERY_FUNCTIONS.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -109,10 +111,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/function/";
     let ret = db::list(key).await?;
+    let map = QUERY_FUNCTIONS.pin();
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Transform = json::from_slice(&item_value).unwrap();
-        QUERY_FUNCTIONS.insert(item_key.to_string(), json_val);
+        map.insert(item_key.to_string(), json_val);
     }
     log::info!("Functions Cached");
     Ok(())

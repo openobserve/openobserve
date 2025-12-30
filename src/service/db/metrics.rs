@@ -85,14 +85,13 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                 };
                 if item_value.updated_by != LOCAL_NODE.uuid {
                     METRIC_CLUSTER_LEADER
-                        .write()
-                        .await
+                        .pin()
                         .insert(item_key.to_owned(), item_value);
                 }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                METRIC_CLUSTER_LEADER.write().await.remove(item_key);
+                METRIC_CLUSTER_LEADER.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -103,13 +102,11 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
 pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
     let key = "/metrics_leader/";
     let ret = db::list(key).await?;
+    let map = METRIC_CLUSTER_LEADER.pin();
     for (item_key, item_value) in ret {
         let item_key_str = item_key.strip_prefix(key).unwrap();
         let json_val: ClusterLeader = json::from_slice(&item_value).unwrap();
-        METRIC_CLUSTER_LEADER
-            .write()
-            .await
-            .insert(item_key_str.to_string(), json_val);
+        map.insert(item_key_str.to_string(), json_val);
     }
     log::info!("Prometheus cluster leaders Cached");
     Ok(())

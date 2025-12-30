@@ -25,7 +25,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics, spawn_pausable_job,
+    RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -99,7 +99,7 @@ static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     files
 });
 
-pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
+pub static QUERY_RESULT_CACHE: Lazy<RwHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
@@ -350,7 +350,7 @@ impl FileData {
         self.cur_size -= release_size;
 
         if !remove_result_files.is_empty() {
-            let mut r = QUERY_RESULT_CACHE.write().await;
+            let r = QUERY_RESULT_CACHE.pin();
             for query_key in remove_result_files {
                 r.remove(&query_key);
             }
@@ -843,7 +843,9 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
     }
 
     // write all data from result_cache to QUERY_RESULT_CACHE
-    QUERY_RESULT_CACHE.write().await.extend(result_cache);
+    for (k, v) in result_cache {
+        QUERY_RESULT_CACHE.pin().insert(k, v);
+    }
     // write all data from metrics_cache to QUERY_METRICS_CACHE
     METRICS_RESULT_CACHE.write().await.extend(metrics_cache);
     Ok(())

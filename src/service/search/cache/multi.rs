@@ -27,10 +27,8 @@ pub async fn get_cached_results(
     cache_req: CacheQueryRequest,
 ) -> Vec<CachedQueryResponse> {
     let mut res: Vec<_> = vec![];
-    let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
-    let cache_metas = r.get(&query_key).cloned();
-    drop(r);
+    let cache_metas = QUERY_RESULT_CACHE.pin().get(&query_key).cloned();
 
     let Some(mut cache_metas) = cache_metas else {
         log::debug!(

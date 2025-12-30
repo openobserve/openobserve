@@ -130,25 +130,24 @@ pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
 
 pub fn get_cached_user_org(org_id: &str, user_email: &str) -> Option<User> {
     let user_email = user_email.to_lowercase();
-    match ORG_USERS.get(&format!("{org_id}/{user_email}")) {
-        Some(org_user) => match USERS.get(&user_email) {
-            Some(user) => Some(User {
-                email: user.email.clone(),
-                password: user.password.clone(),
-                role: org_user.role.clone(),
-                salt: user.salt.clone(),
-                first_name: user.first_name.clone(),
-                last_name: user.last_name.clone(),
-                password_ext: user.password_ext.clone(),
-                token: org_user.token.clone(),
-                rum_token: org_user.rum_token.clone(),
-                org: org_user.org_id.clone(),
-                is_external: user.user_type.is_external(),
-            }),
-            None => None,
-        },
-        None => None,
-    }
+    let org_user = ORG_USERS
+        .pin()
+        .get(&format!("{org_id}/{user_email}"))
+        .cloned()?;
+    let user = USERS.pin().get(&user_email).cloned()?;
+    Some(User {
+        email: user.email.clone(),
+        password: user.password.clone(),
+        role: org_user.role.clone(),
+        salt: user.salt.clone(),
+        first_name: user.first_name.clone(),
+        last_name: user.last_name.clone(),
+        password_ext: user.password_ext.clone(),
+        token: org_user.token.clone(),
+        rum_token: org_user.rum_token.clone(),
+        org: org_user.org_id.clone(),
+        is_external: user.user_type.is_external(),
+    })
 }
 
 pub async fn get_from_db(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow::Error> {
@@ -161,8 +160,8 @@ pub async fn get_from_db(org_id: &str, user_email: &str) -> Result<OrgUserRecord
 
 pub async fn get(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    if let Some(org_user) = ORG_USERS.get(&format!("{org_id}/{user_email}")) {
-        return Ok(org_user.value().clone());
+    if let Some(org_user) = ORG_USERS.pin().get(&format!("{org_id}/{user_email}")) {
+        return Ok(org_user.clone());
     }
     let org_user = org_users::get(org_id, &user_email)
         .await
@@ -276,16 +275,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             continue;
                         }
                     };
-                    ORG_USERS.insert(item_key.to_string(), item_value.clone());
+                    ORG_USERS
+                        .pin()
+                        .insert(item_key.to_string(), item_value.clone());
                     if is_root_user(user_id) {
-                        let mut user = ROOT_USER.get("root").unwrap().to_owned();
+                        let mut user = ROOT_USER.pin().get("root").cloned().unwrap();
                         user.token = item_value.token.clone();
                         user.rum_token = item_value.rum_token.clone();
-                        ROOT_USER.insert("root".to_string(), user);
+                        ROOT_USER.pin().insert("root".to_string(), user);
                     }
                     if let Some(rum_token) = &item_value.rum_token {
                         USERS_RUM_TOKEN
-                            .clone()
+                            .pin()
                             .insert(format!("{org_id}/{rum_token}"), item_value);
                     }
                 } else if item_key.starts_with("many/user/") {
@@ -300,7 +301,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             }
                         };
                     for item in item_value {
-                        ORG_USERS.insert(
+                        ORG_USERS.pin().insert(
                             format!("{}/{}", item.org_id, item.email),
                             OrgUserRecord {
                                 org_id: item.org_id.clone(),
@@ -312,7 +313,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             },
                         );
                         if let Some(rum_token) = &item.rum_token {
-                            USERS_RUM_TOKEN.clone().insert(
+                            USERS_RUM_TOKEN.pin().insert(
                                 format!("{}/{}", item.org_id, rum_token),
                                 OrgUserRecord {
                                     org_id: item.org_id,
@@ -331,11 +332,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 if item_key.starts_with("single") {
                     let item_key = item_key.strip_prefix("single/").unwrap();
-                    if let Some((_, item_value)) = ORG_USERS.remove(item_key)
+                    if let Some(item_value) = ORG_USERS.pin().remove(item_key).cloned()
                         && let Some(rum_token) = item_value.rum_token
                     {
                         USERS_RUM_TOKEN
-                            .clone()
+                            .pin()
                             .remove(&format!("{}/{}", item_value.org_id, rum_token));
                     }
                 } else if item_key.starts_with("many/user/") {
@@ -345,15 +346,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // to filter the existing records from email, and use that
                     // info to remove
                     let org_user_records: Vec<_> = ORG_USERS
+                        .pin()
                         .iter()
-                        .filter(|v| v.email == user_email)
-                        .map(|v| (v.key().to_owned(), v.value().to_owned()))
+                        .filter(|(_, v)| v.email == user_email)
+                        .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
                     for (k, item) in org_user_records {
-                        ORG_USERS.remove(&k);
+                        ORG_USERS.pin().remove(&k);
                         if let Some(rum_token) = &item.rum_token {
                             USERS_RUM_TOKEN
-                                .clone()
+                                .pin()
                                 .remove(&format!("{}/{}", item.org_id, rum_token));
                         }
                     }
@@ -368,23 +370,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let org_user_records = list(None).await?;
     for user in org_user_records {
-        ORG_USERS.insert(
+        ORG_USERS.pin().insert(
             format!("{}/{}", user.org_id.clone(), user.email.clone()),
             user.clone(),
         );
         if let Some(rum_token) = &user.rum_token {
-            USERS_RUM_TOKEN.clone().insert(
+            USERS_RUM_TOKEN.pin().insert(
                 format!("{}/{}", user.org_id.clone(), rum_token),
                 user.clone(),
             );
         }
         if user.role.eq(&UserRole::Root) {
-            let root = match USERS.get(&user.email) {
+            let root = match USERS.pin().get(&user.email) {
                 Some(root) => root.clone(),
                 None => super::user::get_user_record(&user.email).await?,
             };
 
-            ROOT_USER.insert(
+            ROOT_USER.pin().insert(
                 "root".to_string(),
                 User {
                     email: root.email,

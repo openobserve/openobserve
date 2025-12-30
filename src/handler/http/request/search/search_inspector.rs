@@ -223,17 +223,14 @@ pub async fn get_search_profile(
                 };
 
                 if !is_root_user(&user_id) {
-                    let user =
-                        match USERS
-                            .get(&format!("{org_id}/{user_id}"))
-                            .and_then(|user_record| {
-                                DBUser::from(&(user_record.clone())).get_user(org_id.clone())
-                            }) {
-                            Some(user) => user,
-                            None => {
-                                return Ok(meta::http::HttpResponse::forbidden("User not found"));
-                            }
-                        };
+                    let user = match USERS.pin().get(&format!("{org_id}/{user_id}")).and_then(
+                        |user_record| DBUser::from(&(user_record.clone())).get_user(org_id.clone()),
+                    ) {
+                        Some(user) => user,
+                        None => {
+                            return Ok(meta::http::HttpResponse::forbidden("User not found"));
+                        }
+                    };
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,

@@ -36,7 +36,7 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        SchemaCache,
+        SchemaCache, StreamSettingsCache,
     },
 };
 
@@ -342,16 +342,17 @@ pub async fn delete_enrichment_table(
 
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
+    STREAM_SCHEMAS.pin().remove(&key);
     STREAM_SCHEMAS_LATEST.pin().remove(&key);
 
     // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    STREAM_SETTINGS.pin().remove(&key);
+    let cache = STREAM_SETTINGS
+        .pin()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<StreamSettingsCache>();
+    infra::schema::set_stream_settings_atomic(cache);
 
     // delete record_id generator if present
     {

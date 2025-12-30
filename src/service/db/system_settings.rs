@@ -51,7 +51,7 @@ pub async fn get(
     let cache_k = cache_key(scope, org_id, user_id, key);
 
     // Check cache first
-    if let Some(setting) = SYSTEM_SETTINGS.read().await.get(&cache_k) {
+    if let Some(setting) = SYSTEM_SETTINGS.pin().get(&cache_k) {
         return Ok(Some(setting.clone()));
     }
 
@@ -62,7 +62,7 @@ pub async fn get(
 
     // Cache the result if found
     if let Some(ref s) = setting {
-        SYSTEM_SETTINGS.write().await.insert(cache_k, s.clone());
+        SYSTEM_SETTINGS.pin().insert(cache_k, s.clone());
     }
 
     Ok(setting)
@@ -130,8 +130,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
         &result.setting_key,
     );
     SYSTEM_SETTINGS
-        .write()
-        .await
+        .pin()
         .insert(cache_k.clone(), result.clone());
 
     // Emit event to update cache on other cluster nodes
@@ -156,7 +155,7 @@ pub async fn delete(
 
     // Remove from local cache
     let cache_k = cache_key(scope, org_id, user_id, key);
-    SYSTEM_SETTINGS.write().await.remove(&cache_k);
+    SYSTEM_SETTINGS.pin().remove(&cache_k);
 
     // Emit event to update cache on other cluster nodes
     let event_key = format!("{}{}", SYSTEM_SETTINGS_WATCHER_PREFIX, cache_k);
@@ -175,7 +174,7 @@ pub async fn delete_org_settings(org_id: &str) -> Result<u64> {
 
     // Clear org settings from cache, then emit events after releasing lock
     let keys_to_remove: Vec<String> = {
-        let mut cache = SYSTEM_SETTINGS.write().await;
+        let cache = SYSTEM_SETTINGS.pin();
         let keys: Vec<String> = cache
             .iter()
             .filter(|(k, _)| k.split(':').nth(1) == Some(org_id))
@@ -210,7 +209,7 @@ pub async fn delete_user_settings(org_id: &str, user_id: &str) -> Result<u64> {
 
     // Clear user settings from cache, then emit events after releasing lock
     let keys_to_remove: Vec<String> = {
-        let mut cache = SYSTEM_SETTINGS.write().await;
+        let cache = SYSTEM_SETTINGS.pin();
         let keys: Vec<String> = cache
             .iter()
             .filter(|(k, _)| {
@@ -246,7 +245,7 @@ pub async fn cache() -> Result<()> {
         .await
         .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
 
-    let mut cache = SYSTEM_SETTINGS.write().await;
+    let map = SYSTEM_SETTINGS.pin();
     for setting in settings {
         let cache_k = cache_key(
             &setting.scope,
@@ -254,7 +253,7 @@ pub async fn cache() -> Result<()> {
             setting.user_id.as_deref(),
             &setting.setting_key,
         );
-        cache.insert(cache_k, setting);
+        map.insert(cache_k, setting);
     }
     log::info!("System settings cached");
     Ok(())
@@ -314,10 +313,7 @@ pub async fn watch() -> Result<()> {
                 // Fetch from database and update cache
                 match db::get(&scope, org_id, user_id, key).await {
                     Ok(Some(setting)) => {
-                        SYSTEM_SETTINGS
-                            .write()
-                            .await
-                            .insert(cache_k.to_string(), setting);
+                        SYSTEM_SETTINGS.pin().insert(cache_k.to_string(), setting);
                         log::debug!("Updated system setting in cache: {}", cache_k);
                     }
                     Ok(None) => {
@@ -336,7 +332,7 @@ pub async fn watch() -> Result<()> {
                         continue;
                     }
                 };
-                SYSTEM_SETTINGS.write().await.remove(cache_k);
+                SYSTEM_SETTINGS.pin().remove(cache_k);
                 log::debug!("Removed system setting from cache: {}", cache_k);
             }
             super::Event::Empty => {}
@@ -353,12 +349,12 @@ pub async fn invalidate_cache(
     key: &str,
 ) {
     let cache_k = cache_key(scope, org_id, user_id, key);
-    SYSTEM_SETTINGS.write().await.remove(&cache_k);
+    SYSTEM_SETTINGS.pin().remove(&cache_k);
 }
 
 /// Invalidate entire cache
 pub async fn invalidate_all_cache() {
-    SYSTEM_SETTINGS.write().await.clear();
+    SYSTEM_SETTINGS.pin().clear();
 }
 
 /// Get FQN priority dimensions for an organization

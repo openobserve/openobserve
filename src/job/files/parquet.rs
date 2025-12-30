@@ -180,7 +180,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
             continue;
         };
         // delete metadata from cache
-        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        WAL_PARQUET_METADATA.pin().remove(&file_key);
         // delete file from disk
         if let Err(e) = remove_file(&file).await {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
@@ -302,7 +302,7 @@ async fn prepare_files(
             continue;
         }
 
-        let parquet_meta = if let Some(meta) = WAL_PARQUET_METADATA.read().await.get(&file_key) {
+        let parquet_meta = if let Some(meta) = WAL_PARQUET_METADATA.pin().get(&file_key) {
             meta.clone()
         } else if let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await {
             parquet_meta
@@ -312,7 +312,7 @@ async fn prepare_files(
         if parquet_meta.eq(&FileMeta::default()) {
             log::warn!("[INGESTER:JOB] the file is empty, just delete file: {file}");
             // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file_key);
+            WAL_PARQUET_METADATA.pin().remove(&file_key);
             // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file)).await {
                 log::error!("[INGESTER:JOB] Failed to remove parquet file from disk: {file}, {e}");
@@ -364,7 +364,7 @@ async fn move_files(
                 file.key,
             );
             // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            WAL_PARQUET_METADATA.pin().remove(&file.key);
             // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
@@ -410,7 +410,7 @@ async fn move_files(
                 file.key,
             );
             // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            WAL_PARQUET_METADATA.pin().remove(&file.key);
             // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
@@ -452,7 +452,7 @@ async fn move_files(
                     file.key,
                 );
                 // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                WAL_PARQUET_METADATA.pin().remove(&file.key);
                 // delete file from disk
                 if let Err(e) = remove_file(wal_dir.join(&file.key)).await {
                     log::error!(
@@ -595,7 +595,7 @@ async fn move_files(
 
             if can_delete {
                 // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                WAL_PARQUET_METADATA.pin().remove(&file.key);
                 // delete file from disk
                 match remove_file(wal_dir.join(&file.key)).await {
                     Err(e) => {

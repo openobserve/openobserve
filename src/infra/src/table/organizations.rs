@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 #[cfg(feature = "cloud")]
 use config::utils::time::day_micros;
-use config::{RwAHashMap, meta::organization::OrganizationType};
-use hashbrown::HashMap;
+use config::{RwHashMap, meta::organization::OrganizationType};
 use once_cell::sync::Lazy;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
@@ -34,8 +31,7 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-static CACHE: Lazy<Arc<RwAHashMap<String, OrganizationRecord>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+static CACHE: Lazy<RwHashMap<String, OrganizationRecord>> = Lazy::new(Default::default);
 
 #[derive(Debug, Clone)]
 pub struct OrganizationRecord {
@@ -150,8 +146,7 @@ pub async fn add(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {
-            let mut cache = CACHE.write().await;
-            cache.insert(org_id.to_string(), org);
+            CACHE.pin().insert(org_id.to_string(), org);
             Ok(())
         }
         Err(e) => match e.sql_err() {
@@ -178,11 +173,12 @@ pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), erro
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     {
-        let mut cache = CACHE.write().await;
-        if let Some(v) = cache.get_mut(org_id) {
+        CACHE.pin().update(org_id.to_string(), |v| {
+            let mut v = v.clone();
             v.updated_at = update_time;
             v.trial_ends_at = new_end;
-        }
+            v
+        });
     }
 
     Ok(())
@@ -206,11 +202,12 @@ pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     {
-        let mut cache = CACHE.write().await;
-        if let Some(v) = cache.get_mut(org_id) {
+        CACHE.pin().update(org_id.to_string(), |v| {
+            let mut v = v.clone();
             v.updated_at = update_time;
             v.org_name = new_name.to_string();
-        }
+            v
+        });
     }
 
     Ok(())
@@ -228,8 +225,7 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     {
-        let mut cache = CACHE.write().await;
-        cache.remove_entry(org_id);
+        CACHE.pin().remove(org_id);
     }
 
     Ok(())
@@ -237,11 +233,8 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
 
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    {
-        let cache = CACHE.read().await;
-        if let Some(v) = cache.get(org_id) {
-            return Ok(v.clone());
-        }
+    if let Some(v) = CACHE.pin().get(org_id) {
+        return Ok(v.clone());
     }
     let record = Entity::find()
         .filter(Column::Identifier.eq(org_id))
@@ -253,10 +246,7 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
         })?;
 
     let org = OrganizationRecord::from(record.clone());
-    {
-        let mut cache = CACHE.write().await;
-        cache.insert(org_id.to_string(), org);
-    }
+    CACHE.pin().insert(org_id.to_string(), org);
 
     Ok(OrganizationRecord::from(record))
 }
@@ -340,9 +330,9 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     {
-        let mut cache = CACHE.write().await;
+        let map = CACHE.pin();
         for id in &org_ids {
-            cache.remove_entry(id);
+            map.remove(id);
         }
     }
 
@@ -350,10 +340,9 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
 }
 
 pub async fn invalidate_cache(org_id: Option<&str>) {
-    let mut cache = CACHE.write().await;
     if let Some(v) = org_id {
-        cache.remove(v);
+        CACHE.pin().remove(v);
     } else {
-        cache.drain();
+        CACHE.pin().clear();
     }
 }

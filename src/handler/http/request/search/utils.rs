@@ -285,7 +285,7 @@ mod tests {
         settings_b.defined_schema_fields = vec!["other_field".to_string()]; // UDS without continent
 
         {
-            let mut w = STREAM_SETTINGS.write().await;
+            let w = STREAM_SETTINGS.pin();
             w.insert(cache_key_a.clone(), settings_a.clone());
             w.insert(cache_key_b.clone(), settings_b.clone());
 
@@ -318,7 +318,7 @@ JOIN "test1" AS b"#;
             w.remove(&cache_key_b);
         }
         {
-            let mut w = STREAM_SETTINGS.write().await;
+            let w = STREAM_SETTINGS.pin();
             w.remove(&cache_key_a);
             w.remove(&cache_key_b);
         }
@@ -379,7 +379,7 @@ mod validate_query_edge_cases {
                     w.remove(&self.cache_key_test1);
                 }
                 {
-                    let mut w = STREAM_SETTINGS.write().await;
+                    let w = STREAM_SETTINGS.pin();
                     w.remove(&self.cache_key_oly);
                     w.remove(&self.cache_key_test1);
                 }
@@ -464,7 +464,7 @@ mod validate_query_edge_cases {
 
             // Setup UDS settings
             {
-                let mut w = STREAM_SETTINGS.write().await;
+                let w = STREAM_SETTINGS.pin();
                 w.insert(cache_key_oly.clone(), oly_uds.clone());
                 w.insert(cache_key_test1.clone(), test1_uds.clone());
 

@@ -75,7 +75,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
-            ROOT_USER.get("root").unwrap().to_owned()
+            ROOT_USER.pin().get("root").unwrap().to_owned()
         } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
         {
             user
@@ -118,7 +118,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_no_auth() {
         cache_instance_id("instance");
-        ROOT_USER.insert(
+        ROOT_USER.pin().insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
@@ -151,7 +151,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_auth() {
         cache_instance_id("instance");
-        ROOT_USER.insert(
+        ROOT_USER.pin().insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
@@ -168,7 +168,7 @@ mod tests {
             },
         );
 
-        ORG_USERS.insert(
+        ORG_USERS.pin().insert(
             "default/root@example.com".to_string(),
             OrgUserRecord {
                 role: UserRole::Root,
@@ -197,7 +197,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_err_auth() {
         cache_instance_id("instance");
-        ROOT_USER.insert(
+        ROOT_USER.pin().insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),

@@ -270,9 +270,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::user::cache().await?;
                     db::org_users::cache().await?;
                     let mut id = 0;
-                    for user in USERS.iter() {
+                    for (key, value) in USERS.pin().iter() {
                         id += 1;
-                        println!("{id}\t{:?}\n{:?}", user.key(), user.value());
+                        println!("{id}\t{:?}\n{:?}", key, value);
                     }
                 }
                 _ => {

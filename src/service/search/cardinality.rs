@@ -178,7 +178,7 @@ pub async fn check_cardinality(
                         value: cardinality,
                         timestamp: now_micros(),
                     };
-                    CARDINALITY_CACHE.insert(cache_key, cache_entry);
+                    CARDINALITY_CACHE.pin().insert(cache_key, cache_entry);
 
                     log::debug!(
                         "Calculated and cached cardinality for {org_id}/{stream_type}/{stream_name}/{field_name}: {cardinality}"
@@ -211,7 +211,7 @@ async fn get_cardinality_from_cache(
     let cache_key = generate_cache_key(org_id, stream_type, stream_name, field_name);
 
     // Check if entry exists in cache
-    let entry = match CARDINALITY_CACHE.get(&cache_key) {
+    let entry = match CARDINALITY_CACHE.pin().get(&cache_key) {
         Some(entry) => entry.clone(),
         None => {
             return Err(Error::Message(
@@ -222,7 +222,7 @@ async fn get_cardinality_from_cache(
 
     // Check if entry is expired
     if is_cache_expired(&entry) {
-        CARDINALITY_CACHE.remove(&cache_key);
+        CARDINALITY_CACHE.pin().remove(&cache_key);
         Err(Error::Message(
             "cardinality cache miss - expired".to_string(),
         ))
@@ -337,8 +337,8 @@ pub async fn get_cache_stats() -> (usize, usize) {
     let now = now_micros();
     let mut expired_count = 0;
 
-    for entry in CARDINALITY_CACHE.iter() {
-        if now - entry.value().timestamp > CACHE_EXPIRATION_MICROS {
+    for entry in CARDINALITY_CACHE.pin().values() {
+        if now - entry.timestamp > CACHE_EXPIRATION_MICROS {
             expired_count += 1;
         }
     }
@@ -398,7 +398,9 @@ mod tests {
             value: 42.0,
             timestamp: now_micros(),
         };
-        CARDINALITY_CACHE.insert(cache_key.clone(), cache_entry);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(cache_key.clone(), cache_entry);
 
         // Should now return the cached value
         let result =
@@ -406,7 +408,7 @@ mod tests {
         assert_eq!(result.unwrap(), 42.0);
 
         // Clean up - ensure we remove the entry
-        let removed = CARDINALITY_CACHE.remove(&cache_key);
+        let removed = CARDINALITY_CACHE.pin().remove(&cache_key).cloned();
         assert!(removed.is_some(), "Should have removed the cache entry");
 
         // Verify it's really gone
@@ -432,14 +434,18 @@ mod tests {
             value: 100.0,
             timestamp: now - 1000, // 1ms ago (fresh)
         };
-        CARDINALITY_CACHE.insert(fresh_key1.clone(), fresh_entry1);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(fresh_key1.clone(), fresh_entry1);
 
         let fresh_key2 = format!("{test_prefix}_fresh2");
         let fresh_entry2 = CardinalityCacheEntry {
             value: 200.0,
             timestamp: now - 60 * 1_000_000, // 1 minute ago (fresh)
         };
-        CARDINALITY_CACHE.insert(fresh_key2.clone(), fresh_entry2);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(fresh_key2.clone(), fresh_entry2);
 
         // Add some expired entries with unique keys
         let expired_key1 = format!("{test_prefix}_expired1");
@@ -447,7 +453,9 @@ mod tests {
             value: 300.0,
             timestamp: now - CACHE_EXPIRATION_MICROS - 1000, // Over 1 hour ago (expired)
         };
-        CARDINALITY_CACHE.insert(expired_key1.clone(), expired_entry1);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(expired_key1.clone(), expired_entry1);
 
         let expired_key2 = format!("{test_prefix}_expired2");
         let expired_entry2 = CardinalityCacheEntry {
@@ -455,7 +463,9 @@ mod tests {
             timestamp: now - CACHE_EXPIRATION_MICROS - 60 * 1_000_000, /* Way over 1 hour ago
                                                                         * (expired) */
         };
-        CARDINALITY_CACHE.insert(expired_key2.clone(), expired_entry2);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(expired_key2.clone(), expired_entry2);
 
         // Check cache stats - should have added 4 entries (2 fresh + 2 expired)
         let (total, expired) = get_cache_stats().await;
@@ -474,7 +484,9 @@ mod tests {
             value: 500.0,
             timestamp: now - 30 * 1_000_000, // 30 seconds ago (fresh)
         };
-        CARDINALITY_CACHE.insert(fresh_key3.clone(), fresh_entry3);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(fresh_key3.clone(), fresh_entry3);
 
         // Check cache stats again - should have added 1 more fresh entry
         let (total, expired) = get_cache_stats().await;
@@ -490,11 +502,11 @@ mod tests {
         );
 
         // Clean up test entries
-        CARDINALITY_CACHE.remove(&fresh_key1);
-        CARDINALITY_CACHE.remove(&fresh_key2);
-        CARDINALITY_CACHE.remove(&fresh_key3);
-        CARDINALITY_CACHE.remove(&expired_key1);
-        CARDINALITY_CACHE.remove(&expired_key2);
+        CARDINALITY_CACHE.pin().remove(&fresh_key1);
+        CARDINALITY_CACHE.pin().remove(&fresh_key2);
+        CARDINALITY_CACHE.pin().remove(&fresh_key3);
+        CARDINALITY_CACHE.pin().remove(&expired_key1);
+        CARDINALITY_CACHE.pin().remove(&expired_key2);
 
         // Verify cleanup - should be back to initial state
         let (total, expired) = get_cache_stats().await;
@@ -527,14 +539,18 @@ mod tests {
             value: 100.0,
             timestamp: now_micros(),
         };
-        CARDINALITY_CACHE.insert(cache_key1.clone(), cache_entry1);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(cache_key1.clone(), cache_entry1);
 
         let cache_key2 = generate_cache_key(org_id, stream_type, stream_name, &field2);
         let cache_entry2 = CardinalityCacheEntry {
             value: 200.0,
             timestamp: now_micros(),
         };
-        CARDINALITY_CACHE.insert(cache_key2.clone(), cache_entry2);
+        CARDINALITY_CACHE
+            .pin()
+            .insert(cache_key2.clone(), cache_entry2);
 
         // field3 is not in cache, so it will need to be calculated (but will fail due to no real
         // schema)
@@ -559,8 +575,8 @@ mod tests {
         }
 
         // Clean up
-        CARDINALITY_CACHE.remove(&cache_key1);
-        CARDINALITY_CACHE.remove(&cache_key2);
+        CARDINALITY_CACHE.pin().remove(&cache_key1);
+        CARDINALITY_CACHE.pin().remove(&cache_key2);
     }
 
     #[test]

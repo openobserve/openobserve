@@ -975,7 +975,10 @@ pub(crate) async fn check_permissions(
         // root user should have access to everything , bypass check in openfga
         return true;
     } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
+        match ORG_USERS
+            .pin()
+            .get(&format!("{}/{user_id}", config::META_ORG_ID))
+        {
             Some(user) => format!("{}", user.role),
             None => "".to_string(),
         }
@@ -1196,8 +1199,8 @@ mod tests {
         let _ = organization::check_and_create_org_without_ofga(org_id).await;
 
         // Clear global caches to ensure test isolation
-        USERS.clear();
-        ORG_USERS.clear();
+        USERS.pin().clear();
+        ORG_USERS.pin().clear();
         let _ = users::create_root_user_if_not_exists(
             org_id,
             UserRequest {

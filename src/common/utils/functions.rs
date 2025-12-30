@@ -29,12 +29,9 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
     let org_key = &format!("{org_id}/");
 
     crate::common::infra::config::QUERY_FUNCTIONS
-        .clone()
+        .pin()
         .iter()
-        .filter_map(|transform| {
-            let key = transform.key();
-            key.strip_prefix(org_key).map(|x| x.to_string())
-        })
+        .filter_map(|(key, _)| key.strip_prefix(org_key).map(|x| x.to_string()))
         .collect()
 }
 
@@ -43,21 +40,16 @@ pub fn init_vrl_runtime() -> vrl::compiler::runtime::Runtime {
 }
 
 pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
-    let en_tables = ENRICHMENT_TABLES.clone();
     let mut functions = vrl::stdlib::all();
     functions.append(&mut vector_enrichment::vrl_functions());
     let registry = TableRegistry::default();
     let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
-    for table in en_tables.iter() {
+    for table in ENRICHMENT_TABLES.pin().values() {
         if table.org_id == org_id || table.org_id == DEFAULT_ORG {
-            tables.insert(
-                table.stream_name.to_owned(),
-                Box::new(table.value().clone()),
-            );
+            tables.insert(table.stream_name.to_owned(), Box::new(table.clone()));
         }
     }
-    drop(en_tables);
 
     if let Some(v) = GEOIP_CITY_TABLE.read().as_ref() {
         tables.insert(GEO_IP_CITY_ENRICHMENT_TABLE.to_owned(), Box::new(v.clone()));
@@ -113,7 +105,7 @@ mod tests {
         // Setup test data
         let test_org = "test_org";
         let test_key = format!("{test_org}/test_transform");
-        crate::common::infra::config::QUERY_FUNCTIONS.insert(
+        crate::common::infra::config::QUERY_FUNCTIONS.pin().insert(
             test_key.clone(),
             config::meta::function::Transform {
                 name: test_key.clone(),
@@ -147,7 +139,9 @@ mod tests {
             stream_name: test_stream.to_string(),
             data: Arc::new(vec![]),
         };
-        ENRICHMENT_TABLES.insert(table_name.to_string(), en_table);
+        ENRICHMENT_TABLES
+            .pin()
+            .insert(table_name.to_string(), en_table);
 
         // Test the function
         let config = get_vrl_compiler_config(test_org);

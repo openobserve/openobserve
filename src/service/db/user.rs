@@ -47,10 +47,10 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
     // Do not rely on the org_id to check if the user is root. If the user is root,
     // Just return the root user.
     let user = if is_root_user(name) {
-        ROOT_USER.get("root").map(|usr| usr.clone())
+        ROOT_USER.pin().get("root").cloned()
     } else {
         match org_id {
-            None => ROOT_USER.get("root").map(|usr| usr.clone()),
+            None => ROOT_USER.pin().get("root").cloned(),
             Some(org_id) => get_cached_user_org(org_id, name),
         }
     };
@@ -86,9 +86,9 @@ pub async fn get_by_token(
     token: &str,
 ) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
-        None => ROOT_USER.get("root").map(|v| v.value().clone()),
+        None => ROOT_USER.pin().get("root").cloned(),
         Some(org_id) => USERS_RUM_TOKEN
-            .clone()
+            .pin()
             .get(&format!("{org_id}/{token}"))
             .and_then(|v| get_cached_user_org(org_id, &v.email)),
     };
@@ -275,21 +275,24 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                USERS.insert(item_key.to_string(), item_value.clone());
+                USERS.pin().insert(item_key.to_string(), item_value.clone());
                 if item_value.is_root {
                     // Root user must be there, it is created when
                     // openobserve is run for the first time
-                    let mut root = ROOT_USER.get_mut("root").unwrap();
-                    root.first_name = item_value.first_name.clone();
-                    root.last_name = item_value.last_name.clone();
-                    root.password = item_value.password.clone();
-                    root.salt = item_value.salt.clone();
-                    root.password_ext = item_value.password_ext.clone();
+                    ROOT_USER.pin().update("root".to_string(), |v| {
+                        let mut root = v.clone();
+                        root.first_name = item_value.first_name.clone();
+                        root.last_name = item_value.last_name.clone();
+                        root.password = item_value.password.clone();
+                        root.salt = item_value.salt.clone();
+                        root.password_ext = item_value.password_ext.clone();
+                        root
+                    });
                 }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                USERS.remove(item_key);
+                USERS.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -299,8 +302,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let users = list_users(None).await?;
+    let map = USERS.pin();
     for user in users {
-        USERS.insert(user.email.clone(), user);
+        map.insert(user.email.clone(), user);
     }
     log::info!("Users Cached");
     Ok(())
@@ -310,7 +314,7 @@ pub async fn root_user_exists() -> bool {
     // Cache into the ROOT_USER
     match users::get_root_user().await {
         Ok(user) => {
-            ROOT_USER.insert(
+            ROOT_USER.pin().insert(
                 "root".to_string(),
                 User {
                     email: user.email,

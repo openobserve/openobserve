@@ -15,11 +15,7 @@
 
 use std::collections::HashSet;
 
-use config::{
-    RwHashMap, RwHashSet,
-    meta::stream::{FileKey, FileMeta},
-};
-use dashmap::{DashMap, DashSet};
+use config::meta::stream::{FileKey, FileMeta};
 use infra::errors::Result;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -27,14 +23,9 @@ use o2_enterprise::enterprise::{
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 use once_cell::sync::Lazy;
+
 pub mod broadcast;
 pub mod local;
-
-pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
-    Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
-
-pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
-    Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
 
 pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()
@@ -157,74 +148,13 @@ async fn single_cache_stats() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::FileMeta;
-
     use super::*;
-
-    fn create_test_file_meta() -> FileMeta {
-        FileMeta {
-            min_ts: 1234567890,
-            max_ts: 1234567900,
-            records: 100,
-            original_size: 1000,
-            compressed_size: 500,
-            index_size: 100,
-            flattened: false,
-        }
-    }
 
     #[tokio::test]
     async fn test_progress_no_meta() {
         let result = progress("test_org", "test_file.parquet", None, false).await;
         assert!(result.is_ok()); // Should return 0 when no operation is performed
         assert_eq!(result.unwrap(), 0);
-    }
-
-    #[test]
-    fn test_static_variables() {
-        // Test that static variables are accessible
-        let duplicate_count = DEPULICATE_FILES.len();
-        let deleted_count = DELETED_FILES.len();
-        let blocked_orgs_count = BLOCKED_ORGS.len();
-
-        // Just verify they're accessible (counts can be anything)
-        // Counts are usize so they're always >= 0, just verify they exist
-        let _ = duplicate_count;
-        let _ = deleted_count;
-        let _ = blocked_orgs_count;
-    }
-
-    #[test]
-    fn test_duplicate_files_operations() {
-        let test_file = "duplicate_test.parquet";
-
-        // Test insertion
-        DEPULICATE_FILES.insert(test_file.to_string());
-        assert!(DEPULICATE_FILES.contains(test_file));
-
-        // Test removal
-        DEPULICATE_FILES.remove(test_file);
-        assert!(!DEPULICATE_FILES.contains(test_file));
-    }
-
-    #[test]
-    fn test_deleted_files_operations() {
-        let test_file = "deleted_test.parquet";
-        let meta = create_test_file_meta();
-
-        // Test insertion
-        DELETED_FILES.insert(test_file.to_string(), meta.clone());
-        assert!(DELETED_FILES.contains_key(test_file));
-
-        // Test retrieval
-        if let Some(stored_meta) = DELETED_FILES.get(test_file) {
-            assert_eq!(stored_meta.records, meta.records);
-            assert_eq!(stored_meta.min_ts, meta.min_ts);
-        }
-
-        // Test removal
-        DELETED_FILES.remove(test_file);
-        assert!(!DELETED_FILES.contains_key(test_file));
     }
 
     #[test]
@@ -236,64 +166,6 @@ mod tests {
         // Test that it contains strings
         for org in BLOCKED_ORGS.iter() {
             assert!(!org.is_empty() || org.is_empty()); // Just verify it's a string
-        }
-    }
-
-    #[tokio::test]
-    async fn test_concurrent_duplicate_files_access() {
-        let base_file = "concurrent_dup_test";
-
-        // Test concurrent access to duplicate files
-        let tasks: Vec<_> = (0..10)
-            .map(|i| {
-                let file = format!("{base_file}_{i}.parquet");
-                tokio::spawn(async move {
-                    DEPULICATE_FILES.insert(file.clone());
-                    tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                    DEPULICATE_FILES.remove(&file);
-                })
-            })
-            .collect();
-
-        // Wait for all tasks to complete
-        for task in tasks {
-            task.await.unwrap();
-        }
-
-        // Verify all files are removed
-        for i in 0..10 {
-            let file = format!("{base_file}_{i}.parquet");
-            assert!(!DEPULICATE_FILES.contains(&file));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_concurrent_deleted_files_access() {
-        let base_file = "concurrent_del_test";
-        let meta = create_test_file_meta();
-
-        // Test concurrent access to deleted files
-        let tasks: Vec<_> = (0..10)
-            .map(|i| {
-                let file = format!("{base_file}_{i}.parquet");
-                let meta_clone = meta.clone();
-                tokio::spawn(async move {
-                    DELETED_FILES.insert(file.clone(), meta_clone);
-                    tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                    DELETED_FILES.remove(&file);
-                })
-            })
-            .collect();
-
-        // Wait for all tasks to complete
-        for task in tasks {
-            task.await.unwrap();
-        }
-
-        // Verify all files are removed
-        for i in 0..10 {
-            let file = format!("{base_file}_{i}.parquet");
-            assert!(!DELETED_FILES.contains_key(&file));
         }
     }
 

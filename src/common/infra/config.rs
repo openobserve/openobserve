@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    RwAHashMap, RwHashMap,
+    RwHashMap,
     meta::{
         alerts::alert::Alert,
         destinations::{Destination, Template},
@@ -30,8 +30,6 @@ use config::{
         user::User,
     },
 };
-use dashmap::DashMap;
-use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
@@ -50,27 +48,25 @@ use crate::{
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
-pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
+pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(Default::default);
 pub static USERS: Lazy<RwHashMap<String, infra::table::users::UserRecord>> =
-    Lazy::new(DashMap::default);
+    Lazy::new(Default::default);
 pub static ORG_USERS: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
-    Lazy::new(DashMap::default);
-pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, infra::table::org_users::OrgUserRecord>>> =
-    Lazy::new(|| Arc::new(DashMap::default()));
-pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
-pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
-pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
-pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<String>>> = Lazy::new(Default::default);
-pub static ALERTS: Lazy<RwAHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
+    Lazy::new(Default::default);
+pub static USERS_RUM_TOKEN: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
+    Lazy::new(Default::default);
+pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(Default::default);
+pub static ORGANIZATION_SETTING: Lazy<RwHashMap<String, OrganizationSetting>> =
+    Lazy::new(Default::default);
+pub static ORGANIZATIONS: Lazy<RwHashMap<String, Organization>> = Lazy::new(Default::default);
+pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+pub static METRIC_CLUSTER_MAP: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
+pub static METRIC_CLUSTER_LEADER: Lazy<RwHashMap<String, ClusterLeader>> =
+    Lazy::new(Default::default);
+pub static STREAM_ALERTS: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
+pub static ALERTS: Lazy<RwHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
 // Key for realtime alert triggers cache is org/alert_id
-pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
+pub static REALTIME_ALERT_TRIGGERS: Lazy<RwHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
@@ -91,22 +87,21 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 pub static GEOIP_ENT_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
 
-pub static STREAM_EXECUTABLE_PIPELINES: Lazy<papaya::HashMap<StreamParams, ExecutablePipeline>> =
+pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwHashMap<StreamParams, ExecutablePipeline>> =
     Lazy::new(Default::default);
-pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
+pub static PIPELINE_STREAM_MAPPING: Lazy<RwHashMap<String, StreamParams>> =
     Lazy::new(Default::default);
 
-pub static SCHEDULED_PIPELINES: Lazy<RwAHashMap<String, Pipeline>> = Lazy::new(Default::default);
+pub static SCHEDULED_PIPELINES: Lazy<RwHashMap<String, Pipeline>> = Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
-pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
-pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
-    Lazy::new(Default::default);
+pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(Default::default);
+pub static USER_ROLES_CACHE: Lazy<RwHashMap<String, CachedUserRoles>> = Lazy::new(Default::default);
 
 /// System settings cache
 /// Key format: "{scope}:{org_id}:{user_id}:{setting_key}" where org_id/user_id can be "_" if not
 /// applicable
-pub static SYSTEM_SETTINGS: Lazy<Arc<RwAHashMap<String, SystemSetting>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+pub static SYSTEM_SETTINGS: Lazy<Arc<RwHashMap<String, SystemSetting>>> =
+    Lazy::new(|| Arc::new(Default::default()));
 
 #[cfg(test)]
 mod tests {
@@ -130,68 +125,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_organization_setting_access() {
-        let org_settings = ORGANIZATION_SETTING.clone();
-        let read_guard = org_settings.read().await;
-        assert_eq!(read_guard.len(), 0);
-        drop(read_guard);
+        assert_eq!(ORGANIZATION_SETTING.pin().len(), 0);
 
         // Test write access
-        let mut write_guard = org_settings.write().await;
-        write_guard.insert("test_org".to_string(), OrganizationSetting::default());
-        assert_eq!(write_guard.len(), 1);
-        drop(write_guard);
-
-        // Verify the write was successful
-        let read_guard = org_settings.read().await;
-        assert_eq!(read_guard.len(), 1);
-        assert!(read_guard.contains_key("test_org"));
+        ORGANIZATION_SETTING
+            .pin()
+            .insert("test_org".to_string(), OrganizationSetting::default());
+        assert_eq!(ORGANIZATION_SETTING.pin().len(), 1);
+        assert!(ORGANIZATION_SETTING.pin().contains_key("test_org"));
     }
 
     #[tokio::test]
     async fn test_organizations_access() {
-        let organizations = ORGANIZATIONS.clone();
-        let read_guard = organizations.read().await;
-        assert_eq!(read_guard.len(), 0);
-        drop(read_guard);
+        assert_eq!(ORGANIZATIONS.pin().len(), 0);
 
         // Test write access
-        let mut write_guard = organizations.write().await;
         let org = Organization {
             identifier: "test_org".to_string(),
             name: "Test Organization".to_string(),
             org_type: "standard".to_string(),
         };
-        write_guard.insert("test_org".to_string(), org);
-        assert_eq!(write_guard.len(), 1);
-        drop(write_guard);
-
-        // Verify the write was successful
-        let read_guard = organizations.read().await;
-        assert_eq!(read_guard.len(), 1);
-        assert!(read_guard.contains_key("test_org"));
+        ORGANIZATIONS.pin().insert("test_org".to_string(), org);
+        assert_eq!(ORGANIZATIONS.pin().len(), 1);
+        assert!(ORGANIZATIONS.pin().contains_key("test_org"));
     }
 
     #[tokio::test]
     async fn test_metric_cluster_map() {
-        let cluster_map = METRIC_CLUSTER_MAP.clone();
-        let read_guard = cluster_map.read().await;
-        assert_eq!(read_guard.len(), 0);
-        drop(read_guard);
+        assert_eq!(METRIC_CLUSTER_MAP.pin().len(), 0);
 
         // Test write access
-        let mut write_guard = cluster_map.write().await;
-        write_guard.insert(
+        METRIC_CLUSTER_MAP.pin().insert(
             "test_metric".to_string(),
             vec!["node1".to_string(), "node2".to_string()],
         );
-        assert_eq!(write_guard.len(), 1);
-        drop(write_guard);
-
-        // Verify the write was successful
-        let read_guard = cluster_map.read().await;
-        assert_eq!(read_guard.len(), 1);
-        assert!(read_guard.contains_key("test_metric"));
-        if let Some(nodes) = read_guard.get("test_metric") {
+        assert_eq!(METRIC_CLUSTER_MAP.pin().len(), 1);
+        assert!(METRIC_CLUSTER_MAP.pin().contains_key("test_metric"));
+        if let Some(nodes) = METRIC_CLUSTER_MAP.pin().get("test_metric") {
             assert_eq!(nodes.len(), 2);
             assert!(nodes.contains(&"node1".to_string()));
             assert!(nodes.contains(&"node2".to_string()));
@@ -200,26 +170,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_metric_cluster_leader() {
-        let cluster_leader = METRIC_CLUSTER_LEADER.clone();
-        let read_guard = cluster_leader.read().await;
-        assert_eq!(read_guard.len(), 0);
-        drop(read_guard);
+        assert_eq!(METRIC_CLUSTER_LEADER.pin().len(), 0);
 
         // Test write access
-        let mut write_guard = cluster_leader.write().await;
-        let leader = ClusterLeader {
-            name: "leader_node".to_string(),
-            last_received: chrono::Utc::now().timestamp_micros(),
-            updated_by: "test_node".to_string(),
-        };
-        write_guard.insert("test_cluster".to_string(), leader);
-        assert_eq!(write_guard.len(), 1);
-        drop(write_guard);
-
-        // Verify the write was successful
-        let read_guard = cluster_leader.read().await;
-        assert_eq!(read_guard.len(), 1);
-        assert!(read_guard.contains_key("test_cluster"));
+        METRIC_CLUSTER_LEADER.pin().insert(
+            "test_cluster".to_string(),
+            ClusterLeader {
+                name: "leader_node".to_string(),
+                last_received: chrono::Utc::now().timestamp_micros(),
+                updated_by: "test_node".to_string(),
+            },
+        );
+        assert_eq!(METRIC_CLUSTER_LEADER.pin().len(), 1);
+        assert!(METRIC_CLUSTER_LEADER.pin().contains_key("test_cluster"));
     }
 
     #[tokio::test]
@@ -269,18 +232,20 @@ mod tests {
         let test_key = "test_key".to_string();
         let test_value = bytes::Bytes::from("test_value");
 
+        let map = KVS.pin();
+
         // Insert
-        KVS.insert(test_key.clone(), test_value.clone());
-        assert_eq!(KVS.len(), 1);
+        map.insert(test_key.clone(), test_value.clone());
+        assert_eq!(map.len(), 1);
 
         // Get
-        let retrieved = KVS.get(&test_key);
+        let retrieved = map.get(&test_key);
         assert!(retrieved.is_some());
         assert_eq!(*retrieved.unwrap(), test_value);
 
         // Remove
-        KVS.remove(&test_key);
-        assert_eq!(KVS.len(), 0);
+        map.remove(&test_key);
+        assert_eq!(map.len(), 0);
     }
 
     #[test]
@@ -295,15 +260,17 @@ mod tests {
             streams: None,
         };
 
+        let map = QUERY_FUNCTIONS.pin();
+
         // Insert
-        QUERY_FUNCTIONS.insert(test_key.clone(), test_transform.clone());
-        assert_eq!(QUERY_FUNCTIONS.len(), 1);
+        map.insert(test_key.clone(), test_transform.clone());
+        assert_eq!(map.len(), 1);
 
         // Verify existence
-        assert!(QUERY_FUNCTIONS.contains_key(&test_key));
+        assert!(map.contains_key(&test_key));
 
         // Clean up
-        QUERY_FUNCTIONS.remove(&test_key);
-        assert_eq!(QUERY_FUNCTIONS.len(), 0);
+        map.remove(&test_key);
+        assert_eq!(map.len(), 0);
     }
 }

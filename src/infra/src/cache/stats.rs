@@ -17,29 +17,31 @@ use config::{
     RwHashMap,
     meta::stream::{FileMeta, StreamStats, StreamType},
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
 static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 
 #[inline]
-pub fn get_stats() -> RwHashMap<String, StreamStats> {
-    STATS.clone()
+pub fn get_stats() -> HashMap<String, StreamStats> {
+    STATS
+        .pin()
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
 }
 
 #[inline]
 pub fn get_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) -> StreamStats {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STATS
-        .get(&key)
-        .map(|v| v.value().clone())
-        .unwrap_or_default()
+    STATS.pin().get(&key).cloned().unwrap_or_default()
 }
 
 #[inline]
 pub fn remove_stream_stats(org_id: &str, stream_name: &str, stream_type: StreamType) {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STATS.remove(&key);
+    STATS.pin().remove(&key);
 }
 
 #[inline]
@@ -50,7 +52,7 @@ pub fn set_stream_stats(
     val: StreamStats,
 ) {
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STATS.insert(key, val);
+    STATS.pin().insert(key, val);
 }
 
 #[inline]
@@ -72,7 +74,7 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     let stream_type = columns[2];
     let stream_name = columns[3];
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let mut stats = STATS.entry(key).or_default();
+    let mut stats = STATS.pin().get(&key).cloned().unwrap_or_default();
     if stats.doc_time_min > val.min_ts || stats.doc_time_min == 0 {
         stats.doc_time_min = val.min_ts;
     }
@@ -84,6 +86,7 @@ pub fn incr_stream_stats(key: &str, val: &FileMeta) -> Result<(), anyhow::Error>
     stats.storage_size += val.original_size as f64;
     stats.compressed_size += val.compressed_size as f64;
     stats.index_size += val.index_size as f64;
+    STATS.pin().insert(key, stats);
 
     Ok(())
 }
@@ -96,8 +99,9 @@ pub fn get_stream_stats_len() -> usize {
 #[inline]
 pub fn get_stream_stats_in_memory_size() -> usize {
     STATS
+        .pin()
         .iter()
-        .map(|v| v.key().len() + STREAM_STATS_MEM_SIZE)
+        .map(|(key, _)| key.len() + STREAM_STATS_MEM_SIZE)
         .sum()
 }
 

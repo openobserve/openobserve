@@ -42,11 +42,10 @@ pub async fn get_by_id<C: ConnectionTrait>(
     alert_id: Ksuid,
 ) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
     if let Some(alert_folder) = ALERTS
-        .read()
-        .await
+        .pin()
         .get(&cache_alert_key(org_id, &scheduler_key(Some(alert_id))))
     {
-        return Ok(Some(alert_folder.to_owned()));
+        return Ok(Some(alert_folder.clone()));
     }
     let folder_and_alert = table::get_by_id(conn, org_id, alert_id).await?;
     Ok(folder_and_alert)
@@ -314,34 +313,42 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut alerts: Vec<(Folder, Alert)> = Vec::new();
-    let r = infra::schema::STREAM_SCHEMAS.read().await;
     let mut orgs = HashSet::new();
-    for key in r.keys() {
+    let keys = infra::schema::STREAM_SCHEMAS
+        .pin()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    for key in keys {
         if !key.contains('/') {
             continue;
         }
-        let split_key = key.split('/').collect::<Vec<&str>>();
-        let org_name = split_key[0];
-        orgs.insert(org_name);
+        let org_name = key.split('/').next().unwrap();
+        orgs.insert(org_name.to_string());
     }
     for org_name in orgs {
-        let alerts_in_orgs = table::list(client, ListAlertsParams::new(org_name)).await?;
+        let alerts_in_orgs = table::list(client, ListAlertsParams::new(&org_name)).await?;
         alerts.extend(alerts_in_orgs);
     }
 
     for alert in alerts {
         let alert_id = alert.1.id.map_or("".to_string(), |id| id.to_string());
         if alert.1.is_real_time {
-            let mut cacher = STREAM_ALERTS.write().await;
             let stream_key =
                 cache_stream_key(&alert.1.org_id, alert.1.stream_type, &alert.1.stream_name);
-            let group = cacher.entry(stream_key.to_string()).or_default();
-            group.push(alert_id.clone());
+            STREAM_ALERTS.pin().update_or_insert(
+                stream_key.to_string(),
+                |v| {
+                    let mut group = v.clone();
+                    group.push(alert_id.clone());
+                    group
+                },
+                vec![alert_id.clone()],
+            );
         }
 
-        let mut cacher = ALERTS.write().await;
         let alert_cache_key = cache_alert_key(&alert.1.org_id, &alert_id);
-        cacher.insert(alert_cache_key, alert);
+        ALERTS.pin().insert(alert_cache_key, alert);
     }
     log::info!("Alerts Cached");
     Ok(())
@@ -380,49 +387,50 @@ async fn put_into_cache(
     // stream name, and 2. ALERTS to store the whole alert body with key
     // of `org/alert_id`
     if item_value.1.is_real_time {
-        let mut stream_alerts_id_cacher = STREAM_ALERTS.write().await;
         let stream_key =
             cache_stream_key(&org, item_value.1.stream_type, &item_value.1.stream_name);
-        let group = stream_alerts_id_cacher
-            .entry(stream_key.to_string())
-            .or_default();
-        if !group.contains(&alert_id) {
-            group.push(alert_id.clone());
-        }
+        STREAM_ALERTS.pin().update_or_insert(
+            stream_key.to_string(),
+            |v| {
+                let mut group = v.clone();
+                if !group.contains(&alert_id) {
+                    group.push(alert_id.clone());
+                }
+                group
+            },
+            vec![alert_id.clone()],
+        );
     }
     // Store the alert in the ALERTS cache as well with the  alert body
-    let mut alerts_cacher = ALERTS.write().await;
     let alert_cache_key = cache_alert_key(&org, &alert_id);
-    alerts_cacher.insert(alert_cache_key, item_value);
+    ALERTS.pin().insert(alert_cache_key, item_value);
     Ok(())
 }
 
 async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::Error> {
     // First delete from the alerts cache and then from stream_alerts cache if required
-    let mut alerts_cacher = ALERTS.write().await;
     let alert_cache_key = cache_alert_key(&org, &alert_id);
-    let removed_item = alerts_cacher.remove(&alert_cache_key);
+    let removed_item = ALERTS.pin().remove(&alert_cache_key).cloned();
     if let Some(removed_alert) = removed_item {
         // Remove the alert from STREAM_ALERTS cache if it is required
-        let mut cacher = STREAM_ALERTS.write().await;
         let stream_key = cache_stream_key(
             &org,
             removed_alert.1.stream_type,
             &removed_alert.1.stream_name,
         );
-        let group = match cacher.get_mut(&stream_key) {
-            Some(v) => v,
-            None => return Ok(()),
-        };
-        group.retain(|v| v.ne(&alert_id));
+        STREAM_ALERTS.pin().update(stream_key, |v| {
+            let mut group = v.clone();
+            group.retain(|v| v.ne(&alert_id));
+            group
+        });
     }
 
     Ok(())
 }
 
 pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
-    let alerts_cacher = ALERTS.read().await;
-    alerts_cacher
+    ALERTS
+        .pin()
         .get(&cache_alert_key(org_id, alert_id))
         .cloned()
 }

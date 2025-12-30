@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{RwAHashMap, cluster::LOCAL_NODE, meta::stream::StreamType};
+use config::{RwHashMap, cluster::LOCAL_NODE, meta::stream::StreamType};
 use once_cell::sync::Lazy;
 
 use crate::service::db;
 
-static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
+static CACHES: Lazy<RwHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str, rule: (i64, i64)) -> String {
     let (offset, step) = rule;
@@ -32,8 +32,7 @@ pub async fn get_offset_from_cache(
     rule: (i64, i64),
 ) -> Option<(i64, String)> {
     let key = mk_key(org_id, stream_type, stream_name, rule);
-    let r = CACHES.read().await;
-    r.get(&key).cloned()
+    CACHES.pin().get(&key).cloned()
 }
 
 pub async fn get_offset(
@@ -43,11 +42,9 @@ pub async fn get_offset(
     rule: (i64, i64),
 ) -> (i64, String) {
     let key = mk_key(org_id, stream_type, stream_name, rule);
-    let r = CACHES.read().await;
-    if let Some(val) = r.get(&key) {
+    if let Some(val) = CACHES.pin().get(&key) {
         return val.clone();
     }
-    drop(r);
 
     let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
@@ -63,9 +60,7 @@ pub async fn get_offset(
     };
     // only cache the value if it's empty or it's from this node
     if node.is_empty() || LOCAL_NODE.uuid.eq(&node) {
-        let mut w = CACHES.write().await;
-        w.insert(key.clone(), (offset, node.clone()));
-        drop(w);
+        CACHES.pin().insert(key.clone(), (offset, node.clone()));
     }
     (offset, node)
 }
@@ -82,16 +77,12 @@ pub async fn set_offset(
     let Some(node) = node else {
         // release this key from this node
         db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
-        let mut w = CACHES.write().await;
-        w.remove(&key);
-        drop(w);
+        CACHES.pin().remove(&key);
         return Ok(());
     };
 
     // set this key to this node
-    let mut w = CACHES.write().await;
-    w.insert(key, (offset, node.to_string()));
-    drop(w);
+    CACHES.pin().insert(key, (offset, node.to_string()));
     Ok(())
 }
 
@@ -102,9 +93,7 @@ pub async fn del_offset(
     rule: (i64, i64),
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, rule);
-    let mut w = CACHES.write().await;
-    w.remove(&key);
-    drop(w);
+    CACHES.pin().remove(&key);
     db::delete_if_exists(&key, false, db::NO_NEED_WATCH)
         .await
         .map_err(Into::into)
@@ -129,15 +118,19 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 }
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
-    let r = CACHES.read().await;
-    for (key, (offset, node)) in r.iter() {
-        if *offset > 0 {
+    let items = CACHES
+        .pin()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<Vec<_>>();
+    for (key, (offset, node)) in items {
+        if offset > 0 {
             let val = if !node.is_empty() {
                 format!("{offset};{node}")
             } else {
                 offset.to_string()
             };
-            db::put(key, val.into(), db::NO_NEED_WATCH, None).await?;
+            db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
         }
     }
     Ok(())

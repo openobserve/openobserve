@@ -18,9 +18,8 @@ use std::{collections::HashMap, sync::Arc};
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
-    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
-    get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwHashMap, RwHashSet,
+    SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
@@ -36,21 +35,22 @@ use crate::{
 
 pub mod history;
 
-pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
+pub static STREAM_SCHEMAS: Lazy<RwHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_LATEST: Lazy<papaya::HashMap<String, SchemaCache>> =
+pub static STREAM_SCHEMAS_LATEST: Lazy<RwHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
-pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
-/// Used for filtering records when a stream is configured to store original unflattened records
-/// use a RwHashMap instead of RwAHashMap because of high write ratio as
-/// SnowflakeIdGenerator::generate() requires a &mut
-pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
-    Lazy::new(Default::default);
+pub static STREAM_SETTINGS: Lazy<RwHashMap<String, StreamSettings>> = Lazy::new(Default::default);
 /// Cache if the stream stats exist, used for calculating stats
 pub static STREAM_STATS_EXISTS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
+/// Used for filtering records when a stream is configured to store original unflattened records
+/// use a RwHashMap instead of RwHashMap because of high write ratio as
+/// SnowflakeIdGenerator::generate() requires a &mut
+pub static STREAM_RECORD_ID_GENERATOR: Lazy<
+    dashmap::DashMap<String, SnowflakeIdGenerator, ahash::RandomState>,
+> = Lazy::new(Default::default);
 
 // atomic version of cache
-type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
+pub type StreamSettingsCache = hashbrown::HashMap<String, StreamSettings>;
 static STREAM_SETTINGS_ATOMIC: Lazy<ArcSwap<StreamSettingsCache>> =
     Lazy::new(|| ArcSwap::from(Arc::new(hashbrown::HashMap::new())));
 
@@ -165,8 +165,7 @@ pub async fn get_versions(
 
     let (min_ts, max_ts) = time_range.unwrap_or_default();
     let mut last_schema_index = None;
-    let r = STREAM_SCHEMAS.read().await;
-    if let Some(versions) = r.get(cache_key) {
+    if let Some(versions) = STREAM_SCHEMAS.pin().get(cache_key) {
         let mut schemas = Vec::new();
 
         for (index, (start_dt, data)) in versions.iter().enumerate() {
@@ -192,7 +191,6 @@ pub async fn get_versions(
 
         return Ok(schemas);
     }
-    drop(r);
 
     log::warn!("get_versions: cache missing and get from db for key: {cache_key}");
 
@@ -226,14 +224,16 @@ pub async fn get_versions(
     let latest_schema = ret.last().cloned().unwrap();
     let start_dt = unwrap_stream_start_dt(&latest_schema).unwrap_or(now_micros());
     let schema_versions = vec![(start_dt, latest_schema)];
-    let mut w = STREAM_SCHEMAS.write().await;
-    w.entry(cache_key.to_string())
-        .and_modify(|existing_vec| {
+    STREAM_SCHEMAS.pin().update_or_insert(
+        cache_key.to_string(),
+        |v| {
+            let mut existing_vec = v.clone();
             existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
-            existing_vec.extend(schema_versions.clone())
-        })
-        .or_insert(schema_versions);
-    drop(w);
+            existing_vec.extend(schema_versions.clone());
+            existing_vec
+        },
+        schema_versions.clone(),
+    );
 
     Ok(ret)
 }
@@ -260,12 +260,15 @@ pub async fn get_settings(
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
         // Check cache again before updating as another thread might updated while we reading DB
-        let mut w = STREAM_SETTINGS.write().await;
-        if !w.contains_key(&key) {
-            w.insert(key, s.clone());
+        let map = STREAM_SETTINGS.pin();
+        if !map.contains_key(&key) {
+            map.insert(key, s.clone());
         }
-        set_stream_settings_atomic(w.clone());
-        drop(w);
+        let cache = map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<StreamSettingsCache>();
+        set_stream_settings_atomic(cache);
     }
 
     settings

@@ -26,7 +26,7 @@ mod writer;
 use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
-use config::RwAHashMap;
+use config::RwHashMap;
 pub use entry::Entry;
 pub use immutable::{get_memtable_id_from_file_name, read_from_immutable};
 use once_cell::sync::Lazy;
@@ -42,7 +42,7 @@ use crate::errors::OpenDirSnafu;
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
-pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
+pub static WAL_PARQUET_METADATA: Lazy<RwHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
@@ -163,8 +163,6 @@ async fn run() -> errors::Result<()> {
         if let Err(e) = immutable::persist(tx.clone()).await {
             log::error!("immutable persist error: {e}");
         }
-        // shrink metadata cache
-        WAL_PARQUET_METADATA.write().await.shrink_to_fit();
     }
 
     log::info!("[INGESTER:MEM] immutable persist is stopped");

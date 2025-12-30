@@ -967,7 +967,7 @@ async fn send_notification(
     start_time: Option<i64>,
     evaluation_timestamp: i64,
 ) -> Result<String, anyhow::Error> {
-    let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
+    let org_name = if let Some(org) = ORGANIZATIONS.pin().get(&alert.org_id) {
         org.name.clone()
     } else {
         alert.org_id.to_string()

@@ -30,19 +30,16 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
         config::get_config().limit.metrics_leader_push_interval,
         {
             // only update if there's a change
-            let map = METRIC_CLUSTER_LEADER.read().await.clone();
-            for (key, value) in map.iter() {
-                if last_leaders.contains_key(key) {
-                    let last_leader = last_leaders.get(key).unwrap();
-                    if value.eq(last_leader) {
-                        continue;
-                    }
+            let items = METRIC_CLUSTER_LEADER.pin().iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>();
+            for (key, value) in items {
+                if last_leaders.get(&key).is_some_and(|v|v.eq(&value)) {
+                    continue;
                 }
 
-                let result = db::metrics::set_prom_cluster_leader(key, value).await;
+                let result = db::metrics::set_prom_cluster_leader(&key, &value).await;
                 match result {
                     Ok(_) => {
-                        let _ = last_leaders.insert(key.to_string(), value.clone());
+                        let _ = last_leaders.insert(key, value);
                     }
                     Err(err) => log::error!("error updating leader to db {err}"),
                 }

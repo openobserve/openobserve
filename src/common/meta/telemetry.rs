@@ -278,11 +278,11 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
     let mut metrics_compressed_size: f64 = 0.0;
     let mut traces_orig_size: f64 = 0.0;
     let mut traces_compressed_size: f64 = 0.0;
-    for stats in stats::get_stats().iter() {
+    for (key, stats) in stats::get_stats().iter() {
         streams_orig_size += stats.storage_size;
         streams_compressed_size += stats.compressed_size;
 
-        let stream_type = stats.key().split('/').collect::<Vec<&str>>();
+        let stream_type = key.split('/').collect::<Vec<&str>>();
         if stream_type.len() < 2 {
             continue;
         }
@@ -342,15 +342,13 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
 
     let mut rt_alerts = 0;
     let mut scheduled_alerts = 0;
-    let alert_cacher = ALERTS.read().await;
-    for (_, (_, alert)) in alert_cacher.iter() {
+    for (_, (_, alert)) in ALERTS.pin().iter() {
         if alert.is_real_time {
             rt_alerts += 1
         } else {
             scheduled_alerts += 1
         }
     }
-    drop(alert_cacher);
     data.insert("real_time_alerts".to_string(), rt_alerts.into());
     data.insert("scheduled_alerts".to_string(), scheduled_alerts.into());
 }

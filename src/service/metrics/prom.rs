@@ -342,8 +342,7 @@ pub async fn remote_write(
 
             if first_line && dedup_enabled && !cluster_name.is_empty() {
                 let ha_start = std::time::Instant::now();
-                let lock = METRIC_CLUSTER_LEADER.read().await;
-                match lock.get(&cluster_name) {
+                match METRIC_CLUSTER_LEADER.pin().get(&cluster_name) {
                     Some(leader) => {
                         last_received = leader.last_received;
                         has_entry = true;
@@ -352,7 +351,6 @@ pub async fn remote_write(
                         has_entry = false;
                     }
                 }
-                drop(lock);
                 accept_record = if !replica_label.is_empty() {
                     prom_ha_handler(
                         has_entry,
@@ -1120,15 +1118,14 @@ async fn prom_ha_handler(
     last_received: i64,
     election_interval: i64,
 ) -> bool {
-    let mut _accept_record = false;
+    let accept_record;
     let curr_ts = Utc::now().timestamp_micros();
     if !has_entry {
         METRIC_CLUSTER_MAP
-            .write()
-            .await
+            .pin()
             .insert(cluster_name.to_owned(), vec![]);
         log::info!("Making {replica_label} leader for {cluster_name} ");
-        METRIC_CLUSTER_LEADER.write().await.insert(
+        METRIC_CLUSTER_LEADER.pin().insert(
             cluster_name.to_owned(),
             ClusterLeader {
                 name: replica_label.to_owned(),
@@ -1136,12 +1133,15 @@ async fn prom_ha_handler(
                 updated_by: LOCAL_NODE.uuid.clone(),
             },
         );
-        _accept_record = true;
+        accept_record = true;
     } else {
-        let mut lock = METRIC_CLUSTER_LEADER.write().await;
-        let leader = lock.get_mut(cluster_name).unwrap();
+        let mut leader = METRIC_CLUSTER_LEADER
+            .pin()
+            .get(cluster_name)
+            .cloned()
+            .unwrap_or_default();
         if replica_label.eq(&leader.name) {
-            _accept_record = true;
+            accept_record = true;
             leader.last_received = curr_ts;
             // log::info!(  "Updating last received data for {} to {}",
             // &leader.name, Utc.timestamp_nanos(last_received * 1000));
@@ -1156,30 +1156,43 @@ async fn prom_ha_handler(
             );
             leader.name = replica_label.to_owned();
             leader.last_received = curr_ts;
-            _accept_record = true;
+            accept_record = true;
         } else {
             // log::info!(
             //     "Rejecting entry from {}  as leader is {}",
             //     replica_label,
             //     &leader.name,
             // );
-            _accept_record = false;
+            accept_record = false;
+        }
+
+        if accept_record {
+            METRIC_CLUSTER_LEADER
+                .pin()
+                .insert(cluster_name.to_owned(), leader);
         }
     }
 
-    let mut lock = METRIC_CLUSTER_MAP.write().await;
-    let replica_list = lock.entry(cluster_name.to_owned()).or_default();
+    let mut replica_list = METRIC_CLUSTER_MAP
+        .pin()
+        .get(cluster_name)
+        .cloned()
+        .unwrap_or_default();
     let replica_list_db = if !replica_list.contains(&replica_label.to_owned()) {
         replica_list.push(replica_label.to_owned());
         replica_list.clone()
     } else {
         vec![]
     };
-    drop(lock);
 
     if !replica_list_db.is_empty() {
+        // update in cache
+        METRIC_CLUSTER_MAP
+            .pin()
+            .insert(cluster_name.to_owned(), replica_list_db.clone());
+        // update in db
         let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db).await;
     }
 
-    _accept_record
+    accept_record
 }

@@ -25,24 +25,24 @@ fn mk_keys(org_id: &str, key: &str) -> (String, String) {
 
 pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error> {
     let (cache_key, db_key) = mk_keys(org_id, key);
-    if let Some(it) = KVS.get(&cache_key) {
-        return Ok(it.value().clone());
+    if let Some(it) = KVS.pin().get(&cache_key) {
+        return Ok(it.clone());
     }
     let val = db::get(&db_key).await?;
-    KVS.insert(cache_key, val.clone());
+    KVS.pin().insert(cache_key, val.clone());
     Ok(val)
 }
 
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
     let (cache_key, db_key) = mk_keys(org_id, key);
     db::put(&db_key, val.clone(), db::NEED_WATCH, None).await?;
-    KVS.insert(cache_key, val);
+    KVS.pin().insert(cache_key, val);
     Ok(())
 }
 
 pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     let (cache_key, db_key) = mk_keys(org_id, key);
-    KVS.remove(&cache_key);
+    KVS.pin().remove(&cache_key);
     Ok(db::delete(&db_key, false, db::NEED_WATCH, None).await?)
 }
 
@@ -84,11 +84,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                KVS.insert(item_key.to_string(), item_value);
+                KVS.pin().insert(item_key.to_string(), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                KVS.remove(item_key);
+                KVS.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }

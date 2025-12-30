@@ -54,12 +54,12 @@ pub enum TemplateError {
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     let map_key = format!("{org_id}/{name}");
-    if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
-        return Ok(v.value().clone());
+    if let Some(v) = ALERTS_TEMPLATES.pin().get(&map_key) {
+        return Ok(v.clone());
     }
     let default_org_key = format!("{DEFAULT_ORG}/{name}");
-    if let Some(v) = ALERTS_TEMPLATES.get(&default_org_key) {
-        return Ok(v.value().clone());
+    if let Some(v) = ALERTS_TEMPLATES.pin().get(&default_org_key) {
+        return Ok(v.clone());
     }
 
     if let Some(template) = table::templates::get(org_id, name).await? {
@@ -97,12 +97,11 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    for dest in DESTINATIONS.iter() {
-        let d = dest.value();
-        if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
-            && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
+    for (k, v) in DESTINATIONS.pin().iter() {
+        if (k.starts_with(org_id) || k.starts_with(DEFAULT_ORG))
+            && matches!(&v.module, Module::Alert { template, .. } if template.eq(name))
         {
-            return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
+            return Err(TemplateError::DeleteWithDestination(v.name.to_string()));
         }
     }
     let event_key = match table::templates::get(org_id, name).await? {
@@ -134,16 +133,16 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
-    let cache = ALERTS_TEMPLATES.clone();
+    let cache = ALERTS_TEMPLATES.pin();
     if !cache.is_empty() {
         return Ok(cache
-            .into_iter()
+            .iter()
             .filter_map(|(k, template)| {
                 let is_org_template = k.starts_with(&format!("{org_id}/"));
                 // do not return default org's template for cloud version
                 let is_default_template =
                     !cfg!(feature = "cloud") && k.starts_with(&format!("{DEFAULT_ORG}/"));
-                (is_org_template || is_default_template).then_some(template)
+                (is_org_template || is_default_template).then_some(template.clone())
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
@@ -186,11 +185,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
+                ALERTS_TEMPLATES
+                    .pin()
+                    .insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
-                ALERTS_TEMPLATES.remove(item_key);
+                ALERTS_TEMPLATES.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -200,10 +201,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let all_temps = table::templates::list_all().await?;
-    for (org, temp) in all_temps {
-        let cache_key = format!("{}/{}", org, temp.name);
-        ALERTS_TEMPLATES.insert(cache_key, temp);
+    let map = ALERTS_TEMPLATES.pin();
+    for (org, tpl) in all_temps {
+        let cache_key = format!("{}/{}", org, tpl.name);
+        map.insert(cache_key, tpl);
     }
-    log::info!("{} Templates Cached", ALERTS_TEMPLATES.len());
+    log::info!("{} Templates Cached", map.len());
     Ok(())
 }

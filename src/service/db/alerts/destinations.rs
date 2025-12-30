@@ -65,8 +65,8 @@ pub enum DestinationError {
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
     let map_key = format!("{org_id}/{name}");
-    if let Some(val) = DESTINATIONS.get(&map_key) {
-        return Ok(val.value().clone());
+    if let Some(val) = DESTINATIONS.pin().get(&map_key) {
+        return Ok(val.clone());
     }
     table::destinations::get(org_id, name)
         .await?
@@ -133,20 +133,18 @@ pub async fn list(
     org_id: &str,
     module: Option<&str>,
 ) -> Result<Vec<Destination>, DestinationError> {
-    let cache = DESTINATIONS.clone();
+    let cache = DESTINATIONS.pin();
     if !cache.is_empty() {
         let org_filter = format!("{org_id}/");
         return Ok(cache
             .iter()
-            .filter_map(|dest| {
-                let k = dest.key();
+            .filter_map(|(k, v)| {
                 if k.starts_with(&org_filter) {
-                    let dest = dest.value().clone();
                     if let Some(module) = module {
                         let module = module.to_lowercase();
-                        (dest.module.to_string() == module).then_some(dest)
+                        (v.module.to_string() == module).then_some(v.clone())
                     } else {
-                        Some(dest)
+                        Some(v.clone())
                     }
                 } else {
                     None
@@ -194,11 +192,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                DESTINATIONS.insert(format!("{org_id}/{name}"), item_value);
+                DESTINATIONS
+                    .pin()
+                    .insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
-                DESTINATIONS.remove(item_key);
+                DESTINATIONS.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -208,11 +208,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let all_dest = table::destinations::list_all().await?;
+    let map = DESTINATIONS.pin();
     for dest in all_dest {
         let item_key = format!("{}/{}", dest.org_id, dest.name);
-        DESTINATIONS.insert(item_key, dest);
+        map.insert(item_key, dest);
     }
-    log::info!("{} destinations Cached", DESTINATIONS.len());
+    log::info!("{} destinations Cached", map.len());
     Ok(())
 }
 

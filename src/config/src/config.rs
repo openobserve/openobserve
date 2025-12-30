@@ -46,10 +46,8 @@ use crate::{
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
-pub type RwHashMap<K, V> = dashmap::DashMap<K, V, ahash::RandomState>;
-pub type RwHashSet<K> = dashmap::DashSet<K, ahash::RandomState>;
-pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
-pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
+pub type RwHashMap<K, V> = papaya::HashMap<K, V, ahash::RandomState>;
+pub type RwHashSet<K> = papaya::HashSet<K, ahash::RandomState>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
@@ -326,11 +324,13 @@ pub fn refresh_config() -> Result<(), anyhow::Error> {
 }
 
 pub fn cache_instance_id(instance_id: &str) {
-    INSTANCE_ID.insert("instance_id".to_owned(), instance_id.to_owned());
+    INSTANCE_ID
+        .pin()
+        .insert("instance_id".to_owned(), instance_id.to_owned());
 }
 
 pub fn get_instance_id() -> String {
-    match INSTANCE_ID.get("instance_id") {
+    match INSTANCE_ID.pin().get("instance_id") {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
@@ -3089,7 +3089,7 @@ pub fn get_cluster_name() -> String {
     if !cfg.common.cluster_name.is_empty() {
         cfg.common.cluster_name.to_string()
     } else {
-        INSTANCE_ID.get("instance_id").unwrap().to_string()
+        INSTANCE_ID.pin().get("instance_id").unwrap().to_string()
     }
 }
 

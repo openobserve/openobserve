@@ -144,15 +144,13 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    let cacher = ALERTS.read().await;
-    for (stream_key, (_, alert)) in cacher.iter() {
+    for (stream_key, (_, alert)) in ALERTS.pin().iter() {
         if stream_key.starts_with(&format!("{org_id}/"))
             && alert.destinations.contains(&name.to_string())
         {
             return Err(DestinationError::UsedByAlert(alert.name.to_string()));
         }
     }
-    drop(cacher);
 
     if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
         for pl in pls {

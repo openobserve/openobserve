@@ -19,13 +19,13 @@ use once_cell::sync::Lazy;
 static STREAMS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
 pub fn is_running(stream: &str) -> bool {
-    STREAMS.contains(stream)
+    STREAMS.pin().contains(stream)
 }
 
 pub fn set_running(stream: &str) {
-    STREAMS.insert(stream.to_string());
+    STREAMS.pin().insert(stream.to_string());
 }
 
 pub fn clear_running(stream: &str) {
-    STREAMS.remove(stream);
+    STREAMS.pin().remove(stream);
 }

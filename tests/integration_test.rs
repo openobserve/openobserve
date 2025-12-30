@@ -3511,19 +3511,13 @@ mod tests {
             config::meta::stream::StreamType::EnrichmentTables,
             table_name
         );
-        let stream_schemas = STREAM_SCHEMAS.read().await;
-        assert!(stream_schemas.contains_key(&schema_key));
-        drop(stream_schemas);
+        assert!(STREAM_SCHEMAS.pin().contains_key(&schema_key));
 
         // Verify latest schema cache was updated
-        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
-        assert!(stream_schemas_latest.contains_key(&schema_key));
-        drop(stream_schemas_latest);
+        assert!(STREAM_SCHEMAS_LATEST.pin().contains_key(&schema_key));
 
         // Verify stream settings cache was updated
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(STREAM_SETTINGS.pin().contains_key(&schema_key));
 
         // Get the meta table stats for enrichment table
         let meta_table_stats =
@@ -3562,12 +3556,8 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        println!("save enrichment data new table enrichment_tables: {enrichment_tables:?}");
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
-
-        drop(enrichment_tables);
+        assert!(ENRICHMENT_TABLES.pin().contains_key(&schema_key));
+        assert!(ENRICHMENT_TABLES.pin().get(&schema_key).unwrap().data.len() == 2);
 
         println!("save enrichment data new table meta_table_stats: {meta_table_stats:?}");
         // Also, it should store the cache in the disk
@@ -3596,26 +3586,15 @@ mod tests {
         );
 
         // Check that schema caches are cleared
-        let stream_schemas = STREAM_SCHEMAS.read().await;
-        assert!(!stream_schemas.contains_key(&schema_key));
-        drop(stream_schemas);
-
-        let stream_schemas_latest = STREAM_SCHEMAS_LATEST.read().await;
-        assert!(!stream_schemas_latest.contains_key(&schema_key));
-        drop(stream_schemas_latest);
-
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(!stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(!STREAM_SCHEMAS.pin().contains_key(&schema_key));
+        assert!(!STREAM_SCHEMAS_LATEST.pin().contains_key(&schema_key));
+        assert!(!STREAM_SETTINGS.pin().contains_key(&schema_key));
 
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is deleted
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        println!("enrichment data cleanup enrichment_tables: {enrichment_tables:?}");
-        assert!(!enrichment_tables.contains_key(&schema_key));
-        drop(enrichment_tables);
+        assert!(!ENRICHMENT_TABLES.pin().contains_key(&schema_key));
 
         // Check the local disk cache to check if the table is deleted
         check_enrichment_table_local_disk_cache_deleted(org_id, stream_name).await;
@@ -3665,10 +3644,8 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
-        drop(enrichment_tables);
+        assert!(ENRICHMENT_TABLES.pin().contains_key(&schema_key));
+        assert!(ENRICHMENT_TABLES.pin().get(&schema_key).unwrap().data.len() == 1);
 
         println!(
             "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_first.start_time 1: {:?}",
@@ -3731,10 +3708,8 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 2);
-        drop(enrichment_tables);
+        assert!(ENRICHMENT_TABLES.pin().contains_key(&schema_key));
+        assert!(ENRICHMENT_TABLES.pin().get(&schema_key).unwrap().data.len() == 2);
         println!(
             "save enrichment data append mode check_enrichment_table_local_disk_cache meta_table_stats_second.start_time 2: {:?}",
             meta_table_stats_second.start_time
@@ -3784,10 +3759,8 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         // Check the ENRICHMENT_TABLES cache to check if the table is created
-        let enrichment_tables = ENRICHMENT_TABLES.clone();
-        assert!(enrichment_tables.contains_key(&schema_key));
-        assert!(enrichment_tables.get(&schema_key).unwrap().data.len() == 1);
-        drop(enrichment_tables);
+        assert!(ENRICHMENT_TABLES.pin().contains_key(&schema_key));
+        assert!(ENRICHMENT_TABLES.pin().get(&schema_key).unwrap().data.len() == 1);
 
         // Now append data with additional fields (schema evolution)
         let mut append_payload = Vec::new();

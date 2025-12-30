@@ -109,9 +109,8 @@ pub async fn search_parquet(
     let files_metadata = futures::stream::iter(files)
         .map(|mut file| async move {
             let cfg = get_config();
-            let r = WAL_PARQUET_METADATA.read().await;
             let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
-            if let Some(meta) = r.get(file.key.as_str()) {
+            if let Some(meta) = WAL_PARQUET_METADATA.pin().get(file.key.as_str()) {
                 file.meta = meta.clone();
                 // reset file meta if it already removed
                 if !is_exists(&source_file) {
@@ -119,7 +118,6 @@ pub async fn search_parquet(
                 }
                 return file;
             }
-            drop(r);
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();

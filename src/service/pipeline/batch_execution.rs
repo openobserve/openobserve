@@ -1186,8 +1186,8 @@ fn dfs(
 
 async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
     let func_key = format!("{org_id}/{fn_name}");
-    if let Some(trans) = QUERY_FUNCTIONS.get(&func_key) {
-        return Ok(trans.value().clone());
+    if let Some(trans) = QUERY_FUNCTIONS.pin().get(&func_key) {
+        return Ok(trans.clone());
     }
     // get from database
     crate::service::db::functions::get(org_id, fn_name).await

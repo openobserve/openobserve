@@ -87,19 +87,19 @@ pub fn is_ofga_unsupported(name: &str) -> bool {
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
-    let hash = PASSWORD_HASH.get(&key);
+    let hash = PASSWORD_HASH.pin().get(&key).cloned();
     match hash {
-        Some(ret_hash) => ret_hash.value().to_string(),
+        Some(v) => v,
         None => {
             let password_hash = get_passcode_hash(pass, salt);
-            PASSWORD_HASH.insert(key, password_hash.clone());
+            PASSWORD_HASH.pin().insert(key, password_hash.clone());
             password_hash
         }
     }
 }
 
 pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+    match ORG_USERS.pin().get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
@@ -968,7 +968,7 @@ pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
             access_token
         } else if access_token.starts_with("session") {
             let session_key = access_token.strip_prefix("session ").unwrap().to_string();
-            match USER_SESSIONS.get(&session_key) {
+            match USER_SESSIONS.pin().get(&session_key) {
                 Some(token) => {
                     format!("Bearer {}", *token)
                 }

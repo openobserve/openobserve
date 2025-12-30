@@ -39,7 +39,7 @@ use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
-    unwrap_stream_settings,
+    StreamSettingsCache, unwrap_stream_settings,
 };
 use serde_json::{Map, Value};
 
@@ -455,10 +455,15 @@ pub(crate) async fn handle_diff_schema(
             LOCAL_NODE_ID.load(Ordering::Relaxed),
         ));
     }
-    let mut w = STREAM_SETTINGS.write().await;
-    w.insert(cache_key.clone(), stream_setting);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    STREAM_SETTINGS
+        .pin()
+        .insert(cache_key.clone(), stream_setting);
+    let cache = STREAM_SETTINGS
+        .pin()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<StreamSettingsCache>();
+    infra::schema::set_stream_settings_atomic(cache);
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(

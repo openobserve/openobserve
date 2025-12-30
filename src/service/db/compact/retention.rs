@@ -53,13 +53,13 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
 
     // write in cache
-    if let Some(v) = CACHE.get(&key)
-        && v.value() + hour_micros(1) > now_micros()
+    if let Some(v) = CACHE.pin().get(&key)
+        && *v + hour_micros(1) > now_micros()
     {
         return Ok((db_key, false)); // already in cache, don't create same task in one hour
     }
 
-    CACHE.insert(key.clone(), now_micros());
+    CACHE.pin().insert(key.clone(), now_micros());
     // only watch if deleting all data
     let need_watch = if date_range.is_none() {
         db::NEED_WATCH
@@ -111,7 +111,9 @@ pub fn is_deleting_stream(
     stream_name: &str,
     date_range: Option<(&str, &str)>,
 ) -> bool {
-    CACHE.contains_key(&mk_key(org_id, stream_type, stream_name, date_range))
+    CACHE
+        .pin()
+        .contains_key(&mk_key(org_id, stream_type, stream_name, date_range))
 }
 
 pub async fn delete_stream_done(
@@ -130,7 +132,7 @@ pub async fn delete_stream_done(
     db::delete_if_exists(&format!("/compact/delete/{key}"), false, need_watch).await?;
 
     // remove in cache
-    CACHE.remove(&key);
+    CACHE.pin().remove(&key);
 
     Ok(())
 }
@@ -163,11 +165,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                CACHE.insert(item_key.to_string(), now_micros());
+                CACHE.pin().insert(item_key.to_string(), now_micros());
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                CACHE.remove(item_key);
+                CACHE.pin().remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -178,9 +180,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/compact/delete/";
     let ret = db::list(key).await?;
+    let map = CACHE.pin();
     for (item_key, _) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        CACHE.insert(item_key.to_string(), now_micros());
+        map.insert(item_key.to_string(), now_micros());
     }
     Ok(())
 }

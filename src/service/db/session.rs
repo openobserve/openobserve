@@ -26,7 +26,7 @@ use crate::common::infra::config::USER_SESSIONS;
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
-    if let Some(val) = USER_SESSIONS.get(session_id) {
+    if let Some(val) = USER_SESSIONS.pin().get(session_id) {
         return Ok(val.to_string());
     }
 
@@ -40,7 +40,9 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
             let access_token = session.access_token.clone();
             // Cache it in memory
             if !access_token.is_empty() {
-                USER_SESSIONS.insert(session_id.to_string(), access_token.clone());
+                USER_SESSIONS
+                    .pin()
+                    .insert(session_id.to_string(), access_token.clone());
             }
             Ok(access_token)
         }
@@ -65,7 +67,9 @@ pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
                 });
     }
 
-    USER_SESSIONS.insert(session_id.to_string(), val.to_string());
+    USER_SESSIONS
+        .pin()
+        .insert(session_id.to_string(), val.to_string());
 
     Ok(())
 }
@@ -86,7 +90,7 @@ pub async fn delete(session_id: &str) -> Result<(), anyhow::Error> {
             });
     }
 
-    USER_SESSIONS.remove(session_id);
+    USER_SESSIONS.pin().remove(session_id);
 
     Ok(())
 }
@@ -111,7 +115,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 match infra::table::sessions::get(session_id).await {
                     Ok(Some(session)) => {
                         if !session.access_token.is_empty() {
-                            USER_SESSIONS.insert(session_id.to_string(), session.access_token);
+                            USER_SESSIONS
+                                .pin()
+                                .insert(session_id.to_string(), session.access_token);
                             log::debug!("Session added to cache: {}", session_id);
                         }
                     }
@@ -132,7 +138,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             infra::db::Event::Delete(ev) => {
                 let session_id = ev.key.strip_prefix(key).unwrap();
-                USER_SESSIONS.remove(session_id);
+                USER_SESSIONS.pin().remove(session_id);
                 log::debug!("Session removed from cache: {}", session_id);
             }
             infra::db::Event::Empty => {}
@@ -142,16 +148,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let sessions_list = infra::table::sessions::list().await?;
-
+    let map = USER_SESSIONS.pin();
     for session in sessions_list {
         if !session.access_token.is_empty() {
-            USER_SESSIONS.insert(session.session_id, session.access_token);
+            map.insert(session.session_id.to_string(), session.access_token);
         }
     }
-
-    log::info!(
-        "User Sessions Cached: {} sessions loaded",
-        USER_SESSIONS.len()
-    );
+    log::info!("User Sessions Cached: {} sessions loaded", map.len());
     Ok(())
 }

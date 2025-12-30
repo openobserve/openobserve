@@ -416,7 +416,7 @@ pub async fn get_cached_results(
     let query_key = file_path.replace('/', "_");
     let cache_metas = match cache_metas {
         Some(v) => v,
-        None => QUERY_RESULT_CACHE.read().await.get(&query_key).cloned()?,
+        None => QUERY_RESULT_CACHE.pin().get(&query_key).cloned()?,
     };
 
     let selection_strategy = ResultCacheSelectionStrategy::from(
@@ -838,8 +838,7 @@ pub async fn delete_cache(
             "{}_{}_{}_{}",
             columns[1], columns[2], columns[3], columns[4]
         );
-        let mut r = QUERY_RESULT_CACHE.write().await;
-        r.remove(&query_key);
+        QUERY_RESULT_CACHE.pin().remove(&query_key);
     }
     Ok(true)
 }

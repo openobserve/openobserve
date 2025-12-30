@@ -515,7 +515,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     "enrichment table: {item_key} cache data length: {}",
                     data.len()
                 );
-                ENRICHMENT_TABLES.insert(
+                ENRICHMENT_TABLES.pin().insert(
                     item_key.to_owned(),
                     StreamTable {
                         org_id: org_id.to_string(),
@@ -526,7 +526,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                if let Some((key, _)) = ENRICHMENT_TABLES.remove(item_key) {
+                if let Some((key, _)) = ENRICHMENT_TABLES.pin().remove_entry(item_key) {
                     log::info!("deleted enrichment table: {key}");
                 }
             }

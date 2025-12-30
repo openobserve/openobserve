@@ -49,9 +49,7 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 
     // cache the org setting
     ORGANIZATION_SETTING
-        .clone()
-        .write()
-        .await
+        .pin()
         .insert(key.to_string(), setting.clone());
     Ok(())
 }
@@ -89,7 +87,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
     };
 
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+    if let Some(v) = ORGANIZATION_SETTING.pin().get(&key) {
         let mut ret = v.clone();
         ret.free_trial_expiry = trial_period_expiry;
         return Ok(ret);
@@ -106,8 +104,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
 
     // Cache the org setting (even if it's default)
     ORGANIZATION_SETTING
-        .write()
-        .await
+        .pin()
         .insert(key.to_string(), settings.clone());
     settings.free_trial_expiry = trial_period_expiry;
     Ok(settings)
@@ -118,7 +115,7 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
 /// we add a separate function for avoid clone the setting
 pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
-    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+    if let Some(v) = ORGANIZATION_SETTING.pin().get(&key) {
         return Ok(v.toggle_ingestion_logs);
     }
 
@@ -133,10 +130,7 @@ pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool,
     let toggle_ingestion_logs = settings.toggle_ingestion_logs;
 
     // Cache the org setting (even if it's default)
-    ORGANIZATION_SETTING
-        .write()
-        .await
-        .insert(key.to_string(), settings);
+    ORGANIZATION_SETTING.pin().insert(key.to_string(), settings);
     Ok(toggle_ingestion_logs)
 }
 
@@ -144,13 +138,10 @@ pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool,
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;
     let ret = db::list(prefix).await?;
+    let map = ORGANIZATION_SETTING.pin();
     for (key, item_value) in ret {
         let json_val: OrganizationSetting = json::from_slice(&item_value).unwrap();
-        ORGANIZATION_SETTING
-            .clone()
-            .write()
-            .await
-            .insert(key, json_val);
+        map.insert(key, json_val);
     }
     log::info!("Organization settings Cached");
     Ok(())
@@ -186,11 +177,7 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
                     continue;
                 }
             };
-            ORGANIZATION_SETTING
-                .clone()
-                .write()
-                .await
-                .insert(item_key, json_val);
+            ORGANIZATION_SETTING.pin().insert(item_key, json_val);
         }
     }
 }
@@ -198,12 +185,9 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
 /// Cache the existing orgs in the beginning
 pub async fn cache() -> Result<(), anyhow::Error> {
     let orgs = list(None).await?;
+    let map = ORGANIZATIONS.pin();
     for org in orgs {
-        ORGANIZATIONS
-            .clone()
-            .write()
-            .await
-            .insert(org.identifier.clone(), org);
+        map.insert(org.identifier.clone(), org);
     }
     log::info!("Organizations Cached");
     Ok(())
@@ -239,11 +223,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 json::from_slice(&item_value).unwrap()
             };
             organizations::invalidate_cache(Some(item_key)).await;
-            ORGANIZATIONS
-                .clone()
-                .write()
-                .await
-                .insert(item_key.to_string(), json_val);
+            ORGANIZATIONS.pin().insert(item_key.to_string(), json_val);
         }
     }
 }
@@ -303,7 +283,7 @@ pub async fn get_org_from_db(org_id: &str) -> Result<Organization, anyhow::Error
 }
 
 pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
-    if let Some(org) = ORGANIZATIONS.read().await.get(org_id) {
+    if let Some(org) = ORGANIZATIONS.pin().get(org_id) {
         return Ok(org.clone());
     }
     let org = organizations::get(org_id)

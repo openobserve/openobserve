@@ -117,7 +117,7 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
 
 /// Returns the cached scheduled pipeline by id, or fetches from DB if not cached.
 pub async fn get_scheduled_pipeline_from_cache(pipeline_id: &str) -> Option<Pipeline> {
-    SCHEDULED_PIPELINES.read().await.get(pipeline_id).cloned()
+    SCHEDULED_PIPELINES.pin().get(pipeline_id).cloned()
 }
 
 /// Adds or updates a scheduled pipeline in the cache.
@@ -127,32 +127,32 @@ pub async fn cache_scheduled_pipeline(pipeline: &Pipeline) {
         config::meta::pipeline::components::PipelineSource::Scheduled(_)
     ) {
         SCHEDULED_PIPELINES
-            .write()
-            .await
+            .pin()
             .insert(pipeline.id.clone(), pipeline.clone());
     }
 }
 
 /// Removes a scheduled pipeline from the cache.
 pub async fn remove_scheduled_pipeline_from_cache(pipeline_id: &str) {
-    SCHEDULED_PIPELINES.write().await.remove(pipeline_id);
+    SCHEDULED_PIPELINES.pin().remove(pipeline_id);
 }
 
 /// Returns the number of scheduled pipelines in the cache.
 pub async fn get_scheduled_pipelines_cache_size() -> usize {
-    SCHEDULED_PIPELINES.read().await.len()
+    SCHEDULED_PIPELINES.pin().len()
 }
 
 /// Returns cache statistics for monitoring.
 pub async fn get_cache_stats() -> (usize, usize) {
-    let realtime_count = STREAM_EXECUTABLE_PIPELINES.len();
-    let scheduled_count = SCHEDULED_PIPELINES.read().await.len();
-    (realtime_count, scheduled_count)
+    (
+        STREAM_EXECUTABLE_PIPELINES.len(),
+        SCHEDULED_PIPELINES.pin().len(),
+    )
 }
 
 /// Clears the scheduled pipelines cache. Used for maintenance.
 pub async fn clear_scheduled_pipelines_cache() {
-    SCHEDULED_PIPELINES.write().await.clear();
+    SCHEDULED_PIPELINES.pin().clear();
     log::info!("[Pipeline] Scheduled pipelines cache cleared");
 }
 
@@ -200,13 +200,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");
     }
-    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
-    let stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.pin();
-    let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
     // clear the cache first in case of a refresh
-    pipeline_stream_mapping_cache.clear();
-    stream_exec_pl.clear();
-    scheduled_pipelines_cache.clear();
+    PIPELINE_STREAM_MAPPING.pin().clear();
+    STREAM_EXECUTABLE_PIPELINES.pin().clear();
+    SCHEDULED_PIPELINES.pin().clear();
 
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
@@ -222,14 +219,19 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                             )
                         }
                         Ok(exec_pl) => {
-                            pipeline_stream_mapping_cache
+                            PIPELINE_STREAM_MAPPING
+                                .pin()
                                 .insert(pipeline.id.clone(), stream_params.clone());
-                            stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                            STREAM_EXECUTABLE_PIPELINES
+                                .pin()
+                                .insert(stream_params.clone(), exec_pl);
                         }
                     };
                 }
                 config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
-                    scheduled_pipelines_cache.insert(pipeline.id.clone(), pipeline);
+                    SCHEDULED_PIPELINES
+                        .pin()
+                        .insert(pipeline.id.clone(), pipeline);
                 }
             }
         }
@@ -237,8 +239,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
     log::info!(
         "[Pipeline] Cached realtime pipelines: {}, scheduled pipelines: {}",
-        stream_exec_pl.len(),
-        scheduled_pipelines_cache.len()
+        STREAM_EXECUTABLE_PIPELINES.pin().len(),
+        SCHEDULED_PIPELINES.pin().len()
     );
     Ok(())
 }
@@ -325,8 +327,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 match &pipeline.source {
                     config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
-                        let mut pipeline_stream_mapping_cache =
-                            PIPELINE_STREAM_MAPPING.write().await;
                         if pipeline.enabled {
                             match ExecutablePipeline::new(&pipeline).await {
                                 Err(e) => {
@@ -339,7 +339,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     );
                                 }
                                 Ok(exec_pl) => {
-                                    pipeline_stream_mapping_cache
+                                    PIPELINE_STREAM_MAPPING
+                                        .pin()
                                         .insert(pipeline_id.to_string(), stream_params.clone());
                                     STREAM_EXECUTABLE_PIPELINES
                                         .pin()
@@ -351,7 +352,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 }
                             };
                         } else if let Some(removed) =
-                            pipeline_stream_mapping_cache.remove(pipeline_id)
+                            PIPELINE_STREAM_MAPPING.pin().remove(pipeline_id).cloned()
                             && STREAM_EXECUTABLE_PIPELINES.pin().remove(&removed).is_some()
                         {
                             // remove pipeline from cache if the update is to disable
@@ -361,15 +362,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     }
                     config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
-                        let mut scheduled_pipelines_cache = SCHEDULED_PIPELINES.write().await;
                         if pipeline.enabled {
-                            scheduled_pipelines_cache.insert(pipeline_id.to_string(), pipeline);
+                            SCHEDULED_PIPELINES
+                                .pin()
+                                .insert(pipeline_id.to_string(), pipeline);
                             log::info!(
                                 "[Pipeline::watch]: scheduled pipeline {pipeline_id} added to cache."
                             );
                         } else {
                             // remove pipeline from cache if the update is to disable
-                            if scheduled_pipelines_cache.remove(pipeline_id).is_some() {
+                            if SCHEDULED_PIPELINES.pin().remove(pipeline_id).is_some() {
                                 log::info!(
                                     "[Pipeline]: scheduled pipeline {pipeline_id} disabled and removed from cache."
                                 );
@@ -380,7 +382,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
-                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
+                if let Some(removed) = PIPELINE_STREAM_MAPPING.pin().remove(pipeline_id).cloned()
                     && STREAM_EXECUTABLE_PIPELINES.pin().remove(&removed).is_some()
                 {
                     log::info!(
@@ -388,12 +390,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                 }
                 // Also remove from scheduled pipelines cache
-                if SCHEDULED_PIPELINES
-                    .write()
-                    .await
-                    .remove(pipeline_id)
-                    .is_some()
-                {
+                if SCHEDULED_PIPELINES.pin().remove(pipeline_id).is_some() {
                     log::info!(
                         "[Pipeline]: scheduled pipeline {pipeline_id} deleted and removed from cache."
                     );

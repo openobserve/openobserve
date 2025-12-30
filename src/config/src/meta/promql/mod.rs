@@ -83,7 +83,7 @@ pub struct Metric<'a> {
     pub value: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Eq, PartialEq, Deserialize)]
 pub struct ClusterLeader {
     pub name: String,
     pub last_received: i64,

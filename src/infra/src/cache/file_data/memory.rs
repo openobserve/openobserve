@@ -93,18 +93,20 @@ impl FileData {
 
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let idx = get_bucket_idx(file);
-        let data = DATA[idx].get(file)?;
+        let map = DATA[idx].pin();
+        let data = map.get(file)?;
         Some(if let Some(range) = range {
-            data.value().slice(range.start as usize..range.end as usize)
+            data.slice(range.start as usize..range.end as usize)
         } else {
-            data.value().clone()
+            data.clone()
         })
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
         let idx = get_bucket_idx(file);
-        let data = DATA[idx].get(file)?;
-        Some(data.value().len())
+        let map = DATA[idx].pin();
+        let data = map.get(file)?;
+        Some(data.len())
     }
 
     async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
@@ -127,7 +129,7 @@ impl FileData {
         self.data.insert(file.to_string(), data_size);
         // write file into cache
         let idx = get_bucket_idx(file);
-        DATA[idx].insert(file.to_string(), data);
+        DATA[idx].pin().insert(file.to_string(), data);
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
@@ -158,7 +160,8 @@ impl FileData {
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
             let idx = get_bucket_idx(&key);
-            if let Some((key, data)) = DATA[idx].remove(&key)
+            let data = DATA[idx].pin().remove(&key).cloned();
+            if let Some(data) = data
                 && !is_local_disk_storage()
             {
                 _ = super::disk::set(&key, data).await;
@@ -179,7 +182,6 @@ impl FileData {
             }
         }
         self.cur_size -= release_size;
-        let _ = DATA.iter().map(|c| c.shrink_to_fit()).collect::<Vec<_>>();
         log::info!("File memory cache gc done, released {release_size} bytes");
         Ok(())
     }
@@ -194,7 +196,7 @@ impl FileData {
 
         // remove file from data cache
         let idx = get_bucket_idx(&key);
-        DATA[idx].remove(&key);
+        DATA[idx].pin().remove(&key);
 
         // metrics
         let columns = key.split('/').collect::<Vec<&str>>();

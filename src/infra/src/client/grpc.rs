@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, get_config, meta::cluster::NodeInfo};
+use config::{RwHashMap, get_config, meta::cluster::NodeInfo};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
@@ -32,7 +32,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::errors::{Error, ErrorCodes};
 
-static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
+static CHANNELS: Lazy<RwHashMap<String, Channel>> = Lazy::new(Default::default);
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
@@ -55,17 +55,15 @@ pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Statu
     }
 
     // cache hit
-    let r = CHANNELS.read().await;
-    if let Some(channel) = r.get(grpc_addr) {
+    if let Some(channel) = CHANNELS.pin().get(grpc_addr) {
         return Ok(channel.clone());
     }
-    drop(r);
 
     // cache miss, connect to ingester
     let channel = create_channel(grpc_addr).await?;
-    let mut w = CHANNELS.write().await;
-    w.insert(grpc_addr.to_string(), channel.clone());
-    drop(w);
+    CHANNELS
+        .pin()
+        .insert(grpc_addr.to_string(), channel.clone());
 
     Ok(channel.clone())
 }

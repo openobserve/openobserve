@@ -625,7 +625,6 @@ pub async fn add_user_to_org(
     }
     let email = email.trim().to_lowercase();
     let existing_user = db::user::get_user_record(&email).await;
-    let root_user = ROOT_USER.clone();
     if let Ok(existing_user) = existing_user {
         // If the user is root, we don't need to add to the org, as root user
         // already has access to all organizations.
@@ -640,7 +639,7 @@ pub async fn add_user_to_org(
             let local_org = org_id.replace(' ', "_");
             // If the org does not exist, create it
             let _ = organization::check_and_create_org(&local_org).await;
-            root_user.get("root").unwrap().clone()
+            ROOT_USER.pin().get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
                 Ok(user) => user.unwrap(),
@@ -742,19 +741,15 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 }
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
-    let rum_tokens = USERS_RUM_TOKEN.clone();
     let key = format!("{DEFAULT_ORG}/{token}");
-    if let Some(user) = rum_tokens.get(&key) {
+    if let Some(user) = USERS_RUM_TOKEN.pin().get(&key) {
         return get_user(None, &user.email).await;
     }
 
     let key = format!("{org_id}/{token}");
-    if let Some(user) = rum_tokens.get(&key) {
+    if let Some(user) = USERS_RUM_TOKEN.pin().get(&key) {
         return get_user(Some(org_id), &user.email).await;
     }
-
-    // need to drop the reference to rum_tokens to avoid deadlock of dashmap
-    drop(rum_tokens);
 
     if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
         .await
@@ -772,10 +767,10 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         };
         if is_root_user(&user_from_db.email) {
             USERS_RUM_TOKEN
-                .clone()
+                .pin()
                 .insert(format!("{DEFAULT_ORG}/{token}"), org_user_record);
         } else {
-            USERS_RUM_TOKEN.clone().insert(key, org_user_record);
+            USERS_RUM_TOKEN.pin().insert(key, org_user_record);
         }
         Some(user_from_db)
     } else {
@@ -814,22 +809,27 @@ pub async fn list_users(
         return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
     }
 
-    for org_user in ORG_USERS.iter() {
+    let users = ORG_USERS
+        .pin()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<Vec<_>>();
+    for (k, v) in users {
         // If list all user, maintain a list of orgs for each user
         if is_list_all {
-            let (org, id) = org_user.key().split_once('/').unwrap();
+            let (org, id) = k.split_once('/').unwrap();
             if let Some(org_record) = organization::get_org(org).await {
                 user_orgs
                     .entry(id.to_string())
                     .or_default()
                     .push(OrgRoleMapping {
                         org_id: org.to_string(),
-                        role: org_user.value().role.clone(),
+                        role: v.role.clone(),
                         org_name: org_record.name,
                     });
             }
-        } else if org_user.key().starts_with(&format!("{org_id}/"))
-            && let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await
+        } else if k.starts_with(&format!("{org_id}/"))
+            && let Some(user) = get_user(Some(org_id), v.email.as_str()).await
         {
             let should_include = if let Some(ref required_role) = role {
                 // Filter by role if specified
@@ -845,7 +845,7 @@ pub async fn list_users(
                     last_name: user.last_name.clone(),
                     is_external: user.is_external,
                     orgs: None,
-                    created_at: org_user.value().created_at,
+                    created_at: v.created_at,
                 });
             }
         }
@@ -857,11 +857,9 @@ pub async fn list_users(
             if is_root_user(&user.email) {
                 continue;
             }
-            let (role, created_at) = match ORG_USERS.get(&format!("{org_id}/{}", user.email)) {
-                Some(org_user) => {
-                    let value = org_user.value();
-                    (value.role.to_string(), value.created_at)
-                }
+            let (role, created_at) = match ORG_USERS.pin().get(&format!("{org_id}/{}", user.email))
+            {
+                Some(org_user) => (org_user.role.to_string(), org_user.created_at),
                 None => ("".to_string(), 0),
             };
             user_list.push(UserResponse {
@@ -890,8 +888,7 @@ pub async fn list_users(
     #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     {
         if !org_id.eq(DEFAULT_ORG) && role.is_none() {
-            let root = ROOT_USER.get("root").unwrap();
-            let root_user = root.value();
+            let root_user = ROOT_USER.pin().get("root").cloned().unwrap();
             user_list.push(UserResponse {
                 email: root_user.email.clone(),
                 role: root_user.role.to_string(),
@@ -916,7 +913,7 @@ pub async fn remove_user_from_org(
     let email_id = email_id.to_lowercase();
     let initiator_id = initiator_id.to_lowercase();
     let initiating_user = if is_root_user(&initiator_id) {
-        ROOT_USER.get("root").unwrap().to_owned()
+        ROOT_USER.pin().get("root").unwrap().to_owned()
     } else {
         db::user::get(Some(org_id), &initiator_id)
             .await
@@ -1252,8 +1249,7 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 
 #[cfg(feature = "enterprise")]
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
-    let cache = USER_ROLES_CACHE.read().await;
-    if let Some(cached) = cache.get(user_email)
+    if let Some(cached) = USER_ROLES_CACHE.pin().get(user_email)
         && cached.expires_at > Instant::now()
     {
         return Some(cached.roles.clone());
@@ -1263,8 +1259,7 @@ async fn check_cache(user_email: &str) -> Option<Vec<String>> {
 
 #[cfg(feature = "enterprise")]
 async fn update_cache(user_email: &str, roles: Vec<String>) {
-    let mut cache = USER_ROLES_CACHE.write().await;
-    cache.insert(
+    USER_ROLES_CACHE.pin().insert(
         user_email.to_string(),
         CachedUserRoles {
             roles,
@@ -1340,10 +1335,10 @@ mod tests {
             .expect("Failed to create dummy organization");
 
         // Clear global caches to ensure test isolation
-        USERS.clear();
-        ORG_USERS.clear();
+        USERS.pin().clear();
+        ORG_USERS.pin().clear();
 
-        USERS.insert(
+        USERS.pin().insert(
             "admin@zo.dev".to_string(),
             infra::table::users::UserRecord {
                 email: "admin@zo.dev".to_string(),
@@ -1358,7 +1353,7 @@ mod tests {
                 updated_at: 0,
             },
         );
-        ORG_USERS.insert(
+        ORG_USERS.pin().insert(
             "dummy/admin@zo.dev".to_string(),
             OrgUserRecord {
                 role: UserRole::Admin,
@@ -1544,7 +1539,7 @@ mod tests {
         let exists = root_user_exists().await;
         assert!(!exists);
 
-        crate::common::infra::config::ROOT_USER.insert(
+        ROOT_USER.pin().insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),

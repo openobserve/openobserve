@@ -36,8 +36,9 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        get_settings, get_stream_setting_fts_fields, unwrap_partition_time_level,
-        unwrap_stream_created_at, unwrap_stream_is_derived, unwrap_stream_settings,
+        StreamSettingsCache, get_settings, get_stream_setting_fts_fields,
+        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
+        unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -987,14 +988,17 @@ pub async fn stream_delete_inner(
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     log::warn!("Deleting schema cache for key: {key}");
-    STREAM_SCHEMAS.write().await.remove(&key);
+    STREAM_SCHEMAS.pin().remove(&key);
     STREAM_SCHEMAS_LATEST.pin().remove(&key);
 
     // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    STREAM_SETTINGS.pin().remove(&key);
+    let cache = STREAM_SETTINGS
+        .pin()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<StreamSettingsCache>();
+    infra::schema::set_stream_settings_atomic(cache);
 
     // delete stream record id generator cache
     {

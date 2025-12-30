@@ -183,8 +183,8 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         .set(users as i64);
     for org_id in &orgs {
         let mut count: i64 = 0;
-        for user in ORG_USERS.iter() {
-            if user.key().starts_with(&format!("{org_id}/")) {
+        for key in ORG_USERS.pin().keys() {
+            if key.starts_with(&format!("{org_id}/")) {
                 count += 1;
             }
         }

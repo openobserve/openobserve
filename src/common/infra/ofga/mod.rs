@@ -208,9 +208,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
 
             let mut tuples = vec![];
-            let r = ORGANIZATIONS.read().await;
             let mut orgs = HashSet::new();
-            for org_name in r.keys() {
+            for org_name in ORGANIZATIONS.pin().keys() {
                 orgs.insert(org_name.to_owned());
             }
             log::info!("[OFGA:Local] Migrating native objects");
@@ -242,9 +241,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     .await;
                 }
 
-                for user_key_val in ORG_USERS.iter() {
-                    let org_user = user_key_val.value();
-                    let user = USERS.get(org_user.email.as_str()).unwrap();
+                let org_users = ORG_USERS.pin().values().cloned().collect::<Vec<_>>();
+                for org_user in org_users {
+                    let user = USERS.pin().get(org_user.email.as_str()).cloned().unwrap();
                     if user.user_type.is_external() {
                         continue;
                     } else {

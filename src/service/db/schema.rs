@@ -30,7 +30,7 @@ use infra::{
     cache,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        SchemaCache, unwrap_stream_settings,
+        SchemaCache, StreamSettingsCache, unwrap_stream_settings,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -310,18 +310,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
-                let r = STREAM_SCHEMAS.read().await;
-                let prev_start_dt = if let Some(schemas) = r.get(&item_key.to_owned()) {
-                    let idx = if schemas.len() >= 2 {
-                        schemas.len() - 2
+                let prev_start_dt =
+                    if let Some(schemas) = STREAM_SCHEMAS.pin().get(&item_key.to_owned()) {
+                        let idx = if schemas.len() >= 2 {
+                            schemas.len() - 2
+                        } else {
+                            0
+                        };
+                        schemas[idx].0
                     } else {
                         0
                     };
-                    schemas[idx].0
-                } else {
-                    0
-                };
-                drop(r);
                 let ts_range = if ev_start_dt == 0 && prev_start_dt == 0 {
                     None
                 } else if ev_start_dt == 0 || (prev_start_dt > 0 && ev_start_dt > prev_start_dt) {
@@ -367,10 +366,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         LOCAL_NODE_ID.load(Ordering::Relaxed),
                     ));
                 }
-                let mut w = STREAM_SETTINGS.write().await;
-                w.insert(item_key.to_string(), settings);
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
+
+                STREAM_SETTINGS.pin().insert(item_key.to_string(), settings);
+                let cache = STREAM_SETTINGS
+                    .pin()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<StreamSettingsCache>();
+                infra::schema::set_stream_settings_atomic(cache);
+
                 STREAM_SCHEMAS_LATEST.pin().insert(
                     item_key.to_string(),
                     SchemaCache::new(latest_schema.clone()),
@@ -392,14 +396,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     vec![(latest_start_dt, latest_schema)],
                 )
                 .collect::<Vec<_>>();
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.entry(item_key.to_string())
-                    .and_modify(|existing_vec| {
+                STREAM_SCHEMAS.pin().update_or_insert(
+                    item_key.to_string(),
+                    |v| {
+                        let mut existing_vec = v.clone();
                         existing_vec.retain(|(v, _)| schema_versions.iter().all(|(v1, _)| v1 != v));
-                        existing_vec.extend(schema_versions.clone())
-                    })
-                    .or_insert(schema_versions);
-                drop(w);
+                        existing_vec.extend(schema_versions.clone());
+                        existing_vec
+                    },
+                    schema_versions.clone(),
+                );
+
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
 
@@ -411,7 +418,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
                 if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
-                    && !ORGANIZATIONS.read().await.contains_key(org_id)
+                    && !ORGANIZATIONS.pin().contains_key(org_id)
                     && let Err(e) = check_and_create_org(org_id).await
                 {
                     log::error!("Failed to save organization in database: {e}");
@@ -434,20 +441,21 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     // delete only one version
                     continue;
                 }
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                drop(w);
+                STREAM_SCHEMAS.pin().remove(item_key);
                 STREAM_SCHEMAS_LATEST.pin().remove(item_key);
                 {
                     STREAM_RECORD_ID_GENERATOR.remove(item_key);
                     STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
                 }
-                let mut w = STREAM_SETTINGS.write().await;
-                w.remove(item_key);
-                w.shrink_to_fit();
-                infra::schema::set_stream_settings_atomic(w.clone());
-                drop(w);
+
+                STREAM_SETTINGS.pin().remove(item_key);
+                let cache = STREAM_SETTINGS
+                    .pin()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<StreamSettingsCache>();
+                infra::schema::set_stream_settings_atomic(cache);
+
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
                     super::compact::files::del_offset(org_id, stream_type, stream_name).await
@@ -527,10 +535,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 LOCAL_NODE_ID.load(Ordering::Relaxed),
             ));
         }
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert(item_key.to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
-        drop(w);
+
+        STREAM_SETTINGS.pin().insert(item_key.to_string(), settings);
+        let cache = STREAM_SETTINGS
+            .pin()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<StreamSettingsCache>();
+        infra::schema::set_stream_settings_atomic(cache);
+
         STREAM_SCHEMAS_LATEST.pin().insert(
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),
@@ -547,9 +560,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 )
             })
             .collect::<Vec<_>>();
-        let mut w = STREAM_SCHEMAS.write().await;
-        w.insert(item_key.to_string(), schema_versions);
-        drop(w);
+        STREAM_SCHEMAS
+            .pin()
+            .insert(item_key.to_string(), schema_versions);
         if i.is_multiple_of(1000) {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
@@ -692,7 +705,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
             super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
                 .await?;
         let len = data.len();
-        ENRICHMENT_TABLES.insert(
+        ENRICHMENT_TABLES.pin().insert(
             key,
             StreamTable {
                 org_id: tbl.org_id.clone(),

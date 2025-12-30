@@ -116,7 +116,6 @@ async fn register() -> Result<()> {
 
     // 4. calculate node_id
     let mut node_ids = Vec::new();
-    let mut w = super::NODES.write().await;
     for node in node_list {
         if node.is_interactive_querier() {
             super::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
@@ -133,9 +132,8 @@ async fn register() -> Result<()> {
             super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         }
         node_ids.push(node.id);
-        w.insert(node.uuid.clone(), node);
+        super::NODES.pin().insert(node.uuid.clone(), node);
     }
-    drop(w);
 
     let new_node_id = super::generate_node_id(node_ids);
     // update local id
@@ -176,9 +174,7 @@ async fn register() -> Result<()> {
         super::add_node_to_consistent_hash(&node, &Role::FlattenCompactor, None).await;
     }
 
-    let mut w = super::NODES.write().await;
-    w.insert(LOCAL_NODE.uuid.clone(), node);
-    drop(w);
+    super::NODES.pin().insert(LOCAL_NODE.uuid.clone(), node);
 
     // 6. register node to cluster
     let client = get_coordinator().await;
@@ -209,7 +205,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let mut node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
+    let mut node = match super::NODES.pin().get(LOCAL_NODE.uuid.as_str()) {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -233,9 +229,11 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     };
 
     // check node id if it is duplicated in the node list
-    let r = super::NODES.read().await;
-    let node_ids = r.values().map(|n| n.id).collect::<Vec<_>>();
-    drop(r);
+    let node_ids = super::NODES
+        .pin()
+        .iter()
+        .map(|(_, node)| node.id)
+        .collect::<Vec<_>>();
     if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
         let new_node_id = super::generate_node_id(node_ids);
         node.id = new_node_id;

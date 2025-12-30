@@ -620,8 +620,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
     let mut mem_size = std::mem::size_of::<HashMap<String, Vec<Schema>>>();
-    let r = STREAM_SCHEMAS.read().await;
-    for (key, val) in r.iter() {
+    for (key, val) in STREAM_SCHEMAS.pin().iter() {
         stream_num += 1;
         mem_size += std::mem::size_of::<Vec<Schema>>();
         mem_size += std::mem::size_of::<String>() + key.len();
@@ -631,13 +630,10 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
             mem_size += schema.1.size();
         }
     }
-    drop(r);
-    let r = STREAM_SCHEMAS_LATEST.pin();
-    for (key, schema) in r.iter() {
+    for (key, schema) in STREAM_SCHEMAS_LATEST.pin().iter() {
         mem_size += std::mem::size_of::<String>() + key.len();
         mem_size += schema.size();
     }
-    drop(r);
     (stream_num, stream_schema_num, mem_size)
 }
 

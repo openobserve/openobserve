@@ -49,10 +49,9 @@ fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF 
 
 pub fn get_all_transform(org_id: &str) -> Result<Vec<ScalarUDF>> {
     let mut udf_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.clone().iter() {
-        let key = transform.key();
+    for (k, transform) in QUERY_FUNCTIONS.pin().iter() {
         // do not register ingest_time transforms
-        if key.contains(org_id) {
+        if k.contains(org_id) {
             udf_list.push(get_udf_vrl(
                 transform.name.to_owned(),
                 transform.function.to_owned().as_str(),

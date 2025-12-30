@@ -199,28 +199,26 @@ pub async fn get_stream_alerts(
             continue;
         }
 
-        let stream_alerts_cacher = STREAM_ALERTS.read().await;
-        let alerts_id_list = stream_alerts_cacher.get(&key);
-        if alerts_id_list.is_none() {
+        let Some(alerts_id_list) = STREAM_ALERTS.pin().get(&key).cloned() else {
             continue;
-        }
+        };
         let mut alerts_list = vec![];
-        for alert_id in alerts_id_list.unwrap().iter() {
+        for alert_id in alerts_id_list.iter() {
             if let Some((_, alert)) = alert::get_alert_from_cache(&stream.org_id, alert_id).await {
                 alerts_list.push(alert);
             }
         }
 
-        let triggers_cache = REALTIME_ALERT_TRIGGERS.read().await;
+        let triggers_cache = REALTIME_ALERT_TRIGGERS.pin();
         let alerts = alerts_list
             .into_iter()
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
                 let key = format!("{}/{}", stream.org_id, alert.id.as_ref().unwrap());
-                match triggers_cache.get(&key) {
-                    Some(v) => !v.is_silenced,
-                    None => true,
-                }
+                triggers_cache
+                    .get(&key)
+                    .map(|v| !v.is_silenced)
+                    .unwrap_or(true)
             })
             .collect::<Vec<_>>();
         if alerts.is_empty() {
@@ -644,7 +642,7 @@ pub fn refactor_map(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
+    use infra::schema::{STREAM_SETTINGS, StreamSettingsCache, unwrap_stream_settings};
 
     use super::*;
 
@@ -710,10 +708,17 @@ mod tests {
         );
         let schema = arrow_schema::Schema::empty().with_metadata(meta);
         let settings = unwrap_stream_settings(&schema).unwrap();
-        let mut w = STREAM_SETTINGS.write().await;
-        w.insert("default/logs/olympics".to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
-        drop(w);
+
+        STREAM_SETTINGS
+            .pin()
+            .insert("default/logs/olympics".to_string(), settings);
+        let cache = STREAM_SETTINGS
+            .pin()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<StreamSettingsCache>();
+        infra::schema::set_stream_settings_atomic(cache);
+
         let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
             keys.partition_keys,

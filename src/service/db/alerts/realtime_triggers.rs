@@ -126,10 +126,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                REALTIME_ALERT_TRIGGERS
-                    .write()
-                    .await
-                    .insert(item_key, item_value);
+                REALTIME_ALERT_TRIGGERS.pin().insert(item_key, item_value);
             }
             db::Event::Delete(ev) => {
                 // Parse the item key and extract components
@@ -145,10 +142,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     };
 
-                REALTIME_ALERT_TRIGGERS
-                    .write()
-                    .await
-                    .remove(&updated_item_key);
+                REALTIME_ALERT_TRIGGERS.pin().remove(&updated_item_key);
             }
             db::Event::Empty => {}
         }
@@ -158,10 +152,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let triggers = db::scheduler::list(Some(db::scheduler::TriggerModule::Alert)).await?;
-    let mut cache = REALTIME_ALERT_TRIGGERS.write().await;
+    let map = REALTIME_ALERT_TRIGGERS.pin();
     for trigger in triggers {
         if trigger.is_realtime {
-            cache.insert(format!("{}/{}", trigger.org, trigger.module_key), trigger);
+            map.insert(format!("{}/{}", trigger.org, trigger.module_key), trigger);
         }
     }
     log::info!("Alert realtime triggers Cached");
