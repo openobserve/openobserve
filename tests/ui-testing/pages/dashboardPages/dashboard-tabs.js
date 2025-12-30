@@ -37,7 +37,7 @@ export default class DashboardTabs {
   // Method to delete a tab
   async deleteTab(name) {
     // Tabs must be deleted via Settings -> Tabs
-    const settingsBtn = this.page.locator('[data-test="dashboard-settings-btn"]');
+    const settingsBtn = this.page.locator('[data-test="dashboard-setting-btn"]');
     await settingsBtn.click();
     
     await this.page.locator('[data-test="dashboard-settings-tab-tab"]').click();

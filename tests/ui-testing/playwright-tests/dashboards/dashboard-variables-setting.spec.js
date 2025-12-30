@@ -311,7 +311,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.hideVariable();
     await pm.dashboardSetting.saveVariable();
     await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -350,7 +350,7 @@ test.describe("dashboard variables settings", () => {
 
     // Ensure the add variable button is visible
     await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
 
     // Close the settings window
@@ -388,7 +388,7 @@ test.describe("dashboard variables settings", () => {
 
     // Ensure the add variable button is visible
     await page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
 
     // Close the settings window

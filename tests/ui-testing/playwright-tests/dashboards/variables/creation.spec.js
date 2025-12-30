@@ -20,7 +20,7 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
     test.describe('1. Scoped Variable Creation', () => {
         test('1.1: Create Global Variable (Query)', async ({ page }) => {
             await dashboardPage.createDashboard();
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_global', 'query_values', 'logs', 'e2e_automate', 'kubernetes_container_name', false, null, false, 'global');
             await page.reload();
             await expect(page.locator('[data-test="global-variables-selector"] [data-test="dashboard-variable-v_global-container"]')).toBeVisible();
@@ -29,7 +29,7 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.2: Create Tab-Scoped Variable (Query)', async ({ page }) => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_tab', 'query_values', 'logs', 'e2e_automate', 'kubernetes_namespace', false, null, false, 'tabs', ['Tab_A']);
             await page.reload();
             await tabs.switchTab('Tab_A');
@@ -38,7 +38,7 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
 
         test('1.3: Create Global Variable (Constant)', async ({ page }) => {
             await dashboardPage.createDashboard();
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_const', 'constant', null, null, null, false, null, false, 'global');
             await page.reload();
             await expect(page.locator('[data-test="dashboard-variable-v_const-container"]')).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.4: Create Panel-Scoped Variable', async ({ page }) => {
             await dashboardPage.createDashboard();
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_panel', 'query_values', 'logs', 'e2e_automate', 'kubernetes_node_name', false, null, false, 'panels', [], [panel1Id]);
             await page.reload();
             await expect(page.locator(`[data-test-panel-id="${panel1Id}"]`).locator('[data-test="dashboard-variable-v_panel-container"]')).toBeVisible();
@@ -57,7 +57,7 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_B');
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_multi', 'constant', null, null, null, false, null, false, 'panels', ['Tab_B'], [panel1Id]);
             await page.reload();
             await tabs.switchTab('Tab_B');
@@ -68,9 +68,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
     test.describe('2. Valid Dependency Chains', () => {
         test('1.6: Rule: Global depends on Global', async ({ page }) => {
             await dashboardPage.createDashboard();
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_gp', 'query_values', 'logs', 'e2e_automate', 'job');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_gc', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_gp' });
             await page.reload();
             await variables.checkVariableStatus('v_gc', { isLoading: false });
@@ -79,9 +79,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.7: Rule: Tab depends on Global', async ({ page }) => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_g', 'query_values', 'logs', 'e2e_automate', 'job');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_g' }, false, 'tabs', ['Tab_A']);
             await page.reload();
             await tabs.switchTab('Tab_A');
@@ -91,9 +91,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.8: Rule: Panel depends on Global', async ({ page }) => {
             await dashboardPage.createDashboard();
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_g', 'query_values', 'logs', 'e2e_automate', 'job');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_g' }, false, 'panels', [], [panel1Id]);
             await page.reload();
             await variables.checkVariableStatus('v_p', { isLoading: false, panelId: panel1Id });
@@ -103,11 +103,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_g', 'query_values', 'logs', 'e2e_automate', 'job');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_g' }, false, 'tabs', ['Tab_A']);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p', 'query_values', 'logs', 'e2e_automate', 'kubernetes_namespace', false, { filterName: 'level', operator: '=', value: '$v_t' }, false, 'panels', ['Tab_A'], [panel1Id]);
             await page.reload();
             await tabs.switchTab('Tab_A');
@@ -117,9 +117,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.10: Rule: Tab depends on Tab (Same Tab)', async ({ page }) => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t1', 'query_values', 'logs', 'e2e_automate', 'job', false, null, false, 'tabs', ['Tab_A']);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t2', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_t1' }, false, 'tabs', ['Tab_A']);
             await page.reload();
             await tabs.switchTab('Tab_A');
@@ -130,9 +130,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t', 'query_values', 'logs', 'e2e_automate', 'job', false, null, false, 'tabs', ['Tab_A']);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_t' }, false, 'panels', ['Tab_A'], [panel1Id]);
             await page.reload();
             await tabs.switchTab('Tab_A');
@@ -142,9 +142,9 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.12: Rule: Panel depends on Panel (Same Panel)', async ({ page }) => {
             await dashboardPage.createDashboard();
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p1', 'query_values', 'logs', 'e2e_automate', 'job', false, null, false, 'panels', [], [panel1Id]);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p2', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$v_p1' }, false, 'panels', [], [panel1Id]);
             await page.reload();
             await variables.checkVariableStatus('v_p2', { isLoading: false, panelId: panel1Id });
@@ -155,11 +155,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.13: Restriction: Global cannot depend on Tab', async ({ page }) => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_tab', 'constant', null, null, null, false, null, false, 'tabs', ['Tab_A']);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
-            await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+            await page.locator('[data-test="dashboard-add-variable-btn"]').click();
             await page.locator('[data-test="dashboard-variable-scope-select"]').click();
             await page.getByRole('option', { name: 'Global' }).click();
             await page.locator('[data-test="dashboard-add-filter-btn"]').click();
@@ -170,11 +170,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
         test('1.14: Restriction: Global cannot depend on Panel', async ({ page }) => {
             await dashboardPage.createDashboard();
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_panel', 'constant', null, null, null, false, null, false, 'panels', [], [panel1Id]);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
-            await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+            await page.locator('[data-test="dashboard-add-variable-btn"]').click();
             await page.locator('[data-test="dashboard-variable-scope-select"]').click();
             await page.getByRole('option', { name: 'Global' }).click();
             await page.locator('[data-test="dashboard-add-filter-btn"]').click();
@@ -186,11 +186,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab_A');
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_panel', 'constant', null, null, null, false, null, false, 'panels', ['Tab_A'], [panel1Id]);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
-            await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+            await page.locator('[data-test="dashboard-add-variable-btn"]').click();
             await page.locator('[data-test="dashboard-variable-scope-select"]').click();
             await page.getByRole('option', { name: 'Tabs' }).click();
             await page.locator('[data-test="dashboard-add-filter-btn"]').click();
@@ -202,11 +202,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             await dashboardPage.createDashboard();
             await tabs.addTab('Tab1');
             await tabs.addTab('Tab2');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_t1', 'constant', null, null, null, false, null, false, 'tabs', ['Tab1']);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
-            await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+            await page.locator('[data-test="dashboard-add-variable-btn"]').click();
             await page.locator('[data-test="dashboard-variable-scope-select"]').click();
             await page.getByRole('option', { name: 'Tabs' }).click();
             await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
@@ -222,11 +222,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
             const panel1Id = await page.locator('[data-test-panel-id]').first().getAttribute('data-test-panel-id');
             await dashboardPage.addPanel();
             const panel2Id = await page.locator('[data-test-panel-id]').nth(1).getAttribute('data-test-panel-id');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('v_p1', 'constant', null, null, null, false, null, false, 'panels', [], [panel1Id]);
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
-            await page.locator('[data-test="dashboard-variable-add-btn"]').click();
+            await page.locator('[data-test="dashboard-add-variable-btn"]').click();
             await page.locator('[data-test="dashboard-variable-scope-select"]').click();
             await page.getByRole('option', { name: 'Panels' }).click();
             await page.locator('[data-test="dashboard-variable-panels-select"]').click();
@@ -239,11 +239,11 @@ test.describe('Dashboard Variables: Creation & Dependencies', () => {
 
         test('1.18: Circular Dependency Detection (A -> B -> A)', async ({ page }) => {
             await dashboardPage.createDashboard();
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('VAR_A', 'query_values', 'logs', 'e2e_automate', 'job');
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await variables.addDashboardVariable('VAR_B', 'query_values', 'logs', 'e2e_automate', 'level', false, { filterName: 'job', operator: '=', value: '$VAR_A' });
-            await page.locator('[data-test="dashboard-settings-btn"]').click();
+            await page.locator('[data-test="dashboard-setting-btn"]').click();
             await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
             await page.locator('[data-test="dashboard-variable-settings-draggable-row"]:has-text("VAR_A")').locator('[data-test="dashboard-variable-settings-edit-btn"]').click();
             await page.locator('[data-test="dashboard-add-filter-btn"]').click();
