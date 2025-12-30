@@ -86,7 +86,7 @@ test.describe("Dashboard Global Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
     await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
 
@@ -149,7 +149,7 @@ test.describe("Dashboard Global Variables", () => {
 
     // Add dependent variable (region)
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="dashboard-variable-name"]').fill(regionVar);
 
@@ -205,7 +205,7 @@ test.describe("Dashboard Global Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
     await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="dashboard-variable-custom-options"]').fill('value1\nvalue2\nvalue3');
@@ -256,7 +256,7 @@ test.describe("Dashboard Global Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
     await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
     await page.locator('[data-test="dashboard-variable-custom-options"]').fill('opt1\nopt2\nopt3');

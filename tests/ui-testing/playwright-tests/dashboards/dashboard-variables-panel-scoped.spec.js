@@ -55,7 +55,7 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
 
     // Set scope to "Selected Panels"
     await page.locator('[data-test="variable-scope-select"]').click();
@@ -67,7 +67,7 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await page.locator(`[data-test="panel-option-${panel2Id}"]`).click();
 
     // Configure as custom variable
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
     await page.locator('[data-test="variable-custom-options"]').fill('value1\nvalue2\nvalue3');
 
@@ -117,14 +117,14 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
 
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
     await page.locator(`[data-test="panel-option-${panelId}"]`).click();
 
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -180,9 +180,9 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
 
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
@@ -255,21 +255,21 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
 
     // Global variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(globalVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(globalVar);
     await page.locator('[data-test="variable-custom-options"]').fill('optA\noptB');
     await pm.dashboardSetting.saveVariable();
 
     // Tab variable depending on global
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
     await page.locator('[data-test="tab-option-tab-1"]').click();
 
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -284,13 +284,13 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
 
     // Panel variable depending on tab
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
     await page.locator(`[data-test="panel-option-${panelId}"]`).click();
 
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -354,9 +354,9 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(variableName);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(variableName);
 
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
@@ -431,9 +431,9 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
@@ -443,13 +443,13 @@ test.describe("Dashboard Panel-Scoped Variables", () => {
 
     // Add panel child variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
     await page.locator(`[data-test="panel-option-${panelId}"]`).click();
 
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();

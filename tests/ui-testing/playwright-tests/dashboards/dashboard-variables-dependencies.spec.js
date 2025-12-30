@@ -42,8 +42,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(var1);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(var1);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -59,8 +59,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Add second query variable referencing var1
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(var2);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(var2);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -114,9 +114,9 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Custom"').click();
-    await page.locator('[data-test="variable-name-input"]').fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
@@ -126,13 +126,13 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Try to add tab variable depending on panel variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
     await page.locator('[data-test="tab-option-tab-1"]').click();
 
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -173,8 +173,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(parentVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(parentVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -190,8 +190,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Add child variable depending on parent
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(childVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(childVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -267,8 +267,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Global parent
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(globalVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(globalVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -280,12 +280,12 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Tab child of global
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tabVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
     await page.locator('[data-test="tab-option-tab-1"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -299,12 +299,12 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Panel child of tab
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(panelVar);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Panels"').click();
     await page.locator('[data-test="variable-panels-select"]').click();
     await page.locator(`[data-test="panel-option-${panelId}"]`).click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -367,8 +367,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
     await pm.dashboardSetting.openVariables();
 
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(parentVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(parentVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -380,8 +380,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Add child depending on parent
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(childVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(childVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -446,8 +446,8 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Global
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(globalVar);
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(globalVar);
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -459,12 +459,12 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Tab 1 variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tab1Var);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tab1Var);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
     await page.locator('[data-test="tab-option-tab-1"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
@@ -478,12 +478,12 @@ test.describe("Dashboard Variables Dependencies & Edge Cases", () => {
 
     // Tab 2 variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="variable-name-input"]').fill(tab2Var);
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tab2Var);
     await page.locator('[data-test="variable-scope-select"]').click();
     await page.locator('text="Selected Tabs"').click();
     await page.locator('[data-test="variable-tabs-select"]').click();
     await page.locator('[data-test="tab-option-tab-2"]').click();
-    await page.locator('[data-test="variable-type-select"]').click();
+    await page.locator('[data-test="dashboard-variable-type-select"]').click();
     await page.locator('text="Query Values"').click();
     await page.locator('[data-test="variable-stream-type-select"]').click();
     await page.locator('text="logs"').click();
