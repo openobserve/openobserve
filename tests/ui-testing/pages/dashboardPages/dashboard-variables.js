@@ -388,13 +388,34 @@ export default class DashboardVariables {
 
   async checkVariableStatus(name, { isLoading }) {
     // Check for loading spinner on the variable selector
-    // This depends on how the UI shows loading state. 
-    // Assuming a .loading class or similar
     const selector = this.page.locator(`[data-test="variable-selector-${name}"] .q-spinner`);
     if (isLoading) {
       await expect(selector).toBeVisible();
     } else {
       await expect(selector).not.toBeVisible();
     }
+  }
+
+  async verifyVariableError(name) {
+    // Verify red error box/border for specific variable
+    const selector = this.getVariableSelectorLocator(name, 'global');
+    // Assuming error state adds a class or shows a specific element
+    await expect(selector).toHaveClass(/error|border-red/);
+  }
+
+  async verifyTargetTabLabel(variableName, tabName, expectedLabel) {
+    // Open settings for the variable
+    await this.editVariable(variableName, {});
+
+    // Check the tabs dropdown or list for the specific label (e.g., "Tab A (deleted tab)")
+    const targetSelect = this.page.locator('[data-test="dashboard-variable-tabs-select"]');
+    await targetSelect.click();
+
+    await expect(this.page.getByRole("option", { name: expectedLabel })).toBeVisible();
+
+    // Close select
+    await this.page.keyboard.press('Escape');
+    // Close settings
+    await this.page.locator('[data-test="dashboard-settings-close-btn"]').click();
   }
 }
