@@ -369,6 +369,10 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     label_option: Option<LabelOption>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    axis_label_rotate: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis_label_truncate_width: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     show_symbol: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     line_interpolation: Option<LineInterpolation>,
