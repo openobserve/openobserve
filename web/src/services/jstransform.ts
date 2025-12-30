@@ -43,6 +43,9 @@ const jstransform = {
     const config = force ? { params: { force: true } } : {};
     return http().delete(url, config);
   },
+  bulkDelete: (org_identifier: string, data: any) => {
+    return http().delete(`/api/${org_identifier}/functions/bulk`, { data });
+  },
   create_with_index: (
     org_identifier: string,
     stream_name: string,
@@ -111,9 +114,10 @@ const jstransform = {
     table_name: string,
     url: string,
     append_data: boolean,
+    resume: boolean = false,
   ) => {
     return http().post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}`,
+      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}`,
       { url },
     );
   },

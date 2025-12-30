@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
-          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2"
+          class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
           size="xs"
           :class="
             store.state.theme === 'dark'
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #before>
               <QueryEditor
                 ref="queryEditorRef"
-                class="monaco-editor !tw-h-full"
+                class="monaco-editor tw:h-full!"
                 style="width: 100%"
                 v-model:query="
                   dashboardPanelData.data.queries[
@@ -451,6 +451,21 @@ export default defineComponent({
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
+      // For metrics page: when switching from custom to builder in PromQL, set sample query
+      if (
+        dashboardPanelData.data.queryType === "promql" &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      ) {
+        const streamName =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = `${streamName}{}`;
+      }
     };
 
     const updatePromQLQuery = async (value, event) => {

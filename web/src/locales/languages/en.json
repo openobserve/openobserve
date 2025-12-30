@@ -933,7 +933,7 @@
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
     "showAllLegends": "Show All Legends",
-    "legendsOfCharts": "Legends of charts",
+    "legendsOfCharts": "Legends",
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "No legends available",
     "wraptext": "Wrap table cells",
@@ -961,7 +961,8 @@
     "maximum": "Maximum",
     "fixedValue": "Fixed Value",
     "legendLabel": "Legend",
-    "overrideMessage": "Series name overrides. For example, {endpoint} will be replaced with the label value for endpoint.",
+    "overrideMessage": "Series name overrides.",
+    "overrideMessageExample": "For example, {endpoint} will be replaced with the label value for endpoint.",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
     "addFieldMessage": "Please add a field from the list",
     "currentFolderLabel": "Current Folder",
@@ -1059,6 +1060,7 @@
     "editJson": "Edit Dashboard JSON",
     "stepValue": "Step Value",
     "stepValueTooltip": "The interval between datapoints, which must be returned from the range query.",
+    "stepValueTooltipInfo": "If not specified, the step value from Panel Configuration will be used.",
     "stepValueExample": "Eg: 10s, 1h",
     "groupMultiYAxisTrellis": "Group multi Y-axis for trellis",
     "groupMultiYAxisTrellisTooltipTitle": "Group multi Y-axis for trellis",
@@ -1166,7 +1168,8 @@
     "colorBySeriesTitle": "Color by series",
     "colorBySeriesTooltip": "Apply colors to series for better visual distinction in charts. Customize colors for each series to enhance data visualization.",
     "editColorBySeries": " Edit color by series",
-    "applyColorBySeries": " Apply color by series"
+    "applyColorBySeries": " Apply color by series",
+    "optional": "Optional"
   },
   "panel": {
     "header": "Panel",

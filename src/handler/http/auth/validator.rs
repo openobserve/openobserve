@@ -57,6 +57,19 @@ pub const ACCESS_TOKEN: &str = "access_token";
 pub const REFRESH_TOKEN: &str = "refresh_token";
 pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
+/// Helper function to build a successful token validation response
+fn build_token_validation_response(user: &User) -> TokenValidationResponse {
+    TokenValidationResponse {
+        is_valid: true,
+        user_email: user.email.clone(),
+        is_internal_user: !user.is_external,
+        user_role: Some(user.role.clone()),
+        user_name: user.first_name.clone(),
+        family_name: user.last_name.clone(),
+        given_name: user.first_name.clone(),
+    }
+}
+
 pub async fn validator(
     req: ServiceRequest,
     user_id: &str,
@@ -260,29 +273,13 @@ pub async fn validate_credentials(
             });
         }
 
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
+        return Ok(build_token_validation_response(&user));
     }
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
+        return Ok(build_token_validation_response(&user));
     }
 
     // Enforce native login restrictions only for password-based authentication

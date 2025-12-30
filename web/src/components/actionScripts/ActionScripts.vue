@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="action-scripts-list-page">
-    <div v-if="!showAddActionScriptDialog" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem] q-pt-xs">
-      <div class="card-container tw-mb-[0.625rem]">
-        <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full tw-h-[68px]">
-          <div class="tw-font-[600] tw-text-[20px]" data-test="alerts-list-title">
+    <div v-if="!showAddActionScriptDialog" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]">
+          <div class="tw:font-[600] tw:text-[20px]" data-test="alerts-list-title">
                   {{ t("actions.header") }}
                 </div>
-                <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
+                <div class="tw:full-width tw:flex tw:items-center tw:justify-end">
                   <q-input
                     v-model="filterQuery"
                     borderless
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-input>
                 <q-btn
                   data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw-h-[36px]"
+                  class="q-ml-sm o2-primary-button tw:h-[36px]"
                   flat
                   no-caps
                   :label="t(`actions.add`)"
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
         </div>
       </div>
-      <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
-        <div class="card-container tw-h-[calc(100vh-124px)]">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-124px)]">
           <q-table
             data-test="action-scripts-table"
             ref="qTable"
@@ -60,9 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 100%;"
             :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
+            selection="multiple"
+            v-model:selected="selectedActionScripts"
             >
             <template #no-data>
               <NoData />
+            </template>
+            <template v-slot:body-selection="scope">
+              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
             </template>
             <template v-slot:body-cell-actions="props">
               <q-td :props="props">
@@ -118,10 +123,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
-                      {{ resultTotal }} {{ t('actions.header') }}
-                    </div>
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md">
+                    {{ resultTotal }} {{ t('actions.header') }}
+                  </div>
+                  <q-btn
+                    v-if="selectedActionScripts.length > 0"
+                    data-test="action-scripts-bulk-delete-btn"
+                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    no-caps
+                    dense
+                    @click="openBulkDeleteDialog"
+                  >
+                    <q-icon name="delete" size="16px" />
+                    <span class="tw:ml-2">Delete</span>
+                  </q-btn>
+                </div>
                 <QTablePagination
                 :scope="scope"
                 :position="'bottom'"
@@ -134,7 +157,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:header="props">
                 <q-tr :props="props">
-                  <!-- Rendering the of the columns -->
+                  <!-- Adding this block to render the select-all checkbox -->
+                  <q-th v-if="columns.length > 0" auto-width>
+                    <q-checkbox
+                      v-model="props.selected"
+                      size="sm"
+                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                      class="o2-table-checkbox"
+                    />
+                  </q-th>
+
+                  <!-- Rendering the rest of the columns -->
                   <!-- here we can add the classes class so that the head will be sticky -->
                   <q-th
                     v-for="col in props.cols"
@@ -152,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <template v-else>
-      <div class="tw-w-full">
+      <div class="tw:w-full">
         <EditScript
           :isUpdated="isUpdated"
           @update:list="refreshList"
@@ -168,6 +201,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
+    <ConfirmDialog
+      title="Bulk Delete Action Scripts"
+      :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
+      @update:ok="bulkDeleteActionScripts"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
+    <template>
+      <q-dialog class="q-pa-md" v-model="showForm" persistent>
+        <q-card class="clone-alert-popup">
+          <div class="row items-center no-wrap q-mx-md q-my-sm">
+            <div class="flex items-center">
+              <div
+                data-test="add-action-back-btn"
+                class="flex justify-center items-center q-mr-md cursor-pointer"
+                style="
+                  border: 1.5px solid;
+                  border-radius: 50%;
+                  width: 22px;
+                  height: 22px;
+                "
+                title="Go Back"
+                @click="showForm = false"
+              >
+                <q-icon name="arrow_back_ios_new" size="14px" />
+              </div>
+              <div class="text-h6" data-test="clone-alert-title">
+                {{ t("alerts.cloneTitle") }}
+              </div>
+            </div>
+          </div>
+          <q-card-section>
+            <q-form @submit="submitForm">
+              <q-input
+                data-test="to-be-clone-action-name"
+                v-model="toBeCloneAlertName"
+                label="Alert Name"
+              />
+              <q-select
+                data-test="to-be-clone-stream-type"
+                v-model="toBeClonestreamType"
+                label="Stream Type"
+                :options="streamTypes"
+                @update:model-value="updateStreams()"
+              />
+              <q-select
+                data-test="to-be-clone-stream-name"
+                v-model="toBeClonestreamName"
+                :loading="isFetchingStreams"
+                :disable="!toBeClonestreamType"
+                label="Stream Name"
+                :options="streamNames"
+                @change="updateStreamName"
+                @filter="filterStreams"
+                use-input
+                fill-input
+                hide-selected
+                :input-debounce="400"
+              />
+              <div class="flex justify-center q-mt-lg">
+                <q-btn
+                  data-test="clone-action-cancel-btn"
+                  v-close-popup="true"
+                  class="q-mb-md text-bold"
+                  :label="t('alerts.cancel')"
+                  text-color="light-text"
+                  padding="sm md"
+                  no-caps
+                />
+                <q-btn
+                  data-test="clone-action-submit-btn"
+                  :label="t('alerts.save')"
+                  class="q-mb-md text-bold no-border q-ml-md"
+                  color="secondary"
+                  padding="sm xl"
+                  type="submit"
+                  :disable="isSubmitting"
+                  no-caps
+                />
+              </div>
+            </q-form>
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+    </template>
   </div>
 </template>
 
@@ -256,6 +374,8 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const confirmBulkDelete = ref<boolean>(false);
+    const selectedActionScripts = ref<any[]>([]);
     const splitterModel = ref(220);
     const indexOptions = ref([]);
     const schemaList = ref([]);
@@ -569,6 +689,161 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteActionScripts = async () => {
+      try {
+        if (selectedActionScripts.value.length === 0) {
+          $q.notify({
+            type: "warning",
+            message: "No action scripts selected",
+            timeout: 2000,
+          });
+          confirmBulkDelete.value = false;
+          return;
+        }
+
+        const response = await actions.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          {
+            ids: selectedActionScripts.value.map((script: any) => script.id),
+          }
+        );
+
+        const { successful = [], unsuccessful = [], err } = response.data || {};
+
+        if (err) {
+          throw new Error(err);
+        }
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            type: "positive",
+            message: `Successfully deleted ${successful.length} action script(s)`,
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            type: "warning",
+            message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            type: "negative",
+            message: `Failed to delete ${unsuccessful.length} action script(s)`,
+            timeout: 2000,
+          });
+        }
+
+        await getActionScripts();
+        selectedActionScripts.value = [];
+        confirmBulkDelete.value = false;
+      } catch (error: any) {
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            type: "negative",
+            message: error.response?.data?.message || error?.message || "Error while deleting action scripts",
+            timeout: 2000,
+          });
+        }
+        confirmBulkDelete.value = false;
+      }
+    };
+
+    const filterColumns = (options: any[], val: String, update: Function) => {
+      let filteredOptions: any[] = [];
+      if (val === "") {
+        update(() => {
+          filteredOptions = [...options];
+        });
+        return filteredOptions;
+      }
+      update(() => {
+        const value = val.toLowerCase();
+        filteredOptions = options.filter(
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
+        );
+      });
+      return filteredOptions;
+    };
+    const updateStreamName = (selectedOption: any) => {
+      toBeClonestreamName.value = selectedOption;
+    };
+    const updateStreams = (resetStream = true) => {
+      if (resetStream) toBeClonestreamName.value = "";
+      if (streams.value[toBeClonestreamType.value]) {
+        schemaList.value = streams.value[toBeClonestreamType.value];
+        indexOptions.value = streams.value[toBeClonestreamType.value].map(
+          (data: any) => {
+            return data.name;
+          },
+        );
+        updateStreamName(toBeClonestreamName.value);
+
+        return;
+      }
+
+      if (!toBeClonestreamType.value) return Promise.resolve();
+
+      isFetchingStreams.value = true;
+      return getStreams(toBeClonestreamType.value, false)
+        .then((res: any) => {
+          streams.value[toBeClonestreamType.value] = res.list;
+          schemaList.value = res.list;
+          indexOptions.value = res.list.map((data: any) => {
+            return data.name;
+          });
+
+          return Promise.resolve();
+        })
+        .catch(() => Promise.reject())
+        .finally(() => (isFetchingStreams.value = false));
+    };
+    const filterStreams = (val: string, update: any) => {
+      streamNames.value = filterColumns(indexOptions.value, val, update);
+    };
+
+    // const toggleAlertState = (row: any) => {
+    //   alertStateLoadingMap.value[row.uuid] = true;
+    //   const alert: Alert = alerts.value.find(
+    //     (alert) => alert.uuid === row.uuid,
+    //   ) as Alert;
+    //   alertsService
+    //     .toggleState(
+    //       store.state.selectedOrganization.identifier,
+    //       alert.stream_name,
+    //       alert.name,
+    //       !alert?.enabled,
+    //       alert.stream_type,
+    //     )
+    //     .then(() => {
+    //       alert.enabled = !alert.enabled;
+    //       actionsScriptRows.value.forEach((alert) => {
+    //         alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
+    //       });
+    //     })
+    //     .finally(() => {
+    //       alertStateLoadingMap.value[row.uuid] = false;
+    //     });
+    // };
+
+    const routeTo = (name: string) => {
+      router.push({
+        name: name,
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
+    // const refreshDestination = async () => {
+    //   await getDestinations();
+    // };
+
     const filterData = (rows: any, terms: any) => {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -650,6 +925,10 @@ export default defineComponent({
       templates,
       visibleRows,
       hasVisibleRows,
+      confirmBulkDelete,
+      selectedActionScripts,
+      openBulkDeleteDialog,
+      bulkDeleteActionScripts,
       getAlertByName,
     };
   },

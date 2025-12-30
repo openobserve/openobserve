@@ -359,16 +359,16 @@ describe("DashboardErrors", () => {
     it("should have list with correct Tailwind classes", () => {
       const list = wrapper.find("ul");
       expect(list.exists()).toBeTruthy();
-      expect(list.classes()).toContain("tw-list-disc");
-      expect(list.classes()).toContain("tw-list-inside");
-      expect(list.classes()).toContain("tw-px-3");
+      expect(list.classes()).toContain("tw:list-disc");
+      expect(list.classes()).toContain("tw:list-inside");
+      expect(list.classes()).toContain("tw:px-3");
     });
 
     it("should style list items with red color and padding", () => {
       const listItems = wrapper.findAll("li");
       listItems.forEach(item => {
         expect(item.attributes("style")).toContain("color: red");
-        expect(item.classes()).toContain("tw-py-1");
+        expect(item.classes()).toContain("tw:py-1");
       });
     });
 

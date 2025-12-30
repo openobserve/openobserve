@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="pipeline-history-page" class="q-pa-none flex">
-    <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
-      <div class="card-container tw-mb-[0.625rem]">
+    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="flex justify-between full-width tw-h-[68px] tw-px-2 tw-py-3"
+          class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
         >
           <div class="flex items-center">
             <q-btn
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-back-btn"
             />
             <div
-              class="q-table__title tw-font-[600] q-ml-sm tw-flex tw-items-center tw-gap-2"
+              class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
@@ -126,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
-      <div class="pipeline-history-table card-container tw-h-[calc(100vh-127px)]">
+    <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+      <div class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]">
         <q-table
           data-test="pipeline-history-table"
           ref="qTable"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%; height: calc(100vh - 127px)"
         >
           <template #no-data>
-            <div class="tw-h-[calc(100vh-136px)] full-width">
+            <div class="tw:h-[calc(100vh-136px)] full-width">
               <no-data />
             </div>
           </template>
@@ -249,8 +249,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="scope">
-                <div class="bottom-btn tw-h-[48px] tw-w-full tw-flex tw-items-center">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[120px] tw-mr-md">
+                <div class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md">
                       {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
                     </div>
                     <QTablePagination
@@ -517,14 +517,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="errorDialog">
       <q-card style="min-width: 500px">
         <q-card-section class="pipeline-error-header row items-center q-pb-none">
-          <div class="tw-flex-1">
-            <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
+          <div class="tw:flex-1">
+            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
               <q-icon name="error" size="24px" class="error-icon" />
               <span class="pipeline-name">{{ errorMessage.pipeline_name }}</span>
             </div>
             <div class="error-timestamp">
-              <span class="tw-ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw-mr-1" />
+              <span class="tw:ml-1">Last error:</span>
+              <q-icon name="schedule" size="14px" class="tw:mr-1" />
               {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
             </div>
           </div>
@@ -541,8 +541,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-section>
-          <div class="tw-mb-4">
-            <div class="section-label tw-mb-2">Error Summary</div>
+          <div class="tw:mb-4">
+            <div class="section-label tw:mb-2">Error Summary</div>
               <div class="error-summary-box">
                 {{ errorMessage.error }}
               </div>
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             no-caps
             label="Close"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             @click="closeErrorDialog"
           />
         </q-card-actions>

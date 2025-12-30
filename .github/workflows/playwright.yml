@@ -160,6 +160,7 @@ jobs:
                 "alerts-e2e-flow.spec.js",
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
+                "alerts-advanced.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"

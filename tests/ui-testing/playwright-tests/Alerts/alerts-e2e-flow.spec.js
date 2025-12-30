@@ -3,18 +3,26 @@ const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 
+// Test timeout constants (in milliseconds)
+const FIVE_MINUTES_MS = 300000;
+const ALERT_REGISTRATION_WAIT_MS = 30000; // Wait for alert to fully register and become active
+const UI_STABILIZATION_WAIT_MS = 2000;
+const ALERT_TRIGGER_TIMEOUT_MS = 90000; // Real-time alerts need time to process and fire
+
 test.describe("Alerts E2E Flow", () => {
   // Shared test variables
   let pm;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
+  let validationInfra; // Stores unique validation infrastructure per test
+  let testStreamName; // Unique stream with custom columns for this test run
 
   /**
    * Setup for each test
    * - Logs in
    * - Generates shared random value
-   * - Ingests test data (except for scheduled alert test)
+   * - Initializes dedicated test stream with custom columns
    * - Navigates to alerts page
    */
   test.beforeEach(async ({ page }, testInfo) => {
@@ -22,64 +30,108 @@ test.describe("Alerts E2E Flow", () => {
 
     // Generate shared random value if not already generated
     if (!sharedRandomValue) {
-      sharedRandomValue = pm.alertsPage.generateRandomString();
+      // Lowercase to match API behavior (stream names are lowercased)
+      sharedRandomValue = pm.alertsPage.generateRandomString().toLowerCase();
       testLogger.info('Generated shared random value for this run', { sharedRandomValue });
     }
 
-    await pm.commonActions.skipDataIngestionForScheduledAlert(testInfo.title);
+    // Create unique test stream name for this test run (lowercase to match API behavior)
+    testStreamName = `alert_e2e_${sharedRandomValue}`.toLowerCase();
 
-    // Navigate to alerts page first
+    // Initialize the test stream with custom columns (city, country, status, age, etc.)
+    // This ensures we have predictable columns for alert condition testing
+    await pm.commonActions.initializeAlertTestStream(testStreamName);
+    testLogger.info('Initialized test stream with custom columns', {
+      testStreamName,
+      columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
+    });
+
+    // Navigate to alerts page - stream will be available after page load
     await page.goto(
       `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
+
+    // Refresh page to ensure newly created stream appears in dropdowns
+    await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
   /**
    * Test: Complete E2E flow for alerts
-   * Tests all major alert operations in sequence
+   * Tests all major alert operations in sequence:
+   * - Infrastructure setup (template, destination)
+   * - Folder management (create, navigate, delete)
+   * - Alert CRUD (create, update, clone, delete)
+   * - Alert trigger validation
+   * - Alert state management (pause, resume)
+   * - Alert movement between folders
+   * - Search and verify functionality
    */
-  test('Alerts E2E Flow - Create, Update, Move, Clone, Delete, Pause, Resume', {
-    tag: ['@e2eAlerts', '@all', '@alerts']
+  test('Complete Alerts E2E Flow - CRUD, Trigger Validation, Search, Folders, Pause/Resume', {
+    tag: ['@e2eAlerts', '@all', '@alerts'],
+    timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
-    // Test data setup
-    const streamName = 'auto_playwright_stream';
-    const column = 'job';
-    const value = 'test';
+    // This E2E flow covers many operations and needs more than the default 3-minute timeout
+    test.slow();
+
+    // Use the dedicated test stream initialized in beforeEach with custom columns
+    // This provides predictable columns (city, country, status, age) for alert conditions
+    const streamName = testStreamName;
+    const column = 'city';        // Custom column from our test stream
+    const value = 'bangalore';    // Value that triggers the alert condition
 
     // Ensure prerequisites exist
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
+    testLogger.info('Validation infrastructure ready', validationInfra);
+
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
-    // Navigate to alerts tab
     await pm.commonActions.navigateToAlerts();
     await page.waitForLoadState('networkidle');
 
     // ===== First Iteration: Initial Alert Creation and Management =====
-    // Create and verify folder
     const folderName = 'auto_' + sharedRandomValue;
     await pm.alertsPage.createFolder(folderName, 'Test Automation Folder');
     await pm.alertsPage.verifyFolderCreated(folderName);
     testLogger.info('Successfully created folder', { folderName });
 
-    // Navigate to folder and create first alert
     await pm.alertsPage.navigateToFolder(folderName);
-    const alertName = await pm.alertsPage.createAlert(streamName, column, value, createdDestinationName, sharedRandomValue);
+    const triggerStreamName = streamName;
+    const alertName = await pm.alertsPage.createAlert(triggerStreamName, column, value, validationInfra.destinationName, sharedRandomValue);
     await pm.alertsPage.verifyAlertCreated(alertName);
     testLogger.info('Successfully created alert', { alertName });
 
-    // Clone first alert
+    // Wait for alert to register in the system before triggering
+    await page.waitForTimeout(ALERT_REGISTRATION_WAIT_MS);
+
+    // Trigger and validate alert fires (self-referential destination approach)
+    const triggerResult = await pm.alertsPage.verifyAlertTrigger(
+      pm,
+      alertName,
+      triggerStreamName,
+      column,
+      value,
+      ALERT_TRIGGER_TIMEOUT_MS,
+      validationInfra.streamName
+    );
+    expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
+    testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
     await pm.alertsPage.cloneAlert(alertName, 'logs', streamName);
     testLogger.info('Successfully cloned alert', { alertName });
 
-    // Delete all instances of the cloned alert
     await pm.alertsPage.deleteImportedAlert(alertName);
     testLogger.info('Successfully deleted all instances of alert', { alertName });
 
     // ===== Second Iteration: New Alert Creation and Management =====
-    // Navigate back to folder and create new alert
     await pm.alertsPage.navigateToFolder(folderName);
     await page.waitForLoadState('networkidle');
 
@@ -87,35 +139,28 @@ test.describe("Alerts E2E Flow", () => {
     await pm.alertsPage.verifyAlertCreated(newAlertName);
     testLogger.info('Successfully created new alert', { alertName: newAlertName });
 
-    // Update the new alert's operator
     await pm.alertsPage.updateAlert(newAlertName);
     testLogger.info('Successfully updated new alert', { alertName: newAlertName });
 
-    // Clone the new alert
     await pm.alertsPage.cloneAlert(newAlertName, 'logs', streamName);
     testLogger.info('Successfully cloned new alert', { alertName: newAlertName });
 
     // ===== Alert Pause and Resume =====
-    // Pause the new alert
     await pm.alertsPage.pauseAlert(newAlertName);
     testLogger.info('Successfully paused alert', { alertName: newAlertName });
 
-    // Resume the new alert
     await pm.alertsPage.resumeAlert(newAlertName);
     testLogger.info('Successfully resumed alert', { alertName: newAlertName });
 
     // ===== Alert Movement and Cleanup =====
-    // Clean up target folder before moving alerts
     const targetFolderName = 'testfoldermove';
     await pm.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
 
-    // Navigate to target folder and clean up any existing alerts
     await pm.alertsPage.navigateToFolder(targetFolderName);
     await page.waitForLoadState('networkidle');
     await pm.alertsPage.deleteAllAlertsInFolder();
     testLogger.info('Cleaned up target folder before moving alerts', { targetFolderName });
 
-    // Navigate back to source folder and move alerts
     await pm.alertsPage.navigateToFolder(folderName);
     await page.waitForLoadState('networkidle');
     await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
@@ -125,18 +170,15 @@ test.describe("Alerts E2E Flow", () => {
     await pm.dashboardFolder.verifyFolderVisible(folderName);
     await pm.dashboardFolder.deleteFolder(folderName);
 
-    // Verify alerts in target folder
     await page.waitForLoadState('networkidle');
     await pm.dashboardFolder.searchFolder(targetFolderName);
     await pm.dashboardFolder.verifyFolderVisible(targetFolderName);
     await pm.alertsPage.navigateToFolder(targetFolderName);
     await page.waitForLoadState('networkidle');
 
-    // Search and verify alert instance
     await pm.alertsPage.searchAlert(newAlertName);
     await pm.alertsPage.verifySearchResults(2);
 
-    // Delete the alert
     await pm.alertsPage.deleteAlertByRow(newAlertName);
   });
-}); 
+});

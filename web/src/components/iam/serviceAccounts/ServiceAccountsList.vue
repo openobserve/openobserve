@@ -21,22 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-      <div class="card-container tw-mb-[0.625rem]">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width tw-h-[68px] tw-border-b-[1px]"
+      <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
       >
 
         <div
-            class="q-table__title full-width tw-font-[600]"
+            class="q-table__title full-width tw:font-[600]"
             data-test="service-accounts-title-text"
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="full-width tw-flex tw-justify-end">
+          <div class="full-width tw:flex tw:justify-end">
             <q-input
                 v-model="filterQuery"
                 borderless
                 dense
-                class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('serviceAccounts.search')"
               >
                 <template #prepend>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-input>
               <q-btn
-                class="q-ml-sm o2-primary-button tw-h-[36px]"
+                class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
                 no-caps
                 :label="t(`serviceAccounts.add`)"
@@ -53,14 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
       </div>
-      <div class="tw-w-full tw-h-full">
-        <div class="card-container tw-h-[calc(100vh-127px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-[calc(100vh-127px)]">
           <q-table
             ref="qTable"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :rows="visibleRows"
             :columns="columns"
-            row-key="id"
+            row-key="email"
+            selection="multiple"
+            v-model:selected="selectedAccounts"
             :pagination="pagination"
             :filter="filterQuery"
             :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
@@ -69,13 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <NoData></NoData>
             </template>
 
+            <template v-slot:body-selection="scope">
+              <q-td auto-width>
+                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              </q-td>
+            </template>
+
             <template #body-cell-token="props">
             <q-td :props="props" side >
-              <div class="tw-flex tw-items-center" v-if="props.row.isLoading">
+              <div class="tw:flex tw:items-center" v-if="props.row.isLoading">
                 <q-spinner-dots color="primary"  />
               </div>
               <!-- Display the token or masked text based on visibility -->
-            <div v-else  class="tw-flex tw-items-center">
+            <div v-else  class="tw:flex tw:items-center">
               <span 
                 style="
                 display: inline-block;
@@ -163,10 +171,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
             <template #bottom="scope">
-              <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                   {{ resultTotal }} {{ t('serviceAccounts.header') }}
                 </div>
+                <q-btn
+                  v-if="selectedAccounts.length > 0"
+                  data-test="service-accounts-list-delete-accounts-btn"
+                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-secondary-button-dark'
+                      : 'o2-secondary-button-light'
+                  "
+                  no-caps
+                  dense
+                  @click="openBulkDeleteDialog"
+                >
+                  <q-icon name="delete" size="16px" />
+                  <span class="tw:ml-2">Delete</span>
+                </q-btn>
                 <QTablePagination
                   :scope="scope"
                   :resultTotal="resultTotal"
@@ -179,6 +203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:header="props">
                   <q-tr :props="props">
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th v-if="columns.length > 0" auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                        class="o2-table-checkbox"
+                      />
+                    </q-th>
+
                     <!-- Rendering the rest of the columns -->
                     <q-th
                       v-for="col in props.cols"
@@ -266,25 +300,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
+    <q-dialog v-model="confirmBulkDelete">
+      <q-card style="width: 280px">
+        <q-card-section class="confirmBody">
+          <div class="head">Delete Service Accounts</div>
+          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+            Cancel
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="bulkDeleteServiceAccounts"
+          >
+            OK
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="isShowToken"  persistent>
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
+    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
       <div>Service Account Token </div>
           <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
     </q-card-section>
 
     <q-card-section>
 
-      <div class="tw-flex tw-items-center tw-gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
+      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
   <!-- Token section taking 75% of the width -->
   <div
-    class="text-h6 text-center tw-truncate el-border"
+    class="text-h6 text-center tw:truncate el-border"
     style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
   >
     {{  serviceToken }}
   </div>
   <!-- Buttons section taking 25% of the width -->
-  <div class="tw-flex tw-justify-end tw-gap-1" style="flex: 1; max-width: 25%;">
+  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
     <q-btn
       @click.stop="copyToClipboard(serviceToken)"
       size="lg"
@@ -375,6 +434,8 @@ export default defineComponent({
     const serviceToken  = ref("");
 
     const serviceAccounts = ref([]);
+    const selectedAccounts: any = ref([]);
+    const confirmBulkDelete = ref(false);
 
     onBeforeMount(()=>{
       getServiceAccountsUsers();
@@ -659,6 +720,54 @@ export default defineComponent({
         });
     };
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteServiceAccounts = async () => {
+      const accountEmails = selectedAccounts.value.map((account: any) => account.email);
+
+      try {
+        const res = await service_accounts.bulkDelete(
+          store.state.selectedOrganization.identifier,
+          { ids: accountEmails }
+        );
+        const { successful, unsuccessful } = res.data;
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            color: "positive",
+            message: `Successfully deleted ${successful.length} service account(s)`,
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            color: "warning",
+            message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            color: "negative",
+            message: `Failed to delete ${unsuccessful.length} service account(s)`,
+            timeout: 2000,
+          });
+        }
+
+        selectedAccounts.value = [];
+        confirmBulkDelete.value = false;
+        await getServiceAccountsUsers();
+      } catch (err: any) {
+        if (err.response?.status != 403 || err?.status != 403) {
+          $q.notify({
+            color: "negative",
+            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
+            timeout: 2000,
+          });
+        }
+      }
+    };
+
     const refreshServiceToken = async (row:any,fromColum = true) =>{
       if(fromColum) row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
@@ -805,6 +914,10 @@ export default defineComponent({
       confirmRefresh,
       visibleRows,
       hasVisibleRows,
+      selectedAccounts,
+      confirmBulkDelete,
+      openBulkDeleteDialog,
+      bulkDeleteServiceAccounts,
     };
   },
 });

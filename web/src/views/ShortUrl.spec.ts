@@ -100,11 +100,11 @@ describe("ShortUrl", () => {
 
   it("should render loading container with correct CSS classes", () => {
     const container = wrapper.find('[data-test="loading-container"]');
-    expect(container.classes()).toContain("tw-h-[100vh]");
-    expect(container.classes()).toContain("tw-flex");
-    expect(container.classes()).toContain("tw-flex-col");
-    expect(container.classes()).toContain("tw-items-center");
-    expect(container.classes()).toContain("tw-justify-center");
+    expect(container.classes()).toContain("tw:h-[100vh]");
+    expect(container.classes()).toContain("tw:flex");
+    expect(container.classes()).toContain("tw:flex-col");
+    expect(container.classes()).toContain("tw:items-center");
+    expect(container.classes()).toContain("tw:justify-center");
   });
 
   it("should render spinner with correct data-test attribute", () => {

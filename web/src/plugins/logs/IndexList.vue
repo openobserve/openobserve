@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="column logs-index-menu !tw-p-[0.375rem] tw-h-[calc(100%-0.7rem)]"
+    class="column logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div style="max-width: 100%; overflow: hidden;">
@@ -78,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       class="index-table q-mt-xs"
     >
-      <h3
+      <div
         data-test="logs-search-no-field-found-text"
-        class="text-center col-10 q-mx-none"
+        class="text-center col-10 q-mx-none q-pt-md"
       >
         <q-icon name="info" color="primary" size="xs" />
         {{ t("search.noFieldFoundInStream") }}
-      </h3>
+      </div>
     </div>
     <div v-else class="index-table q-mt-xs">
       <FieldList

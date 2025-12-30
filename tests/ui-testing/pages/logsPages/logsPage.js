@@ -430,15 +430,19 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3) {
+    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
         testLogger.info(`selectStream: Selecting stream: ${stream}`);
 
-        // First, wait for the stream to be available via API
-        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
-        if (!streamAvailable) {
-            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
+        if (apiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+            if (!streamAvailable) {
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+            } else {
+                testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            }
         } else {
-            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
@@ -3329,15 +3333,47 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+                // Find the color indicator div - it's a div with inline backgroundColor style
+                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+                // Use multiple selector approaches for robustness
+                let colorDiv = row.querySelector('div[style*="background"]');
+
+                // Fallback: try class-based selector with escaped colon
+                if (!colorDiv) {
+                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
+                }
+
+                // Fallback: try finding the first absolute positioned child div
+                if (!colorDiv) {
+                    const divs = row.querySelectorAll('div');
+                    for (const div of divs) {
+                        const style = window.getComputedStyle(div);
+                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                            colorDiv = div;
+                            break;
+                        }
+                    }
+                }
 
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
 
-                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                // Skip if no valid background color
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
+
+                // Check for severity value in the row text - look for various patterns
                 for (let sev = 0; sev <= 7; sev++) {
-                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
+                    const patterns = [
+                        `"severity":"${sev}"`,
+                        `"severity":${sev},`,
+                        `"severity":${sev}}`,
+                        `"severity": ${sev}`,
+                        `severity: ${sev}`
+                    ];
+
+                    if (patterns.some(pattern => text.includes(pattern))) {
                         findings.push({
                             severity: sev,
                             color: bgColor

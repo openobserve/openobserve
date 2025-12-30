@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
-    <div class="card-container tw-mb-[0.625rem]">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px]"
+    <div class="card-container tw:mb-[0.625rem]">
+    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
       >
     <div
       data-test="iam-groups-section-title"
-      class="q-table__title tw-font-[600]"
+      class="q-table__title tw:font-[600]"
     >
       {{ t("iam.groups") }}
     </div>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               borderless
               dense
-              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-btn
           data-test="iam-groups-add-group-btn"
-          class="q-ml-sm o2-primary-button tw-h-[36px]"
+          class="q-ml-sm o2-primary-button tw:h-[36px]"
           flat
           no-caps
           :label="t(`iam.addGroup`)"
@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     </div>
-    <div class="tw-w-full tw-h-full">
-      <div class="card-container tw-h-[calc(100vh-127px)]">      
+    <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-[calc(100vh-127px)]">      
         <app-table
         data-test="iam-groups-table-section"
         class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
@@ -69,9 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('iam.groups')"
         :hideTopPagination="true"
         :showBottomPaginationWithTitle="true"
+        selection="multiple"
+        row-key="group_name"
+        v-model:selected="selectedGroups"
+        :theme="store.state.theme"
       >
         <template  v-slot:actions="slotProps: any">
-          <div class="tw-flex tw-items-center tw-gap-2 tw-justify-center">
+          <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
             <q-btn
               :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
               padding="sm"
@@ -98,6 +102,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
           </div>
         </template>
+        <template v-slot:bottom-actions>
+          <q-btn
+            v-if="selectedGroups.length > 0"
+            data-test="iam-groups-bulk-delete-btn"
+            class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
+            no-caps
+            dense
+            @click="openBulkDeleteDialog"
+          >
+            <q-icon name="delete" size="16px" />
+            <span class="tw:ml-2">{{ t('common.delete') }}</span>
+          </q-btn>
+        </template>
       </app-table>
     </div>
     </div>
@@ -117,6 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
+    <ConfirmDialog
+      title="Bulk Delete Groups"
+      :message="`Are you sure you want to delete ${selectedGroups.length} group(s)?`"
+      @update:ok="bulkDeleteUserGroups"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
   </q-page>
 </template>
 
@@ -128,7 +157,7 @@ import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup } from "@/services/iam";
+import { getGroups, deleteGroup, bulkDeleteGroups } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -157,6 +186,9 @@ const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
+
+const selectedGroups: any = ref([]);
+const confirmBulkDelete = ref(false);
 
 const columns: any = [
   {
@@ -278,6 +310,59 @@ const showConfirmDialog = (row: any) => {
 const _deleteGroup = () => {
   deleteUserGroup(deleteConformDialog.value.data);
   deleteConformDialog.value.data = null;
+};
+
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
+
+const bulkDeleteUserGroups = async () => {
+  const groupNames = selectedGroups.value.map((group: any) => group.group_name);
+
+  try {
+    const response = await bulkDeleteGroups(store.state.selectedOrganization.identifier, {
+      ids: groupNames,
+    });
+
+    const { successful = [], unsuccessful = [], err } = response.data || {};
+
+    if (err) {
+      throw new Error(err);
+    }
+
+    if (successful.length > 0 && unsuccessful.length === 0) {
+      q.notify({
+        message: `Successfully deleted ${successful.length} group(s)`,
+        color: "positive",
+        position: "bottom",
+      });
+    } else if (successful.length > 0 && unsuccessful.length > 0) {
+      q.notify({
+        message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
+        color: "warning",
+        position: "bottom",
+      });
+    } else if (unsuccessful.length > 0) {
+      q.notify({
+        message: `Failed to delete ${unsuccessful.length} group(s)`,
+        color: "negative",
+        position: "bottom",
+      });
+    }
+
+    await setupGroups();
+    selectedGroups.value = [];
+    confirmBulkDelete.value = false;
+  } catch (error: any) {
+    if (error.response?.status != 403 || error?.status != 403) {
+      q.notify({
+        message: error.response?.data?.message || error?.message || "Error while deleting groups",
+        color: "negative",
+        position: "bottom",
+      });
+    }
+    confirmBulkDelete.value = false;
+  }
 };
 
 const visibleRows = computed(() => {

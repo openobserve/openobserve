@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { useStore } from "vuex";
 
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
@@ -70,8 +71,8 @@ const useEnterpriseRoutes = () => {
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
             // Check if service accounts are enabled
-            const store = (window as any).store;
-            const serviceAccountEnabled = store?.state?.zoConfig?.service_account_enabled ?? true;
+            const store = useStore();
+            const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
 
             if (!serviceAccountEnabled) {
               // Redirect to users page if service accounts are disabled

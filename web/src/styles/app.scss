@@ -1150,7 +1150,7 @@ body {
 }
 
 // Additional centering for the toggle button when used with flex classes
-.tw-flex.tw-items-center.tw-justify-center.o2-toggle-button-xs {
+.tw:flex.tw:items-center.tw:justify-center.o2-toggle-button-xs {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;

@@ -28,20 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card class="correlation-dashboard-card">
       <!-- Header -->
-      <q-card-section v-if="!isEmbeddedTabs" class="correlation-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
-        <div class="tw-flex tw-items-center tw-gap-3">
+      <q-card-section v-if="!isEmbeddedTabs" class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+        <div class="tw:flex tw:items-center tw:gap-3">
           <q-icon name="link" size="md" color="primary" />
-          <div class="tw-flex tw-flex-col tw-gap-0">
-            <span class="tw-text-lg tw-font-semibold">
+          <div class="tw:flex tw:flex-col tw:gap-0">
+            <span class="tw:text-lg tw:font-semibold">
               Correlated Streams - {{ serviceName }}
             </span>
-            <span class="tw-text-xs tw-opacity-70">
+            <span class="tw:text-xs tw:opacity-70">
               {{ formatTimeRange(timeRange) }}
             </span>
           </div>
         </div>
 
-        <div class="tw-flex tw-items-center tw-gap-3">
+        <div class="tw:flex tw:items-center tw:gap-3">
           <q-btn
             flat
             round
@@ -54,19 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
-      <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
-        <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
-          <span class="tw-text-xs tw-font-semibold tw-opacity-70">
+      <div class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+          <span class="tw:text-xs tw:font-semibold tw:opacity-70">
             {{ t('correlation.filters') }}:
           </span>
           <div
             v-for="(value, key) in pendingDimensions"
             :key="key"
-            class="tw-flex tw-items-center tw-gap-2"
+            class="tw:flex tw:items-center tw:gap-2"
           >
             <span
-              class="tw-text-xs tw-font-semibold"
-              :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
+              class="tw:text-xs tw:font-semibold"
+              :class="unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'"
             >
               {{ key }}:
             </span>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.apply')"
             :disable="!hasPendingChanges"
             @click="applyDimensionChanges"
-            class="o2-secondary-button tw-ml-2"
+            class="o2-secondary-button tw:ml-2"
             data-test="apply-dimension-filters"
           />
         </div>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!isEmbeddedTabs"
         v-model="activeTab"
         dense
-        class="tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
         active-color="primary"
         indicator-color="primary"
         align="left"
@@ -120,18 +120,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tab-panels
         v-model="activeTab"
         animated
-        class="correlation-content tw-flex-1 tw-overflow-auto"
+        class="correlation-content tw:flex-1 tw:overflow-auto"
       >
         <!-- Logs Tab Panel -->
-        <q-tab-panel name="logs" class="tw-p-0">
+        <q-tab-panel name="logs" class="tw:p-0">
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.loading') }}</div>
-            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">{{ t('correlation.loadingLogs') }}</div>
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.loading') }}</div>
+            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">{{ t('correlation.loadingLogs') }}</div>
           </div>
 
           <!-- Logs Dashboard -->
@@ -148,20 +148,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Logs State -->
           <div
             v-else
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="article" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.noLogsFound') }}</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+            <q-icon name="article" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.noLogsFound') }}</div>
+            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
               {{ t('correlation.service', { service: serviceName }) }}
             </div>
           </div>
         </q-tab-panel>
 
         <!-- Metrics Tab Panel -->
-        <q-tab-panel name="metrics" class="tw-p-0">
+        <q-tab-panel name="metrics" class="tw:p-0">
           <!-- Metrics Selector Button (only shown in metrics tab) -->
-          <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-end">
+          <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end">
             <q-btn
               outline
               dense
@@ -179,11 +179,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="loading"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.loading') }}</div>
-            <div class="tw-text-xs tw-text-gray-500 tw-mt-2">
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.loading') }}</div>
+            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
               {{ t('correlation.loadingMetrics', { count: selectedMetricStreams.length }) }}
             </div>
           </div>
@@ -191,16 +191,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error State -->
           <div
             v-else-if="error"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">{{ t('correlation.failedToLoad') }}</div>
-            <div class="tw-text-sm tw-text-gray-500">{{ error }}</div>
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
+            <div class="tw:text-base tw:mb-2">{{ t('correlation.failedToLoad') }}</div>
+            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
             <q-btn
               outline
               color="primary"
               :label="t('correlation.retryButton')"
-              class="tw-mt-4"
+              class="tw:mt-4"
               @click="loadDashboard"
             />
           </div>
@@ -220,67 +220,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Metrics State -->
           <div
             v-else
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="info_outline" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.noMetrics') }}</div>
+            <q-icon name="info_outline" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.noMetrics') }}</div>
           </div>
         </q-tab-panel>
 
         <!-- Traces Tab Panel -->
-        <q-tab-panel name="traces" class="tw-p-0">
+        <q-tab-panel name="traces" class="tw:p-0">
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.loadingTraces') }}</div>
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.loadingTraces') }}</div>
           </div>
 
           <!-- Error State -->
           <div
             v-else-if="tracesError"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">{{ t('correlation.tracesError') }}</div>
-            <div class="tw-text-sm tw-text-gray-500">{{ tracesError }}</div>
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
+            <div class="tw:text-base tw:mb-2">{{ t('correlation.tracesError') }}</div>
+            <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
             <q-btn
               outline
               color="primary"
               :label="t('correlation.retryButton')"
-              class="tw-mt-4"
+              class="tw:mt-4"
               @click="loadCorrelatedTraces"
             />
           </div>
 
           <!-- Direct Trace Correlation - Full Span List -->
-          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
+          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw:h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
-              <div class="tw-flex tw-items-center tw-gap-3">
+            <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg">
+              <div class="tw:flex tw:items-center tw:gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
-                <div class="tw-flex tw-flex-col">
-                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
+                <div class="tw:flex tw:flex-col">
+                  <span class="tw:text-sm tw:font-semibold">{{ t('correlation.directTraceMatch') }}</span>
                   <a
                     href="#"
-                    class="tw-text-xs tw-text-blue-500 tw-font-mono tw-underline hover:tw-text-blue-700 tw-cursor-pointer"
+                    class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
                     @click.prevent="openTraceInNewWindow"
                     :title="t('correlation.openTraceInNewWindow')"
                   >
                     {{ extractedTraceId }}
-                    <q-icon name="open_in_new" size="xs" class="tw-ml-1" />
+                    <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
                   </a>
                 </div>
-                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                <q-chip dense color="primary" text-color="white" class="tw:ml-auto">
                   {{ traceSpanList.length }} {{ t('correlation.spans') }}
                 </q-chip>
               </div>
             </div>
 
             <!-- Span Table -->
-            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100% - 4rem)">
               <q-table
                 :rows="traceSpanList"
                 :columns="spanTableColumns"
@@ -292,23 +292,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:body-cell-service_name="props">
                   <q-td :props="props">
-                    <div class="tw-flex tw-items-center tw-gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <div
-                        class="tw-w-2 tw-h-2 tw-rounded-full"
+                        class="tw:w-2 tw:h-2 tw:rounded-full"
                         :style="{ backgroundColor: getServiceColor(props.row.service_name) }"
                       />
-                      <span class="tw-font-mono tw-text-xs">{{ props.row.service_name }}</span>
+                      <span class="tw:font-mono tw:text-xs">{{ props.row.service_name }}</span>
                     </div>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-operation_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ props.row.operation_name }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ props.row.operation_name }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-duration="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-span_status="props">
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:body-cell-start_time="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
                   </q-td>
                 </template>
               </q-table>
@@ -329,23 +329,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Dimension-based Correlation - Traces List -->
-          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
+          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw:h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
-              <div class="tw-flex tw-items-center tw-gap-3">
+            <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg">
+              <div class="tw:flex tw:items-center tw:gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
-                <div class="tw-flex tw-flex-col">
-                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
-                  <span class="tw-text-xs tw-text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
+                <div class="tw:flex tw:flex-col">
+                  <span class="tw:text-sm tw:font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
+                  <span class="tw:text-xs tw:text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
                 </div>
-                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                <q-chip dense color="primary" text-color="white" class="tw:ml-auto">
                   {{ tracesForDimensions.length }} {{ t('menu.traces') }}
                 </q-chip>
               </div>
             </div>
 
             <!-- Traces Table -->
-            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100% - 4rem)">
               <q-table
                 :rows="tracesForDimensions"
                 :columns="traceListColumns"
@@ -358,37 +358,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:body-cell-trace_id="slotProps">
                   <q-td :props="slotProps">
                     <span
-                      class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline"
+                      class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
                       @click="openTraceInNewWindow(slotProps.row.trace_id)"
                       :title="t('correlation.openTraceInNewWindow')"
                     >
                       {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                      <q-icon name="open_in_new" size="0.75rem" class="tw-ml-1" />
+                      <q-icon name="open_in_new" size="0.75rem" class="tw:ml-1" />
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-service_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.service_name) ? props.row.service_name.map((s: any) => s.service_name).join(', ') : props.row.service_name }}
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-operation_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.operation_name) ? props.row.operation_name[0] : props.row.operation_name }}
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-duration="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-spans="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.spans) ? props.row.spans[0] : props.row.spans }}
                     </span>
                   </q-td>
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:body-cell-start_time="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
                   </q-td>
                 </template>
               </q-table>
@@ -413,11 +413,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.noTracesFound') }}</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.noTracesFound') }}</div>
+            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
               {{ t('correlation.noTracesDescription', { service: serviceName }) }}
             </div>
           </div>
@@ -425,11 +425,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Initial State (waiting for tab to be shown) -->
           <div
             v-else
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.correlatedTraces') }}</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.correlatedTraces') }}</div>
+            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
               {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
             </div>
           </div>
@@ -441,19 +441,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Embedded Tabs Mode -->
   <div v-else class="correlation-dashboard-embedded">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
-    <div class="tw-py-2 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
-      <div class="tw-flex tw-items-center tw-gap-3 tw-flex-wrap">
-        <span class="tw-text-xs tw-font-semibold tw-opacity-70">
+    <div class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
+        <span class="tw:text-xs tw:font-semibold tw:opacity-70">
           {{ t('correlation.filters') }}:
         </span>
         <div
           v-for="(value, key) in pendingDimensions"
           :key="key"
-          class="tw-flex tw-items-center tw-gap-2"
+          class="tw:flex tw:items-center tw:gap-2"
         >
           <span
-            class="tw-text-xs tw-font-semibold"
-            :class="unstableDimensionKeys.has(key) ? 'tw-opacity-60' : 'tw-opacity-100'"
+            class="tw:text-xs tw:font-semibold"
+            :class="unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'"
           >
             {{ key }}:
           </span>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.apply')"
           :disable="!hasPendingChanges"
           @click="applyDimensionChanges"
-          class="o2-secondary-button tw-ml-2"
+          class="o2-secondary-button tw:ml-2"
           data-test="apply-dimension-filters-embedded"
           style="line-height: 2.2rem !important;"
         />
@@ -493,9 +493,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-tab-panels
       v-model="activeTab"
       animated
-      class="correlation-content tw-flex-1 tw-overflow-auto"
+      class="correlation-content tw:flex-1 tw:overflow-auto"
     >
-      <q-tab-panel name="logs" class="tw-p-0">
+      <q-tab-panel name="logs" class="tw:p-0">
         <RenderDashboardCharts
           v-if="logsDashboardData"
           :key="logsDashboardRenderKey"
@@ -507,8 +507,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-tab-panel>
 
-      <q-tab-panel name="metrics" class="tw-p-0">
-        <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] tw-flex tw-items-center tw-justify-end">
+      <q-tab-panel name="metrics" class="tw:p-0">
+        <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end">
           <q-btn
             outline
             dense
@@ -533,59 +533,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-tab-panel>
 
-      <q-tab-panel name="traces" class="tw-p-0">
+      <q-tab-panel name="traces" class="tw:p-0">
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.loadingTraces') }}</div>
+            <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.loadingTraces') }}</div>
           </div>
 
           <!-- Error State -->
           <div
             v-else-if="tracesError"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
-            <div class="tw-text-base tw-mb-2">{{ t('correlation.tracesError') }}</div>
-            <div class="tw-text-sm tw-text-gray-500">{{ tracesError }}</div>
+            <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
+            <div class="tw:text-base tw:mb-2">{{ t('correlation.tracesError') }}</div>
+            <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
             <q-btn
               outline
               color="primary"
               :label="t('correlation.retryButton')"
-              class="tw-mt-4"
+              class="tw:mt-4"
               @click="loadCorrelatedTraces"
             />
           </div>
 
           <!-- Direct Trace Correlation - Full Span List -->
-          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw-h-full">
+          <div v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0" class="tw:h-full">
             <!-- Trace Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
-              <div class="tw-flex tw-items-center tw-gap-3">
+            <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg">
+              <div class="tw:flex tw:items-center tw:gap-3">
                 <q-icon name="link" color="positive" size="1.25rem" />
-                <div class="tw-flex tw-flex-col">
-                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.directTraceMatch') }}</span>
+                <div class="tw:flex tw:flex-col">
+                  <span class="tw:text-sm tw:font-semibold">{{ t('correlation.directTraceMatch') }}</span>
                   <a
                     href="#"
-                    class="tw-text-xs tw-text-blue-500 tw-font-mono tw-underline hover:tw-text-blue-700 tw-cursor-pointer"
+                    class="tw:text-xs tw:text-blue-500 tw:font-mono tw:underline hover:tw:text-blue-700 tw:cursor-pointer"
                     @click.prevent="openTraceInNewWindow"
                     :title="t('correlation.openTraceInNewWindow')"
                   >
                     {{ extractedTraceId }}
-                    <q-icon name="open_in_new" size="xs" class="tw-ml-1" />
+                    <q-icon name="open_in_new" size="xs" class="tw:ml-1" />
                   </a>
                 </div>
-                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                <q-chip dense color="primary" text-color="white" class="tw:ml-auto">
                   {{ traceSpanList.length }} {{ t('correlation.spans') }}
                 </q-chip>
               </div>
             </div>
 
             <!-- Span Table -->
-            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100% - 4rem)">
               <q-table
                 :rows="traceSpanList"
                 :columns="spanTableColumns"
@@ -597,23 +597,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:body-cell-service_name="props">
                   <q-td :props="props">
-                    <div class="tw-flex tw-items-center tw-gap-2">
+                    <div class="tw:flex tw:items-center tw:gap-2">
                       <div
-                        class="tw-w-2 tw-h-2 tw-rounded-full"
+                        class="tw:w-2 tw:h-2 tw:rounded-full"
                         :style="{ backgroundColor: getServiceColor(props.row.service_name) }"
                       />
-                      <span class="tw-font-mono tw-text-xs">{{ props.row.service_name }}</span>
+                      <span class="tw:font-mono tw:text-xs">{{ props.row.service_name }}</span>
                     </div>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-operation_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ props.row.operation_name }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ props.row.operation_name }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-duration="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-span_status="props">
@@ -626,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:body-cell-start_time="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
                   </q-td>
                 </template>
               </q-table>
@@ -634,23 +634,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Dimension-based Correlation - Traces List -->
-          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw-h-full">
+          <div v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0" class="tw:h-full">
             <!-- Header -->
-            <div class="tw-p-3 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)] trace-header-bg">
-              <div class="tw-flex tw-items-center tw-gap-3">
+            <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg">
+              <div class="tw:flex tw:items-center tw:gap-3">
                 <q-icon name="hub" color="primary" size="1.25rem" />
-                <div class="tw-flex tw-flex-col">
-                  <span class="tw-text-sm tw-font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
-                  <span class="tw-text-xs tw-text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
+                <div class="tw:flex tw:flex-col">
+                  <span class="tw:text-sm tw:font-semibold">{{ t('correlation.dimensionBasedCorrelation') }}</span>
+                  <span class="tw:text-xs tw:text-gray-500">{{ t('correlation.tracesFromService', { service: serviceName }) }}</span>
                 </div>
-                <q-chip dense color="primary" text-color="white" class="tw-ml-auto">
+                <q-chip dense color="primary" text-color="white" class="tw:ml-auto">
                   {{ tracesForDimensions.length }} {{ t('menu.traces') }}
                 </q-chip>
               </div>
             </div>
 
             <!-- Traces Table -->
-            <div class="tw-p-3 tw-overflow-auto" style="max-height: calc(100% - 4rem)">
+            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100% - 4rem)">
               <q-table
                 :rows="tracesForDimensions"
                 :columns="traceListColumns"
@@ -663,37 +663,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:body-cell-trace_id="slotProps">
                   <q-td :props="slotProps">
                     <span
-                      class="tw-font-mono tw-text-xs tw-text-primary tw-cursor-pointer hover:tw-underline"
+                      class="tw:font-mono tw:text-xs tw:text-primary tw:cursor-pointer hover:tw:underline"
                       @click="openTraceInNewWindow(slotProps.row.trace_id)"
                       :title="t('correlation.openTraceInNewWindow')"
                     >
                       {{ slotProps.row.trace_id?.substring(0, 16) }}...
-                      <q-icon name="open_in_new" size="0.75rem" class="tw-ml-1" />
+                      <q-icon name="open_in_new" size="0.75rem" class="tw:ml-1" />
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-service_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.service_name) ? props.row.service_name.map((s: any) => s.service_name).join(', ') : props.row.service_name }}
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-operation_name="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.operation_name) ? props.row.operation_name[0] : props.row.operation_name }}
                     </span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-duration="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatDuration(props.row.duration || 0) }}</span>
                   </q-td>
                 </template>
                 <template v-slot:body-cell-spans="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">
+                    <span class="tw:font-mono tw:text-xs">
                       {{ Array.isArray(props.row.spans) ? props.row.spans[0] : props.row.spans }}
                     </span>
                   </q-td>
@@ -708,7 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:body-cell-start_time="props">
                   <q-td :props="props">
-                    <span class="tw-font-mono tw-text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
+                    <span class="tw:font-mono tw:text-xs">{{ formatTimestamp(props.row.start_time) }}</span>
                   </q-td>
                 </template>
               </q-table>
@@ -718,11 +718,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.noTracesFound') }}</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+            <q-icon name="search_off" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.noTracesFound') }}</div>
+            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
               {{ t('correlation.noTracesDescription', { service: serviceName }) }}
             </div>
           </div>
@@ -730,11 +730,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Initial State (waiting for tab to be shown) -->
           <div
             v-else
-            class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
           >
-            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw-mb-4" />
-            <div class="tw-text-base">{{ t('correlation.correlatedTraces') }}</div>
-            <div class="tw-text-sm tw-text-gray-500 tw-mt-2">
+            <q-icon name="account_tree" size="3.75rem" color="grey-6" class="tw:mb-4" />
+            <div class="tw:text-base">{{ t('correlation.correlatedTraces') }}</div>
+            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
               {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
             </div>
           </div>
@@ -745,9 +745,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Metric Stream Selector Dialog -->
   <q-dialog v-model="showMetricSelector">
     <q-card class="metric-selector-dialog">
-      <q-card-section class="tw-p-4 tw-border-b">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-3">
-          <div class="tw-text-base tw-font-semibold">{{ t('correlation.selectMetrics') }}</div>
+      <q-card-section class="tw:p-4 tw:border-b">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
+          <div class="tw:text-base tw:font-semibold">{{ t('correlation.selectMetrics') }}</div>
           <q-btn flat round dense icon="close" v-close-popup />
         </div>
 
@@ -758,7 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           :placeholder="t('search.searchField')"
           clearable
-          class="tw-w-full"
+          class="tw:w-full"
         >
           <template #prepend>
             <q-icon name="search" />
@@ -766,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </q-card-section>
 
-      <q-card-section class="tw-p-0 metric-list-container">
+      <q-card-section class="tw:p-0 metric-list-container">
         <q-list v-if="filteredMetricStreams.length > 0">
           <q-item
             v-for="stream in filteredMetricStreams"
@@ -790,7 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-list>
 
         <!-- No results message -->
-        <div v-else class="tw-p-4 tw-text-center tw-text-gray-500">
+        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
           {{ t('search.noResult') }}
         </div>
       </q-card-section>

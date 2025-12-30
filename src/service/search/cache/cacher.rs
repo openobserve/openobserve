@@ -17,7 +17,7 @@ use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
-    utils::{file::scan_files, json, time::now_micros},
+    utils::{file::scan_files, json},
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -25,7 +25,6 @@ use infra::cache::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
-use proto::cluster_rpc::SearchQuery;
 
 use crate::{
     common::meta::search::{
@@ -36,10 +35,7 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
         },
-        sql::{
-            RE_HISTOGRAM, RE_SELECT_FROM, Sql,
-            visitor::histogram_interval::generate_histogram_interval,
-        },
+        sql::{RE_HISTOGRAM, Sql, visitor::histogram_interval::generate_histogram_interval},
     },
 };
 
@@ -88,31 +84,23 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
 pub async fn check_cache(
     trace_id: &str,
     org_id: &str,
-    stream_type: StreamType,
     req: &mut config::meta::search::Request,
-    origin_sql: &mut String,
-    file_path: &mut String,
+    origin_sql: &mut str,
+    file_path: &str,
     is_aggregate: bool,
+    sql: &Sql,
+    result_ts_col: &str,
+    is_descending: bool,
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
 
-    let query: SearchQuery = req.query.clone().into();
-    let sql = match Sql::new(&query, org_id, stream_type, req.search_type).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Error parsing sql: {e}");
-            return MultiCachedQueryResponse::default();
-        }
-    };
+    let order_by = &sql.order_by;
 
     // skip the queries with no timestamp column
-    let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
-    let order_by = sql.order_by;
-    let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
-    if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
+    if result_ts_col.is_empty() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse {
-            order_by,
+            order_by: order_by.clone(),
             ..Default::default()
         };
     }
@@ -127,82 +115,39 @@ pub async fn check_cache(
         || (!order_by.is_empty()
             && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
             && !is_histogram_query
-            && (result_ts_col.is_none()
-                || (result_ts_col.is_some()
-                    && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
+            && !result_ts_col.is_empty()
+            && result_ts_col != order_by.first().as_ref().unwrap().0)
     {
         return MultiCachedQueryResponse {
-            order_by,
+            order_by: order_by.clone(),
             ..Default::default()
         };
     }
 
-    // Hack select for _timestamp
-    if !is_aggregate && sql.group_by.is_empty() && order_by.is_empty() && !origin_sql.contains('*')
-    {
-        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(TIMESTAMP_COL_NAME) {
-            *origin_sql =
-                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME},{cap_str}"), 1);
-        }
-        req.query.sql = origin_sql.clone();
-        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
-    }
-    if !is_aggregate && origin_sql.contains('*') {
-        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
-    }
+    // Note: Both result_ts_col refinement and SQL modification (adding _timestamp to SELECT)
+    // are now done in prepare_cache_response() before calling this function.
+    // just use the refined result_ts_col that was passed in.
 
-    // Check ts_col again, if it is still None, return default
-    let Some(result_ts_col) = result_ts_col else {
+    // Check ts_col again, if it is still empty, return default
+    if result_ts_col.is_empty() {
         return MultiCachedQueryResponse {
-            order_by,
+            order_by: order_by.clone(),
             ..Default::default()
         };
-    };
+    }
 
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        *file_path = format!("{file_path}_{interval}_{result_ts_col}");
-
-        let mut req_time_range = (req.query.start_time, req.query.end_time);
-        if req_time_range.1 == 0 {
-            req_time_range.1 = now_micros();
-        }
-
-        let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
-        let q_time_range =
-            if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-                Some(req_time_range)
-            } else {
-                sql.time_range
-            };
-        handle_histogram(origin_sql, q_time_range, req.query.histogram_interval);
-        req.query.sql = origin_sql.clone();
+        // Note: handle_histogram is now called in prepare_cache_response() before hash computation
+        // to ensure consistent hashing. We just need to update req.query.sql with the normalized
+        // SQL.
+        req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
     }
 
-    let mut is_descending = true;
+    // Note: is_descending refinement for histogram queries is now done in prepare_cache_response()
+    // before calling this function, so we use the pre-refined value directly
 
-    if !order_by.is_empty() {
-        // For histogram queries, if ORDER BY is not on the histogram/timestamp column,
-        // we should still cache based on the histogram's inherent time ordering
-        // Check if any order_by field matches the result_ts_col
-        let mut found_ts_order = false;
-        for (field, order) in &order_by {
-            if is_timestamp_field(field, &result_ts_col) {
-                is_descending = order == &OrderBy::Desc;
-                found_ts_order = true;
-                break;
-            }
-        }
-
-        // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
-        // use ascending as default
-        if !found_ts_order && is_histogram_query {
-            is_descending = false;
-        }
-    }
     if is_aggregate && order_by.is_empty() && result_ts_col.is_empty() {
         return MultiCachedQueryResponse::default();
     }
@@ -212,7 +157,7 @@ pub async fn check_cache(
     // requiring us to scan all hits to find the actual time range.
     let is_histogram_non_ts_order = is_histogram_query
         && !order_by.is_empty()
-        && has_non_timestamp_ordering(&order_by, &result_ts_col);
+        && has_non_timestamp_ordering(order_by, result_ts_col);
 
     let mut multi_resp = MultiCachedQueryResponse {
         trace_id: trace_id.to_string(),
@@ -239,7 +184,7 @@ pub async fn check_cache(
                 q_start_time: req.query.start_time,
                 q_end_time: req.query.end_time,
                 is_aggregate,
-                ts_column: result_ts_col.clone(),
+                ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
                 is_histogram_non_ts_order,
@@ -301,11 +246,11 @@ pub async fn check_cache(
             }
         }
         multi_resp.cache_query_response = true;
-        multi_resp.limit = sql.limit as i64;
-        multi_resp.ts_column = result_ts_col;
+        multi_resp.limit = sql.limit;
+        multi_resp.ts_column = result_ts_col.to_string();
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.file_path = file_path.to_string();
-        multi_resp.order_by = order_by;
+        multi_resp.order_by = order_by.clone();
         multi_resp.is_aggregate = is_aggregate;
         multi_resp
     } else {
@@ -316,7 +261,7 @@ pub async fn check_cache(
                 q_start_time: req.query.start_time,
                 q_end_time: req.query.end_time,
                 is_aggregate,
-                ts_column: result_ts_col.clone(),
+                ts_column: result_ts_col.to_string(),
                 histogram_interval,
                 is_descending,
                 is_histogram_non_ts_order,
@@ -398,10 +343,10 @@ pub async fn check_cache(
         }
         multi_resp.took = start.elapsed().as_millis() as usize;
         multi_resp.cache_query_response = true;
-        multi_resp.limit = sql.limit as i64;
-        multi_resp.ts_column = result_ts_col;
+        multi_resp.limit = sql.limit;
+        multi_resp.ts_column = result_ts_col.to_string();
         multi_resp.file_path = file_path.to_string();
-        multi_resp.order_by = order_by;
+        multi_resp.order_by = order_by.clone();
         multi_resp.is_aggregate = is_aggregate;
         multi_resp
     }
@@ -684,6 +629,77 @@ pub fn get_ts_col_order_by(
     }
 }
 
+/// Computes the cache file path based on query metadata and histogram information.
+/// This function ensures consistent file path generation across different code paths.
+///
+/// # Arguments
+/// * `base_path` - The base path format: "{org_id}/{stream_type}/{stream_name}/{hashed_query}"
+/// * `is_aggregate` - Whether the query is an aggregate query
+/// * `histogram_interval` - Optional histogram interval from the SQL query
+/// * `ts_column` - The timestamp column name
+///
+/// # Returns
+/// The complete file path with histogram information appended if applicable
+pub fn compute_cache_file_path(
+    base_path: &str,
+    is_aggregate: bool,
+    histogram_interval: Option<i64>,
+    ts_column: &str,
+) -> String {
+    let mut file_path = base_path.to_string();
+
+    // For histogram queries, append interval and ts_column to file_path
+    if is_aggregate && let Some(interval) = histogram_interval {
+        file_path = format!("{file_path}_{interval}_{ts_column}");
+    }
+
+    file_path
+}
+
+/// Refines is_descending for histogram queries with non-timestamp ORDER BY.
+///
+/// For histogram queries, if ORDER BY is not on the timestamp column,
+/// we use ascending as the default for cache operations.
+///
+/// # Arguments
+/// * `sql` - Parsed SQL query
+/// * `ts_column` - The timestamp column name
+/// * `initial_is_descending` - The initial is_descending value from ORDER BY
+///
+/// # Returns
+/// Refined is_descending value
+pub fn refine_is_descending_for_histogram(
+    sql: &Sql,
+    ts_column: &str,
+    initial_is_descending: bool,
+) -> bool {
+    let is_histogram_query = sql.histogram_interval.is_some();
+
+    if !is_histogram_query || sql.order_by.is_empty() {
+        return initial_is_descending;
+    }
+
+    // Check if ORDER BY includes the timestamp column
+    let mut found_ts_order = false;
+    let mut refined_is_descending = initial_is_descending;
+
+    for (field, order) in &sql.order_by {
+        if is_timestamp_field(field, ts_column) {
+            refined_is_descending = order == &OrderBy::Desc;
+            found_ts_order = true;
+            break;
+        }
+    }
+
+    // For histogram queries ordered by non-timestamp columns (e.g., ORDER BY count),
+    // use ascending as default
+    if !found_ts_order {
+        refined_is_descending = false;
+    }
+
+    refined_is_descending
+}
+
 enum DeletionCriteria {
     TimeRange(i64, i64),
     ThresholdTimestamp(i64),
@@ -947,12 +963,16 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{Field, Schema};
-    use config::meta::{
-        search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
-        sql::OrderBy,
+    use config::{
+        meta::{
+            search::{Query, Request, RequestEncoding, Response, ResponseTook, SearchEventType},
+            sql::OrderBy,
+        },
+        utils::time::now_micros,
     };
     use datafusion::common::TableReference;
     use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+    use proto::cluster_rpc::SearchQuery;
 
     use super::*;
     use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
@@ -1232,18 +1252,28 @@ mod tests {
             local_mode: None,
         };
         let mut origin_sql = req.query.sql.clone();
-        let mut file_path = "test_org/logs/test_stream".to_string();
+        let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;
         let mut should_exec_query = true;
+
+        // Parse SQL to get metadata (new signature requires this)
+        let query: SearchQuery = req.query.clone().into();
+        let sql = Sql::new(&query, org_id, stream_type, req.search_type)
+            .await
+            .unwrap();
+        let (result_ts_col, is_descending) =
+            get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).unwrap_or_default();
 
         let result = check_cache(
             trace_id,
             org_id,
-            stream_type,
             &mut req,
             &mut origin_sql,
-            &mut file_path,
+            &file_path,
             is_aggregate,
+            &sql,
+            &result_ts_col,
+            is_descending,
             &mut should_exec_query,
         )
         .await;

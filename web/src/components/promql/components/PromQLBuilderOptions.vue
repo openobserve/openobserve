@@ -3,7 +3,7 @@
     <q-separator />
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
-    <div class="tw-py-[0.25rem]">
+    <div class="tw:py-[0.25rem]">
       <div style="display: flex; flex-direction: row" class="q-pl-md">
         <div class="layout-name">{{ t("panel.options") }}</div>
         <span class="layout-separator">:</span>
@@ -40,7 +40,10 @@
                   self="bottom middle"
                   max-width="250px"
                 >
+                  ({{ t("dashboard.optional") }}) <b>Legend - </b>
                   {{ t("dashboard.overrideMessage") }}
+                  <br />
+                  {{ t("dashboard.overrideMessageExample") }}
                 </q-tooltip>
               </q-icon>
             </div>
@@ -79,8 +82,10 @@
                     self="bottom middle"
                     max-width="250px"
                   >
-                    <b>Step - </b>
+                    ({{ t("dashboard.optional") }}) <b>Step - </b>
                     {{ t("dashboard.stepValueTooltip") }}
+                    <br />
+                    {{ t("dashboard.stepValueTooltipInfo") }}
                     <br />
                     {{ t("dashboard.stepValueExample") }}
                   </q-tooltip>

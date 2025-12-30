@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-    <div class="q-px-md q-py-md card-container tw-h-[calc(100vh-50px)]">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+    <div class="q-px-md q-py-md card-container tw:h-[calc(100vh-50px)]">
       <div class="row items-center no-wrap">
         <div class="col">
           <div v-if="isUpdating" class="text-h6">
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw-mb-2">Data Source</div>
+              <div class="text-grey-8 text-bold tw:mb-2">Data Source</div>
               <q-option-group
                 v-model="formData.source"
                 :options="sourceOptions"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               >
                 <template v-slot:hint>
-                  <div class="tw-text-xs">
+                  <div class="tw:text-xs">
                     Must be a publicly accessible CSV file
                   </div>
                 </template>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex justify-start q-mt-md">
             <q-btn
               v-close-popup
-              class="q-mr-md o2-secondary-button tw-h-[36px]"
+              class="q-mr-md o2-secondary-button tw:h-[36px]"
               :label="t('function.cancel')"
               no-caps
               flat
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('cancel:hideform')"
             />
             <q-btn
-              class="o2-primary-button no-border tw-h-[36px]"
+              class="o2-primary-button no-border tw:h-[36px]"
               :label="t('function.save')"
               type="submit"
               no-caps
