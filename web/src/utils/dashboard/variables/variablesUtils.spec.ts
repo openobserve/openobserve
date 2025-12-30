@@ -255,8 +255,9 @@ describe("Variables Utils", () => {
 
     it("should handle null values", () => {
       const content = "SELECT * FROM logs WHERE field = '${null}'";
-      const expected = "SELECT * FROM logs WHERE field = ''";
-      
+      // Null values are replaced with SELECT_ALL_VALUE sentinel
+      const expected = "SELECT * FROM logs WHERE field = '_o2_all_'";
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
