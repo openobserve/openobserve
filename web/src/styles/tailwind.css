@@ -1,8 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" prefix(tw);
+
+@plugin "@tailwindcss/typography";
+
+@source "../**/*.{vue,js,ts}";
 
 @layer base {
+  *, :before, :after {
+    border-color: #e5e7eb;
+  }
+
   h5 {
     font-size: 1.5rem;
     font-weight: 400;
@@ -24,5 +30,5 @@
     text-overflow: ellipsis;
     width: auto;
   }
-  /* ... */
 }
+

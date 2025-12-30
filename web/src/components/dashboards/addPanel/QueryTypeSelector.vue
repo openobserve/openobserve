@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
       </div>
-      <div class="row button-group tw-ml-[0.25rem]">
+      <div class="row button-group tw:ml-[0.25rem]">
         <div v-if="dashboardPanelData.data.type != 'custom_chart'">
           <button
             data-test="dashboard-builder-query-type"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <ConfirmDialog
       title="Change Query Mode"
-      message="Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+      :message="confirmDialogMessage"
       @update:ok="changeToggle()"
       @update:cancel="confirmQueryModeChangeDialog = false"
       v-model="confirmQueryModeChangeDialog"
@@ -145,6 +145,7 @@ export default defineComponent({
       updateXYFieldsForCustomQueryMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const confirmQueryModeChangeDialog = ref(false);
+    const confirmDialogMessage = ref("Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.");
 
     const selectedButtonQueryType = ref("sql");
     // this is the value of the current button
@@ -266,6 +267,22 @@ export default defineComponent({
           dashboardPanelData.layout.showQueryBar = true;
         } else {
           popupSelectedButtonType.value = selectedQueryType;
+
+          // Set appropriate message based on the transition
+          if (
+            isPromQLMode.value &&
+            isCustomMode.value &&
+            selectedQueryType === "builder"
+          ) {
+            // Switching from PromQL custom to builder
+            confirmDialogMessage.value =
+              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off.";
+          } else {
+            // Default message for other transitions
+            confirmDialogMessage.value =
+              "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
+          }
+
           dashboardPanelData.data.queries[0].query != ""
             ? (confirmQueryModeChangeDialog.value = true)
             : changeToggle();
@@ -400,6 +417,7 @@ export default defineComponent({
       onUpdateQueryMode,
       changeToggle,
       confirmQueryModeChangeDialog,
+      confirmDialogMessage,
       selectedButtonType,
       store,
       selectedButtonQueryType,

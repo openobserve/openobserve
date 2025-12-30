@@ -1030,7 +1030,10 @@
     "hiddenColumns": "Gizli Sütunlar",
     "stickyFirstColumn": "Yapışkan İlk Sütun",
     "stickyColumns": "Yapışkan Sütunlar",
-    "promqlTableMode": "PromQL Tablo Modu"
+    "promqlTableMode": "PromQL Tablo Modu",
+    "overrideMessageExample": "Örneğin, {endpoint} uç nokta için etiket değeri ile değiştirilecektir.",
+    "stepValueTooltipInfo": "Belirtilmemişse, Panel Yapılandırması'ndaki adım değeri kullanılacaktır.",
+    "optional": "İsteğe Bağlı"
   },
   "panel": {
     "header": "Panel",

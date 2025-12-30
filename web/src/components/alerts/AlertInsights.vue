@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tw-px-[0.625rem] tw-py-[0.1rem]">
-      <div class="card-container tw-mb-[0.625rem]">
+    <div class="tw:px-[0.625rem] tw:py-[0.1rem]">
+      <div class="card-container tw:mb-[0.625rem]">
         <!-- Header -->
         <div
           class="insights-header flex justify-between items-center"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="alert-insights-back-btn"
             />
-            <div class="q-table__title tw-font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
+            <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
           </div>
 
           <div class="flex items-center">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters Section -->
         <div
           v-if="show"
-          class="filters-section tw-flex tw-items-center tw-gap-2 tw-flex-wrap"
+          class="filters-section tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
         >
           <span class="filter-label">{{ t("common.filters") }}:</span>
 
@@ -124,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[panelId, filter] in rangeFilters"
             :key="panelId"
-            class="filter-chip tw-rounded tw-flex tw-items-center"
+            class="filter-chip tw:rounded tw:flex tw:items-center"
             :class="
               store.state.theme === 'dark'
-                ? 'tw-bg-indigo-900 tw-text-indigo-100'
-                : 'tw-bg-blue-100 tw-text-blue-800'
+                ? 'tw:bg-indigo-900 tw:text-indigo-100'
+                : 'tw:bg-blue-100 tw:text-blue-800'
             "
             data-test="range-filter-chip"
           >
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <q-icon
               name="close"
-              class="chip-close-icon tw-cursor-pointer"
+              class="chip-close-icon tw:cursor-pointer"
               @click="removeRangeFilter(panelId)"
             />
           </div>
@@ -171,11 +171,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="action-buttons-row tw-bg-primary tw-bg-opacity-10 tw-flex tw-items-center"
+      class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
       data-test="action-buttons-row"
     >
       <q-icon name="campaign" color="primary" size="sm" />
-      <span class="tw-text-sm tw-font-medium"
+      <span class="tw:text-sm tw:font-medium"
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >
 
@@ -230,8 +230,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="tw-w-full tw-h-full tw-px-[0.625rem] tw-pb-[0.625rem]">
-      <div class="card-container tw-mb-[0.625rem] tw-h-[calc(100vh-208px)]">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-208px)]">
         <div
           @contextmenu="handleNativeContextMenu"
         >

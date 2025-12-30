@@ -26,16 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-card class="analysis-dashboard-card">
       <!-- Header -->
-      <q-card-section class="analysis-header tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-4 tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]">
-        <div class="tw-flex tw-items-center tw-gap-3">
+      <q-card-section class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+        <div class="tw:flex tw:items-center tw:gap-3">
           <q-icon name="dashboard" size="md" color="primary" />
-          <div class="tw-flex tw-flex-col tw-gap-0">
-            <span class="tw-text-lg tw-font-semibold">
+          <div class="tw:flex tw:flex-col tw:gap-0">
+            <span class="tw:text-lg tw:font-semibold">
               <template v-if="props.analysisType === 'latency'">{{ t('latencyInsights.title') }}</template>
               <template v-else-if="props.analysisType === 'volume'">{{ t('volumeInsights.title') }}</template>
               <template v-else-if="props.analysisType === 'error'">{{ t('errorInsights.title') }}</template>
             </span>
-            <span class="tw-text-xs tw-opacity-70">
+            <span class="tw:text-xs tw:opacity-70">
               <span v-if="props.analysisType === 'latency' && durationFilter">
                 {{ t('latencyInsights.durationLabel') }} {{ formatTimeWithSuffix(durationFilter.start) }} - {{ formatTimeWithSuffix(durationFilter.end) }}
               </span>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw-flex tw-items-center tw-gap-3">
+        <div class="tw:flex tw:items-center tw:gap-3">
           <!-- Refresh button (shown when percentile changes on latency tab) -->
           <q-btn
             v-if="showRefreshButton"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="activeAnalysisType"
         dense
         inline-label
-        class="tw-border-b tw-border-solid tw-border-[var(--o2-border-color)]"
+        class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
         active-color="primary"
         indicator-color="primary"
         align="left"
@@ -118,20 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :name="tab.name"
           :label="tab.label"
           :icon="tab.icon"
-          class="tw-min-h-[3rem]"
+          class="tw:min-h-[3rem]"
         />
       </q-tabs>
 
       <!-- Dashboard Content -->
-      <q-card-section class="analysis-content tw-flex-1 tw-overflow-auto tw-p-0">
+      <q-card-section class="analysis-content tw:flex-1 tw:overflow-auto tw:p-0">
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw-mb-4" />
-          <div class="tw-text-base">{{ t('latencyInsights.analyzingDimensions') }}</div>
-          <div class="tw-text-xs tw-text-gray-500 tw-mt-2">
+          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <div class="tw:text-base">{{ t('latencyInsights.analyzingDimensions') }}</div>
+          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
             {{ t('latencyInsights.computingDistributions', { count: selectedDimensions.length }) }}
           </div>
         </div>
@@ -139,16 +139,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error State -->
         <div
           v-else-if="error"
-          class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full tw-py-20"
+          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon name="error_outline" size="3.75rem" color="negative" class="tw-mb-4" />
-          <div class="tw-text-base tw-mb-2">{{ t('latencyInsights.failedToLoad') }}</div>
-          <div class="tw-text-sm tw-text-gray-500">{{ error }}</div>
+          <q-icon name="error_outline" size="3.75rem" color="negative" class="tw:mb-4" />
+          <div class="tw:text-base tw:mb-2">{{ t('latencyInsights.failedToLoad') }}</div>
+          <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
           <q-btn
             outline
             color="primary"
             :label="t('latencyInsights.retryButton')"
-            class="tw-mt-4"
+            class="tw:mt-4"
             @click="loadAnalysis"
           />
         </div>
@@ -173,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Dimension Selector Dialog -->
   <q-dialog v-model="showDimensionSelector">
     <q-card class="dimension-selector-dialog">
-      <q-card-section class="tw-p-4 tw-border-b">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-3">
-          <div class="tw-text-base tw-font-semibold">{{ t('latencyInsights.selectDimensions') }}</div>
+      <q-card-section class="tw:p-4 tw:border-b">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
+          <div class="tw:text-base tw:font-semibold">{{ t('latencyInsights.selectDimensions') }}</div>
           <q-btn flat round dense icon="close" v-close-popup />
         </div>
 
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           :placeholder="t('search.searchField')"
           clearable
-          class="tw-w-full"
+          class="tw:w-full"
         >
           <template #prepend>
             <q-icon name="search" />
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </q-card-section>
 
-      <q-card-section class="tw-p-0 dimension-list-container">
+      <q-card-section class="tw:p-0 dimension-list-container">
         <q-list v-if="filteredDimensions.length > 0">
           <q-item
             v-for="dimension in filteredDimensions"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-list>
 
         <!-- No results message -->
-        <div v-else class="tw-p-4 tw-text-center tw-text-gray-500">
+        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
           {{ t('search.noResult') }}
         </div>
       </q-card-section>

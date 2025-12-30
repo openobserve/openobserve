@@ -31,7 +31,7 @@
         >
           <div style="display: flex">
             <StreamFieldSelect
-              class="tw-w-full"
+              class="tw:w-full"
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"

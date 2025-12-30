@@ -308,22 +308,22 @@ describe('ScriptEditor.vue', () => {
   describe('Component Structure', () => {
     it('has correct main wrapper structure', () => {
       wrapper = createWrapper();
-      
-      const mainDiv = wrapper.find('.tw-w-full.tw-h-full');
+
+      const mainDiv = wrapper.find('.tw\\:w-full.tw\\:h-full');
       expect(mainDiv.exists()).toBe(true);
     });
 
     it('has correct editor section structure', () => {
       wrapper = createWrapper();
-      
+
       const editorSection = wrapper.find('[data-test="test-function-input-editor-section"]');
       expect(editorSection.exists()).toBe(true);
-      expect(editorSection.classes()).toContain('tw-border-[1px]');
-      expect(editorSection.classes()).toContain('tw-border-gray-200');
-      expect(editorSection.classes()).toContain('tw-h-[calc(100%-30px)]');
-      expect(editorSection.classes()).toContain('tw-relative');
-      expect(editorSection.classes()).toContain('tw-rounded-md');
-      expect(editorSection.classes()).toContain('tw-overflow-hidden');
+      expect(editorSection.classes()).toContain('tw:border-[1px]');
+      expect(editorSection.classes()).toContain('tw:border-gray-200');
+      expect(editorSection.classes()).toContain('tw:h-[calc(100%-30px)]');
+      expect(editorSection.classes()).toContain('tw:relative');
+      expect(editorSection.classes()).toContain('tw:rounded-md');
+      expect(editorSection.classes()).toContain('tw:overflow-hidden');
     });
 
     it('query editor has correct CSS classes', async () => {
