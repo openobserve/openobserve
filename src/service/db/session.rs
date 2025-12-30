@@ -37,6 +37,16 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 
     match session {
         Some(session) => {
+            // Check if session has expired
+            if infra::table::sessions::is_expired(&session) {
+                log::info!("Session expired: {}", session_id);
+                // Evict from local cache
+                USER_SESSIONS.remove(session_id);
+                // Delete expired session from DB
+                let _ = infra::table::sessions::delete(session_id).await;
+                return Err(anyhow::anyhow!("Session expired: {}", session_id));
+            }
+
             let access_token = session.access_token.clone();
             // Cache it in memory
             if !access_token.is_empty() {
@@ -48,8 +58,8 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
     }
 }
 
-pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
-    infra::table::sessions::set(session_id, val).await?;
+pub async fn set(session_id: &str, val: &str, expires_at: i64) -> Result<(), anyhow::Error> {
+    infra::table::sessions::set(session_id, val, expires_at).await?;
     let key = format!("{USER_SESSION_KEY}{session_id}");
     if let Err(e) = put_into_db_coordinator(&key, Bytes::new(), true, None).await {
         log::error!("[SESSION] Failed to sync session to coordinator: {key} - {e}");

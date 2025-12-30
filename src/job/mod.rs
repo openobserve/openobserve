@@ -52,6 +52,7 @@ mod promql;
 mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
+mod session_cleanup;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -359,6 +360,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
+    session_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

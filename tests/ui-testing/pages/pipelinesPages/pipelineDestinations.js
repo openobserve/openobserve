@@ -28,7 +28,6 @@ export class PipelineDestinations {
         await this.page.locator('[data-test="pipeline-destination-list-add-btn"]').click();
         await this.page.locator('[data-test="destination-type-card-openobserve"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="destination-type-card-openobserve"]').click();
-        await this.page.locator('[data-test="destination-type-card-openobserve"]').click();
         await this.page.locator('[data-test="step1-continue-btn"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="step1-continue-btn"]').click();
         await this.page.locator('[data-test="add-destination-name-input"]').waitFor({ state: 'visible' });
