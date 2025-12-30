@@ -151,7 +151,6 @@ pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec
     infra_scheduler::list_by_org(org, module).await
 }
 
-
 #[inline]
 pub async fn is_empty() -> bool {
     infra_scheduler::is_empty().await

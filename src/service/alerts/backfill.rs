@@ -77,11 +77,8 @@ fn get_destination_streams(
 
 /// Validate that timestamps are aligned to hour boundaries (for logs streams)
 /// Hours must be at :00:00.000000 (zero minutes, seconds, microseconds)
-fn validate_time_alignment_hourly(
-    start_time: i64,
-    end_time: i64,
-) -> Result<(), anyhow::Error> {
-    use chrono::{Timelike, TimeZone};
+fn validate_time_alignment_hourly(start_time: i64, end_time: i64) -> Result<(), anyhow::Error> {
+    use chrono::{TimeZone, Timelike};
 
     let start_dt = Utc
         .timestamp_micros(start_time)
@@ -112,11 +109,8 @@ fn validate_time_alignment_hourly(
 
 /// Validate that timestamps are aligned to day boundaries (for metrics/traces streams)
 /// Days must be at 00:00:00.000000 (midnight)
-fn validate_time_alignment_daily(
-    start_time: i64,
-    end_time: i64,
-) -> Result<(), anyhow::Error> {
-    use chrono::{Timelike, TimeZone};
+fn validate_time_alignment_daily(start_time: i64, end_time: i64) -> Result<(), anyhow::Error> {
+    use chrono::{TimeZone, Timelike};
 
     let start_dt = Utc
         .timestamp_micros(start_time)
@@ -172,7 +166,10 @@ pub async fn create_backfill_job(
     // 1a. Validate deletion is not enabled for pipelines with remote destinations
     if delete_before_backfill {
         let has_remote_destination = pipeline.nodes.iter().any(|node| {
-            matches!(&node.data, config::meta::pipeline::components::NodeData::RemoteStream(_))
+            matches!(
+                &node.data,
+                config::meta::pipeline::components::NodeData::RemoteStream(_)
+            )
         });
 
         if has_remote_destination {
@@ -205,7 +202,8 @@ pub async fn create_backfill_job(
         let requires_daily_alignment = destination_streams.iter().any(|s| {
             matches!(
                 s.stream_type,
-                config::meta::stream::StreamType::Metrics | config::meta::stream::StreamType::Traces
+                config::meta::stream::StreamType::Metrics
+                    | config::meta::stream::StreamType::Traces
             )
         });
 
@@ -605,9 +603,13 @@ pub async fn update_backfill_job(
 
     // Validate deletion is not enabled for pipelines with remote destinations
     if req.delete_before_backfill {
-        let pipeline = crate::service::db::pipeline::get_by_id(&existing_config.pipeline_id).await?;
+        let pipeline =
+            crate::service::db::pipeline::get_by_id(&existing_config.pipeline_id).await?;
         let has_remote_destination = pipeline.nodes.iter().any(|node| {
-            matches!(&node.data, config::meta::pipeline::components::NodeData::RemoteStream(_))
+            matches!(
+                &node.data,
+                config::meta::pipeline::components::NodeData::RemoteStream(_)
+            )
         });
 
         if has_remote_destination {

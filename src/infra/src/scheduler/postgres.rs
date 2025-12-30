@@ -22,10 +22,7 @@ use config::{
 };
 use sqlx::Row;
 
-use super::{
-    TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus,
-    get_scheduler_max_retries,
-};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
         self, IndexStatement,

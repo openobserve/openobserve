@@ -18,10 +18,7 @@ use chrono::Duration;
 use config::utils::{json, time::now_micros};
 use sqlx::Row;
 
-use super::{
-    TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus,
-    get_scheduler_max_retries,
-};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
         self, IndexStatement,

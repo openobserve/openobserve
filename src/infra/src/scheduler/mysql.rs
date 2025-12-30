@@ -23,8 +23,7 @@ use config::{
 use sqlx::Row;
 
 use super::{
-    TRIGGERS_KEY, Trigger, TriggerId, TriggerModule, TriggerStatus,
-    get_scheduler_max_retries,
+    TRIGGERS_KEY, Trigger, TriggerId, TriggerModule, TriggerStatus, get_scheduler_max_retries,
 };
 use crate::{
     db::{
