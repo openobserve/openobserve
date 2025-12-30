@@ -290,33 +290,38 @@ export class DashboardPage {
     await expect(this.dashboardTable).toContainText('No data available');
   }
 
-  async addCustomChart(pictorialJSON) {
+  async addCustomChart() {
     await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardsMenuItem.click();
 
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.waitForTimeout(2000);
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await this.addDashboardButton.click();
-    await this.page.waitForTimeout(2000);
+
+    // Wait for dialog and fill name
+    await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardNameInput.fill("Customcharts");
+
+    // Wait for submit button to be enabled
+    await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });
     await this.dashboardSubmitButton.click();
 
-    await this.addPanelBtn.waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for success and navigation
+    await this.page.getByText('Dashboard added successfully.').waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Add panel and select custom chart
+    await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
     await this.addPanelBtn.click();
     await this.customChartItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.customChartItem.click();
 
+    // Clear Monaco editor content
     await this.markdownEditor.locator('.monaco-editor').waitFor({ state: 'visible', timeout: 10000 });
     await this.markdownEditor.locator('.monaco-editor').click();
 
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
-
-    await this.page.keyboard.press(`${modifier}+A`);
-    await this.page.keyboard.press("Backspace");
-
-    // First clear any existing content
-    await this.markdownEditor.waitFor({ state: 'visible', timeout: 10000 });
-    await this.markdownEditor.click();
     await this.page.keyboard.press(`${modifier}+A`);
     await this.page.keyboard.press('Delete');
   }
