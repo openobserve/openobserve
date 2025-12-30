@@ -1,10 +1,10 @@
-import fixtures from "./utils/enhanced-baseFixtures.js";
-import { DashboardPage } from '../pages/dashboardPages/dashboardPage';
-import DashboardVariables from '../pages/dashboardPages/dashboard-variables';
-import DashboardTabs from '../pages/dashboardPages/dashboard-tabs';
-import DashboardDrilldownPage from '../pages/dashboardPages/dashboard-drilldown.js';
-import { waitForValuesStreamComplete } from './utils/streaming-helpers.js';
-import { waitForDashboardPage, deleteDashboard } from './dashboards/utils/dashCreation.js';
+import fixtures from "../utils/enhanced-baseFixtures.js";
+import { DashboardPage } from '../../pages/dashboardPages/dashboardPage.js';
+import DashboardVariables from '../../pages/dashboardPages/dashboard-variables.js';
+import DashboardTabs from '../../pages/dashboardPages/dashboard-tabs.js';
+import DashboardDrilldownPage from '../../pages/dashboardPages/dashboard-drilldown.js';
+import { waitForValuesStreamComplete } from '../utils/streaming-helpers.js';
+import { waitForDashboardPage, deleteDashboard } from './utils/dashCreation.js';
 
 const { test, expect, navigateToBase } = fixtures;
 const randomDashboardName = "VarTest_" + Math.random().toString(36).slice(2, 11);
