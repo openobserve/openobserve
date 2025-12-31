@@ -43,6 +43,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
+    runtime::METRICS_RUNTIME,
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
@@ -52,7 +53,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::stream::SchemaRecords,
+        meta::{ingestion::IngestUser, stream::SchemaRecords},
     },
     service::{
         alerts::alert::AlertExt,
@@ -68,7 +69,23 @@ use crate::{
 pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
-    user: crate::common::meta::ingestion::IngestUser,
+    user: IngestUser,
+) -> std::result::Result<(), anyhow::Error> {
+    let org_id = org_id.to_string();
+    let ret = METRICS_RUNTIME
+        .spawn(async move { remote_write_inner(&org_id, body, user).await })
+        .await;
+    match ret {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Error spawning remote write task: {e}")),
+    }
+}
+
+async fn remote_write_inner(
+    org_id: &str,
+    body: web::Bytes,
+    user: IngestUser,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
