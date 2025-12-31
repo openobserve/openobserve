@@ -215,12 +215,9 @@ pub async fn handle_otlp_request(
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
     // Start retrieving associated pipeline and construct pipeline params
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &traces_stream_name,
-        &StreamType::Traces,
-    )
-    .await;
+    let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param);
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
@@ -872,8 +869,7 @@ async fn write_traces(
             stream_type: StreamType::Traces,
         }],
         &mut stream_alerts_map,
-    )
-    .await;
+    );
     let cur_stream_alerts = stream_alerts_map.get(&format!(
         "{}/{}/{}",
         org_id,

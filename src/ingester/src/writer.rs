@@ -430,10 +430,18 @@ impl Writer {
                 });
             }
         } else {
+            let start = std::time::Instant::now();
             self.write_queue
                 .send((WriterSignal::Produce, processed_batch, fsync))
                 .await
                 .context(TokioMpscSendEntriesSnafu)?;
+            let took = start.elapsed().as_millis();
+            if took > 100 {
+                log::warn!(
+                    "(slow!) [INGESTER:MEM:{}] write to queue took: {took} ms",
+                    self.idx,
+                );
+            }
         }
 
         Ok(())

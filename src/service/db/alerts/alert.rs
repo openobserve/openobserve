@@ -428,7 +428,7 @@ async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::
     Ok(())
 }
 
-pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
+pub fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {
     ALERTS
         .pin()
         .get(&cache_alert_key(org_id, alert_id))

@@ -96,7 +96,7 @@ impl ReportingQueue {
             data_type
         );
 
-        let start = time::Instant::now();
+        let start = std::time::Instant::now();
         let result = self
             .msg_sender
             .send(ReportingMessage::Data(reporting_data))
@@ -105,7 +105,7 @@ impl ReportingQueue {
         let took = start.elapsed().as_millis();
         if took > 100 {
             log::warn!(
-                "(slow!) [SELF-REPORTING] enqueue: Queued {} data after {took} ms (indicates queue was full and blocked)",
+                "(slow!) [SELF-REPORTING] enqueue: Queued {} data took {took} ms",
                 data_type,
             );
         }
@@ -174,7 +174,7 @@ impl ReportingQueue {
             timeout_duration
         );
 
-        let start = time::Instant::now();
+        let start = std::time::Instant::now();
         match time::timeout(
             timeout_duration,
             self.msg_sender.send(ReportingMessage::Data(reporting_data)),

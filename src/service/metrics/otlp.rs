@@ -215,36 +215,23 @@ pub async fn handle_otlp_request(
                         .insert(metric_name.clone().to_owned(), partition_det.clone());
                 }
 
-                // Start get stream alerts
-                crate::service::ingestion::get_stream_alerts(
-                    &[StreamParams {
-                        org_id: org_id.to_owned().into(),
-                        stream_name: metric_name.to_owned().into(),
-                        stream_type: StreamType::Metrics,
-                    }],
-                    &mut stream_alerts_map,
-                )
-                .await;
-                // End get stream alert
-
                 // get stream pipeline
+                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
                 if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipeline(
-                            org_id,
-                            &metric_name,
-                            &StreamType::Metrics,
-                        )
-                        .await;
+                        crate::service::ingestion::get_stream_executable_pipeline(&stream_param);
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
 
+                // Start get stream alerts
+                crate::service::ingestion::get_stream_alerts(
+                    std::slice::from_ref(&stream_param),
+                    &mut stream_alerts_map,
+                );
+                // End get stream alert
+
                 // get user defined schema
-                let streams = vec![StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                    stream_name: metric_name.to_owned().into(),
-                }];
+                let streams = vec![stream_param];
                 crate::service::ingestion::get_uds_and_original_data_streams(
                     &streams,
                     &mut user_defined_schema_map,
@@ -355,37 +342,26 @@ pub async fn handle_otlp_request(
                                 .insert(local_metric_name.clone(), partition_det.clone());
                         }
 
-                        // Start get stream alerts
-                        crate::service::ingestion::get_stream_alerts(
-                            &[StreamParams {
-                                org_id: org_id.to_owned().into(),
-                                stream_name: local_metric_name.to_owned().into(),
-                                stream_type: StreamType::Metrics,
-                            }],
-                            &mut stream_alerts_map,
-                        )
-                        .await;
-                        // End get stream alert
-
                         // get stream pipeline
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
                         if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
                                 crate::service::ingestion::get_stream_executable_pipeline(
-                                    org_id,
-                                    &local_metric_name,
-                                    &StreamType::Metrics,
-                                )
-                                .await;
+                                    &stream_param,
+                                );
                             stream_executable_pipelines
                                 .insert(local_metric_name.clone(), pipeline_params);
                         }
 
-                        let streams = vec![StreamParams {
-                            org_id: org_id.to_owned().into(),
-                            stream_type: StreamType::Metrics,
-                            stream_name: local_metric_name.to_owned().into(),
-                        }];
+                        // Start get stream alerts
+                        crate::service::ingestion::get_stream_alerts(
+                            std::slice::from_ref(&stream_param),
+                            &mut stream_alerts_map,
+                        );
+                        // End get stream alert
 
+                        let streams = vec![stream_param];
                         crate::service::ingestion::get_uds_and_original_data_streams(
                             &streams,
                             &mut user_defined_schema_map,

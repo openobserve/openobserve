@@ -653,50 +653,6 @@ pub async fn stream_schema_exists(
     schema_chk
 }
 
-pub async fn stream_schema_exists_with_cost(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, SchemaCache>,
-) -> (StreamSchemaChk, u128, u128) {
-    let start = std::time::Instant::now();
-    let mut schema_chk = StreamSchemaChk {
-        conforms: true,
-        has_fields: false,
-        has_partition_keys: false,
-        has_metrics_metadata: false,
-    };
-
-    let schema = match stream_schema_map.get(stream_name) {
-        Some(schema) => schema.schema().clone(),
-        None => {
-            let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type)
-                .await
-                .unwrap();
-            let db_schema = schema_cache.schema().clone();
-            stream_schema_map.insert(stream_name.to_string(), schema_cache);
-            db_schema
-        }
-    };
-    let get_from_lock = start.elapsed().as_micros();
-
-    let start = std::time::Instant::now();
-    if !schema.fields().is_empty() {
-        schema_chk.has_fields = true;
-    }
-    let settings = unwrap_stream_settings(&schema);
-    if let Some(stream_setting) = settings
-        && !stream_setting.partition_keys.is_empty()
-    {
-        schema_chk.has_partition_keys = true;
-    }
-    if schema.metadata().contains_key(METADATA_LABEL) {
-        schema_chk.has_metrics_metadata = true;
-    }
-    let get_others = start.elapsed().as_micros();
-    (schema_chk, get_from_lock, get_others)
-}
-
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;

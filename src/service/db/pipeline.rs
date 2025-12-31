@@ -94,7 +94,7 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
 /// StreamParams
 ///
 /// Used for pipeline execution.
-pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
+pub fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
     STREAM_EXECUTABLE_PIPELINES
         .pin()
         .get(stream_params)

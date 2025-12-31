@@ -56,7 +56,7 @@ fn create_reporting_queue(
     let timeout = time::Duration::from_secs(publish_interval);
 
     let (msg_sender, msg_receiver) =
-        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num) * 2);
+        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num) * 10);
     let msg_receiver = Arc::new(Mutex::new(msg_receiver));
 
     for thread_id in 0..thread_num {
@@ -243,7 +243,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     };
 
     if !usages.is_empty() {
-        let start = time::Instant::now();
+        let start = std::time::Instant::now();
         super::ingestion::ingest_usages(usages).await;
         let took = start.elapsed().as_millis();
         if took > 200 {

@@ -180,16 +180,11 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_executable_pipeline(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: &StreamType,
-) -> Option<ExecutablePipeline> {
-    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
-    pipeline::get_executable_pipeline(&stream_params).await
+pub fn get_stream_executable_pipeline(stream: &StreamParams) -> Option<ExecutablePipeline> {
+    pipeline::get_executable_pipeline(stream)
 }
 
-pub async fn get_stream_alerts(
+pub fn get_stream_alerts(
     streams: &[StreamParams],
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
@@ -204,7 +199,7 @@ pub async fn get_stream_alerts(
         };
         let mut alerts_list = vec![];
         for alert_id in alerts_id_list.iter() {
-            if let Some((_, alert)) = alert::get_alert_from_cache(&stream.org_id, alert_id).await {
+            if let Some((_, alert)) = alert::get_alert_from_cache(&stream.org_id, alert_id) {
                 alerts_list.push(alert);
             }
         }

@@ -350,8 +350,7 @@ async fn write_logs(
             stream_type: StreamType::Logs,
         }],
         &mut stream_alerts_map,
-    )
-    .await;
+    );
     let cur_stream_alerts =
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =
