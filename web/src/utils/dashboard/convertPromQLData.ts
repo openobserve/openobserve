@@ -313,14 +313,39 @@ export const convertPromQLData = async (
 
   // Calculate additional spacing needed for rotated labels
   const labelRotation = panelSchema.config?.axis_label_rotate || 0;
-  const labelWidth = panelSchema.config?.axis_label_truncate_width || 120;
-  const labelFontSize = 12;
+  let labelWidth = panelSchema.config?.axis_label_truncate_width || 0;
   const hasXAxisName = !!panelSchema.queries[0]?.fields?.x?.[0]?.label;
+
+  // For PromQL, xAxisData contains [timestamp, formattedDate]
+  // We need to calculate the actual max width of the current labels if truncate is not set
+  if (labelWidth === 0 && xAxisData.length > 0) {
+    // Determine which date format is likely being used
+    // formatDate uses "YY-MM-DD HH:MM:SS" which is roughly 19 characters
+    // But it could be any format. For now, we'll estimate based on a sample
+    const sampleDate = xAxisData[0][1];
+    labelWidth = calculateWidthText(sampleDate?.toString() || "", "12px");
+  } else if (labelWidth === 0) {
+    labelWidth = 120; // Fallback
+  }
+
+  const labelFontSize = 12;
+  const labelMargin = 10;
+
+  // Calculate the section height (nameGap) upfront
+  const dynamicXAxisNameGap = calculateDynamicNameGap(
+    labelRotation,
+    labelWidth,
+    labelFontSize,
+    25,
+    labelMargin,
+  );
+
   const additionalBottomSpace = calculateRotatedLabelBottomSpace(
     labelRotation,
     labelWidth,
     labelFontSize,
     hasXAxisName,
+    dynamicXAxisNameGap,
   );
 
   const options: any = {
@@ -455,13 +480,7 @@ export const convertPromQLData = async (
       type: "time",
       name: panelSchema.queries[0]?.fields?.x?.[0]?.label || "",
       nameLocation: "middle",
-      nameGap: calculateDynamicNameGap(
-        panelSchema.config?.axis_label_rotate || 0,
-        panelSchema.config?.axis_label_truncate_width || 120,
-        12,
-        25,
-        10,
-      ),
+      nameGap: dynamicXAxisNameGap,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,

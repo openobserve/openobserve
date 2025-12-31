@@ -994,13 +994,34 @@ export const convertSQLData = async (
 
   // Calculate additional spacing needed for rotated labels
   const labelRotation = panelSchema.config?.axis_label_rotate || 0;
-  const labelWidth = panelSchema.config?.axis_label_truncate_width || 120; // Use configured truncate width or default to 120
+  let labelWidth = panelSchema.config?.axis_label_truncate_width || 0;
+
+  // If truncate width is not set, calculate the actual max width from data
+  if (labelWidth === 0 && xAxisKeys.length > 0) {
+    const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
+    labelWidth = calculateWidthText(longestLabelStr, "12px");
+  } else if (labelWidth === 0) {
+    labelWidth = 120; // Fallback
+  }
+
   const labelFontSize = 12;
+  const labelMargin = 10;
+
+  // Calculate the section height (nameGap) upfront so we can use it for bottom spacing
+  const dynamicXAxisNameGap = calculateDynamicNameGap(
+    labelRotation,
+    labelWidth,
+    labelFontSize,
+    25,
+    labelMargin,
+  );
+
   const additionalBottomSpace = calculateRotatedLabelBottomSpace(
     labelRotation,
     labelWidth,
     labelFontSize,
-    hasXAxisName,
+    !!hasXAxisName,
+    dynamicXAxisNameGap,
   );
 
   const options: any = {
@@ -1018,7 +1039,11 @@ export const convertSQLData = async (
               panelSchema.config?.show_legends
                 ? (panelSchema.config?.axis_width == null ? 50 : 60)
                 : (panelSchema.config?.axis_width == null ? 35 : 40);
-            return baseBottom + additionalBottomSpace;
+          // When an x-axis name is present, `nameGap` already reserves space
+          // between rotated labels and the axis name. Adding `additionalBottomSpace`
+          // here causes double-counting and extra blank space beneath the axis
+          // name. Only return the base bottom in this case.
+          return baseBottom;
           })()
         : (() => {
             const baseBottom =
@@ -1208,13 +1233,7 @@ export const convertSQLData = async (
           rotate: panelSchema.config?.label_option?.rotate || 0,
         },
         nameLocation: "middle",
-        nameGap: calculateDynamicNameGap(
-          labelRotation,
-          labelWidth,
-          labelFontSize,
-          25,
-          labelMargin,
-        ),
+        nameGap: dynamicXAxisNameGap,
         nameTextStyle: {
           fontWeight: "bold",
           fontSize: 14,
@@ -1621,13 +1640,7 @@ export const convertSQLData = async (
           rotate: xAxisLabelRotation,
         };
         options.xAxis[0].axisTick = {};
-        options.xAxis[0].nameGap = calculateDynamicNameGap(
-          xAxisLabelRotation,
-          xAxisLabelWidth,
-          12,
-          25,
-          options.xAxis[0].axisLabel?.margin || 10,
-        );
+        options.xAxis[0].nameGap = dynamicXAxisNameGap;
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
@@ -1780,15 +1793,7 @@ export const convertSQLData = async (
             : "";
         // For h-bar, xAxis is the bottom axis after swap
         // Apply dynamic nameGap calculation if rotation is configured
-        const hBarXAxisRotation = options.xAxis.axisLabel?.rotate || 0;
-        const hBarXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
-        options.xAxis.nameGap = calculateDynamicNameGap(
-          hBarXAxisRotation,
-          hBarXAxisWidth,
-          12,
-          20,
-          options.xAxis.axisLabel?.margin || 10,
-        );
+        options.xAxis.nameGap = dynamicXAxisNameGap;
       }
 
       break;
@@ -2320,15 +2325,7 @@ export const convertSQLData = async (
 
       // For h-stacked, xAxis is actually the original yAxis (bottom axis after swap)
       // Apply dynamic nameGap calculation if rotation is configured
-      const hStackedXAxisRotation = options.xAxis.axisLabel?.rotate || 0;
-      const hStackedXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
-      options.xAxis.nameGap = calculateDynamicNameGap(
-        hStackedXAxisRotation,
-        hStackedXAxisWidth,
-        12,
-        25,
-        options.xAxis.axisLabel?.margin || 10,
-      );
+      options.xAxis.nameGap = dynamicXAxisNameGap;
 
       break;
     }
@@ -3106,7 +3103,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
           panelSchema.config?.line_interpolation,
         )
           ? // TODO: replace this with type integrations
-            panelSchema.config.line_interpolation.replace("step-", "")
+          panelSchema.config.line_interpolation.replace("step-", "")
           : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
