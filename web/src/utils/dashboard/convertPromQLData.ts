@@ -20,6 +20,8 @@ import {
   getContrastColor,
   applySeriesColorMappings,
   getUnitValue,
+  calculateDynamicNameGap,
+  calculateRotatedLabelBottomSpace,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -1175,90 +1177,7 @@ const calculateWidthText = (text: string): number => {
   return width;
 };
 
-/**
- * Calculates the dynamic nameGap for x-axis based on label rotation and truncate width.
- * When labels are rotated, we need more space between the labels and the axis name.
- *
- * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
- * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
- * @param {number} fontSize - The font size of the labels in pixels (default: 12).
- * @param {number} defaultNameGap - The default nameGap to use when rotation is 0 (default: 25).
- * @param {number} axisLabelMargin - The margin between axis and labels (default: 10).
- * @return {number} The calculated nameGap value.
- */
-const calculateDynamicNameGap = (
-  rotate: number = 0,
-  labelWidth: number = 120,
-  fontSize: number = 12,
-  defaultNameGap: number = 25,
-  axisLabelMargin: number = 10,
-): number => {
-  // If no rotation, return the default nameGap
-  if (rotate === 0) {
-    return defaultNameGap;
-  }
 
-  // Convert rotation to radians
-  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
-
-  // Calculate the vertical height occupied by rotated label
-  // When a label of width W is rotated by angle θ:
-  // - The vertical height = W * sin(θ) + fontSize * cos(θ)
-  const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
-
-  // Calculate nameGap: vertical height + axis label margin + small buffer (5px)
-  // The buffer ensures there's slight spacing between label tip and axis name
-  const calculatedNameGap = Math.ceil(verticalHeight + axisLabelMargin + 5);
-
-  // Return the maximum of calculated and default to ensure minimum spacing
-  return Math.max(calculatedNameGap, defaultNameGap);
-};
-
-/**
- * Calculates the additional bottom spacing needed for rotated x-axis labels.
- * This ensures rotated labels don't overlap with legends or get cut off.
- *
- * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
- * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
- * @param {number} fontSize - The font size of the labels in pixels (default: 12).
- * @param {boolean} hasAxisName - Whether the axis has a name/title (default: false).
- * @return {number} The additional spacing needed in pixels.
- */
-const calculateRotatedLabelBottomSpace = (
-  rotate: number = 0,
-  labelWidth: number = 120,
-  fontSize: number = 12,
-  hasAxisName: boolean = false,
-): number => {
-  // If no rotation, no additional space needed
-  if (rotate === 0) {
-    return 0;
-  }
-
-  // Convert rotation to radians
-  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
-
-  // Calculate the vertical height occupied by rotated label
-  const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
-
-  // If there's an axis name, the nameGap already accounts for the label height
-  // The default bottom spacing (35-60px) is already generous, so we only need
-  // to add space if the rotated labels extend significantly beyond normal
-  if (hasAxisName) {
-    // Default bottom already has ~35-60px which covers nameGap + some buffer
-    // Only add extra if the label height significantly exceeds the default nameGap (25px)
-    const excessHeight = verticalHeight - 25; // 25px is the default nameGap
-    return Math.max(0, Math.ceil(excessHeight * 0.4)); // Only add 40% of excess as buffer
-  } else {
-    // Without axis name, add some space but account for existing bottom spacing
-    // The vertical height already includes fontSize, so we subtract it to avoid double-counting
-    return Math.max(0, Math.ceil((verticalHeight - fontSize) * 0.5));
-  }
-};
 
 /**
  * Retrieves the legend name for a given metric and label.
