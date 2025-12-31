@@ -248,7 +248,8 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         let took = start.elapsed().as_millis();
         if took > 200 {
             log::warn!(
-                "(slow!) [SELF-REPORTING] thread_{thread_id} ingest usage data took {took} ms"
+                "(slow!-{:?}) [SELF-REPORTING] thread_{thread_id} ingest usage data took {took} ms",
+                std::thread::current().id()
             );
         }
     }

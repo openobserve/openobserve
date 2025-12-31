@@ -438,7 +438,8 @@ impl Writer {
             let took = start.elapsed().as_millis();
             if took > 100 {
                 log::warn!(
-                    "(slow!) [INGESTER:MEM:{}] write to queue took: {took} ms",
+                    "(slow!-{:?}) [INGESTER:MEM:{}] write to queue took: {took} ms",
+                    std::thread::current().id(),
                     self.idx,
                 );
             }

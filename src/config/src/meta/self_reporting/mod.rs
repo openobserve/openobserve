@@ -105,7 +105,8 @@ impl ReportingQueue {
         let took = start.elapsed().as_millis();
         if took > 100 {
             log::warn!(
-                "(slow!) [SELF-REPORTING] enqueue: Queued {} data took {took} ms",
+                "(slow!-{:?}) [SELF-REPORTING] enqueue: Queued {} data took {took} ms",
+                std::thread::current().id(),
                 data_type,
             );
         }
