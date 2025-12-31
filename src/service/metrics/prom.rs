@@ -43,6 +43,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
+    runtime::METRICS_RUNTIME,
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
@@ -52,7 +53,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::stream::SchemaRecords,
+        meta::{ingestion::IngestUser, stream::SchemaRecords},
     },
     service::{
         alerts::alert::AlertExt,
@@ -66,6 +67,22 @@ use crate::{
 };
 
 pub async fn remote_write(
+    org_id: &str,
+    body: web::Bytes,
+    user: IngestUser,
+) -> std::result::Result<(), anyhow::Error> {
+    let org_id = org_id.to_string();
+    let ret = METRICS_RUNTIME
+        .spawn(async move { remote_write_inner(&org_id, body, user).await })
+        .await;
+    match ret {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Error spawning remote write task: {e}")),
+    }
+}
+
+async fn remote_write_inner(
     org_id: &str,
     body: web::Bytes,
     user: crate::common::meta::ingestion::IngestUser,
@@ -95,11 +112,12 @@ pub async fn remote_write(
     // End get user defined schema
 
     // associated pipeline
-    let stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> = HashMap::new();
+    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
+        HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, Vec<(json::Value, i64)>> = HashMap::new();
 
     // realtime alerts
-    let stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let decoded = snap::raw::Decoder::new()
@@ -214,18 +232,18 @@ pub async fn remote_write(
 
         // Preload pipelines
         let t = std::time::Instant::now();
-        // for stream in &streams {
-        //     let stream_name_str: &str = stream.stream_name.as_ref();
-        //     if !stream_executable_pipelines.contains_key(stream_name_str) {
-        //         let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
-        //             &stream.org_id,
-        //             &stream.stream_name,
-        //             &stream.stream_type,
-        //         )
-        //         .await;
-        //         stream_executable_pipelines.insert(stream.stream_name.to_string(),
-        // pipeline_params);     }
-        // }
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !stream_executable_pipelines.contains_key(stream_name_str) {
+                let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
+                    &stream.org_id,
+                    &stream.stream_name,
+                    &stream.stream_type,
+                )
+                .await;
+                stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
+            }
+        }
         preload_pipeline_time = t.elapsed().as_micros();
 
         // Preload UDS
@@ -273,7 +291,7 @@ pub async fn remote_write(
 
         // Preload alerts
         let t = std::time::Instant::now();
-        // crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
+        crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
         preload_alerts_time = t.elapsed().as_micros();
     }
     let total_preload_time = preload_start.elapsed().as_micros();
@@ -400,33 +418,33 @@ pub async fn remote_write(
             );
 
             // ready to be buffered for downstream processing
-            // if stream_executable_pipelines
-            //     .get(&metric_name)
-            //     .unwrap()
-            //     .is_some()
-            // {
-            //     // buffer to pipeline for batch processing
-            //     stream_pipeline_inputs
-            //         .entry(metric_name.to_owned())
-            //         .or_default()
-            //         .push((value, timestamp));
-            // } else {
-            // get json object
-            let mut local_val = match value.take() {
-                json::Value::Object(val) => val,
-                _ => unreachable!(),
-            };
+            if stream_executable_pipelines
+                .get(&metric_name)
+                .unwrap()
+                .is_some()
+            {
+                // buffer to pipeline for batch processing
+                stream_pipeline_inputs
+                    .entry(metric_name.to_owned())
+                    .or_default()
+                    .push((value, timestamp));
+            } else {
+                // get json object
+                let mut local_val = match value.take() {
+                    json::Value::Object(val) => val,
+                    _ => unreachable!(),
+                };
 
-            if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
-                local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
+                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                }
+
+                // buffer to downstream processing directly
+                json_data_by_stream
+                    .entry(metric_name.clone())
+                    .or_default()
+                    .push((local_val, timestamp));
             }
-
-            // buffer to downstream processing directly
-            json_data_by_stream
-                .entry(metric_name.clone())
-                .or_default()
-                .push((local_val, timestamp));
-            // }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
     }
