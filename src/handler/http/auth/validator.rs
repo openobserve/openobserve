@@ -149,10 +149,6 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
     }
 }
 
-// The validate_meta_service_account_flag function has been removed as the is_meta_service_account
-// concept has been deprecated. All service accounts are now treated uniformly, with permissions
-// controlled via OpenFGA.
-
 pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,

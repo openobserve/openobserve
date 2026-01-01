@@ -775,7 +775,6 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
             token: user_from_db.token.clone(),
             rum_token: user_from_db.rum_token.clone(),
             created_at: 0,
-            is_meta_service_account: false,
             allow_static_token: true,
         };
         if is_root_user(&user_from_db.email) {
@@ -1302,6 +1301,7 @@ mod tests {
 
         let user_org = UserOrg {
             name: "org2".to_string(),
+            org_name: "Organization 2".to_string(),
             token: "token2".to_string(),
             rum_token: Some("rum2".to_string()),
             role: get_default_user_role(),
@@ -1309,6 +1309,7 @@ mod tests {
 
         let matched_org = UserOrg {
             name: target_org.clone(),
+            org_name: "Organization 1".to_string(),
             token: "token1".to_string(),
             rum_token: Some("rum1".to_string()),
             role: get_default_user_role(),
@@ -1375,7 +1376,7 @@ mod tests {
                 org_id: "dummy".to_string(),
                 email: "admin@zo.dev".to_string(),
                 created_at: 0,
-                is_meta_service_account: false,
+                allow_static_token: true,
             },
         );
     }
@@ -1502,6 +1503,7 @@ mod tests {
             is_external: false,
             organizations: vec![UserOrg {
                 name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
                 token: "".to_string(),
                 rum_token: None,
                 role: UserRole::User,
@@ -1525,6 +1527,7 @@ mod tests {
             is_external: false,
             organizations: vec![UserOrg {
                 name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
                 token: "existing_token".to_string(),
                 rum_token: Some("existing_rum".to_string()),
                 role: UserRole::User,

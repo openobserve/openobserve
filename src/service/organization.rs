@@ -217,23 +217,6 @@ pub async fn get_meta_service_account_tokens(
         return Err(anyhow::Error::msg("User is not a service account"));
     }
 
-    // Check if this is a meta service account (has is_meta_service_account flag in any org)
-    let mut is_meta_svc = false;
-    for org in &db_user.organizations {
-        let key = format!("{}/{}", org.name, user_email);
-        if let Some(user_record) = ORG_USERS.get(&key)
-            && org.name != config::META_ORG_ID
-            && user_record.is_meta_service_account
-        {
-            is_meta_svc = true;
-            break;
-        }
-    }
-
-    if !is_meta_svc {
-        return Err(anyhow::Error::msg("User is not a meta service account"));
-    }
-
     // Collect all tokens (unmasked)
     let tokens: Vec<OrgTokenInfo> = db_user
         .organizations
@@ -459,8 +442,7 @@ pub async fn create_org(
                     UserRole::ServiceAccount,
                     &token,
                     Some(rum_token),
-                    false, // is_meta_service_account
-                    false, // allow_static_token - requires assume API
+                    false,
                 )
                 .await?;
 
@@ -537,8 +519,7 @@ pub async fn create_org(
                     UserRole::ServiceAccount,
                     &token,
                     Some(rum_token),
-                    false, // is_meta_service_account
-                    false, // allow_static_token - requires assume API
+                    false,
                 )
                 .await?;
 
