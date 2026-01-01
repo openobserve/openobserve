@@ -309,6 +309,12 @@ mod tests {
         test_enrichment_table_integration().await;
         test_enrichment_table_local_all_sequential().await;
 
+        // backfill jobs
+        test_backfill_job_list_and_delete().await;
+        test_backfill_job_get_nonexistent().await;
+        test_backfill_job_delete_by_pipeline().await;
+        test_backfill_job_enable_disable().await;
+
         // others
         e2e_health_check().await;
         e2e_config().await;
