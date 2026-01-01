@@ -204,9 +204,20 @@ export default defineComponent({
     }
 
     function selectField(field: any) {
+      // Preserve all field properties including rawQuery, type, etc.
       internalModel.value = {
         streamAlias: field?.stream?.streamAlias,
         field: field.name,
+        // Preserve additional field properties if they exist
+        ...(field.type && { type: field.type }),
+        ...(field.rawQuery && { rawQuery: field.rawQuery }),
+        ...(field.functionName !== undefined && { functionName: field.functionName }),
+        ...(field.args && { args: field.args }),
+        ...(field.label && { label: field.label }),
+        ...(field.alias && { alias: field.alias }),
+        ...(field.column && { column: field.column }),
+        ...(field.color && { color: field.color }),
+        ...(field.aggregationFunction && { aggregationFunction: field.aggregationFunction }),
       };
       displayValue.value = field.name;
       updateInputValue(field.name);

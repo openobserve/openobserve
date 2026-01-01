@@ -100,6 +100,15 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 export interface JoinFieldReference {
   streamAlias: string;
   field: string;
+  type?: "build" | "raw" | "custom";
+  rawQuery?: string;
+  functionName?: string | null;
+  args?: any[];
+  label?: string;
+  alias?: string;
+  column?: string;
+  color?: string;
+  aggregationFunction?: string;
 }
 
 export interface JoinCondition {

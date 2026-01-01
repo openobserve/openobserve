@@ -152,17 +152,38 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
         continue;
       }
 
-      const leftFieldStr = leftField.streamAlias
-        ? `${leftField.streamAlias}.${leftField.field}`
-        : defaultStream
-          ? `${defaultStream}.${leftField.field}`
-          : leftField.field;
+      // Build field expressions - handle raw fields and complex field structures
+      let leftFieldStr: string;
+      if (leftField.type === "raw" && leftField.rawQuery) {
+        // If it's a raw field, use the rawQuery directly
+        leftFieldStr = leftField.rawQuery;
+      } else if (leftField.type === "build" && leftField.functionName) {
+        // If it's a build field with a function, use buildSQLQueryFromInput
+        leftFieldStr = buildSQLQueryFromInput(leftField, defaultStream);
+      } else {
+        // Simple field reference
+        leftFieldStr = leftField.streamAlias
+          ? `${leftField.streamAlias}.${leftField.field}`
+          : defaultStream
+            ? `${defaultStream}.${leftField.field}`
+            : leftField.field;
+      }
 
-      const rightFieldStr = rightField.streamAlias
-        ? `${rightField.streamAlias}.${rightField.field}`
-        : defaultStream
-          ? `${defaultStream}.${rightField.field}`
-          : rightField.field;
+      let rightFieldStr: string;
+      if (rightField.type === "raw" && rightField.rawQuery) {
+        // If it's a raw field, use the rawQuery directly
+        rightFieldStr = rightField.rawQuery;
+      } else if (rightField.type === "build" && rightField.functionName) {
+        // If it's a build field with a function, use buildSQLQueryFromInput
+        rightFieldStr = buildSQLQueryFromInput(rightField, defaultStream);
+      } else {
+        // Simple field reference
+        rightFieldStr = rightField.streamAlias
+          ? `${rightField.streamAlias}.${rightField.field}`
+          : defaultStream
+            ? `${defaultStream}.${rightField.field}`
+            : rightField.field;
+      }
 
       joinConditionStrings.push(
         `${leftFieldStr} ${operation} ${rightFieldStr}`,
