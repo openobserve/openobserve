@@ -80,11 +80,7 @@ pub async fn handle_request(
 
     let index_all_max_value_length = cfg.limit.index_all_max_value_length;
 
-    let stream_param = StreamParams {
-        org_id: org_id.to_owned().into(),
-        stream_name: stream_name.to_owned().into(),
-        stream_type: StreamType::Logs,
-    };
+    let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipeline =
         crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;

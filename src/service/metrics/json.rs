@@ -130,11 +130,7 @@ pub async fn ingest(
         };
 
         // Start retrieve associated pipeline and initialize ExecutablePipeline
-        let stream_param = StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Metrics,
-        };
+        let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
         if !stream_executable_pipelines.contains_key(&stream_name) {
             let exec_pl_option =
                 crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;

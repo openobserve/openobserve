@@ -216,11 +216,7 @@ pub async fn handle_otlp_request(
                 }
 
                 // Start get stream alerts
-                let stream_param = StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: metric_name.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                };
+                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
                 crate::service::ingestion::get_stream_alerts(
                     std::slice::from_ref(&stream_param),
                     &mut stream_alerts_map,
@@ -348,11 +344,8 @@ pub async fn handle_otlp_request(
                         }
 
                         // Start get stream alerts
-                        let stream_param = StreamParams {
-                            org_id: org_id.to_owned().into(),
-                            stream_name: local_metric_name.to_owned().into(),
-                            stream_type: StreamType::Metrics,
-                        };
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
                         crate::service::ingestion::get_stream_alerts(
                             std::slice::from_ref(&stream_param),
                             &mut stream_alerts_map,
