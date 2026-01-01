@@ -2054,15 +2054,18 @@ export const usePanelDataLoader = (
 
   const areDependentVariablesStillLoadingWith = (
     newDependentVariablesData: any,
-  ) =>
-    newDependentVariablesData?.some(
-      (it: any) =>
-        it.isLoading ||
-        it.isVariableLoadingPending ||
-        !it.isVariablePartialLoaded ||
-        it.value == null ||
-        (Array.isArray(it.value) && it.value.length === 0),
-    );
+  ) => {
+    const result = newDependentVariablesData?.some((it: any) => {
+      const hasNullValue = it.value == null;
+      const hasEmptyArray = Array.isArray(it.value) && it.value.length === 0;
+      const isStillLoading = it.isLoading || it.isVariableLoadingPending;
+
+      const shouldBlock = (hasNullValue || hasEmptyArray) && isStillLoading;
+      return shouldBlock;
+    });
+
+    return result;
+  };
 
   const getDependentVariablesData = () =>
     variablesData.value?.values
