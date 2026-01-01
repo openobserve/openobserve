@@ -625,6 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="() => toggleOption(opt)"
                         dense
                         class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
                       />
                     </q-item-section>
                     <q-item-section>
@@ -686,6 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="() => toggleOption(opt)"
                         dense
                         class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
                       />
                     </q-item-section>
                     <q-item-section>

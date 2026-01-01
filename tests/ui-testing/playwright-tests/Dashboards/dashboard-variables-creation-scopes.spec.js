@@ -1,0 +1,728 @@
+/**
+ * Dashboard Variables - Creation & Scope Restrictions Test Suite
+ * Tests variable creation rules, scope-based dependency restrictions, and edit panel variable availability
+ */
+
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+import { ingestion } from "./utils/dashIngestion.js";
+import PageManager from "../../pages/page-manager.js";
+import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+
+test.describe.configure({ mode: "parallel" });
+
+test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
+  test.beforeEach(async ({ page }) => {
+    await navigateToBase(page);
+    await ingestion(page);
+  });
+
+  test("should allow tab variable to depend only on global variables", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_TabDepRule_${Date.now()}`;
+    const globalVar = `global_var_${Date.now()}`;
+    const tabVar = `tab_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add tab
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add global variable
+    await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.goToVariablesTab();
+    // Add tab variable
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
+
+    // Set scope to tab
+    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+
+    // Assign to Tab1 - need to open the tabs dropdown first
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
+    await page.waitForTimeout(500); // Wait for dropdown to open
+    // Click the Tab1 option - find the q-item that has exact text "Tab1"
+    await page.locator('.q-item').filter({ hasText: /^Tab1$/ }).click();
+
+    // Select stream and field
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    await page.waitForTimeout(1000);
+    await page.locator('[role="option"]').first().click();
+
+    // Add dependency using filter mechanism
+    // Dependencies are created through filters where the value references another variable using $variableName
+    await scopedVars.addDependency(globalVar, "kubernetes_namespace_name", "=");
+
+    // Save the variable - using helper method to handle potential DOM updates
+    await scopedVars.clickSaveButton();
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should NOT allow tab variable to depend on panel variables", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_TabNoPanelDep_${Date.now()}`;
+    const panelVar = `panel_var_${Date.now()}`;
+    const tabVar = `tab_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add panel
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    // Add X and Y axis fields (required for saving panel)
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard and panel editor to close
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    // Wait for settings button to be available (indicates panel editor has closed)
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
+    // Add tab
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add panel variable using panel name instead of panel ID
+    await scopedVars.addScopedVariable(panelVar, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "panel",
+      assignedPanels: ["Panel1"]
+    });
+
+    // Try to add tab variable
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
+
+    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+
+    // Select stream and field
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    await page.waitForTimeout(1000);
+    await page.locator('[role="option"]').first().click();
+
+    // Check dependency dropdown via filter - should NOT show panel variables
+    // Add filter to check available dependency options
+    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+
+    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+
+    // Click on the autocomplete to see available variables
+    const autoComplete = page.locator('[data-test="common-auto-complete"]').last();
+    await autoComplete.click();
+
+    // Wait for dropdown to appear with options
+    await page.waitForSelector('[role="listbox"]', { state: "visible", timeout: 5000 });
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 });
+
+    // Check that panel variable is NOT in the autocomplete suggestions
+    const options = await page.locator('[role="option"]').allTextContents();
+    expect(options).not.toContain(panelVar);
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should NOT allow tab variable to depend on other tab's variables", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_TabNoOtherTab_${Date.now()}`;
+    const tab1Var = `tab1_var_${Date.now()}`;
+    const tab2Var = `tab2_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add Tab1 and Tab2
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    await pm.dashboardSetting.addTabSetting("Tab2");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add variable to Tab1
+    await scopedVars.addScopedVariable(tab1Var, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "tab",
+      assignedTabs: ["tab1"]
+    });
+
+    // Try to add variable to Tab2
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(tab2Var);
+
+    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+
+    // Open tabs dropdown and select tab2
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
+    await page.waitForTimeout(500);
+    // Click the Tab2 option
+    await page.locator('.q-item').filter({ hasText: /^Tab2$/ }).click();
+
+    // Select stream and field
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_container_name");
+    await page.waitForTimeout(1000);
+    await page.locator('[role="option"]').first().click();
+
+    // Check dependency dropdown via filter - should NOT show Tab1's variable
+    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+
+    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+
+    // Click on the autocomplete to see available variables
+    const autoComplete = page.locator('[data-test="common-auto-complete"]').last();
+    await autoComplete.click();
+
+    // Wait for dropdown to appear with options
+    await page.waitForSelector('[role="listbox"]', { state: "visible", timeout: 5000 });
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 });
+
+    const options = await page.locator('[role="option"]').allTextContents();
+    expect(options).not.toContain(tab1Var);
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should allow panel variable to depend on global and current tab variables", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_PanelDepRule_${Date.now()}`;
+    const globalVar = `global_var_${Date.now()}`;
+    const tabVar = `tab_var_${Date.now()}`;
+    const panelVar = `panel_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add tab
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add global and tab variables
+    await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_container_name", {
+      scope: "tab",
+      assignedTabs: ["tab1"]
+    });
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Switch to Tab1 and add panel
+    await page.locator('[data-test="dashboard-tab-tab1"]').click();
+    await page.waitForTimeout(1000);
+
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    // Add X and Y axis fields (required for saving panel)
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Add panel variable
+    await pm.dashboardSetting.openSetting();
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar);
+
+    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+
+    // First select the tab containing the panel
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
+    await page.waitForTimeout(500);
+    // Click the Tab1 option
+    await page.locator('.q-item').filter({ hasText: /^Tab1$/ }).click();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Then select the panel by name
+    await page.locator('[data-test="dashboard-variable-panels-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-panels-select"]').click();
+    await page.waitForTimeout(500);
+    await page.locator('.q-item').filter({ hasText: /^Panel1$/ }).click();
+
+    // Select stream and field
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_pod_name");
+    await page.waitForTimeout(1000);
+    await page.locator('[role="option"]').first().click();
+
+    // Check dependency dropdown via filter - should show both global and tab variables
+    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+
+    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+
+    // Click on the autocomplete to see available variables
+    const autoComplete = page.locator('[data-test="common-auto-complete"]').last();
+    await autoComplete.click();
+
+    // Wait for dropdown to appear with options
+    await page.waitForSelector('[role="listbox"]', { state: "visible", timeout: 5000 });
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 });
+
+    const options = await page.locator('[role="option"]').allTextContents();
+    expect(options).toContain(globalVar);
+    expect(options).toContain(tabVar);
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should NOT allow panel variable to depend on other panel variables", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_PanelNoOtherPanel_${Date.now()}`;
+    const panel1Var = `panel1_var_${Date.now()}`;
+    const panel2Var = `panel2_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add Panel1
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Add Panel2
+    await pm.dashboardCreate.addPanelToExistingDashboard();
+    await pm.chartTypeSelector.selectChartType("bar");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Add variable to Panel1 using panel name
+    await pm.dashboardSetting.openSetting();
+    await scopedVars.addScopedVariable(panel1Var, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "panel",
+      assignedPanels: ["Panel1"]
+    });
+
+    // Try to add variable to Panel2 depending on Panel1's variable
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(panel2Var);
+
+    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
+    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+
+    // First select the default tab to enable the panels dropdown
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
+    await page.waitForTimeout(500);
+    // Click the Default tab option
+    await page.locator('.q-item').filter({ hasText: /^Default$/ }).click();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Now open the panels dropdown and select panel2 by name
+    await page.locator('[data-test="dashboard-variable-panels-select"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-variable-panels-select"]').click();
+    await page.waitForTimeout(500);
+    await page.locator('.q-item').filter({ hasText: /^Panel2$/ }).click();
+
+    // Select stream and field
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
+
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_pod_name");
+    await page.waitForTimeout(1000);
+    await page.locator('[role="option"]').first().click();
+
+    // Check dependency dropdown via filter - should NOT show Panel1's variable
+    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
+
+    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await filterNameSelector.fill("kubernetes_namespace_name");
+    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+
+    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+
+    // Click on the autocomplete to see available variables
+    const autoComplete = page.locator('[data-test="common-auto-complete"]').last();
+    await autoComplete.click();
+
+    // Wait for dropdown to appear with options
+    await page.waitForSelector('[role="listbox"]', { state: "visible", timeout: 5000 });
+    await page.waitForSelector('[role="option"]', { state: "visible", timeout: 5000 });
+
+    const options = await page.locator('[role="option"]').allTextContents();
+    expect(options).not.toContain(panel1Var);
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should create tab variable assigned to multiple tabs", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_MultiTab_${Date.now()}`;
+    const variableName = `multi_tab_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add multiple tabs
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    await pm.dashboardSetting.addTabSetting("Tab2");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    await pm.dashboardSetting.addTabSetting("Tab3");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add variable assigned to all tabs
+    await scopedVars.addScopedVariable(variableName, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "tab",
+      assignedTabs: ["tab1", "tab2", "tab3"]
+    });
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Verify variable is visible in all tabs
+    for (const tabId of ["tab1", "tab2", "tab3"]) {
+      await page.locator(`[data-test="dashboard-tab-${tabId}"]`).click();
+      await page.waitForTimeout(1000);
+      await scopedVars.verifyVariableVisibility(variableName, true);
+    }
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should create panel variable assigned to multiple panels", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_MultiPanel_${Date.now()}`;
+    const variableName = `multi_panel_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add multiple panels
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    await pm.dashboardCreate.addPanelToExistingDashboard();
+    await pm.chartTypeSelector.selectChartType("bar");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Add variable assigned to both panels using panel names
+    await pm.dashboardSetting.openSetting();
+    await scopedVars.addScopedVariable(variableName, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "panel",
+      assignedPanels: ["Panel1", "Panel2"]
+    });
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Verify variable is visible for both panels
+    await scopedVars.verifyVariableVisibility(variableName, true);
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should create tab/panel variables without global variables existing", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_NoGlobal_${Date.now()}`;
+    const tabVar = `tab_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add tab
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Create tab variable WITHOUT any global variables
+    await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "tab",
+      assignedTabs: ["tab1"]
+    });
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Switch to Tab1 and verify variable exists
+    await page.locator('[data-test="dashboard-tab-tab1"]').click();
+    await page.waitForTimeout(1000);
+    await scopedVars.verifyVariableVisibility(tabVar, true);
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should show only available variables in add panel edit mode", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_PanelEditVars_${Date.now()}`;
+    const globalVar = `global_var_${Date.now()}`;
+    const tabVar = `tab_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add Tab1
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add global and tab variables
+    await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_container_name", {
+      scope: "tab",
+      assignedTabs: ["tab1"]
+    });
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Switch to Tab1
+    await page.locator('[data-test="dashboard-tab-tab1"]').click();
+    await page.waitForTimeout(1000);
+
+    // Go to add panel
+    await pm.dashboardCreate.addPanel();
+    await page.waitForTimeout(1000);
+
+    // Check available variables in panel edit mode
+    // Both global and tab1 variables should be available
+    await scopedVars.verifyVariableInPanelEdit(globalVar, true);
+    await scopedVars.verifyVariableInPanelEdit(tabVar, true);
+
+    // Save panel
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
+  test("should NOT show other tab's variables in add panel edit mode", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_PanelEditNoOtherTab_${Date.now()}`;
+    const tab1Var = `tab1_var_${Date.now()}`;
+    const tab2Var = `tab2_var_${Date.now()}`;
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
+
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+
+    // Add Tab1 and Tab2
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.addTabSetting("Tab1");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    await pm.dashboardSetting.addTabSetting("Tab2");
+    await pm.dashboardSetting.saveTabSetting();
+    await page.waitForTimeout(500);
+
+    // Add variables to both tabs
+    await scopedVars.addScopedVariable(tab1Var, "logs", "e2e_automate", "kubernetes_namespace_name", {
+      scope: "tab",
+      assignedTabs: ["tab1"]
+    });
+    await scopedVars.addScopedVariable(tab2Var, "logs", "e2e_automate", "kubernetes_container_name", {
+      scope: "tab",
+      assignedTabs: ["tab2"]
+    });
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Go to Tab1 and add panel
+    await page.locator('[data-test="dashboard-tab-tab1"]').click();
+    await page.waitForTimeout(1000);
+
+    await pm.dashboardCreate.addPanel();
+    await page.waitForTimeout(1000);
+
+    // Should see Tab1 variable, but NOT Tab2 variable
+    await scopedVars.verifyVariableInPanelEdit(tab1Var, true);
+    await scopedVars.verifyVariableInPanelEdit(tab2Var, false);
+
+    // Cancel panel creation
+    await page.locator('[data-test="dashboard-panel-cancel-btn"]').click();
+    await page.waitForTimeout(1000);
+
+    // Cleanup
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+});
