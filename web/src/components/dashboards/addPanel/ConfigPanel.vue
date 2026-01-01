@@ -2681,6 +2681,15 @@ export default defineComponent({
   }
 }
 
+// Ensure label icons are always interactive
+:deep(.q-field__label) {
+  pointer-events: auto !important;
+  
+  .q-icon {
+    pointer-events: auto !important;
+  }
+}
+
 .input-container {
   display: flex;
   align-items: center;
