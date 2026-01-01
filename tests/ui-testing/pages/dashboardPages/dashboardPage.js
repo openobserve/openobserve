@@ -3,11 +3,8 @@ import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue
 } from '../commonActions.js';
-import testLogger from '../../playwright-tests/utils/test-logger.js';
-
 export class DashboardPage {
   constructor(page) {
-    testLogger.info('Initializing DashboardPage');
     this.page = page;
     const timestamp = Date.now();
     const randomSuffix = Math.floor(Math.random() * 10000);
@@ -56,12 +53,12 @@ export class DashboardPage {
     this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor-query-editor"]');
   }
   async navigateToDashboards() {
-    await this.page.waitForSelector('[data-test="menu-link-/dashboards-item"]');
+    await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
     await this.dashboardsMenuItem.click();
     // Wait for navigation to complete by checking URL
-    await this.page.waitForURL('**/dashboards**', { timeout: 30000 });
+    await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
     // Wait for the dashboard page to load by checking for a key element
-    await this.page.waitForSelector('[data-test="dashboard-add"]', { timeout: 30000 });
+    await this.page.waitForSelector('[data-test="dashboard-add"]', { timeout: 10000 });
   }
   async createDashboard() {
     // Wait for the dashboard page to be fully loaded
@@ -329,49 +326,7 @@ export class DashboardPage {
     await this.page.keyboard.press('Delete');
   }
 
-  async clickGlobalRefresh() {
-    await this.page.locator('[data-test="dashboard-refresh-btn"]').click();
-  }
 
-  async verifyGlobalRefreshIndicator(shouldBeVisible = true) {
-    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
-    if (shouldBeVisible) {
-      await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
-    } else {
-      await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
-    }
-  }
-
-  async verifyPanelRefreshIndicator(panelId, visible = true) {
-    const panel = this.page.locator(`[data-test-panel-id="${panelId}"]`);
-    const refreshBtn = panel.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
-    if (visible) {
-        // Quasar warning color for small icons often uses text-warning
-        await expect(refreshBtn).toHaveClass(/text-warning|bg-warning/);
-    } else {
-        await expect(refreshBtn).not.toHaveClass(/text-warning|bg-warning/);
-    }
-  }
-
-  async clickPanelRefresh(panelId) {
-    const panel = this.page.locator(`[data-test-panel-id="${panelId}"]`);
-    await panel.locator('[data-test="dashboard-panel-refresh-panel-btn"]').click();
-  }
-
-  async getPanelId(panelIndex = 0) {
-    const panels = await this.page.locator('[data-test-panel-id]').all();
-    if (panels.length > panelIndex) {
-      return await panels[panelIndex].getAttribute('data-test-panel-id');
-    }
-    return null;
-  }
-
-  async addPanel(panelName = null) {
-    await this.page.locator('[data-test="dashboard-add-panel-btn"]').click();
-    if (panelName) {
-      await this.page.locator('[data-test="dashboard-panel-name"]').fill(panelName);
-    }
-  }
 }
 
 

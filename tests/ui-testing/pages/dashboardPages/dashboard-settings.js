@@ -1,4 +1,3 @@
-import { expect } from '@playwright/test';
 // Dashboard Setting Page Object
 // This class contains methods to interact with the dashboard settings page in OpenObserve.
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
@@ -97,7 +96,8 @@ export default class DashboardSetting {
   }
   //close setting dashboard//
   async closeSettingDashboard() {
-    await this.closeSettingWindow();
+    await this.closeSetting.waitFor({ state: "visible" });
+    await this.closeSetting.click();
   }
 
   //show dynamic filter//
@@ -274,67 +274,40 @@ export default class DashboardSetting {
     // Strategy 1: Try exact match
     try {
       const fieldOption = this.page.getByRole("option", { name: field, exact: true });
-      if (await fieldOption.isVisible({ timeout: 5000 })) {
-        await fieldOption.click();
-        fieldSelected = true;
-      }
-    } catch (e) { }
-
-    if (!fieldSelected) {
+      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+      await fieldOption.click();
+      fieldSelected = true;
+    } catch (e) {
       // Strategy 2: Try partial match
       try {
         const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
-        if (await fieldOption.isVisible({ timeout: 5000 })) {
-          await fieldOption.click();
-          fieldSelected = true;
-        }
-      } catch (e2) { }
-    }
-
-    if (!fieldSelected) {
-      // Strategy 3: Use keyboard to select the first visible option
-      try {
-        await this.page.keyboard.press('ArrowDown');
-        await this.page.waitForTimeout(200);
-        await this.page.keyboard.press('Enter');
+        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
+        await fieldOption.click();
         fieldSelected = true;
-      } catch (e3) {
-        fieldSelected = false;
+      } catch (e2) {
+        // Strategy 3: Use keyboard to select the first visible option
+        try {
+          await this.page.keyboard.press('ArrowDown');
+          // Wait for selection to be highlighted
+          await this.page.waitForFunction(
+            () => {
+              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
+                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
+                                 document.querySelector('[role="option"].q-focusable--focused');
+              return highlighted !== null;
+            },
+            { timeout: 3000, polling: 100 }
+          );
+          await this.page.keyboard.press('Enter');
+          fieldSelected = true;
+        } catch (e3) {
+          fieldSelected = false;
+        }
       }
     }
 
     if (!fieldSelected) {
       throw new Error(`Failed to select field: ${field}`);
-    }
-  }
-
-  async setScope(scope, targetTabs = [], targetPanels = []) {
-    const scopeSelect = this.page.locator('[data-test="dashboard-variable-scope-select"]');
-    await scopeSelect.click();
-
-    let scopeLabel = 'Global';
-    if (scope === 'tabs' || scope === 'tab') scopeLabel = 'Selected Tabs';
-    if (scope === 'panels' || scope === 'panel') scopeLabel = 'Selected Panels';
-
-    await this.page.getByRole("option", { name: scopeLabel, exact: true }).click();
-
-    if (scope === 'tabs' || scope === 'tab' || scope === 'panels' || scope === 'panel') {
-      const isTab = (scope === 'tabs' || scope === 'tab');
-      const targetSelect = isTab
-        ? this.page.locator('[data-test="dashboard-variable-tabs-select"]')
-        : this.page.locator('[data-test="dashboard-variable-panels-select"]');
-
-      await targetSelect.click();
-
-      const targets = isTab ? targetTabs : targetPanels;
-      for (const target of targets) {
-        const option = this.page.getByRole("option", { name: target });
-        await option.scrollIntoViewIfNeeded();
-        if (await option.isVisible()) {
-          await option.locator('.q-checkbox').click();
-        }
-      }
-      await this.page.keyboard.press('Escape');
     }
   }
 
@@ -470,21 +443,9 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
-    // Ensure it's attached before trying to scroll or wait for visibility
-    try {
-      if (await closeBtn.count() > 0) {
-        await closeBtn.waitFor({ state: "attached", timeout: 5000 });
-        await closeBtn.scrollIntoViewIfNeeded();
-        await closeBtn.waitFor({ state: "visible", timeout: 5000 });
-        await closeBtn.click({ force: true });
-        // Wait for it to disappear
-        await expect(closeBtn).not.toBeVisible({ timeout: 5000 }).catch(() => { });
-      }
-    } catch (e) {
-      // If it fails because it's already gone, that's fine
-      console.log("closeSettingWindow: element already gone or error", e.message);
-    }
+    await this.page
+      .locator('[data-test="dashboard-settings-close-btn"]')
+      .click();
   }
 
   // Update tab name in edit tab options//
