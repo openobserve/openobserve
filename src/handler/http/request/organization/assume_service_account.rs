@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
 use actix_web::{HttpResponse, post, web};
-// Re-export shared types from config crate for OpenAPI
-#[cfg(feature = "enterprise")]
+// Re-export shared types from config crate for OpenAPI (unconditionally for OpenAPI
+// generation)
 pub use config::meta::session::{AssumeServiceAccountRequest, AssumeServiceAccountResponse};
 
 #[cfg(feature = "enterprise")]
@@ -51,7 +50,6 @@ use crate::{
 ///     "duration_seconds": 3600
 ///   }'
 /// ```
-#[cfg(feature = "enterprise")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -72,123 +70,135 @@ use crate::{
         (status = StatusCode::FORBIDDEN, description = "Not authorized or service account not assigned"),
         (status = StatusCode::BAD_REQUEST, description = "Invalid request"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error"),
+        (status = 501, description = "Not available in non-enterprise builds"),
     ),
 )]
-#[cfg(feature = "enterprise")]
 #[post("/{org_id}/organizations/assume_service_account")]
 pub async fn assume_service_account(
     org_id: web::Path<String>,
     req: web::Json<AssumeServiceAccountRequest>,
-    _auth: AuthExtractor,
-    Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] _auth: AuthExtractor,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-    let mut req = req.into_inner();
-    let user_email = user_email.user_id;
-
-    // Default service_account to caller's user_id if not specified
-    let target_service_account = req
-        .service_account
-        .clone()
-        .unwrap_or_else(|| user_email.clone());
-
-    log::info!(
-        "Assume service account request: user='{}', target_org='{}', service_account='{}', duration={:?}",
-        user_email,
-        req.org_id,
-        target_service_account,
-        req.duration_seconds
-    );
-
-    // Step 1: Verify the request is for _meta org
-    if org_id != config::META_ORG_ID {
-        log::warn!(
-            "Assume service account rejected: API must be called on _meta org, got '{}'",
-            org_id
-        );
-        return Ok(MetaHttpResponse::bad_request(
-            "Assume service account API must be called on _meta organization",
-        ));
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, req);
+        Ok(HttpResponse::NotImplemented().json(serde_json::json!({
+            "error": "This feature is only available in the enterprise version"
+        })))
     }
 
-    // Step 2: Call enterprise implementation
-    use crate::service::{db, users};
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id = org_id.into_inner();
+        let mut req = req.into_inner();
+        let user_email = user_email.user_id;
 
-    // Set the service_account field to the resolved value
-    req.service_account = Some(target_service_account);
+        // Default service_account to caller's user_id if not specified
+        let target_service_account = req
+            .service_account
+            .clone()
+            .unwrap_or_else(|| user_email.clone());
 
-    let enterprise_req = req;
+        log::info!(
+            "Assume service account request: user='{}', target_org='{}', service_account='{}', duration={:?}",
+            user_email,
+            req.org_id,
+            target_service_account,
+            req.duration_seconds
+        );
 
-    let result = o2_enterprise::enterprise::assume_service_account::process_assume_service_account(
-        &user_email,
-        enterprise_req,
-        |org_id, email| {
-            let org_id = org_id.to_string();
-            let email = email.to_string();
-            Box::pin(async move { users::get_user(Some(&org_id), &email).await })
-        },
-        |org_id, email| {
-            let org_id = org_id.to_string();
-            let email = email.to_string();
-            Box::pin(async move {
-                log::debug!(
-                    "Attempting to get org_user for org_id='{}', email='{}'",
-                    org_id,
-                    email
-                );
-                let record = db::org_users::get(&org_id, &email).await.map_err(|e| {
-                    log::error!(
-                        "Failed to get org_user for org_id='{}', email='{}': {}",
-                        org_id,
-                        email,
-                        e
-                    );
-                    e.to_string()
-                })?;
-                log::debug!("Found org_user: role={:?}", record.role);
-                Ok(
-                    o2_enterprise::enterprise::assume_service_account::OrgUserInfo {
-                        token: record.token,
-                        role: format!("{}", record.role),
-                    },
-                )
-            })
-        },
-        |session_id, token, expires_at| {
-            let session_id = session_id.to_string();
-            let email = user_email.to_string();
-            // Create Basic auth token in format: Basic base64(email:token)
-            let basic_auth = format!("{}:{}", email, token);
-            let basic_auth_encoded = config::utils::base64::encode(&basic_auth);
-            let auth_token = format!("Basic {}", basic_auth_encoded);
-            Box::pin(async move {
-                db::session::set_with_expiry(&session_id, &auth_token, expires_at).await
-            })
-        },
-    )
-    .await;
-
-    let result = match result {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("Assume service account failed: {}", e);
-            if let Some(msg) = e.strip_prefix("BADREQUEST:") {
-                return Ok(MetaHttpResponse::bad_request(msg));
-            } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
-                return Ok(MetaHttpResponse::forbidden(msg));
-            } else {
-                return Ok(MetaHttpResponse::forbidden(e));
-            }
+        // Step 1: Verify the request is for _meta org
+        if org_id != config::META_ORG_ID {
+            log::warn!(
+                "Assume service account rejected: API must be called on _meta org, got '{}'",
+                org_id
+            );
+            return Ok(MetaHttpResponse::bad_request(
+                "Assume service account API must be called on _meta organization",
+            ));
         }
-    };
 
-    Ok(HttpResponse::Ok().json(AssumeServiceAccountResponse {
-        session_id: result.session_id,
-        org_id: result.org_id,
-        role_name: result.role_name,
-        expires_at: chrono::DateTime::from_timestamp(result.expires_at, 0)
-            .unwrap()
-            .to_rfc3339(),
-        expires_in: result.duration,
-    }))
+        // Step 2: Call enterprise implementation
+        use crate::service::{db, users};
+
+        // Set the service_account field to the resolved value
+        req.service_account = Some(target_service_account);
+
+        let enterprise_req = req;
+
+        let result =
+            o2_enterprise::enterprise::assume_service_account::process_assume_service_account(
+                &user_email,
+                enterprise_req,
+                |org_id, email| {
+                    let org_id = org_id.to_string();
+                    let email = email.to_string();
+                    Box::pin(async move { users::get_user(Some(&org_id), &email).await })
+                },
+                |org_id, email| {
+                    let org_id = org_id.to_string();
+                    let email = email.to_string();
+                    Box::pin(async move {
+                        log::debug!(
+                            "Attempting to get org_user for org_id='{}', email='{}'",
+                            org_id,
+                            email
+                        );
+                        let record = db::org_users::get(&org_id, &email).await.map_err(|e| {
+                            log::error!(
+                                "Failed to get org_user for org_id='{}', email='{}': {}",
+                                org_id,
+                                email,
+                                e
+                            );
+                            e.to_string()
+                        })?;
+                        log::debug!("Found org_user: role={:?}", record.role);
+                        Ok(
+                            o2_enterprise::enterprise::assume_service_account::OrgUserInfo {
+                                token: record.token,
+                                role: format!("{}", record.role),
+                            },
+                        )
+                    })
+                },
+                |session_id, token, expires_at| {
+                    let session_id = session_id.to_string();
+                    let email = user_email.to_string();
+                    // Create Basic auth token in format: Basic base64(email:token)
+                    let basic_auth = format!("{}:{}", email, token);
+                    let basic_auth_encoded = config::utils::base64::encode(&basic_auth);
+                    let auth_token = format!("Basic {}", basic_auth_encoded);
+                    Box::pin(async move {
+                        db::session::set_with_expiry(&session_id, &auth_token, expires_at).await
+                    })
+                },
+            )
+            .await;
+
+        let result = match result {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("Assume service account failed: {}", e);
+                if let Some(msg) = e.strip_prefix("BADREQUEST:") {
+                    return Ok(MetaHttpResponse::bad_request(msg));
+                } else if let Some(msg) = e.strip_prefix("FORBIDDEN:") {
+                    return Ok(MetaHttpResponse::forbidden(msg));
+                } else {
+                    return Ok(MetaHttpResponse::forbidden(e));
+                }
+            }
+        };
+
+        Ok(HttpResponse::Ok().json(AssumeServiceAccountResponse {
+            session_id: result.session_id,
+            org_id: result.org_id,
+            role_name: result.role_name,
+            expires_at: chrono::DateTime::from_timestamp(result.expires_at, 0)
+                .unwrap()
+                .to_rfc3339(),
+            expires_in: result.duration,
+        }))
+    }
 }

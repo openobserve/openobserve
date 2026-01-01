@@ -371,9 +371,11 @@ pub async fn delete_bulk(
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",
     summary = "Get service account API token",
-    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one. \
+    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. \
                    \
-                   When accessed from _meta org for a meta service account (one with is_meta_service_account=true in customer orgs), returns all tokens across all organizations. For regular orgs or non-meta service accounts, returns only the single org token.",
+                   **Security Note:** Service accounts with `allow_static_token=false` will return a masked token (***MASKED***) instead of the actual token. These accounts must use the `assume_service_account` API to obtain temporary session tokens. \
+                   \
+                   Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
     security(
         ("Authorization"= [])
     ),

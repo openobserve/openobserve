@@ -48,7 +48,6 @@ pub struct OrgUserRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
-    pub is_meta_service_account: bool,
     pub allow_static_token: bool,
 }
 
@@ -76,7 +75,6 @@ impl OrgUserRecord {
             token: token.to_string(),
             rum_token,
             created_at: chrono::Utc::now().timestamp_micros(),
-            is_meta_service_account: false,
             allow_static_token: true, // Default to true for backward compatibility
         }
     }
@@ -91,7 +89,6 @@ impl From<Model> for OrgUserRecord {
             token: model.token,
             rum_token: model.rum_token,
             created_at: model.created_at,
-            is_meta_service_account: model.is_meta_service_account.unwrap_or(false),
             allow_static_token: model.allow_static_token,
         }
     }
@@ -107,7 +104,6 @@ pub struct UserOrgExpandedRecord {
     pub created_at: i64,
     pub org_name: String,
     pub org_type: OrganizationType,
-    pub is_meta_service_account: bool,
     pub allow_static_token: bool,
 }
 
@@ -121,8 +117,6 @@ impl FromQueryResult for UserOrgExpandedRecord {
         let created_at = result.try_get(pre, "created_at")?;
         let org_name = result.try_get(pre, "org_name")?;
         let org_type: i16 = result.try_get(pre, "org_type")?;
-        let is_meta_service_account: Option<bool> =
-            result.try_get(pre, "is_meta_service_account").ok();
         let allow_static_token: bool = result.try_get(pre, "allow_static_token").unwrap_or(true);
 
         Ok(Self {
@@ -134,7 +128,6 @@ impl FromQueryResult for UserOrgExpandedRecord {
             created_at,
             org_name,
             org_type: org_type.into(),
-            is_meta_service_account: is_meta_service_account.unwrap_or(false),
             allow_static_token,
         })
     }
@@ -154,7 +147,6 @@ pub struct OrgUserExpandedRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
-    pub is_meta_service_account: bool,
 }
 
 impl FromQueryResult for OrgUserExpandedRecord {
@@ -171,8 +163,6 @@ impl FromQueryResult for OrgUserExpandedRecord {
         let token = res.try_get(pre, "token")?;
         let rum_token = res.try_get(pre, "rum_token")?;
         let created_at = res.try_get(pre, "created_at")?;
-        let is_meta_service_account: Option<bool> =
-            res.try_get(pre, "is_meta_service_account").ok();
 
         Ok(Self {
             email,
@@ -187,7 +177,6 @@ impl FromQueryResult for OrgUserExpandedRecord {
             token,
             rum_token,
             created_at,
-            is_meta_service_account: is_meta_service_account.unwrap_or(false),
         })
     }
 }
@@ -217,7 +206,7 @@ pub async fn add(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
-    add_with_flags(org_id, user_email, role, token, rum_token, false, true).await
+    add_with_flags(org_id, user_email, role, token, rum_token, true).await
 }
 
 pub async fn add_with_flag(
@@ -226,18 +215,8 @@ pub async fn add_with_flag(
     role: UserRole,
     token: &str,
     rum_token: Option<String>,
-    is_meta_service_account: bool,
 ) -> Result<(), errors::Error> {
-    add_with_flags(
-        org_id,
-        user_email,
-        role,
-        token,
-        rum_token,
-        is_meta_service_account,
-        true,
-    )
-    .await
+    add_with_flags(org_id, user_email, role, token, rum_token, true).await
 }
 
 pub async fn add_with_flags(
@@ -246,7 +225,7 @@ pub async fn add_with_flags(
     role: UserRole,
     token: &str,
     rum_token: Option<String>,
-    is_meta_service_account: bool,
+
     allow_static_token: bool,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
@@ -260,7 +239,7 @@ pub async fn add_with_flags(
         created_at: Set(now),
         updated_at: Set(now),
         id: Set(ider::uuid()),
-        is_meta_service_account: Set(Some(is_meta_service_account)),
+
         allow_static_token: Set(allow_static_token),
     };
 
@@ -423,7 +402,7 @@ pub async fn get_expanded_user_org(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
-        .column(Column::IsMetaServiceAccount)
+        .column(Column::AllowStaticToken)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -459,7 +438,7 @@ pub async fn get_user_by_rum_token(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
-        .column(Column::IsMetaServiceAccount)
+        .column(Column::AllowStaticToken)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -501,7 +480,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
         .column(Column::CreatedAt)
         .column(organizations::Column::OrgName)
         .column(organizations::Column::OrgType)
-        .column(Column::IsMetaServiceAccount)
+        .column(Column::AllowStaticToken)
         .into_model::<UserOrgExpandedRecord>()
         .all(client)
         .await
