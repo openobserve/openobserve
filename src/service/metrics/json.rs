@@ -130,25 +130,21 @@ pub async fn ingest(
         };
 
         // Start retrieve associated pipeline and initialize ExecutablePipeline
+        let stream_param = StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: stream_name.to_owned().into(),
+            stream_type: StreamType::Metrics,
+        };
         if !stream_executable_pipelines.contains_key(&stream_name) {
-            let exec_pl_option = crate::service::ingestion::get_stream_executable_pipeline(
-                org_id,
-                &stream_name,
-                &StreamType::Metrics,
-            )
-            .await;
+            let exec_pl_option =
+                crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
             stream_executable_pipelines.insert(stream_name.clone(), exec_pl_option);
         }
         // End pipeline params construction
 
         // get user defined schema
-        let streams = vec![StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_type: StreamType::Metrics,
-            stream_name: stream_name.to_owned().into(),
-        }];
         crate::service::ingestion::get_uds_and_original_data_streams(
-            &streams,
+            std::slice::from_ref(&stream_param),
             &mut user_defined_schema_map,
             &mut streams_need_original_map,
             &mut streams_need_all_values_map,

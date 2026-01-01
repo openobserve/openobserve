@@ -105,12 +105,13 @@ pub async fn ingest(
     }
 
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &stream_type,
-    )
-    .await;
+    let stream_param = StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_name: stream_name.to_owned().into(),
+        stream_type,
+    };
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction

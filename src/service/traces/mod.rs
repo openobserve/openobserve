@@ -215,12 +215,13 @@ pub async fn handle_otlp_request(
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
     // Start retrieving associated pipeline and construct pipeline params
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &traces_stream_name,
-        &StreamType::Traces,
-    )
-    .await;
+    let stream_param = StreamParams {
+        org_id: org_id.to_owned().into(),
+        stream_name: traces_stream_name.to_owned().into(),
+        stream_type: StreamType::Traces,
+    };
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
@@ -228,13 +229,8 @@ pub async fn handle_otlp_request(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    let streams = vec![StreamParams {
-        org_id: org_id.to_owned().into(),
-        stream_type: StreamType::Traces,
-        stream_name: traces_stream_name.to_owned().into(),
-    }];
     crate::service::ingestion::get_uds_and_original_data_streams(
-        &streams,
+        std::slice::from_ref(&stream_param),
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
         &mut streams_need_all_values_map,
