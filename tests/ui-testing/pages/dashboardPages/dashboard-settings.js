@@ -157,6 +157,19 @@ export default class DashboardSetting {
       .click();
   }
 
+  // Navigate to Variables tab after opening settings
+  async goToVariablesTab() {
+    // Wait for settings dialog to be fully visible
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .waitFor({ state: "visible", timeout: 10000 });
+
+    // Click on Variables tab
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .click();
+  }
+
   //Generate unique variable name
   variableName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
