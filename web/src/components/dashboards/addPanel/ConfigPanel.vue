@@ -1460,17 +1460,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-input
           v-model.number="dashboardPanelData.data.config.axis_label_rotate"
-          label="Label Rotate"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
           class="q-py-md showLabelOnTop"
+          :class="{ 'input-disabled-overlay': hasTimeBasedXAxis }"
           stack-label
           borderless
           dense
           label-slot
           :type="'number'"
           placeholder="0"
+          :readonly="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_rotate =
@@ -1478,20 +1479,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="dashboard-config-axis-label-rotate"
         >
+          <template v-slot:label>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span>Label Rotate</span>
+              <q-icon
+                name="info"
+                size="14px"
+                :color="hasTimeBasedXAxis ? 'grey-6' : 'grey-5'"
+                style="cursor: pointer;"
+              >
+                <q-tooltip
+                  anchor="top middle"
+                  self="bottom middle"
+                  :offset="[0, 8]"
+                  class="bg-grey-8"
+                >
+                  {{ hasTimeBasedXAxis
+                    ? 'Not available for time-series x-axis fields'
+                    : 'Rotate x-axis labels by the specified angle (in degrees)' }}
+                </q-tooltip>
+              </q-icon>
+            </div>
+          </template>
         </q-input>
         <q-input
           v-model.number="dashboardPanelData.data.config.axis_label_truncate_width"
-          label="Label Truncate"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
           class="q-py-md showLabelOnTop"
+          :class="{ 'input-disabled-overlay': hasTimeBasedXAxis }"
           stack-label
           borderless
           dense
           label-slot
           :type="'number'"
           placeholder="0"
+          :readonly="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_truncate_width =
@@ -1499,6 +1523,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="dashboard-config-axis-label-truncate-width"
         >
+          <template v-slot:label>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span>Label Truncate</span>
+              <q-icon
+                name="info"
+                size="14px"
+                :color="hasTimeBasedXAxis ? 'grey-6' : 'grey-5'"
+                style="cursor: pointer;"
+              >
+                <q-tooltip
+                  anchor="top middle"
+                  self="bottom middle"
+                  :offset="[0, 8]"
+                  class="bg-grey-8"
+                >
+                  {{ hasTimeBasedXAxis
+                    ? 'Not available for time-series x-axis fields'
+                    : 'Truncate x-axis labels to the specified width (in pixels)' }}
+                </q-tooltip>
+              </q-icon>
+            </div>
+          </template>
         </q-input>
       </div>
 
@@ -1748,7 +1794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1780,6 +1826,10 @@ import {
   shouldApplyChartAlign,
   shouldShowGridlines,
 } from "@/utils/dashboard/configUtils";
+import {
+  isTimeSeries,
+  isTimeStamp,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   components: {
@@ -2424,6 +2474,96 @@ export default defineComponent({
       );
     });
 
+    // Check if x-axis has time-based fields (histogram, date_bin, etc.) or time-formatted data
+    const hasTimeBasedXAxis = computed(() => {
+      const xFields = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ]?.fields?.x || [];
+
+      // Debug logging
+      console.log('[hasTimeBasedXAxis] Checking x-axis fields:', xFields);
+      console.log('[hasTimeBasedXAxis] Panel data available:', !!props.panelData, 'length:', props.panelData?.length);
+      console.log('[hasTimeBasedXAxis] Panel data sample:', props.panelData);
+
+      // Check 1: Field uses time-related functions
+      const timeRelatedFunctions = ["histogram", "date_bin", "date_trunc", "time_bucket"];
+      const hasTimeFunctionField = xFields.some((field: any) =>
+        timeRelatedFunctions.includes(field.functionName)
+      );
+
+      console.log('[hasTimeBasedXAxis] Has time function field:', hasTimeFunctionField);
+
+      if (hasTimeFunctionField) {
+        return true;
+      }
+
+      // Check 1.5: Check if field is using the timestamp column from store
+      const timestampColumn = store.state.zoConfig?.timestamp_column;
+      if (timestampColumn) {
+        const usesTimestampColumn = xFields.some((field: any) => {
+          // Check if field's argument uses the timestamp column
+          const fieldName = field?.args?.[0]?.value?.field || field?.column;
+          return fieldName === timestampColumn;
+        });
+
+        if (usesTimestampColumn) {
+          console.log('[hasTimeBasedXAxis] Field uses timestamp column from store');
+          return true;
+        }
+      }
+
+      // Check 2: Check if data looks like time series by sampling the actual data
+      // This is the ONLY reliable way - check actual data values, not field names
+      // panelData structure: { options: { xAxis: [{ data: [...] }] } } or { options: { xAxis: { data: [...] } } }
+      const xAxisData = Array.isArray(props.panelData?.options?.xAxis)
+        ? props.panelData?.options?.xAxis?.[0]?.data
+        : props.panelData?.options?.xAxis?.data;
+
+      if (Array.isArray(xAxisData) && xAxisData.length > 0) {
+        const sampleSize = Math.min(20, xAxisData.length);
+        const sample = xAxisData.slice(0, sampleSize);
+
+        console.log('[hasTimeBasedXAxis] Sampled x-axis data:', sample.slice(0, 3));
+
+        if (sample.length > 0) {
+          // Check if data matches time series patterns (ISO8601 or timestamp)
+          if (isTimeSeries(sample) || isTimeStamp(sample, null)) {
+            return true;
+          }
+
+          // Check if data looks like formatted time/date strings
+          const timePatterns = [
+            // ISO 8601 formats
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO8601: 2025-10-13T06:58:37 (with optional fractional seconds and timezone)
+            // Date with time formats
+            /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/, // YYYY-MM-DD HH:MM:SS
+            /^\d{2}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2}/, // MM/DD/YYYY HH:MM:SS or DD/MM/YYYY HH:MM:SS
+            // Time only formats
+            /^\d{2}:\d{2}:\d{2}/, // HH:MM:SS (with optional milliseconds)
+            // Date only formats
+            /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+            /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY or DD/MM/YYYY
+            /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY or MM-DD-YYYY
+            // Unix timestamp (seconds - 10 digits, milliseconds - 13 digits)
+            /^\d{10,13}$/,
+          ];
+
+          const matchesTimePattern = sample.every((value: any) => {
+            const strValue = String(value);
+            return timePatterns.some((pattern) => pattern.test(strValue));
+          });
+
+          if (matchesTimePattern) {
+            console.log('[hasTimeBasedXAxis] Matched time pattern in data');
+            return true;
+          }
+        }
+      }
+
+      console.log('[hasTimeBasedXAxis] No time detection matched, returning false');
+      return false;
+    });
+
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
       if (
@@ -2450,6 +2590,26 @@ export default defineComponent({
         }
       }
     });
+
+    // Clear axis label rotate and truncate when switching to time-based x-axis
+    // Use watch instead of watchEffect to avoid running on every panelData change
+    watch(
+      () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
+      () => {
+        // Only clear values when switching TO a time-based field
+        if (hasTimeBasedXAxis.value) {
+          if (dashboardPanelData.data.config.axis_label_rotate !== 0) {
+            console.log('[hasTimeBasedXAxis] Clearing axis_label_rotate due to x-axis field change');
+            dashboardPanelData.data.config.axis_label_rotate = 0;
+          }
+          if (dashboardPanelData.data.config.axis_label_truncate_width !== null) {
+            console.log('[hasTimeBasedXAxis] Clearing axis_label_truncate_width due to x-axis field change');
+            dashboardPanelData.data.config.axis_label_truncate_width = null;
+          }
+        }
+      },
+      { deep: true }
+    );
 
     return {
       t,
@@ -2481,6 +2641,7 @@ export default defineComponent({
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
+      hasTimeBasedXAxis,
       dashboardPanelDataPageKey,
       store,
       shouldShowLegendsToggle,
@@ -2505,6 +2666,19 @@ export default defineComponent({
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+.input-disabled-overlay {
+  :deep(input) {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  :deep(.q-field__label) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
 }
 
 .input-container {
