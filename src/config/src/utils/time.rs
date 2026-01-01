@@ -482,4 +482,85 @@ mod tests {
             assert_eq!(format_duration(input), v_exp);
         }
     }
+
+    #[test]
+    fn test_day_micros() {
+        assert_eq!(day_micros(1), 86400000000);
+        assert_eq!(day_micros(2), 172800000000);
+        assert_eq!(day_micros(0), 0);
+    }
+
+    #[test]
+    fn test_hour_micros() {
+        assert_eq!(hour_micros(1), 3600000000);
+        assert_eq!(hour_micros(2), 7200000000);
+        assert_eq!(hour_micros(0), 0);
+    }
+
+    #[test]
+    fn test_second_micros() {
+        assert_eq!(second_micros(1), 1000000);
+        assert_eq!(second_micros(60), 60000000);
+        assert_eq!(second_micros(0), 0);
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_valid() {
+        let result = parse_str_to_timestamp_micros_as_option("1609459200000000");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_invalid() {
+        let result = parse_str_to_timestamp_micros_as_option("invalid");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_as_option_date_string() {
+        let result = parse_str_to_timestamp_micros_as_option("2021-01-01T00:00:00Z");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 1609459200000000);
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros_zero() {
+        let now = now_micros();
+        let result = parse_i64_to_timestamp_micros(0);
+        // Result should be close to now (within a few seconds)
+        assert!(result > 0);
+        assert!((result - now).abs() < 5000000); // Within 5 seconds
+    }
+
+    #[test]
+    fn test_parse_i64_to_timestamp_micros_negative() {
+        // Negative timestamps should be treated as seconds
+        let result = parse_i64_to_timestamp_micros(-1);
+        assert_eq!(result, -1_000_000);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_edge_cases() {
+        assert_eq!(parse_milliseconds("1ms").unwrap(), 1);
+        assert_eq!(parse_milliseconds("100ms").unwrap(), 100);
+        assert_eq!(parse_milliseconds("1s1ms").unwrap(), 1001);
+        assert_eq!(parse_milliseconds("1m1s1ms").unwrap(), 61001);
+    }
+
+    #[test]
+    fn test_parse_milliseconds_complex() {
+        assert_eq!(parse_milliseconds("2d3h4m5s").unwrap(), 183845000);
+        assert_eq!(parse_milliseconds("1w1d").unwrap(), 691200000);
+        assert_eq!(parse_milliseconds("1y1w1d").unwrap(), 32227200000);
+    }
+
+    #[test]
+    fn test_now_micros() {
+        let t1 = now_micros();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let t2 = now_micros();
+        assert!(t2 > t1);
+        assert!(t2 - t1 >= 10000); // At least 10ms difference
+    }
 }
