@@ -533,13 +533,16 @@ export default defineComponent({
                     );
 
                     if (firstNonBlankOption) {
-                      variableObject.value = firstNonBlankOption.value;
+                      // For multi-select, wrap in array; for single-select, use the value directly
+                      variableObject.value = variableObject.multiSelect
+                        ? [firstNonBlankOption.value]
+                        : firstNonBlankOption.value;
                     } else {
                       // All options are blank - keep value unset
-                      variableObject.value = null;
+                      variableObject.value = variableObject.multiSelect ? [] : null;
                     }
                   } else {
-                    variableObject.value = null;
+                    variableObject.value = variableObject.multiSelect ? [] : null;
                   }
                 }
               }
@@ -1699,23 +1702,40 @@ export default defineComponent({
           `[VariablesValueSelector] Checking variable ${variable.name}: isPartialLoaded=${variable.isVariablePartialLoaded}, value=${JSON.stringify(variable.value)}`,
         );
         if (variable.isVariablePartialLoaded) {
+          // Escape special regex characters in variable name
+          const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
           // Replace array values
           if (Array.isArray(variable.value)) {
             const arrayValues = variable.value
               .map((value: any) => `'${escapeSingleQuotes(value)}'`)
               .join(", ");
+
+            // Create regex patterns to replace all occurrences
+            // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
+            const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, 'g');
+            // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
+            const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, 'g');
+
+            // First replace unquoted patterns (for IN clauses)
             queryContext = queryContext.replace(
-              `'$${variable.name}'`,
+              unquotedPattern,
+              arrayValues,
+            );
+            // Then replace quoted patterns
+            queryContext = queryContext.replace(
+              quotedPattern,
               arrayValues,
             );
             console.log(
               `[VariablesValueSelector] Replaced array '$${variable.name}' with ${arrayValues}`,
             );
           } else if (variable.value !== null && variable.value !== undefined) {
-            // Replace single values
+            // Replace single values with regex to replace all occurrences
             const replacedValue = escapeSingleQuotes(variable.value);
+            const pattern = new RegExp(`\\$${escapedVarName}`, 'g');
             queryContext = queryContext.replace(
-              `$${variable.name}`,
+              pattern,
               replacedValue,
             );
             console.log(
