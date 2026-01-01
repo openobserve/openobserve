@@ -1484,9 +1484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>Label Rotate</span>
               <q-icon
                 name="info"
-                size="14px"
-                :color="hasTimeBasedXAxis ? 'grey-6' : 'grey-5'"
+                size="20px"
                 style="cursor: pointer;"
+                data-test="dashboard-config-axis-label-rotate-info"
               >
                 <q-tooltip
                   anchor="top middle"
@@ -1528,9 +1528,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>Label Truncate</span>
               <q-icon
                 name="info"
-                size="14px"
-                :color="hasTimeBasedXAxis ? 'grey-6' : 'grey-5'"
+                size="20px"
                 style="cursor: pointer;"
+                data-test="dashboard-config-axis-label-truncate-info"
               >
                 <q-tooltip
                   anchor="top middle"
