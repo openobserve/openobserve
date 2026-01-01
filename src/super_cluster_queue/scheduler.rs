@@ -182,6 +182,29 @@ async fn update(msg: Message) -> Result<()> {
                 );
             }
         }
+        TriggerModule::Backfill => {
+            // For backfill jobs, check if the backfill job exists in the backfill_jobs table
+            let job_id = &trigger.module_key;
+            if infra::table::backfill_jobs::get(&trigger.org, job_id)
+                .await
+                .is_ok()
+            {
+                // We need to add this trigger to the db in this region
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] Backfill job not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
         TriggerModule::QueryRecommendations => {
             todo!("We will get here eventually")
         }

@@ -51,3 +51,135 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
     let val = serde_json::json!(map);
     serde_json::from_value(val).map_err(|e| format!("Header deserialization error: {e}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+    use serde::Deserialize;
+
+    use super::*;
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TestHeaders {
+        #[serde(rename = "x-api-key")]
+        api_key: String,
+        #[serde(rename = "user-agent")]
+        user_agent: String,
+    }
+
+    #[test]
+    fn test_deserialize_headers_success() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_static("test-key-123"),
+        );
+        headers.insert(
+            HeaderName::from_static("user-agent"),
+            HeaderValue::from_static("Mozilla/5.0"),
+        );
+
+        let result: Result<TestHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_ok());
+        let test_headers = result.unwrap();
+        assert_eq!(test_headers.api_key, "test-key-123");
+        assert_eq!(test_headers.user_agent, "Mozilla/5.0");
+    }
+
+    #[test]
+    fn test_deserialize_headers_missing_field() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_static("test-key-123"),
+        );
+        // Missing user-agent header
+
+        let result: Result<TestHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("deserialization error"));
+    }
+
+    #[test]
+    fn test_deserialize_headers_empty() {
+        let headers = HeaderMap::new();
+
+        let result: Result<TestHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_err());
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct OptionalHeaders {
+        #[serde(rename = "x-api-key")]
+        api_key: Option<String>,
+        #[serde(rename = "user-agent")]
+        user_agent: Option<String>,
+    }
+
+    #[test]
+    fn test_deserialize_headers_optional_fields() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-api-key"),
+            HeaderValue::from_static("test-key-123"),
+        );
+
+        let result: Result<OptionalHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_ok());
+        let test_headers = result.unwrap();
+        assert_eq!(test_headers.api_key, Some("test-key-123".to_string()));
+        assert_eq!(test_headers.user_agent, None);
+    }
+
+    #[test]
+    fn test_deserialize_headers_special_characters() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct SpecialHeaders {
+            #[serde(rename = "x-custom-header")]
+            custom: String,
+        }
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-custom-header"),
+            HeaderValue::from_static("value-with-dashes"),
+        );
+
+        let result: Result<SpecialHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_ok());
+        let special_headers = result.unwrap();
+        assert_eq!(special_headers.custom, "value-with-dashes");
+    }
+
+    #[test]
+    fn test_deserialize_headers_multiple_values() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct MultiHeaders {
+            authorization: String,
+            #[serde(rename = "content-type")]
+            content_type: String,
+            accept: String,
+        }
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("authorization"),
+            HeaderValue::from_static("Bearer token123"),
+        );
+        headers.insert(
+            HeaderName::from_static("content-type"),
+            HeaderValue::from_static("application/json"),
+        );
+        headers.insert(
+            HeaderName::from_static("accept"),
+            HeaderValue::from_static("*/*"),
+        );
+
+        let result: Result<MultiHeaders, String> = deserialize_headers(&headers);
+        assert!(result.is_ok());
+        let multi_headers = result.unwrap();
+        assert_eq!(multi_headers.authorization, "Bearer token123");
+        assert_eq!(multi_headers.content_type, "application/json");
+        assert_eq!(multi_headers.accept, "*/*");
+    }
+}

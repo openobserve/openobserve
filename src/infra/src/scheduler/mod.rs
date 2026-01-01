@@ -99,6 +99,7 @@ pub async fn push(trigger: Trigger) -> Result<()> {
 /// Deletes the Trigger job matching the given parameters
 #[inline]
 pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
+    log::info!("deleting scheduled job: {key}, {module}");
     CLIENT.delete(org, module, key).await
 }
 
