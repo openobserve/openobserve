@@ -27,38 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
-            <!-- Icon-only View Mode Tabs -->
-            <div class="view-mode-tabs">
-              <q-btn
-                flat
-                dense
-                :class="viewMode === 'alerts' ? 'active-tab' : 'inactive-tab'"
-                class="view-tab-btn"
-                @click="onViewModeChange('alerts')"
-                data-test="alerts-view-btn"
-              >
-                <q-icon name="notifications_active" size="18px" />
-                <q-tooltip>{{ t('alerts.header') }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                :class="viewMode === 'incidents' ? 'active-tab' : 'inactive-tab'"
-                class="view-tab-btn"
-                @click="onViewModeChange('incidents')"
-                data-test="incidents-view-btn"
-              >
-                <q-icon name="crisis_alert" size="18px" />
-                <q-tooltip>{{ t('alerts.incidents.title') }}</q-tooltip>
-              </q-btn>
-            </div>
-
-            <!-- Page Title -->
-            <div
-              class="page-title tw:font-[600] tw:text-[20px]"
-              :data-test="viewMode === 'alerts' ? 'alerts-list-title' : 'incidents-list-title'"
-            >
-              {{ viewMode === 'alerts' ? t('alerts.header') : t('alerts.incidents.title') }}
+            <!-- View Mode Tabs (Alerts / Incidents) -->
+            <div class="view-mode-tabs-container">
+              <app-tabs
+                :tabs="viewTabs"
+                v-model:active-tab="viewMode"
+                @update:active-tab="onViewModeChange"
+                data-test="alert-incident-view-tabs"
+              />
             </div>
           </div>
           <div class="flex q-ml-auto tw:ps-2 items-center">
@@ -1173,6 +1149,18 @@ export default defineComponent({
 
     // Incident search query
     const incidentSearchQuery = ref("");
+
+    // View mode tabs (Alerts / Incidents)
+    const viewTabs = computed(() => [
+      {
+        label: t('alerts.header'),
+        value: 'alerts',
+      },
+      {
+        label: t('alerts.incidents.title'),
+        value: 'incidents',
+      }
+    ]);
 
     // Tabs for alerts view only (removed incidents tab)
     const alertTabs = reactive([
@@ -2788,6 +2776,7 @@ export default defineComponent({
       tabs,
       alertTabs,
       viewMode,
+      viewTabs,
       onViewModeChange,
       incidentSearchQuery,
       filterAlertsByTab,
@@ -2812,72 +2801,26 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-.view-mode-tabs {
-  display: flex;
-  gap: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 6px;
-  padding: 4px;
+.view-mode-tabs-container {
+  margin-right: 24px;
 
-  .view-tab-btn {
-    min-width: 32px;
-    min-height: 32px;
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-
-    &.active-tab {
-      background: var(--q-primary);
-      color: white;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-
-      .q-icon {
-        color: white;
-      }
+  // Customize app-tabs for view mode switching
+  ::v-deep .app-tabs {
+    .q-tabs {
+      min-height: 36px;
     }
 
-    &.inactive-tab {
-      color: rgba(0, 0, 0, 0.54);
+    .q-tab {
+      padding: 0 20px;
+      min-height: 36px;
+      text-transform: none;
+      font-weight: 600;
 
-      &:hover {
-        background: rgba(0, 0, 0, 0.04);
-      }
-
-      .q-icon {
-        color: rgba(0, 0, 0, 0.54);
-      }
-    }
-  }
-}
-
-.page-title {
-  color: rgba(0, 0, 0, 0.87);
-  line-height: 1.2;
-}
-
-// Dark mode support
-.body--dark {
-  .view-mode-tabs {
-    border-color: rgba(255, 255, 255, 0.12);
-
-    .view-tab-btn {
-      &.inactive-tab {
-        color: rgba(255, 255, 255, 0.7);
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.12);
-        }
-
-        .q-icon {
-          color: rgba(255, 255, 255, 0.7);
-        }
+      &__icon {
+        font-size: 18px;
+        margin-right: 8px;
       }
     }
-  }
-
-  .page-title {
-    color: rgba(255, 255, 255, 0.87);
   }
 }
 
