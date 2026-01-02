@@ -1464,14 +1464,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           style="width: 50%"
           class="q-py-md showLabelOnTop"
-          :class="{ 'input-disabled-overlay': hasTimeBasedXAxis }"
           stack-label
           borderless
           dense
           label-slot
           :type="'number'"
           placeholder="0"
-          :readonly="hasTimeBasedXAxis"
+          :disable="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_rotate =
@@ -1508,14 +1507,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           bg-color="input-bg"
           style="width: 50%"
           class="q-py-md showLabelOnTop"
-          :class="{ 'input-disabled-overlay': hasTimeBasedXAxis }"
           stack-label
           borderless
           dense
           label-slot
           :type="'number'"
           placeholder="0"
-          :readonly="hasTimeBasedXAxis"
+          :disable="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_truncate_width =
