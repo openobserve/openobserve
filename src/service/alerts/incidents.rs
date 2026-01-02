@@ -17,12 +17,77 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::{
     meta::alerts::{alert::Alert, deduplication::GlobalDeduplicationConfig},
     utils::json::{Map, Value},
 };
+
+/// Service Discovery correlation result
+struct ServiceDiscoveryResult {
+    correlation_key: String,
+    service_name: String,
+    #[allow(dead_code)]
+    matched_dimensions: HashMap<String, String>,
+}
+
+/// Extract service name from dimensions using FQN priority
+/// Guarantees a service name is always returned (fallback to "unknown")
+fn extract_service_name_from_dimensions(
+    dimensions: &HashMap<String, String>,
+    fqn_priority: &[String],
+) -> String {
+    // Try each FQN priority dimension in order
+    for dim_key in fqn_priority {
+        if let Some(value) = dimensions.get(dim_key)
+            && !value.is_empty()
+        {
+            return value.clone();
+        }
+    }
+
+    // Final fallback: check "service" directly
+    dimensions
+        .get("service")
+        .cloned()
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Extract all service names from stable_dimensions using FQN priority
+fn extract_all_services(
+    dimensions: &HashMap<String, String>,
+    fqn_priority: &[String],
+) -> Vec<String> {
+    let mut services = Vec::new();
+
+    // Check each FQN dimension (k8s-deployment, k8s-statefulset, etc.)
+    for fqn_key in fqn_priority {
+        if let Some(service) = dimensions.get(fqn_key)
+            && !service.is_empty()
+            && !services.contains(service)
+        {
+            services.push(service.clone());
+        }
+    }
+
+    // Fallback: check "service" dimension
+    if services.is_empty()
+        && let Some(service) = dimensions.get("service")
+    {
+        services.push(service.clone());
+    }
+
+    services
+}
+
+/// Get primary service (first from FQN priority or first discovered)
+fn get_primary_service(all_services: &[String]) -> String {
+    all_services
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "unknown".to_string())
+}
 
 /// Correlate an alert to an incident
 ///
@@ -41,7 +106,7 @@ pub async fn correlate_alert_to_incident(
     triggered_at: i64,
     _service_name_hint: Option<&str>,
     trace_id: Option<&str>,
-) -> Result<Option<String>, anyhow::Error> {
+) -> Result<Option<(String, String)>, anyhow::Error> {
     // Get org-level deduplication config for semantic groups
     let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
         Ok(Some(config)) if config.enabled => config,
@@ -73,15 +138,34 @@ pub async fn correlate_alert_to_incident(
         .collect();
 
     // Query Service Discovery for pre-computed correlation_key hash using correlation API
-    let service_discovery_key =
+    let service_discovery_result =
         query_service_discovery_key(&alert.org_id, &alert.stream_name, &labels).await;
 
     // Use enterprise correlation engine with actual hash (or None for fallback)
     let correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
         &labels,
-        service_discovery_key.as_deref(),
+        service_discovery_result
+            .as_ref()
+            .map(|r| r.correlation_key.as_str()),
         trace_id,
         &org_config,
+    );
+
+    // Guarantee service_name extraction
+    let service_name = if let Some(ref sd_result) = service_discovery_result {
+        sd_result.service_name.clone()
+    } else {
+        // Fallback: Extract from stable_dimensions using FQN priority
+        let fqn_priority =
+            crate::service::db::system_settings::get_fqn_priority_dimensions(&alert.org_id).await;
+        extract_service_name_from_dimensions(&correlation_result.stable_dimensions, &fqn_priority)
+    };
+
+    log::info!(
+        "[incidents] Alert {} correlation - service: {}, correlation_key: {}",
+        alert.name,
+        service_name,
+        correlation_result.correlation_key
     );
 
     // Find or create incident
@@ -92,21 +176,22 @@ pub async fn correlate_alert_to_incident(
         alert,
         triggered_at,
         &correlation_result.reason.to_string(),
-        trace_id,
+        &service_name,
     )
     .await?;
 
-    Ok(Some(incident_id))
+    Ok(Some((incident_id, service_name)))
 }
 
 /// Query Service Discovery for correlation_key using the correlation API
 ///
 /// Uses ServiceStorage::correlate() from PR #9513 for proper dimension matching
+/// Returns full result including service_name for topology enrichment
 async fn query_service_discovery_key(
     org_id: &str,
     alert_stream: &str,
     labels: &HashMap<String, String>,
-) -> Option<String> {
+) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
         // Get FQN priority and semantic groups (org-level or system defaults)
@@ -140,7 +225,13 @@ async fn query_service_discovery_key(
                     response.service_name,
                     correlation_key
                 );
-                Some(correlation_key)
+
+                // Return full result including service_name
+                Some(ServiceDiscoveryResult {
+                    correlation_key,
+                    service_name: response.service_name,
+                    matched_dimensions: response.matched_dimensions,
+                })
             }
             Ok(None) => {
                 log::debug!("[incidents] No service found via correlation API");
@@ -167,16 +258,70 @@ async fn find_or_create_incident(
     alert: &Alert,
     triggered_at: i64,
     correlation_reason: &str,
-    _trace_id: Option<&str>,
+    service_name: &str,
 ) -> Result<String, anyhow::Error> {
     // Note: trace_id is already in stable_dimensions when trace correlation is used
-    // It's available via: stable_dimensions.get("trace_id")
 
     // Try to find existing open incident
     if let Some(existing) =
         infra::table::alert_incidents::find_open_by_correlation_key(org_id, correlation_key).await?
     {
-        // Add this alert to existing incident
+        // Deserialize current dimensions
+        let mut current_dims: HashMap<String, String> =
+            serde_json::from_value(existing.stable_dimensions.clone()).unwrap_or_default();
+
+        // Merge: add new dimensions if key doesn't exist
+        let initial_count = current_dims.len();
+        for (key, new_value) in stable_dimensions {
+            use std::collections::hash_map::Entry;
+            match current_dims.entry(key.clone()) {
+                Entry::Vacant(e) => {
+                    // New dimension - add it
+                    e.insert(new_value.clone());
+                }
+                Entry::Occupied(e) => {
+                    // Dimension exists - check for conflict
+                    if e.get() != new_value {
+                        log::warn!(
+                            "[incidents] Dimension conflict in incident {}: {}='{}' (incoming) vs '{}' (existing) - keeping existing",
+                            existing.id,
+                            key,
+                            new_value,
+                            e.get()
+                        );
+                        // Keep existing value (first-seen wins)
+                    }
+                }
+            }
+        }
+
+        let dimensions_changed = current_dims.len() > initial_count;
+
+        if dimensions_changed {
+            log::info!(
+                "[incidents] Incident {} dimensions expanded: {} → {} dimensions",
+                existing.id,
+                initial_count,
+                current_dims.len()
+            );
+        }
+
+        // Update incident metadata
+        let new_alert_count = existing.alert_count + 1;
+        infra::table::alert_incidents::update_incident_metadata(
+            org_id,
+            &existing.id,
+            new_alert_count,
+            triggered_at,
+            if dimensions_changed {
+                Some(serde_json::to_value(&current_dims)?)
+            } else {
+                None
+            },
+        )
+        .await?;
+
+        // Add alert to junction table
         infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
             &alert.get_unique_key(),
@@ -187,11 +332,32 @@ async fn find_or_create_incident(
         .await?;
 
         log::debug!(
-            "[incidents] Added alert '{}' to existing incident {} (correlation_key: {})",
+            "[incidents] Added alert '{}' to existing incident {} (correlation_key: {}, dimensions_changed: {})",
             alert.name,
             existing.id,
-            correlation_key
+            correlation_key,
+            dimensions_changed
         );
+
+        // Trigger re-enrichment if dimensions changed or topology missing
+        if dimensions_changed || existing.topology_context.is_none() {
+            let org_id_clone = org_id.to_string();
+            let incident_id_clone = existing.id.clone();
+            let service_name_clone = service_name.to_string();
+
+            tokio::spawn(async move {
+                if let Err(e) =
+                    enrich_with_topology(&org_id_clone, &incident_id_clone, &service_name_clone)
+                        .await
+                {
+                    log::debug!(
+                        "[incidents] Topology re-enrichment failed for incident {}: {}",
+                        incident_id_clone,
+                        e
+                    );
+                }
+            });
+        }
 
         return Ok(existing.id);
     }
@@ -373,12 +539,36 @@ pub async fn list_incidents(
 /// Enrich incident with Service Graph topology context
 ///
 /// Called asynchronously after incident creation to add topology information.
+/// Supports multi-service incidents by extracting ALL services from stable_dimensions.
 pub async fn enrich_with_topology(
     org_id: &str,
     incident_id: &str,
-    service_name: &str,
+    primary_service_name: &str,
 ) -> Result<(), anyhow::Error> {
     use crate::service::traces::service_graph;
+
+    // Get current incident with full dimensions
+    let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
+        Some(i) => i,
+        None => return Ok(()),
+    };
+
+    let stable_dimensions: HashMap<String, String> =
+        serde_json::from_value(incident.stable_dimensions).unwrap_or_default();
+
+    // Extract ALL service names from FQN priority dimensions
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+    let mut all_services = HashSet::new();
+    all_services.insert(primary_service_name.to_string());
+
+    for fqn_key in &fqn_priority {
+        if let Some(service) = stable_dimensions.get(fqn_key)
+            && !service.is_empty()
+        {
+            all_services.insert(service.clone());
+        }
+    }
 
     // Query current topology
     let edges = match service_graph::query_edges_from_stream_internal(org_id, None).await {
@@ -399,29 +589,199 @@ pub async fn enrich_with_topology(
     // Build topology using enterprise logic
     let (nodes, edges, _) = o2_enterprise::enterprise::service_graph::build_topology(edges);
 
-    // Extract topology context for the incident's service
-    let topology = o2_enterprise::enterprise::alerts::incidents::extract_topology_context(
-        service_name,
-        &nodes,
-        &edges,
-    );
+    // Build aggregate topology from ALL services in incident
+    let mut upstream_services = HashSet::new();
+    let mut downstream_services = HashSet::new();
+
+    for service in &all_services {
+        let topology = o2_enterprise::enterprise::alerts::incidents::extract_topology_context(
+            service, &nodes, &edges,
+        );
+        upstream_services.extend(topology.upstream_services);
+        downstream_services.extend(topology.downstream_services);
+    }
+
+    let enriched_topology = config::meta::alerts::incidents::IncidentTopology {
+        service: primary_service_name.to_string(),
+        upstream_services: upstream_services.into_iter().collect(),
+        downstream_services: downstream_services.into_iter().collect(),
+        related_incident_ids: vec![],
+        suggested_root_cause: None,
+    };
 
     // Update incident with topology context
     infra::table::alert_incidents::update_topology(
         org_id,
         incident_id,
-        serde_json::to_value(&topology)?,
+        serde_json::to_value(&enriched_topology)?,
     )
     .await?;
 
-    log::debug!(
-        "[incidents] Enriched incident {} with topology: {} upstream, {} downstream",
+    log::info!(
+        "[incidents] Enriched incident {} with {} services, {} upstream, {} downstream",
         incident_id,
-        topology.upstream_services.len(),
-        topology.downstream_services.len()
+        all_services.len(),
+        enriched_topology.upstream_services.len(),
+        enriched_topology.downstream_services.len()
     );
 
     Ok(())
+}
+
+/// Get service graph data for an incident
+///
+/// Builds a graph showing all services involved in the incident with their
+/// dependencies and alert counts. Uses topology_context from the incident
+/// record and counts alerts per service from the junction table.
+pub async fn get_service_graph(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Option<config::meta::alerts::incidents::IncidentServiceGraph>, anyhow::Error> {
+    use config::meta::alerts::incidents::{
+        IncidentGraphStats, IncidentServiceEdge, IncidentServiceGraph, IncidentServiceNode,
+    };
+
+    // Get incident with its alerts
+    let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
+        Some(i) => i,
+        None => return Ok(None),
+    };
+
+    // Get stable dimensions
+    let stable_dimensions: HashMap<String, String> =
+        match serde_json::from_value(incident.stable_dimensions) {
+            Ok(map) => map,
+            Err(e) => {
+                log::warn!(
+                    "Failed to parse stable_dimensions JSON for incident {}: {}",
+                    incident_id,
+                    e
+                );
+                HashMap::new()
+            }
+        };
+
+    // Extract ALL services from stable_dimensions using FQN priority
+    let fqn_priority =
+        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
+    let all_services = extract_all_services(&stable_dimensions, &fqn_priority);
+
+    if all_services.is_empty() {
+        // No service dimensions found - return empty graph
+        return Ok(Some(IncidentServiceGraph {
+            incident_service: String::new(),
+            root_cause_service: None,
+            nodes: vec![],
+            edges: vec![],
+            stats: IncidentGraphStats {
+                total_services: 0,
+                total_alerts: 0,
+                services_with_alerts: 0,
+            },
+        }));
+    }
+
+    // Primary service is first from FQN priority
+    let incident_service = get_primary_service(&all_services);
+
+    // Get topology context if available
+    let topology: Option<config::meta::alerts::incidents::IncidentTopology> = incident
+        .topology_context
+        .and_then(|v| serde_json::from_value(v).ok());
+
+    // Get all alerts for this incident to count by service
+    let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+
+    // Count alerts by service
+    // We need to get service info from alerts - for now, count all alerts under primary service
+    // In a more complete implementation, we'd look up each alert's labels
+    let mut service_alert_counts: HashMap<String, u32> = HashMap::new();
+
+    // For each alert, try to extract service name
+    // The alert_name often contains service info, or we can look up the alert
+    for _alert in &incident_alerts {
+        // For now, attribute all alerts to the primary service
+        // A more complete implementation would look up each alert's labels
+        *service_alert_counts
+            .entry(incident_service.clone())
+            .or_insert(0) += 1;
+    }
+
+    // Build nodes and edges based on topology
+    let root_cause_service = topology
+        .as_ref()
+        .and_then(|t| t.suggested_root_cause.clone());
+
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let mut all_services: HashSet<String> = all_services.into_iter().collect();
+
+    // Add primary service
+    all_services.insert(incident_service.clone());
+
+    if let Some(ref topo) = topology {
+        // Add upstream services
+        for upstream in &topo.upstream_services {
+            all_services.insert(upstream.clone());
+        }
+
+        // Add downstream services
+        for downstream in &topo.downstream_services {
+            all_services.insert(downstream.clone());
+        }
+
+        // Build edges: upstream -> primary
+        for upstream in &topo.upstream_services {
+            edges.push(IncidentServiceEdge {
+                from: upstream.clone(),
+                to: incident_service.clone(),
+            });
+        }
+
+        // Build edges: primary -> downstream
+        for downstream in &topo.downstream_services {
+            edges.push(IncidentServiceEdge {
+                from: incident_service.clone(),
+                to: downstream.clone(),
+            });
+        }
+    }
+
+    // Build nodes for all services
+    for service in &all_services {
+        let alert_count = *service_alert_counts.get(service).unwrap_or(&0);
+        let is_root_cause = root_cause_service
+            .as_ref()
+            .map(|r| r == service)
+            .unwrap_or(false);
+        let is_primary = service == &incident_service;
+
+        nodes.push(IncidentServiceNode {
+            service_name: service.clone(),
+            alert_count,
+            is_root_cause,
+            is_primary,
+        });
+    }
+
+    // Calculate stats
+    let total_alerts: u32 = service_alert_counts.values().sum();
+    let services_with_alerts = service_alert_counts
+        .values()
+        .filter(|&&count| count > 0)
+        .count();
+
+    Ok(Some(IncidentServiceGraph {
+        incident_service,
+        root_cause_service,
+        nodes,
+        edges,
+        stats: IncidentGraphStats {
+            total_services: all_services.len(),
+            total_alerts,
+            services_with_alerts,
+        },
+    }))
 }
 
 /// Update incident status

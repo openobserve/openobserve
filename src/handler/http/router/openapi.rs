@@ -139,6 +139,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::incidents::update_incident_status,
         request::alerts::incidents::get_incident_stats,
         request::alerts::incidents::trigger_incident_rca,
+        request::alerts::incidents::get_incident_service_graph,
         request::agent::chat::agent_chat,
         request::agent::chat::agent_chat_stream,
         request::alerts::templates::list_templates,
@@ -324,6 +325,10 @@ use crate::{common::meta, handler::http::request};
             config::meta::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::IncidentSeverity,
             config::meta::alerts::incidents::CorrelationReason,
+            config::meta::alerts::incidents::IncidentServiceGraph,
+            config::meta::alerts::incidents::IncidentServiceNode,
+            config::meta::alerts::incidents::IncidentServiceEdge,
+            config::meta::alerts::incidents::IncidentGraphStats,
             // Folders
             crate::handler::http::models::folders::CreateFolderRequestBody,
             crate::handler::http::models::folders::CreateFolderResponseBody,
