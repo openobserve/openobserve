@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "Pipeline wurde erfolgreich aktualisiert",
     "pipelineSaved": "Pipeline wurde erfolgreich gespeichert",
     "errorSavingPipeline": "Fehler beim Speichern der Pipeline",
-    "cancelChangesConfirm": "Möchten Sie die Änderungen wirklich stornieren?"
+    "cancelChangesConfirm": "Möchten Sie die Änderungen wirklich stornieren?",
+    "cancel": "Stornieren",
+    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab"
   },
   "reports": {
     "header": "Berichte",

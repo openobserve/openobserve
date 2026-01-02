@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "Pipeline succesvol bijgewerkt",
     "pipelineSaved": "Pipeline succesvol opgeslagen",
     "errorSavingPipeline": "Fout tijdens het opslaan van de pijplijn",
-    "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?"
+    "cancelChangesConfirm": "Weet je zeker dat je wijzigingen wilt annuleren?",
+    "cancel": "Annuleer",
+    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten"
   },
   "reports": {
     "header": "Rapporten",

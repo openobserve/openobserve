@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "파이프라인이 성공적으로 업데이트되었습니다",
     "pipelineSaved": "파이프라인이 성공적으로 저장되었습니다.",
     "errorSavingPipeline": "파이프라인을 저장하는 중 오류가 발생했습니다.",
-    "cancelChangesConfirm": "정말로 변경을 취소하시겠습니까?"
+    "cancelChangesConfirm": "정말로 변경을 취소하시겠습니까?",
+    "cancel": "취소",
+    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요"
   },
   "reports": {
     "header": "보고서",

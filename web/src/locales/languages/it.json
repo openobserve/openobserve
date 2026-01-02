@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "Pipeline aggiornata con successo",
     "pipelineSaved": "Pipeline salvata con successo",
     "errorSavingPipeline": "Errore durante il salvataggio della pipeline",
-    "cancelChangesConfirm": "Sei sicuro di voler annullare le modifiche?"
+    "cancelChangesConfirm": "Sei sicuro di voler annullare le modifiche?",
+    "cancel": "Annulla",
+    "dragDropNodesHere": "Trascina e rilascia i nodi qui"
   },
   "reports": {
     "header": "Rapporti",

@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "Boru Hattı Başarıyla Güncellendi",
     "pipelineSaved": "Boru hattı başarıyla kaydedildi",
     "errorSavingPipeline": "Boru hattını kaydederken hata",
-    "cancelChangesConfirm": "Değişiklikleri iptal etmek istediğinizden emin misiniz?"
+    "cancelChangesConfirm": "Değişiklikleri iptal etmek istediğinizden emin misiniz?",
+    "cancel": "İptal",
+    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın"
   },
   "reports": {
     "header": "Raporlar",

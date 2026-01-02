@@ -1859,7 +1859,9 @@
     "pipelineUpdated": "管道已成功更新",
     "pipelineSaved": "管道已成功保存",
     "errorSavingPipeline": "保存管道时出错",
-    "cancelChangesConfirm": "您确定要取消更改吗？"
+    "cancelChangesConfirm": "您确定要取消更改吗？",
+    "cancel": "取消",
+    "dragDropNodesHere": "将节点拖放到此处"
   },
   "reports": {
     "header": "报表",

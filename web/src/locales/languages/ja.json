@@ -1877,7 +1877,9 @@
     "pipelineUpdated": "パイプラインは正常に更新されました",
     "pipelineSaved": "パイプラインは正常に保存されました",
     "errorSavingPipeline": "パイプラインの保存中にエラーが発生しました",
-    "cancelChangesConfirm": "変更をキャンセルしてもよろしいですか?"
+    "cancelChangesConfirm": "変更をキャンセルしてもよろしいですか?",
+    "cancel": "[キャンセル]",
+    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ"
   },
   "reports": {
     "header": "レポート",

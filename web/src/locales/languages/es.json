@@ -1863,7 +1863,9 @@
     "pipelineUpdated": "La canalización se actualizó correctamente",
     "pipelineSaved": "La canalización se guardó correctamente",
     "errorSavingPipeline": "Error al guardar la canalización",
-    "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?"
+    "cancelChangesConfirm": "¿Estás seguro de que deseas cancelar los cambios?",
+    "cancel": "Cancelar",
+    "dragDropNodesHere": "Arrastra y suelta los nodos aquí"
   },
   "reports": {
     "header": "Informes",
