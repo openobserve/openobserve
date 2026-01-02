@@ -97,7 +97,10 @@
     "months": "Des mois",
     "sec": "seconde",
     "off": "Off",
-    "minRefreshIntervalMessage": "L'intervalle de rafraîchissement minimum est de {interval} secondes. Veuillez ajuster l'intervalle de rafraîchissement minimum en conséquence."
+    "minRefreshIntervalMessage": "L'intervalle de rafraîchissement minimum est de {interval} secondes. Veuillez ajuster l'intervalle de rafraîchissement minimum en conséquence.",
+    "min": "minimum",
+    "hr": "heure",
+    "day": "jour"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

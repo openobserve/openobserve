@@ -97,7 +97,10 @@
     "months": "Maanden",
     "sec": "sec",
     "off": "Uit",
-    "minRefreshIntervalMessage": "Het minimale vernieuwingsinterval is {interval} seconden. Pas het minimale vernieuwingsinterval dienovereenkomstig aan."
+    "minRefreshIntervalMessage": "Het minimale vernieuwingsinterval is {interval} seconden. Pas het minimale vernieuwingsinterval dienovereenkomstig aan.",
+    "min": "min",
+    "hr": "hr",
+    "day": "dag"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

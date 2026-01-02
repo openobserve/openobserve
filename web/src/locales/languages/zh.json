@@ -97,7 +97,10 @@
     "months": "月",
     "sec": "秒",
     "off": "关闭",
-    "minRefreshIntervalMessage": "最小刷新间隔为 {interval} 秒。请相应地调整最小刷新间隔。"
+    "minRefreshIntervalMessage": "最小刷新间隔为 {interval} 秒。请相应地调整最小刷新间隔。",
+    "min": "分钟",
+    "hr": "hr",
+    "day": "天"
   },
   "search": {
     "selectIndex": "选择数据流",

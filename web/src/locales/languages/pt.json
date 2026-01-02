@@ -97,7 +97,10 @@
     "months": "Meses",
     "sec": "seg",
     "off": "Desligado",
-    "minRefreshIntervalMessage": "O intervalo mínimo de atualização é de {interval} segundos. Ajuste o intervalo mínimo de atualização adequadamente."
+    "minRefreshIntervalMessage": "O intervalo mínimo de atualização é de {interval} segundos. Ajuste o intervalo mínimo de atualização adequadamente.",
+    "min": "min",
+    "hr": "hr",
+    "day": "dia"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

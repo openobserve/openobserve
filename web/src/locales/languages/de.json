@@ -97,7 +97,10 @@
     "months": "Monate",
     "sec": "Sekunde",
     "off": "Aus",
-    "minRefreshIntervalMessage": "Das minimale Aktualisierungsintervall beträgt {interval} Sekunden. Bitte passen Sie das minimale Aktualisierungsintervall entsprechend an."
+    "minRefreshIntervalMessage": "Das minimale Aktualisierungsintervall beträgt {interval} Sekunden. Bitte passen Sie das minimale Aktualisierungsintervall entsprechend an.",
+    "min": "Min.",
+    "hr": "Std.",
+    "day": "Tag"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

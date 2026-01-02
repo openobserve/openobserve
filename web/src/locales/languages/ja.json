@@ -97,7 +97,10 @@
     "months": "ヶ月",
     "sec": "秒",
     "off": "[オフ]",
-    "minRefreshIntervalMessage": "最小更新間隔は {interval} 秒です。それに応じて最小更新間隔を調整してください。"
+    "minRefreshIntervalMessage": "最小更新間隔は {interval} 秒です。それに応じて最小更新間隔を調整してください。",
+    "min": "最小",
+    "hr": "時間",
+    "day": "日"
   },
   "search": {
     "metrics": "メトリクス",

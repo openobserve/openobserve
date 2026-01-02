@@ -97,7 +97,10 @@
     "months": "Aylar",
     "sec": "sn",
     "off": "Kapalı",
-    "minRefreshIntervalMessage": "Minimum yenileme aralığı {interval} saniyedir. Lütfen minimum yenileme aralığını buna göre ayarlayın."
+    "minRefreshIntervalMessage": "Minimum yenileme aralığı {interval} saniyedir. Lütfen minimum yenileme aralığını buna göre ayarlayın.",
+    "min": "asgari",
+    "hr": "saat",
+    "day": "gün"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

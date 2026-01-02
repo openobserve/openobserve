@@ -97,7 +97,10 @@
     "months": "개월",
     "sec": "초",
     "off": "끄기",
-    "minRefreshIntervalMessage": "최소 새로 고침 간격은 {interval} 초입니다.그에 따라 최소 새로 고침 간격을 조정하십시오."
+    "minRefreshIntervalMessage": "최소 새로 고침 간격은 {interval} 초입니다.그에 따라 최소 새로 고침 간격을 조정하십시오.",
+    "min": "분",
+    "hr": "시간",
+    "day": "하루"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
