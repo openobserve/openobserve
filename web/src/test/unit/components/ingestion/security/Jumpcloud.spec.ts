@@ -24,7 +24,7 @@ describe("Jumpcloud.vue", () => {
     return mount(Jumpcloud, {
       global: {
         plugins: [store, Quasar],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub"></div>', props: ["content"] } },
+        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });
   };

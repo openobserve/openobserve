@@ -64,8 +64,8 @@ describe("BackfillJobDetails.vue", () => {
   const mountComponent = (props = {}) => {
     return mount(BackfillJobDetails, {
       props: {
-        modelValue: true,
-        jobId: "job-123",
+        modelValue: false, // Start with dialog closed to avoid watch triggers
+        jobId: "",
         ...props,
       },
       global: {
@@ -75,21 +75,24 @@ describe("BackfillJobDetails.vue", () => {
   };
 
   describe("rendering", () => {
-    it("should render dialog", () => {
-      const wrapper = mountComponent();
+    it("should render dialog", async () => {
+      const wrapper = mountComponent({ modelValue: true, jobId: "test-123" });
+      await flushPromises();
 
       expect(wrapper.find('[data-test="backfill-job-details-dialog"]').exists()).toBe(true);
     });
 
-    it("should render dialog title", () => {
-      const wrapper = mountComponent();
+    it("should render dialog title", async () => {
+      const wrapper = mountComponent({ modelValue: true });
+      await flushPromises();
 
       expect(wrapper.find('[data-test="dialog-title"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="dialog-title"]').text()).toBe("Backfill Job Details");
     });
 
-    it("should render close button", () => {
-      const wrapper = mountComponent();
+    it("should render close button", async () => {
+      const wrapper = mountComponent({ modelValue: true });
+      await flushPromises();
 
       expect(wrapper.find('[data-test="close-dialog-btn"]').exists()).toBe(true);
     });

@@ -24,7 +24,7 @@ describe("GoogleWorkspace.vue", () => {
     return mount(GoogleWorkspace, {
       global: {
         plugins: [store, Quasar],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub"></div>', props: ["content"] } },
+        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });
   };
@@ -42,9 +42,10 @@ describe("GoogleWorkspace.vue", () => {
     expect(wrapper.find("a").attributes("href")).toBe("https://docs.example.com/googleworkspace");
   });
 
-  it("should replace [STREAM_NAME] with google_workspace", () => {
+  it("should replace [STREAM_NAME] with googleworkspace", () => {
     const wrapper = mountComponent();
     const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("google_workspace");
+    expect(copyContent.props("content")).toContain("googleworkspace");
+    expect(copyContent.props("content")).not.toContain("[STREAM_NAME]");
   });
 });

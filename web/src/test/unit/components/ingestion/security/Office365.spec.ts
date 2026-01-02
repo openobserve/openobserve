@@ -24,7 +24,7 @@ describe("Office365.vue", () => {
     return mount(Office365, {
       global: {
         plugins: [store, Quasar],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub"></div>', props: ["content"] } },
+        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
       },
     });
   };

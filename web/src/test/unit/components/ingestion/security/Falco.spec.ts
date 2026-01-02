@@ -49,7 +49,7 @@ describe("Falco.vue", () => {
         plugins: [store, Quasar],
         stubs: {
           CopyContent: {
-            template: '<div data-test="copy-content-stub"></div>',
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
             props: ["content"],
           },
         },
