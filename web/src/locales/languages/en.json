@@ -1255,6 +1255,8 @@
     "totalDataIngested": "Ingested Size",
     "totalDataCompressed": "Compressed Size",
     "view": "View More >>",
+    "viewButton": "View",
+    "noDataAvailable": "No data available",
     "scheduledAlert": "Scheduled",
     "rtAlert": "Real time",
     "noData": "No Data Ingested",
