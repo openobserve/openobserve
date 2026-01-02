@@ -25,7 +25,7 @@
           <q-input
             data-test="add-function-name-input"
             v-model.trim="functionName"
-            :placeholder="t('function.name')"
+            :label="t('function.name')"
             class="q-pa-none tw:w-full"
             stack-label
             borderless
