@@ -48,14 +48,14 @@ test.describe("Dashboard Variables - Global Level", () => {
     await pm.dashboardSetting.saveVariable();
 
     // Verify variable exists and is global
-    await expect(page.locator(`[data-test="dashboard-variable-${variableName}"]`)).toBeVisible();
+    await expect(page.locator(`[data-test="variable-selector-${variableName}"]`)).toBeVisible();
 
     // Verify variable scope is global in the settings
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
 
     // Click on the variable to edit
-    await page.locator(`[data-test="dashboard-variable-${variableName}-edit"]`).click();
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).click();
 
     // Verify scope selector shows "global"
     const scopeValue = await page.locator('[data-test="dashboard-variable-scope-select"]').textContent();
