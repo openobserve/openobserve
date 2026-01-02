@@ -277,7 +277,8 @@
     "transformLabel": "トランスフォーム",
     "addToDashboard": "ダッシュボードに追加",
     "selectStream": "[ストリーム] を選択",
-    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。"
+    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。",
+    "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。"
   },
   "menu": {
     "home": "ホーム",
