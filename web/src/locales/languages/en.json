@@ -1129,6 +1129,10 @@
     "searchSelf": "Switch to Search across the current Folder",
     "searchAll": "Switch to Search Across all Folders",
     "folder": "Folder",
+    "folders": "Folders",
+    "searchFolder": "Search Folder",
+    "deleteFolder": "Delete Folder",
+    "deleteFolderMessage": "Are you sure you want to delete this Folder?",
     "searchMsg": "Search for Dashboards across Folders",
     "trellisLayout": "Trellis Layout",
     "numOfColumns": "Columns per Row",
@@ -1610,6 +1614,22 @@
       "searchField": "Search for a field",
       "savedFunctions": "Saved functions",
       "autoUsesCheckInterval": "Auto (uses check interval)"
+    },
+    "steps": {
+      "alertSetup": "Alert Setup",
+      "conditions": "Conditions",
+      "compareWithPast": "Compare with Past",
+      "alertSettings": "Alert Settings",
+      "deduplication": "Deduplication",
+      "advanced": "Advanced"
+    },
+    "stepCaptions": {
+      "alertSetup": "Set the stage for your alert",
+      "conditions": "What should trigger the alert",
+      "compareWithPast": "Compare current results with data from another time period",
+      "alertSettings": "Set your alert rules and choose how you'd like to be notified.",
+      "deduplication": "Avoid sending the same alert multiple times by grouping similar alerts together.",
+      "advanced": "Context variables, description, and row template"
     },
     "noHistory": "No alert history found",
     "totalEvaluations": "Total Evaluations",
