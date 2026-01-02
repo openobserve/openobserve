@@ -736,7 +736,9 @@
     "pipelineUpdated": "Pipeline Updated successfully",
     "pipelineSaved": "Pipeline saved successfully",
     "errorSavingPipeline": "Error while saving pipeline",
-    "cancelChangesConfirm": "Are you sure you want to cancel changes?"
+    "cancelChangesConfirm": "Are you sure you want to cancel changes?",
+    "cancel": "Cancel",
+    "dragDropNodesHere": "Drag and drop nodes here"
   },
   "function": {
     "header": "Functions",
