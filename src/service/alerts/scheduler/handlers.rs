@@ -850,34 +850,20 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                Ok(Some(incident_id)) => {
+                Ok(Some((incident_id, discovered_service_name))) => {
                     log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {}",
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
                         &new_trigger.org,
                         &alert.name,
-                        incident_id
+                        incident_id,
+                        discovered_service_name
                     );
 
-                    // Spawn async task to enrich incident with topology context
-                    // This runs in the background to not block notification sending
-                    if let Some(service_name) = service_name {
-                        let org_id = new_trigger.org.clone();
-                        let incident_id_clone = incident_id.clone();
-                        let service_name_clone = service_name.to_string();
-                        tokio::spawn(async move {
-                            if let Err(e) = crate::service::alerts::incidents::enrich_with_topology(
-                                &org_id,
-                                &incident_id_clone,
-                                &service_name_clone,
-                            )
-                            .await
-                            {
-                                log::debug!(
-                                    "[incidents] Topology enrichment failed for incident {incident_id_clone}: {e}"
-                                );
-                            }
-                        });
-                    }
+                    // Note: Topology enrichment now happens automatically in
+                    // find_or_create_incident when dimensions change or
+                    // topology is missing. The enrichment is triggered
+                    // during incident creation or when new dimensions are discovered.
+                    // No need to spawn enrichment here anymore.
                 }
                 Ok(None) => {
                     log::debug!(
