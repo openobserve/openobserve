@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/plugins/logs/components/FieldExpansion.vue";
 import i18n from "@/locales";
+import { Quasar } from "quasar";
 
 // Mock formatLargeNumber utility
 vi.mock("@/utils/zincutils", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 describe("FieldExpansion.vue", () => {
+
   const defaultProps = {
     field: {
       name: "status",
@@ -54,7 +56,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template:
@@ -81,7 +83,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -113,7 +115,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -145,7 +147,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -175,7 +177,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -204,7 +206,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -231,7 +233,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -256,7 +258,7 @@ describe("FieldExpansion.vue", () => {
           selectedFields: [],
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -282,7 +284,7 @@ describe("FieldExpansion.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -311,7 +313,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -331,7 +333,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -353,7 +355,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -380,7 +382,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -406,7 +408,7 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -428,11 +430,11 @@ describe("FieldExpansion.vue", () => {
       const wrapper = mount(FieldExpansion, {
         props: defaultProps,
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template:
-                '<div @click="$emit(\'before-show\', {})"><slot name="header" /><slot /></div>',
+                '<div class="q-expansion-item" @click="$emit(\'before-show\', {})"><slot name="header" /><slot /></div>',
             },
             "q-icon": true,
             "q-btn": true,
@@ -453,7 +455,7 @@ describe("FieldExpansion.vue", () => {
           selectedStreamsCount: 1,
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -473,9 +475,17 @@ describe("FieldExpansion.vue", () => {
       });
 
       const buttons = wrapper.findAll("button");
-      if (buttons.length > 0) {
-        await buttons[0].trigger("click");
+      // Find the include button (should have EqualIcon which shows "=")
+      // The include/exclude buttons are rendered after the header buttons
+      // Header has 1 button (add-to-filter), so first include button should be at index 1
+      if (buttons.length > 1) {
+        await buttons[1].trigger("click");
         expect(wrapper.emitted("add-search-term")).toBeTruthy();
+        expect(wrapper.emitted("add-search-term")?.[0]).toEqual([
+          "status",
+          "200",
+          "include",
+        ]);
       }
     });
   });
@@ -492,7 +502,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -524,7 +534,7 @@ describe("FieldExpansion.vue", () => {
           },
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -554,7 +564,7 @@ describe("FieldExpansion.vue", () => {
           showQuickMode: true,
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -577,7 +587,7 @@ describe("FieldExpansion.vue", () => {
           showQuickMode: false,
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -602,7 +612,7 @@ describe("FieldExpansion.vue", () => {
           theme: "dark",
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
@@ -629,7 +639,7 @@ describe("FieldExpansion.vue", () => {
           theme: "light",
         },
         global: {
-          plugins: [i18n],
+          plugins: [i18n, Quasar],
           stubs: {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",

@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import RealUserMonitoring from "@/views/RUM/RealUserMonitoring.vue";
 import i18n from "@/locales";
+import { Quasar } from "quasar";
 
 // Mock composables
 vi.mock("@/composables/useSessionReplay", () => ({
@@ -527,7 +528,7 @@ describe("RealUserMonitoring.vue", () => {
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router, i18n, Quasar],
           mocks: { $q },
           stubs: {
             "router-view": {
@@ -563,7 +564,7 @@ describe("RealUserMonitoring.vue", () => {
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router, i18n, Quasar],
           mocks: { $q },
           stubs: {
             "router-view": {

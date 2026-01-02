@@ -19,6 +19,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { createStore } from "vuex";
 import CustomNode from "@/plugins/pipelines/CustomNode.vue";
 import i18n from "@/locales";
+import useDnD from "@/plugins/pipelines/useDnD";
 
 // Mock @vue-flow/core
 vi.mock("@vue-flow/core", () => ({
@@ -542,7 +543,7 @@ describe("CustomNode.vue", () => {
 
   describe("error handling", () => {
     it("should show error badge when node has errors", () => {
-      const useDnDMock = require("@/plugins/pipelines/useDnD").default;
+      const useDnDMock = vi.mocked(useDnD);
       useDnDMock.mockReturnValue({
         pipelineObj: {
           currentSelectedPipeline: {
@@ -593,7 +594,7 @@ describe("CustomNode.vue", () => {
     });
 
     it("should show error count in badge", () => {
-      const useDnDMock = require("@/plugins/pipelines/useDnD").default;
+      const useDnDMock = vi.mocked(useDnD);
       useDnDMock.mockReturnValue({
         pipelineObj: {
           currentSelectedPipeline: {

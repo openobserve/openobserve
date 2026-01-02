@@ -19,6 +19,7 @@ import { createStore } from "vuex";
 import TransformSelector from "@/plugins/logs/TransformSelector.vue";
 import i18n from "@/locales";
 import { ref } from "vue";
+import { Quasar } from "quasar";
 
 // Create mock objects that can be modified per test
 const mockSearchObj = {
@@ -101,7 +102,7 @@ describe("TransformSelector.vue", () => {
     return mount(TransformSelector, {
       props,
       global: {
-        plugins: [store, i18n],
+        plugins: [store, i18n, Quasar],
         mocks: {
           $q,
         },
@@ -135,7 +136,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -157,7 +158,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -183,7 +184,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -211,7 +212,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -239,7 +240,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -265,7 +266,7 @@ describe("TransformSelector.vue", () => {
           functionOptions: [],
         },
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -298,7 +299,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -331,7 +332,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -363,7 +364,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -389,7 +390,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -415,7 +416,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -445,7 +446,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -471,7 +472,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -498,7 +499,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -527,7 +528,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -556,7 +557,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -584,7 +585,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [store, i18n],
+          plugins: [store, i18n, Quasar],
           mocks: {
             $q,
           },
@@ -614,7 +615,7 @@ describe("TransformSelector.vue", () => {
       const wrapper = mount(TransformSelector, {
         props: defaultProps,
         global: {
-          plugins: [darkStore, i18n],
+          plugins: [darkStore, i18n, Quasar],
           mocks: {
             $q,
           },
