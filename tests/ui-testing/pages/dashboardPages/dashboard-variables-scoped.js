@@ -547,7 +547,7 @@ export default class DashboardVariablesScoped {
    * @param {boolean} shouldBeVisible - Expected visibility
    */
   async verifyVariableVisibility(variableName, shouldBeVisible = true) {
-    const variableElement = this.page.locator(`[data-test="dashboard-variable-${variableName}"]`);
+    const variableElement = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
 
     if (shouldBeVisible) {
       await expect(variableElement).toBeVisible({ timeout: 5000 });
@@ -562,7 +562,7 @@ export default class DashboardVariablesScoped {
    * @param {string} expectedValue - Expected value
    */
   async verifyVariableValue(variableName, expectedValue) {
-    const variableElement = this.page.locator(`[data-test="dashboard-variable-${variableName}"]`);
+    const variableElement = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
     await expect(variableElement).toContainText(expectedValue, { timeout: 5000 });
   }
 
@@ -622,7 +622,7 @@ export default class DashboardVariablesScoped {
    * @param {boolean} shouldBeAvailable - Expected availability
    */
   async verifyVariableInPanelEdit(variableName, shouldBeAvailable = true) {
-    const variableOption = this.page.locator(`[data-test="panel-edit-variable-${variableName}"]`);
+    const variableOption = this.page.locator(`[data-test="variable-selector-${variableName}"]`);
 
     if (shouldBeAvailable) {
       await expect(variableOption).toBeVisible({ timeout: 5000 });
