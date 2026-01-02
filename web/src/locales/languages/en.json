@@ -1545,6 +1545,7 @@
       "groupWaitTimeTooltip": "Time to wait and collect similar alerts before sending a grouped notification. Allows batching of alerts that occur in quick succession."
     },
     "summary": {
+      "title": "Summary",
       "configureAlert": "Configure your alert to see a summary",
       "alertName": "Alert Name",
       "streamInfo": "Data Source",
