@@ -104,7 +104,8 @@
     "switchTo": "Passa a",
     "lightMode": "Modalità luce",
     "darkMode": "Modalità oscura",
-    "manageTheme": "Gestisci tema"
+    "manageTheme": "Gestisci tema",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "Modalità tabella ProMQL",
     "overrideMessageExample": "Ad esempio, {endpoint} verrà sostituito con il valore dell'etichetta per endpoint.",
     "stepValueTooltipInfo": "Se non specificato, verrà utilizzato il valore del passo di Panel Configuration.",
-    "optional": "Facoltativo"
+    "optional": "Facoltativo",
+    "createDrilldown": "Crea drilldown",
+    "editDrilldown": "Modifica drilldown",
+    "goTo": "Vai a:",
+    "selectLogsMode": "Seleziona la modalità Log:",
+    "enterCustomQuery": "Inserisci una query personalizzata:",
+    "enterUrl": "Inserisci l'URL:",
+    "invalidUrl": "URL non valido",
+    "selectFolderDrilldown": "Seleziona cartella *:",
+    "noFoldersAvailable": "Nessuna cartella disponibile",
+    "selectDashboardDrilldown": "Seleziona Dashboard *:",
+    "noDashboardsAvailable": "Nessuna dashboard disponibile",
+    "selectTabDrilldown": "Seleziona scheda *:",
+    "noTabAvailable": "Nessuna scheda disponibile",
+    "variables": "Variabili:",
+    "passAllCurrentVariables": "Passa tutte le variabili correnti:",
+    "openInNewTab": "Apri in una nuova scheda:",
+    "update": "Aggiornamento",
+    "edgeSource": "Fonte Edge",
+    "edgeTarget": "Obiettivo Edge",
+    "edgeValue": "Valore del bordo",
+    "nodeName": "Nome del nodo",
+    "nodeValue": "Valore del nodo",
+    "seriesName": "Nome della serie",
+    "seriesValue": "Valore della serie",
+    "axisValue": "Valore dell'asse"
   },
   "panel": {
     "header": "Pannello",

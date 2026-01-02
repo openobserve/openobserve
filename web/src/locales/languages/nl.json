@@ -104,7 +104,8 @@
     "switchTo": "Overschakelen naar",
     "lightMode": "Lichtmodus",
     "darkMode": "Donkere modus",
-    "manageTheme": "Thema beheren"
+    "manageTheme": "Thema beheren",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "ProMQL-tabelmodus",
     "overrideMessageExample": "{endpoint} wordt bijvoorbeeld vervangen door de labelwaarde voor eindpunt.",
     "stepValueTooltipInfo": "Indien niet gespecificeerd, wordt de stapwaarde van Paneelconfiguratie gebruikt.",
-    "optional": "Optioneel"
+    "optional": "Optioneel",
+    "createDrilldown": "Drilldown maken",
+    "editDrilldown": "Drilldown bewerken",
+    "goTo": "Ga naar:",
+    "selectLogsMode": "Selecteer de modus Logboeken:",
+    "enterCustomQuery": "Voer een aangepaste zoekopdracht in:",
+    "enterUrl": "Voer de URL in:",
+    "invalidUrl": "Ongeldige URL",
+    "selectFolderDrilldown": "Selecteer map *:",
+    "noFoldersAvailable": "Geen mappen beschikbaar",
+    "selectDashboardDrilldown": "Selecteer Dashboard *:",
+    "noDashboardsAvailable": "Geen dashboards beschikbaar",
+    "selectTabDrilldown": "Selecteer Tab *:",
+    "noTabAvailable": "Geen tabblad beschikbaar",
+    "variables": "Variabelen:",
+    "passAllCurrentVariables": "Geef alle huidige variabelen door:",
+    "openInNewTab": "Open in een nieuw tabblad:",
+    "update": "Bijwerken",
+    "edgeSource": "Edge-bron",
+    "edgeTarget": "Randdoel",
+    "edgeValue": "Randwaarde",
+    "nodeName": "Naam van het knooppunt",
+    "nodeValue": "Knooppuntwaarde",
+    "seriesName": "Naam van de serie",
+    "seriesValue": "Seriewaarde",
+    "axisValue": "Axiswaarde"
   },
   "panel": {
     "header": "Paneel",
