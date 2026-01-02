@@ -299,6 +299,7 @@
     "addToDashboard": "添加到仪表盘",
     "selectStream": "选择数据流",
     "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。",
+    "buildQuery": "构建",
     "toggleFunctionEditor": "切换函数编辑器",
     "hide": "隐藏",
     "show": "显示",

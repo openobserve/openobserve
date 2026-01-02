@@ -299,6 +299,7 @@
     "addToDashboard": "Adicionar ao painel",
     "selectStream": "Selecione Stream",
     "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms.",
+    "buildQuery": "Construir",
     "toggleFunctionEditor": "Alternar editor de funções",
     "hide": "Esconder",
     "show": "Mostra",

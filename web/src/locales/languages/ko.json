@@ -299,6 +299,7 @@
     "addToDashboard": "대시보드에 추가",
     "selectStream": "스트림 선택",
     "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다.",
+    "buildQuery": "짓다",
     "toggleFunctionEditor": "토글 함수 편집기",
     "hide": "숨기기",
     "show": "쇼",
