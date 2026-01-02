@@ -134,9 +134,7 @@ async function mountAlertList() {
           emits: ["update:active-tab"],
           template:
             '<div class="app-tabs-stub">' +
-            '<button class="tab-all" @click="$emit(\'update:active-tab\', \'all\')">All</button>' +
-            '<button class="tab-scheduled" @click="$emit(\'update:active-tab\', \'scheduled\')">Scheduled</button>' +
-            '<button class="tab-realtime" @click="$emit(\'update:active-tab\', \'realTime\')">RealTime</button>' +
+            '<button v-for="tab in tabs" :key="tab.value" :class="`tab-${tab.value}`" @click="$emit(\'update:active-tab\', tab.value)">{{tab.label}}</button>' +
             '</div>',
         },
         SelectFolderDropDown: true,
@@ -295,11 +293,12 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
-  it("renders the page container and title", async () => {
+  it("renders the page container and view mode tabs", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
-    expect(wrapper.get('[data-test="alerts-list-title"]').text()).toBeTruthy();
+    // Verify view mode tabs exist (Alerts/Incidents tabs)
+    expect(wrapper.find('[data-test="alert-incident-view-tabs"]').exists()).toBe(true);
   });
 
   it("renders search input and toggle", async () => {
@@ -336,20 +335,26 @@ describe("AlertList - data fetching and columns", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
+    // Ensure we're in alerts view mode first
+    wrapper.vm.viewMode = 'alerts';
+    await flushPromises();
+
     // default tab: all
+    wrapper.vm.activeTab = 'all';
+    await flushPromises();
     let names = wrapper.vm.columns.map((c: any) => c.name);
     expect(names).toContain("period");
     expect(names).toContain("frequency");
 
     // switch to realTime
-    await wrapper.find(".tab-realtime").trigger("click");
+    wrapper.vm.activeTab = 'realTime';
     await flushPromises();
     names = wrapper.vm.columns.map((c: any) => c.name);
     expect(names).not.toContain("period");
     expect(names).not.toContain("frequency");
 
     // switch to scheduled
-    await wrapper.find(".tab-scheduled").trigger("click");
+    wrapper.vm.activeTab = 'scheduled';
     await flushPromises();
     names = wrapper.vm.columns.map((c: any) => c.name);
     expect(names).toContain("period");
@@ -381,7 +386,13 @@ describe("AlertList - filtering behaviors", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    await wrapper.find(".tab-scheduled").trigger("click");
+    // Ensure we're in alerts view mode
+    wrapper.vm.viewMode = 'alerts';
+    await flushPromises();
+
+    // Set activeTab and trigger filtering
+    wrapper.vm.activeTab = 'scheduled';
+    wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
     expect(wrapper.vm.filteredResults.every((r: any) => !r.is_real_time)).toBe(true);
@@ -391,7 +402,13 @@ describe("AlertList - filtering behaviors", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    await wrapper.find(".tab-realtime").trigger("click");
+    // Ensure we're in alerts view mode
+    wrapper.vm.viewMode = 'alerts';
+    await flushPromises();
+
+    // Set activeTab and trigger filtering
+    wrapper.vm.activeTab = 'realTime';
+    wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
     expect(wrapper.vm.filteredResults.every((r: any) => r.is_real_time)).toBe(true);
@@ -415,7 +432,13 @@ describe("AlertList - filtering behaviors", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    await wrapper.find(".tab-scheduled").trigger("click");
+    // Ensure we're in alerts view mode
+    wrapper.vm.viewMode = 'alerts';
+    await flushPromises();
+
+    // Set activeTab and trigger filtering
+    wrapper.vm.activeTab = 'scheduled';
+    wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
     wrapper.vm.filterAlertsByQuery("Scheduled");
@@ -662,8 +685,16 @@ describe("AlertList - additional validations", () => {
     it(`tab ${tab} shows only matching rows (${idx})`, async () => {
       const wrapper: any = await mountAlertList();
       await waitData(wrapper);
-      await wrapper.find(`.tab-${tab === "all" ? "all" : tab.toLowerCase()}`).trigger("click");
+
+      // Ensure we're in alerts view mode
+      wrapper.vm.viewMode = 'alerts';
       await flushPromises();
+
+      // Set activeTab and trigger filtering
+      wrapper.vm.activeTab = tab;
+      wrapper.vm.filterAlertsByTab(true);
+      await flushPromises();
+
       expect(wrapper.vm.filteredResults.every((r: any) => predicate(r))).toBe(true);
     });
   });

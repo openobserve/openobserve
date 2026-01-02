@@ -367,7 +367,7 @@ export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
   const path =
     window.location.origin == "http://localhost:8081"
-      ? "/"
+      ? pos > -1 ? "/web/" : "/"
       : pos > -1
         ? window.location.pathname.slice(0, pos + 5)
         : "";
