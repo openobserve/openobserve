@@ -221,6 +221,7 @@
     "resetFilters": "Reset filters",
     "redirect_to_logs_page": "Go back to Logs page",
     "visualize": "Visualize",
+    "buildQuery": "Build",
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to visualize",
     "visualizeDisabledForMultiStream": "Visualization is disabled for multi stream",
     "sqlModeDisabledForVisualization": "SQL mode cannot be disabled while on visualization with multiple streams",
