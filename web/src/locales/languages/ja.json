@@ -104,7 +104,8 @@
     "switchTo": "に切り替え",
     "lightMode": "ライトモード",
     "darkMode": "ダークモード",
-    "manageTheme": "テーマを管理"
+    "manageTheme": "テーマを管理",
+    "url": "URL"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1069,7 +1070,32 @@
     "promqlTableMode": "プロムQL テーブルモード",
     "overrideMessageExample": "たとえば、{endpoint} はエンドポイントのラベル値に置き換えられます。",
     "stepValueTooltipInfo": "指定しない場合は、パネル設定のステップ値が使用されます。",
-    "optional": "[オプション]"
+    "optional": "[オプション]",
+    "createDrilldown": "ドリルダウンを作成",
+    "editDrilldown": "ドリルダウンを編集",
+    "goTo": "次の場所に移動:",
+    "selectLogsMode": "ログモードを選択:",
+    "enterCustomQuery": "カスタムクエリを入力:",
+    "enterUrl": "URL を入力:",
+    "invalidUrl": "URL が無効です",
+    "selectFolderDrilldown": "フォルダを選択*:",
+    "noFoldersAvailable": "使用可能なフォルダはありません",
+    "selectDashboardDrilldown": "ダッシュボードを選択*:",
+    "noDashboardsAvailable": "使用可能なダッシュボードはありません",
+    "selectTabDrilldown": "タブを選択*:",
+    "noTabAvailable": "タブはありません",
+    "variables": "変数:",
+    "passAllCurrentVariables": "現在の変数をすべて渡す:",
+    "openInNewTab": "新しいタブで開く:",
+    "update": "[更新]",
+    "edgeSource": "エッジソース",
+    "edgeTarget": "エッジターゲット",
+    "edgeValue": "エッジ値",
+    "nodeName": "ノード名",
+    "nodeValue": "ノード値",
+    "seriesName": "シリーズ名",
+    "seriesValue": "シリーズ値",
+    "axisValue": "軸値"
   },
   "panel": {
     "header": "パネル",

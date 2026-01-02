@@ -104,7 +104,8 @@
     "switchTo": "로 전환",
     "lightMode": "라이트 모드",
     "darkMode": "다크 모드",
-    "manageTheme": "테마 관리"
+    "manageTheme": "테마 관리",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "ProMQL 테이블 모드",
     "overrideMessageExample": "예를 들어, {endpoint} 는 엔드포인트의 레이블 값으로 대체됩니다.",
     "stepValueTooltipInfo": "지정하지 않으면 패널 구성의 단계 값이 사용됩니다.",
-    "optional": "선택 사항"
+    "optional": "선택 사항",
+    "createDrilldown": "드릴다운 생성",
+    "editDrilldown": "드릴다운 편집",
+    "goTo": "다음으로 이동:",
+    "selectLogsMode": "로그 모드 선택:",
+    "enterCustomQuery": "사용자 지정 쿼리 입력:",
+    "enterUrl": "URL 입력:",
+    "invalidUrl": "잘못된 URL",
+    "selectFolderDrilldown": "폴더 선택*:",
+    "noFoldersAvailable": "사용 가능한 폴더 없음",
+    "selectDashboardDrilldown": "대시보드 선택*:",
+    "noDashboardsAvailable": "사용 가능한 대시보드 없음",
+    "selectTabDrilldown": "탭 선택*:",
+    "noTabAvailable": "사용 가능한 탭 없음",
+    "variables": "변수:",
+    "passAllCurrentVariables": "모든 현재 변수 전달:",
+    "openInNewTab": "새 탭에서 열기:",
+    "update": "업데이트",
+    "edgeSource": "엣지 소스",
+    "edgeTarget": "엣지 타겟",
+    "edgeValue": "엣지 값",
+    "nodeName": "노드 이름",
+    "nodeValue": "노드 값",
+    "seriesName": "시리즈 이름",
+    "seriesValue": "시리즈 값",
+    "axisValue": "축 값"
   },
   "panel": {
     "header": "패널",

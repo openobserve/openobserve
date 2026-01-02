@@ -104,7 +104,8 @@
     "switchTo": "Passez à",
     "lightMode": "Mode d'éclairage",
     "darkMode": "Mode sombre",
-    "manageTheme": "Gérer le thème"
+    "manageTheme": "Gérer le thème",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "Mode Tableau ProMQL",
     "overrideMessageExample": "Par exemple, {endpoint} sera remplacé par la valeur d'étiquette du point de terminaison.",
     "stepValueTooltipInfo": "Si elle n'est pas spécifiée, la valeur de l'étape de Configuration du panneau sera utilisée.",
-    "optional": "Facultatif"
+    "optional": "Facultatif",
+    "createDrilldown": "Créer Drilldown",
+    "editDrilldown": "Modifier Drilldown",
+    "goTo": "Accédez à :",
+    "selectLogsMode": "Sélectionnez le mode Journaux :",
+    "enterCustomQuery": "Entrez une requête personnalisée :",
+    "enterUrl": "Entrez l'URL :",
+    "invalidUrl": "URL non valide",
+    "selectFolderDrilldown": "Sélectionnez le dossier* :",
+    "noFoldersAvailable": "Aucun dossier disponible",
+    "selectDashboardDrilldown": "Sélectionnez Tableau de bord* :",
+    "noDashboardsAvailable": "Aucun tableau de bord disponible",
+    "selectTabDrilldown": "Sélectionnez l'onglet * :",
+    "noTabAvailable": "Aucun onglet disponible",
+    "variables": "Variables :",
+    "passAllCurrentVariables": "Transmettez toutes les variables actuelles :",
+    "openInNewTab": "Ouvrir dans un nouvel onglet :",
+    "update": "Mettre à jour",
+    "edgeSource": "Source périphérique",
+    "edgeTarget": "Cible Edge",
+    "edgeValue": "Valeur Edge",
+    "nodeName": "Nom du nœud",
+    "nodeValue": "Valeur du nœud",
+    "seriesName": "Nom de la série",
+    "seriesValue": "Valeur de la série",
+    "axisValue": "Valeur de l'axe"
   },
   "panel": {
     "header": "Panneau",

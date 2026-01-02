@@ -104,7 +104,8 @@
     "switchTo": "Mudar para",
     "lightMode": "Modo de luz",
     "darkMode": "Modo escuro",
-    "manageTheme": "Gerenciar tema"
+    "manageTheme": "Gerenciar tema",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "Modo de tabela ProMQL",
     "overrideMessageExample": "Por exemplo, {endpoint} será substituído pelo valor do rótulo para endpoint.",
     "stepValueTooltipInfo": "Se não for especificado, o valor da etapa da Configuração do painel será usado.",
-    "optional": "Opcional"
+    "optional": "Opcional",
+    "createDrilldown": "Criar detalhamento",
+    "editDrilldown": "Editar detalhamento",
+    "goTo": "Vá para:",
+    "selectLogsMode": "Selecione o modo de registros:",
+    "enterCustomQuery": "Insira a consulta personalizada:",
+    "enterUrl": "Insira o URL:",
+    "invalidUrl": "URL inválida",
+    "selectFolderDrilldown": "Selecione a pasta *:",
+    "noFoldersAvailable": "Nenhuma pasta disponível",
+    "selectDashboardDrilldown": "Selecione o painel de controle *:",
+    "noDashboardsAvailable": "Não há painéis disponíveis",
+    "selectTabDrilldown": "Selecione a guia *:",
+    "noTabAvailable": "Nenhuma guia disponível",
+    "variables": "Variáveis:",
+    "passAllCurrentVariables": "Passe todas as variáveis atuais:",
+    "openInNewTab": "Abrir em uma nova guia:",
+    "update": "Atualizar",
+    "edgeSource": "Fonte periférica",
+    "edgeTarget": "Alvo periférico",
+    "edgeValue": "Valor da borda",
+    "nodeName": "Nome do nó",
+    "nodeValue": "Valor do nó",
+    "seriesName": "Nome da série",
+    "seriesValue": "Valor da série",
+    "axisValue": "Valor do eixo"
   },
   "panel": {
     "header": "Painel",

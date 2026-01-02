@@ -104,7 +104,8 @@
     "switchTo": "Wechseln Sie zu",
     "lightMode": "Licht-Modus",
     "darkMode": "Dunkler Modus",
-    "manageTheme": "Theme verwalten"
+    "manageTheme": "Theme verwalten",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "PromQL-Tabellenmodus",
     "overrideMessageExample": "Beispielsweise wird {endpoint} durch den Labelwert für Endpunkt ersetzt.",
     "stepValueTooltipInfo": "Wenn nicht angegeben, wird der Schrittwert aus der Panel-Konfiguration verwendet.",
-    "optional": "Fakultativ"
+    "optional": "Fakultativ",
+    "createDrilldown": "Drilldown erstellen",
+    "editDrilldown": "Drilldown bearbeiten",
+    "goTo": "Gehe zu:",
+    "selectLogsMode": "Wählen Sie den Protokollmodus aus:",
+    "enterCustomQuery": "Geben Sie eine benutzerdefinierte Abfrage ein:",
+    "enterUrl": "URL eingeben:",
+    "invalidUrl": "Ungültige URL",
+    "selectFolderDrilldown": "Ordner auswählen*:",
+    "noFoldersAvailable": "Keine Ordner verfügbar",
+    "selectDashboardDrilldown": "Wählen Sie Dashboard aus*:",
+    "noDashboardsAvailable": "Keine Dashboards verfügbar",
+    "selectTabDrilldown": "Tab auswählen*:",
+    "noTabAvailable": "Kein Tab verfügbar",
+    "variables": "Variablen:",
+    "passAllCurrentVariables": "Übergeben Sie alle aktuellen Variablen:",
+    "openInNewTab": "In neuem Tab öffnen:",
+    "update": "Aktualisieren",
+    "edgeSource": "Edge-Quelle",
+    "edgeTarget": "Edge-Ziel",
+    "edgeValue": "Kantenwert",
+    "nodeName": "Knotenname",
+    "nodeValue": "Knotenwert",
+    "seriesName": "Name der Serie",
+    "seriesValue": "Wert der Serie",
+    "axisValue": "Achsenwert"
   },
   "panel": {
     "header": "Panel",

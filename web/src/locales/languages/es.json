@@ -104,7 +104,8 @@
     "switchTo": "Cambiar a",
     "lightMode": "Modo de luz",
     "darkMode": "Modo oscuro",
-    "manageTheme": "Administrar tema"
+    "manageTheme": "Administrar tema",
+    "url": "URL"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "Modo de tabla PromQL",
     "overrideMessageExample": "Por ejemplo, {endpoint} se reemplazará por el valor de etiqueta de endpoint.",
     "stepValueTooltipInfo": "Si no se especifica, se utilizará el valor del paso de Configuración del panel.",
-    "optional": "Opcional"
+    "optional": "Opcional",
+    "createDrilldown": "Crear un desglose",
+    "editDrilldown": "Editar Drilldown",
+    "goTo": "Ir a:",
+    "selectLogsMode": "Seleccione el modo de registros:",
+    "enterCustomQuery": "Introduzca una consulta personalizada:",
+    "enterUrl": "Ingresa la URL:",
+    "invalidUrl": "URL no válida",
+    "selectFolderDrilldown": "Seleccione la carpeta *:",
+    "noFoldersAvailable": "No hay carpetas disponibles",
+    "selectDashboardDrilldown": "Seleccione Tablero de mandos *:",
+    "noDashboardsAvailable": "No hay paneles disponibles",
+    "selectTabDrilldown": "Seleccione la pestaña*:",
+    "noTabAvailable": "No hay ninguna pestaña disponible",
+    "variables": "Variables:",
+    "passAllCurrentVariables": "Pase todas las variables actuales:",
+    "openInNewTab": "Abrir en una pestaña nueva:",
+    "update": "Actualización",
+    "edgeSource": "Fuente perimetral",
+    "edgeTarget": "Objetivo de borde",
+    "edgeValue": "Valor de borde",
+    "nodeName": "Nombre del nodo",
+    "nodeValue": "Valor de nodo",
+    "seriesName": "Nombre de la serie",
+    "seriesValue": "Valor de la serie",
+    "axisValue": "Valor del eje"
   },
   "panel": {
     "header": "Panel",

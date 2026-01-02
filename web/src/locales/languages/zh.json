@@ -104,7 +104,8 @@
     "switchTo": "切换到",
     "lightMode": "灯光模式",
     "darkMode": "黑暗模式",
-    "manageTheme": "管理主题"
+    "manageTheme": "管理主题",
+    "url": "网址"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1053,7 +1054,32 @@
     "promqlTableMode": "PromQL 表格模式",
     "overrideMessageExample": "例如，{endpoint} 将被替换为端点的标签值。",
     "stepValueTooltipInfo": "如果未指定，则将使用面板配置中的步长值。",
-    "optional": "可选"
+    "optional": "可选",
+    "createDrilldown": "创建 Drilldown",
+    "editDrilldown": "编辑 Drilldown",
+    "goTo": "前往：",
+    "selectLogsMode": "选择日志模式：",
+    "enterCustomQuery": "输入自定义查询：",
+    "enterUrl": "输入网址：",
+    "invalidUrl": "网址无效",
+    "selectFolderDrilldown": "选择文件夹 *:",
+    "noFoldersAvailable": "没有可用的文件夹",
+    "selectDashboardDrilldown": "选择控制面板 *:",
+    "noDashboardsAvailable": "没有可用的仪表板",
+    "selectTabDrilldown": "选择选项卡 *:",
+    "noTabAvailable": "没有可用的选项卡",
+    "variables": "变量：",
+    "passAllCurrentVariables": "传递所有当前变量：",
+    "openInNewTab": "在新标签页中打开：",
+    "update": "更新",
+    "edgeSource": "边缘来源",
+    "edgeTarget": "边缘目标",
+    "edgeValue": "边缘价值",
+    "nodeName": "节点名称",
+    "nodeValue": "节点值",
+    "seriesName": "系列名称",
+    "seriesValue": "系列价值",
+    "axisValue": "轴值"
   },
   "panel": {
     "header": "面板",
