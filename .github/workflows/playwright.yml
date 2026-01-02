@@ -401,7 +401,7 @@ jobs:
                 ACTUAL_FOLDER="Logs"
                 ;;
               "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables-Scoped")
-                ACTUAL_FOLDER="Dashboards"
+                ACTUAL_FOLDER="dashboards"
                 ;;
               *)
                 ACTUAL_FOLDER="${{ matrix.testfolder }}"
