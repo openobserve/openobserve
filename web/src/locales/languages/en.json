@@ -664,7 +664,12 @@
     "extendedEndDate": "End Date",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Environment quick mode field",
-    "sdr": "Sensitive Data Redaction"
+    "sdr": "Sensitive Data Redaction",
+    "fields": "Fields",
+    "fieldName": "Field Name",
+    "fieldRequired": "Field is required!",
+    "dataType": "Data Type",
+    "dataTypeRequired": "Data Type is required!"
   },
   "pipeline": {
     "header": "Pipelines",
