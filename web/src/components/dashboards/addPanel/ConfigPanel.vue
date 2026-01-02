@@ -1850,7 +1850,7 @@ export default defineComponent({
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject<string>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -2480,27 +2480,29 @@ export default defineComponent({
         return true;
       }
 
-      // For custom queries, check SQL for time functions used in SELECT with x-axis alias patterns
+      // For custom queries, check SQL for time functions (without requiring specific alias)
       if (isCustomQuery && currentQuery?.query) {
         const queryText = currentQuery.query.toLowerCase();
-        
+
         // Extract SELECT clause (from SELECT to FROM/WHERE/GROUP)
         const selectMatch = queryText.match(/select\s+(.*?)\s+from/is);
         if (selectMatch) {
           const selectClause = selectMatch[1];
-          
-          // Check if SELECT contains time functions with x-axis alias
+
+          // Check if SELECT contains time functions anywhere in the clause
+          // Don't rely on specific alias patterns as aliasing is not compulsory
           const timeRelatedFunctions = ["histogram\\(", "date_bin\\(", "date_trunc\\(", "time_bucket\\("];
           const timestampColumn = store.state.zoConfig?.timestamp_column?.toLowerCase() || '_timestamp';
-          
-          // Check for time functions or timestamp column specifically in x-axis aliases
-          const xAxisPattern = /as\s+["']?x_axis/i;
-          const hasTimeInXAxis = timeRelatedFunctions.some(func => {
-            const funcRegex = new RegExp(func + '[^)]*\\)\\s*' + xAxisPattern.source, 'i');
+
+          // Check for time functions or timestamp column in SELECT (regardless of alias)
+          const hasTimeFunction = timeRelatedFunctions.some(func => {
+            const funcRegex = new RegExp(func, 'i');
             return funcRegex.test(selectClause);
-          }) || new RegExp(timestampColumn + '\\s*' + xAxisPattern.source, 'i').test(selectClause);
-          
-          if (hasTimeInXAxis) {
+          });
+
+          const hasTimestampColumn = new RegExp('\\b' + timestampColumn + '\\b', 'i').test(selectClause);
+
+          if (hasTimeFunction || hasTimestampColumn) {
             return true;
           }
         }
