@@ -277,7 +277,8 @@
     "transformLabel": "트랜스폼",
     "addToDashboard": "대시보드에 추가",
     "selectStream": "스트림 선택",
-    "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다."
+    "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다.",
+    "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다."
   },
   "menu": {
     "home": "홈",

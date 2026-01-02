@@ -277,7 +277,8 @@
     "transformLabel": "Transformar",
     "addToDashboard": "Adicionar ao painel",
     "selectStream": "Selecione Stream",
-    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms."
+    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms.",
+    "webUrlNotConfigured": "O URL de compartilhamento é desativado até que ZO_WEB_URL seja configurado pelo administrador."
   },
   "menu": {
     "home": "Início",

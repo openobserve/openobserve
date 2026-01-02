@@ -277,7 +277,8 @@
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
     "selectStream": "Selecteer Stream",
-    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms.",
+    "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder."
   },
   "menu": {
     "home": "Home",

@@ -260,6 +260,7 @@
     "linkCopiedSuccessfully": "Link Copied Successfully!",
     "errorCopyingLink": "Error while copy link.",
     "errorShorteningLink": "Error while shortening link.",
+    "webUrlNotConfigured": "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
     "maxViewsLimit": "You can only save 10 views.",
     "viewAddedToFavorites": "View added to favorites.",
     "viewRemovedFromFavorites": "View removed from favorites.",
