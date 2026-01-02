@@ -16,8 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
+import * as VueFlowCore from "@vue-flow/core";
 
-// Mock @vue-flow/core
+// Mock @vue-flow/core - must be defined in factory function
 vi.mock("@vue-flow/core", () => ({
   BaseEdge: {
     template: "<div class='base-edge'></div>",
@@ -179,14 +180,14 @@ describe("CustomEdge.vue", () => {
     });
 
     it("should call getBezierPath with props", () => {
-      const getBezierPathMock = vi.mocked(require("@vue-flow/core").getBezierPath);
-      getBezierPathMock.mockClear();
+      const mockGetBezierPath = vi.mocked(VueFlowCore.getBezierPath);
+      mockGetBezierPath.mockClear();
 
       mount(CustomEdge, {
         props: defaultProps,
       });
 
-      expect(getBezierPathMock).toHaveBeenCalledWith(
+      expect(mockGetBezierPath).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceX: 100,
           sourceY: 200,
@@ -267,14 +268,14 @@ describe("CustomEdge.vue", () => {
 
   describe("VueFlow integration", () => {
     it("should call useVueFlow on mount", () => {
-      const useVueFlowMock = vi.mocked(require("@vue-flow/core").useVueFlow);
-      useVueFlowMock.mockClear();
+      const mockUseVueFlow = vi.mocked(VueFlowCore.useVueFlow);
+      mockUseVueFlow.mockClear();
 
       mount(CustomEdge, {
         props: defaultProps,
       });
 
-      expect(useVueFlowMock).toHaveBeenCalled();
+      expect(mockUseVueFlow).toHaveBeenCalled();
     });
 
     it("should have access to VueFlow methods", () => {
@@ -285,8 +286,8 @@ describe("CustomEdge.vue", () => {
         removeSelectedEdges: vi.fn(),
       };
 
-      const useVueFlowMock = vi.mocked(require("@vue-flow/core").useVueFlow);
-      useVueFlowMock.mockReturnValue(mockMethods);
+      const mockUseVueFlow = vi.mocked(VueFlowCore.useVueFlow);
+      mockUseVueFlow.mockReturnValueOnce(mockMethods);
 
       mount(CustomEdge, {
         props: defaultProps,

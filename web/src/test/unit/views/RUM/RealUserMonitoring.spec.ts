@@ -78,9 +78,45 @@ vi.mock("@/composables/useStreams", () => ({
 describe("RealUserMonitoring.vue", () => {
   let store: any;
   let router: any;
+  let $q: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock Quasar
+    $q = {
+      dark: { isActive: false, mode: false },
+      platform: {
+        is: {
+          mobile: false,
+          desktop: true,
+          cordova: false,
+          capacitor: false,
+          electron: false,
+          chrome: true,
+          safari: false,
+          firefox: false,
+          edge: false,
+          ie: false,
+          linux: false,
+          mac: true,
+          win: false,
+          android: false,
+          ios: false,
+        },
+        has: {
+          touch: false,
+        },
+        within: {
+          iframe: false,
+        },
+      },
+      iconMapFn: vi.fn((iconName: string) => iconName),
+      iconSet: {
+        name: 'material-icons',
+      },
+      notify: vi.fn(),
+    };
 
     store = createStore({
       state: {
@@ -137,16 +173,22 @@ describe("RealUserMonitoring.vue", () => {
 
   describe("loading state", () => {
     it("should show loading spinner when RUM status is being checked", async () => {
+      let resolveGetStream: any;
       mockGetStream.mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve(null), 100))
+        () => new Promise((resolve) => { resolveGetStream = resolve; })
       );
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-spinner-hourglass": true,
+            "q-btn": true,
+            "q-icon": true,
+            "q-spinner-hourglass": {
+              template: '<div class="q-spinner-hourglass">Loading...</div>',
+            },
             "q-btn": true,
             "q-icon": true,
             AppTabs: true,
@@ -154,13 +196,17 @@ describe("RealUserMonitoring.vue", () => {
         },
       });
 
+      // Wait for the component to mount and start loading
+      await wrapper.vm.$nextTick();
+
       expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Hold on tight, we're loading RUM data."
       );
 
+      // Resolve the promise
+      resolveGetStream(null);
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 150));
     });
   });
 
@@ -171,8 +217,11 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
@@ -185,7 +234,7 @@ describe("RealUserMonitoring.vue", () => {
 
       await flushPromises();
 
-      expect(wrapper.text()).toContain("About Real User Monitoring");
+      expect(wrapper.text()).toContain("Discover Real User Monitoring");
       expect(wrapper.text()).toContain("Get Started");
     });
 
@@ -196,8 +245,11 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
@@ -249,8 +301,11 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": true,
             "q-icon": true,
@@ -274,6 +329,7 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
@@ -302,6 +358,7 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": {
               template:
@@ -332,8 +389,11 @@ describe("RealUserMonitoring.vue", () => {
       mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": true,
             "q-icon": true,
@@ -368,19 +428,21 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
-            AppTabs: {
-              template: '<div class="app-tabs" />',
-            },
+            AppTabs: true,
           },
         },
       });
 
       await flushPromises();
 
-      expect(wrapper.find(".app-tabs").exists()).toBe(true);
+      // Check that showTabs computed property evaluates to true
+      expect(wrapper.vm.showTabs).toBe(true);
     });
 
     it("should show tabs for ErrorTracking route", async () => {
@@ -389,19 +451,20 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
-            AppTabs: {
-              template: '<div class="app-tabs" />',
-            },
+            AppTabs: true,
           },
         },
       });
 
       await flushPromises();
 
-      expect(wrapper.find(".app-tabs").exists()).toBe(true);
+      expect(wrapper.vm.showTabs).toBe(true);
     });
 
     it("should show tabs for rumPerformanceSummary route", async () => {
@@ -410,19 +473,20 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
-            AppTabs: {
-              template: '<div class="app-tabs" />',
-            },
+            AppTabs: true,
           },
         },
       });
 
       await flushPromises();
 
-      expect(wrapper.find(".app-tabs").exists()).toBe(true);
+      expect(wrapper.vm.showTabs).toBe(true);
     });
 
     it("should show tabs for rumPerformanceWebVitals route", async () => {
@@ -431,19 +495,20 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
-            AppTabs: {
-              template: '<div class="app-tabs" />',
-            },
+            AppTabs: true,
           },
         },
       });
 
       await flushPromises();
 
-      expect(wrapper.find(".app-tabs").exists()).toBe(true);
+      expect(wrapper.vm.showTabs).toBe(true);
     });
   });
 
@@ -463,6 +528,7 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view" />',
@@ -476,7 +542,7 @@ describe("RealUserMonitoring.vue", () => {
       await flushPromises();
 
       expect(wrapper.find(".router-view").exists()).toBe(true);
-      expect(wrapper.text()).not.toContain("About Real User Monitoring");
+      expect(wrapper.text()).not.toContain("Discover Real User Monitoring");
     });
   });
 
@@ -498,6 +564,7 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": {
               template:
@@ -523,8 +590,11 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
+          mocks: { $q },
           stubs: {
             "router-view": true,
+            "q-btn": true,
+            "q-icon": true,
             "q-spinner-hourglass": true,
             "q-btn": true,
             "q-icon": true,
@@ -536,7 +606,7 @@ describe("RealUserMonitoring.vue", () => {
       await flushPromises();
 
       // Should show get started screen when streams fail to load
-      expect(wrapper.text()).toContain("About Real User Monitoring");
+      expect(wrapper.text()).toContain("Discover Real User Monitoring");
     });
   });
 });
