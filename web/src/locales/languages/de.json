@@ -88,7 +88,16 @@
     "status": "Status",
     "cancel": "Stornieren",
     "relative": "Relativ",
-    "absolute": "Absolut"
+    "absolute": "Absolut",
+    "seconds": "Sekunden",
+    "minutes": "Minuten",
+    "hours": "Stunden",
+    "days": "Tage",
+    "weeks": "Wochen",
+    "months": "Monate",
+    "sec": "Sekunde",
+    "off": "Aus",
+    "minRefreshIntervalMessage": "Das minimale Aktualisierungsintervall beträgt {interval} Sekunden. Bitte passen Sie das minimale Aktualisierungsintervall entsprechend an."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -277,7 +286,11 @@
     "transformLabel": "Verwandeln",
     "addToDashboard": "Zum Dashboard hinzufügen",
     "selectStream": "Wählen Sie Stream",
-    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden."
+    "pattern_summary": "Es werden 1 bis 50 von {totalEvents} -Ereignissen und {patternsFound} -Mustern angezeigt, die in {logsAnalyzed} -Ereignissen in {totalTime} ms gefunden wurden.",
+    "toggleFunctionEditor": "Funktionseditor umschalten",
+    "hide": "Verstecken",
+    "show": "Zeige",
+    "editor": "Redakteur"
   },
   "menu": {
     "home": "Startseite",

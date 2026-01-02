@@ -88,7 +88,16 @@
     "status": "상태",
     "cancel": "취소",
     "relative": "상대적",
-    "absolute": "앱솔루트"
+    "absolute": "앱솔루트",
+    "seconds": "세컨즈",
+    "minutes": "의사록",
+    "hours": "시간",
+    "days": "데이즈",
+    "weeks": "주",
+    "months": "개월",
+    "sec": "초",
+    "off": "끄기",
+    "minRefreshIntervalMessage": "최소 새로 고침 간격은 {interval} 초입니다.그에 따라 최소 새로 고침 간격을 조정하십시오."
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -277,7 +286,11 @@
     "transformLabel": "트랜스폼",
     "addToDashboard": "대시보드에 추가",
     "selectStream": "스트림 선택",
-    "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다."
+    "pattern_summary": "{TotalTime} 밀리초 내에 {logsAnallets} 이벤트에서 발견된 {TotalEvents} 이벤트 및 {PatternsFound} 패턴 중 1~50개를 표시합니다.",
+    "toggleFunctionEditor": "토글 함수 편집기",
+    "hide": "숨기기",
+    "show": "쇼",
+    "editor": "에디터"
   },
   "menu": {
     "home": "홈",

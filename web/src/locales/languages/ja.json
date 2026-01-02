@@ -88,7 +88,16 @@
     "status": "ステータス",
     "cancel": "[キャンセル]",
     "relative": "相対",
-    "absolute": "絶対"
+    "absolute": "絶対",
+    "seconds": "秒",
+    "minutes": "議事録",
+    "hours": "時間",
+    "days": "日々",
+    "weeks": "数週間",
+    "months": "ヶ月",
+    "sec": "秒",
+    "off": "[オフ]",
+    "minRefreshIntervalMessage": "最小更新間隔は {interval} 秒です。それに応じて最小更新間隔を調整してください。"
   },
   "search": {
     "metrics": "メトリクス",
@@ -277,7 +286,11 @@
     "transformLabel": "トランスフォーム",
     "addToDashboard": "ダッシュボードに追加",
     "selectStream": "[ストリーム] を選択",
-    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。"
+    "pattern_summary": "{totalTime} ミリ秒で {logsAnalyzed} イベントで見つかった {totalEvents} イベントと {PatternsFound} パターンのうち 1 ～ 50 件を表示しています。",
+    "toggleFunctionEditor": "関数エディターの切り替え",
+    "hide": "隠す",
+    "show": "ショー",
+    "editor": "エディター"
   },
   "menu": {
     "home": "ホーム",

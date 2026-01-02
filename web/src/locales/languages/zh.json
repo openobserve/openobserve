@@ -88,7 +88,16 @@
     "status": "状态",
     "cancel": "取消",
     "relative": "相对的",
-    "absolute": "绝对"
+    "absolute": "绝对",
+    "seconds": "秒",
+    "minutes": "分钟",
+    "hours": "小时",
+    "days": "天数",
+    "weeks": "几周",
+    "months": "月",
+    "sec": "秒",
+    "off": "关闭",
+    "minRefreshIntervalMessage": "最小刷新间隔为 {interval} 秒。请相应地调整最小刷新间隔。"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -277,7 +286,11 @@
     "transformLabel": "转换",
     "addToDashboard": "添加到仪表盘",
     "selectStream": "选择数据流",
-    "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。"
+    "pattern_summary": "在 {totalTime} 毫秒内显示在 {LogsAnalyzed} 事件中找到的 {TotalEvents} 事件和 {PatternsFound} 模式中的 1 到 50 个。",
+    "toggleFunctionEditor": "切换函数编辑器",
+    "hide": "隐藏",
+    "show": "显示",
+    "editor": "编辑器"
   },
   "menu": {
     "home": "主页",

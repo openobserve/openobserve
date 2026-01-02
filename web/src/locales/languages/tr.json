@@ -88,7 +88,16 @@
     "status": "Durum",
     "cancel": "İptal",
     "relative": "Göreceli",
-    "absolute": "Mutlak"
+    "absolute": "Mutlak",
+    "seconds": "Saniyeler",
+    "minutes": "Dakika",
+    "hours": "Saatler",
+    "days": "Günler",
+    "weeks": "Haftalar",
+    "months": "Aylar",
+    "sec": "sn",
+    "off": "Kapalı",
+    "minRefreshIntervalMessage": "Minimum yenileme aralığı {interval} saniyedir. Lütfen minimum yenileme aralığını buna göre ayarlayın."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -277,7 +286,11 @@
     "transformLabel": "Dönüştürün",
     "addToDashboard": "Kontrol Paneline Ekle",
     "selectStream": "Akışı Seç",
-    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor."
+    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor.",
+    "toggleFunctionEditor": "İşlev Düzenleyicisini Aç/Kapat",
+    "hide": "Gizle",
+    "show": "Göster",
+    "editor": "Editör"
   },
   "menu": {
     "home": "Ana Sayfa",

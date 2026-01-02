@@ -88,7 +88,16 @@
     "status": "Status",
     "cancel": "Annuleer",
     "relative": "Relatief",
-    "absolute": "Absoluut"
+    "absolute": "Absoluut",
+    "seconds": "Seconden",
+    "minutes": "Minuten",
+    "hours": "Uren",
+    "days": "Dagen",
+    "weeks": "Weken",
+    "months": "Maanden",
+    "sec": "sec",
+    "off": "Uit",
+    "minRefreshIntervalMessage": "Het minimale vernieuwingsinterval is {interval} seconden. Pas het minimale vernieuwingsinterval dienovereenkomstig aan."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -277,7 +286,11 @@
     "transformLabel": "Transformeren",
     "addToDashboard": "Aan dashboard toevoegen",
     "selectStream": "Selecteer Stream",
-    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms."
+    "pattern_summary": "Toont 1 tot 50 van de {totalEvents} -gebeurtenissen en {PatternsFound} -patronen gevonden in {logsAnalyzed} -gebeurtenissen in {totalTime} ms.",
+    "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
+    "hide": "Verstoppen",
+    "show": "Laat zien",
+    "editor": "Redacteur"
   },
   "menu": {
     "home": "Home",

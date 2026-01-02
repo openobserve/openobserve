@@ -88,7 +88,16 @@
     "status": "Status",
     "cancel": "Cancelar",
     "relative": "Relativo",
-    "absolute": "Absoluto"
+    "absolute": "Absoluto",
+    "seconds": "Segundos",
+    "minutes": "Minutos",
+    "hours": "Horas",
+    "days": "Dias",
+    "weeks": "Semanas",
+    "months": "Meses",
+    "sec": "seg",
+    "off": "Desligado",
+    "minRefreshIntervalMessage": "O intervalo mínimo de atualização é de {interval} segundos. Ajuste o intervalo mínimo de atualização adequadamente."
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -277,7 +286,11 @@
     "transformLabel": "Transformar",
     "addToDashboard": "Adicionar ao painel",
     "selectStream": "Selecione Stream",
-    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms."
+    "pattern_summary": "Mostrando de 1 a 50 dos eventos {totalEvents} e padrões {patternsFound} encontrados em eventos {logsAnalyzed} em {totalTime} ms.",
+    "toggleFunctionEditor": "Alternar editor de funções",
+    "hide": "Esconder",
+    "show": "Mostra",
+    "editor": "Editor"
   },
   "menu": {
     "home": "Início",
