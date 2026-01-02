@@ -65,7 +65,8 @@ impl From<PipelineError> for HttpResponse {
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -112,7 +113,8 @@ pub async fn save_pipeline(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -205,7 +207,8 @@ async fn list_pipelines(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -237,7 +240,8 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -271,7 +275,8 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/pipelines/bulk")]
@@ -335,7 +340,8 @@ async fn delete_pipeline_bulk(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
@@ -371,7 +377,8 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpRespo
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]

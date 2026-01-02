@@ -107,7 +107,8 @@ impl From<DashboardError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create or update dashboard. Set dashboardId to update existing"}))
     )
 )]
 #[post("/{org_id}/dashboards")]
@@ -153,7 +154,8 @@ pub async fn create_dashboard(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
@@ -199,7 +201,8 @@ async fn update_dashboard(
         (status = StatusCode::OK, body = inline(ListDashboardsResponseBody)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all dashboards in organization"}))
     )
 )]
 #[get("/{org_id}/dashboards")]
@@ -239,7 +242,8 @@ async fn list_dashboards(
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID"}))
     )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
@@ -272,7 +276,8 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON"}))
     )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/export")]
@@ -306,7 +311,8 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID"}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
@@ -344,7 +350,8 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/dashboards/bulk")]
@@ -424,7 +431,8 @@ async fn delete_dashboard_bulk(
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder"}))
     )
 )]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
@@ -472,7 +480,8 @@ async fn move_dashboard(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder"}))
     )
 )]
 #[patch("/{org_id}/dashboards/move")]

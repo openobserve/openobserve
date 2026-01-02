@@ -62,7 +62,8 @@ use crate::{
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List service accounts"}))
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -128,7 +129,8 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create service account"}))
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -178,7 +180,8 @@ pub async fn save(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update service account"}))
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -266,7 +269,8 @@ pub async fn update(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete service account"}))
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]
@@ -297,7 +301,8 @@ pub async fn delete(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/service_accounts/bulk")]
@@ -379,7 +384,8 @@ pub async fn delete_bulk(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get service account token"}))
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]

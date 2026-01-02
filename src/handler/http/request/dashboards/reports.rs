@@ -91,7 +91,8 @@ impl From<ReportError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a scheduled report"}))
     )
 )]
 #[post("/{org_id}/reports")]
@@ -140,7 +141,8 @@ pub async fn create_report(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a report"}))
     )
 )]
 #[put("/{org_id}/reports/{name}")]
@@ -179,7 +181,8 @@ async fn update_report(
         (status = StatusCode::OK, body = inline(Vec<Report>)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all reports"}))
     )
 )]
 #[get("/{org_id}/reports")]
@@ -283,7 +286,8 @@ async fn list_reports(
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get report details"}))
     )
 )]
 #[get("/{org_id}/reports/{name}")]
@@ -318,7 +322,8 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a report"}))
     )
 )]
 #[delete("/{org_id}/reports/{name}")]
@@ -357,7 +362,8 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/reports/bulk")]

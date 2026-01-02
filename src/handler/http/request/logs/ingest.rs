@@ -61,6 +61,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_bulk")]
@@ -150,6 +153,9 @@ pub async fn bulk(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_multi")]
@@ -245,7 +251,7 @@ pub async fn multi(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
 )]
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
@@ -340,6 +346,9 @@ pub async fn json(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
         (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
@@ -479,6 +488,9 @@ pub async fn handle_gcp_request(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/v1/logs")]
@@ -593,6 +605,9 @@ pub async fn otlp_logs_write(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Success","code": 200})),
         (status = 200, description = "Failure", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_hec")]

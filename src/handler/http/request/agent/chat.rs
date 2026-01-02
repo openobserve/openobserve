@@ -177,6 +177,9 @@ pub async fn agent_chat(
         (status = StatusCode::BAD_REQUEST, description = "Agent not enabled"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to query agent"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/agent/chat/stream")]
 pub async fn agent_chat_stream(

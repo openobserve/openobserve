@@ -193,6 +193,9 @@ struct Rum {
                    and orchestration platforms to determine service availability and readiness.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/healthz")]
@@ -221,6 +224,9 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
         (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/schedulez")]
