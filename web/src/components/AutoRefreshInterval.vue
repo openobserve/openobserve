@@ -132,22 +132,22 @@ export default defineComponent({
     const refreshTimes = [
       [
         { label: `5 ${t("common.sec")}`, value: 5, disabled: false },
-        { label: "1 min", value: 60, disabled: false },
-        { label: "1 hr", value: 3600, disabled: false },
+        { label: `1 ${t("common.min")}`, value: 60, disabled: false },
+        { label: `1 ${t("common.hr")}`, value: 3600, disabled: false },
       ],
       [
-        { label: "10 sec", value: 10, disabled: false },
-        { label: "5 min", value: 300, disabled: false },
-        { label: "2 hr", value: 7200, disabled: false },
+        { label: `10 ${t("common.sec")}`, value: 10, disabled: false },
+        { label: `5 ${t("common.min")}`, value: 300, disabled: false },
+        { label: `2 ${t("common.hr")}`, value: 7200, disabled: false },
       ],
       [
-        { label: "15 sec", value: 15, disabled: false },
-        { label: "15 min", value: 900, disabled: false },
-        { label: "1 day", value: 86400, disabled: false },
+        { label: `15 ${t("common.sec")}`, value: 15, disabled: false },
+        { label: `15 ${t("common.min")}`, value: 900, disabled: false },
+        { label: `1 ${t("common.day")}`, value: 86400, disabled: false },
       ],
       [
-        { label: "30 sec", value: 30, disabled: false },
-        { label: "30 min", value: 1800, disabled: false },
+        { label: `30 ${t("common.sec")}`, value: 30, disabled: false },
+        { label: `30 ${t("common.min")}`, value: 1800, disabled: false },
       ],
     ];
 
