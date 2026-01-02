@@ -125,6 +125,9 @@ pub async fn get_dimension_analytics(
     ),
     security(
         ("Authorization" = [])
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[actix_web::post("/{org_id}/service_streams/_correlate")]

@@ -279,7 +279,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get ingest token"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -322,7 +322,7 @@ async fn get_user_passcode(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update ingest token"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -365,7 +365,7 @@ async fn update_user_passcode(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get RUM ingest token"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -408,7 +408,7 @@ async fn get_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update RUM ingest token"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -451,7 +451,7 @@ async fn update_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create RUM ingest token"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/rumtoken")]

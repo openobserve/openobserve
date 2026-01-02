@@ -660,7 +660,7 @@ pub async fn around_v1(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search around timestamp (v2)"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_around")]
