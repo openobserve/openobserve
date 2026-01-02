@@ -1091,7 +1091,11 @@
     "nodeValue": "Düğüm Değeri",
     "seriesName": "Seri Adı",
     "seriesValue": "Seri Değeri",
-    "axisValue": "Eksen Değeri"
+    "axisValue": "Eksen Değeri",
+    "folders": "Klasörler",
+    "searchFolder": "Arama Klasörü",
+    "deleteFolder": "Klasörü Sil",
+    "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?"
   },
   "panel": {
     "header": "Panel",
@@ -1529,6 +1533,22 @@
       "searchField": "Bir alan ara",
       "savedFunctions": "Kaydedilen fonksiyonlar",
       "autoUsesCheckInterval": "Otomatik (kontrol aralığını kullanır)"
+    },
+    "steps": {
+      "alertSetup": "Uyarı Kurulumu",
+      "conditions": "Koşullar",
+      "compareWithPast": "Geçmişle karşılaştırın",
+      "alertSettings": "Uyarı Ayarları",
+      "deduplication": "Tekilleştirme",
+      "advanced": "Gelişmiş"
+    },
+    "stepCaptions": {
+      "alertSetup": "Uyarınız için sahneyi ayarlayın",
+      "conditions": "Uyarıyı ne tetiklemeli",
+      "compareWithPast": "Mevcut sonuçları başka bir zaman dilimine ait verilerle karşılaştırın",
+      "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
+      "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
+      "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
     }
   },
   "alert_templates": {

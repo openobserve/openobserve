@@ -1091,7 +1091,11 @@
     "nodeValue": "Valore del nodo",
     "seriesName": "Nome della serie",
     "seriesValue": "Valore della serie",
-    "axisValue": "Valore dell'asse"
+    "axisValue": "Valore dell'asse",
+    "folders": "Cartelle",
+    "searchFolder": "Cartella di ricerca",
+    "deleteFolder": "Elimina cartella",
+    "deleteFolderMessage": "Sei sicuro di voler eliminare questa cartella?"
   },
   "panel": {
     "header": "Pannello",
@@ -1529,6 +1533,22 @@
       "searchField": "Cerca un campo",
       "savedFunctions": "Funzioni salvate",
       "autoUsesCheckInterval": "Auto (utilizza l'intervallo di controllo)"
+    },
+    "steps": {
+      "alertSetup": "Configurazione degli avvisi",
+      "conditions": "Condizioni",
+      "compareWithPast": "Confronta con il passato",
+      "alertSettings": "Impostazioni degli avvisi",
+      "deduplication": "Deduplicazione",
+      "advanced": "Avanzato"
+    },
+    "stepCaptions": {
+      "alertSetup": "Prepara il terreno per il tuo avviso",
+      "conditions": "Cosa dovrebbe attivare l'avviso",
+      "compareWithPast": "Confronta i risultati attuali con i dati di un altro periodo di tempo",
+      "alertSettings": "Imposta le regole per gli avvisi e scegli come ricevere le notifiche.",
+      "deduplication": "Evita di inviare lo stesso avviso più volte raggruppando avvisi simili.",
+      "advanced": "Variabili di contesto, descrizione e modello di riga"
     }
   },
   "alert_templates": {

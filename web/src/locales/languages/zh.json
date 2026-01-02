@@ -1091,7 +1091,11 @@
     "nodeValue": "节点值",
     "seriesName": "系列名称",
     "seriesValue": "系列价值",
-    "axisValue": "轴值"
+    "axisValue": "轴值",
+    "folders": "文件夹",
+    "searchFolder": "搜索文件夹",
+    "deleteFolder": "删除文件夹",
+    "deleteFolderMessage": "确定要删除此文件夹吗？"
   },
   "panel": {
     "header": "面板",
@@ -1525,6 +1529,22 @@
       "searchField": "搜索字段",
       "savedFunctions": "保存的函数",
       "autoUsesCheckInterval": "自动（使用检查间隔）"
+    },
+    "steps": {
+      "alertSetup": "警报设置",
+      "conditions": "条件",
+      "compareWithPast": "与过去比较",
+      "alertSettings": "警报设置",
+      "deduplication": "重复数据删除",
+      "advanced": "高级"
+    },
+    "stepCaptions": {
+      "alertSetup": "为您的警报做好准备",
+      "conditions": "什么应该触发警报",
+      "compareWithPast": "将当前结果与其他时间段的数据进行比较",
+      "alertSettings": "设置警报规则并选择您希望以何种方式收到通知。",
+      "deduplication": "通过将相似的警报分组在一起，避免多次发送相同的警报。",
+      "advanced": "上下文变量、描述和行模板"
     }
   },
   "alert_templates": {

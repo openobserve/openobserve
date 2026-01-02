@@ -1091,7 +1091,11 @@
     "nodeValue": "Knotenwert",
     "seriesName": "Name der Serie",
     "seriesValue": "Wert der Serie",
-    "axisValue": "Achsenwert"
+    "axisValue": "Achsenwert",
+    "folders": "Ordner",
+    "searchFolder": "Ordner durchsuchen",
+    "deleteFolder": "Ordner löschen",
+    "deleteFolderMessage": "Möchten Sie diesen Ordner wirklich löschen?"
   },
   "panel": {
     "header": "Panel",
@@ -1529,6 +1533,22 @@
       "searchField": "Suche nach einem Feld",
       "savedFunctions": "Gespeicherte Funktionen",
       "autoUsesCheckInterval": "Auto (verwendet Prüfintervall)"
+    },
+    "steps": {
+      "alertSetup": "Einrichtung von Warnmeldungen",
+      "conditions": "Bedingungen",
+      "compareWithPast": "Mit der Vergangenheit vergleichen",
+      "alertSettings": "Einstellungen für Warnmeldungen",
+      "deduplication": "Deduplizierung",
+      "advanced": "Fortgeschritten"
+    },
+    "stepCaptions": {
+      "alertSetup": "Bereite die Voraussetzungen für deine Warnung vor",
+      "conditions": "Was sollte die Warnung auslösen",
+      "compareWithPast": "Aktuelle Ergebnisse mit Daten aus einem anderen Zeitraum vergleichen",
+      "alertSettings": "Lege deine Alarmregeln fest und wähle aus, wie du benachrichtigt werden möchtest.",
+      "deduplication": "Vermeiden Sie es, dieselbe Warnung mehrmals zu senden, indem Sie ähnliche Warnungen zu Gruppen zusammenfassen.",
+      "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
     }
   },
   "alert_templates": {

@@ -1107,7 +1107,11 @@
     "nodeValue": "ノード値",
     "seriesName": "シリーズ名",
     "seriesValue": "シリーズ値",
-    "axisValue": "軸値"
+    "axisValue": "軸値",
+    "folders": "フォルダー",
+    "searchFolder": "検索フォルダー",
+    "deleteFolder": "[フォルダを削除]",
+    "deleteFolderMessage": "このフォルダを削除してよろしいですか?"
   },
   "panel": {
     "header": "パネル",
@@ -1539,6 +1543,22 @@
       "searchField": "フィールドを検索する",
       "savedFunctions": "保存済み機能",
       "autoUsesCheckInterval": "自動 (チェック間隔を使用)"
+    },
+    "steps": {
+      "alertSetup": "アラート設定",
+      "conditions": "条件",
+      "compareWithPast": "過去と比較",
+      "alertSettings": "アラート設定",
+      "deduplication": "重複排除",
+      "advanced": "上級者向け"
+    },
+    "stepCaptions": {
+      "alertSetup": "アラートのステージを設定する",
+      "conditions": "アラートをトリガーするもの",
+      "compareWithPast": "現在の結果を別の期間のデータと比較する",
+      "alertSettings": "アラートルールを設定し、通知方法を選択します。",
+      "deduplication": "類似のアラートをグループ化して、同じアラートを複数回送信しないようにします。",
+      "advanced": "コンテキスト変数、説明、行テンプレート"
     }
   },
   "alert_templates": {

@@ -1091,7 +1091,11 @@
     "nodeValue": "Valor do nó",
     "seriesName": "Nome da série",
     "seriesValue": "Valor da série",
-    "axisValue": "Valor do eixo"
+    "axisValue": "Valor do eixo",
+    "folders": "Pastas",
+    "searchFolder": "Pasta de pesquisa",
+    "deleteFolder": "Excluir pasta",
+    "deleteFolderMessage": "Tem certeza de que deseja excluir esta pasta?"
   },
   "panel": {
     "header": "Painel",
@@ -1529,6 +1533,22 @@
       "searchField": "Pesquisar um campo",
       "savedFunctions": "Funções salvas",
       "autoUsesCheckInterval": "Automático (usa intervalo de verificação)"
+    },
+    "steps": {
+      "alertSetup": "Configuração de alerta",
+      "conditions": "Condições",
+      "compareWithPast": "Compare com o passado",
+      "alertSettings": "Configurações de alerta",
+      "deduplication": "Desduplicação",
+      "advanced": "Avançado"
+    },
+    "stepCaptions": {
+      "alertSetup": "Prepare o cenário para seu alerta",
+      "conditions": "O que deve acionar o alerta",
+      "compareWithPast": "Compare os resultados atuais com dados de outro período",
+      "alertSettings": "Defina suas regras de alerta e escolha como você gostaria de ser notificado.",
+      "deduplication": "Evite enviar o mesmo alerta várias vezes agrupando alertas semelhantes.",
+      "advanced": "Variáveis de contexto, descrição e modelo de linha"
     }
   },
   "alert_templates": {

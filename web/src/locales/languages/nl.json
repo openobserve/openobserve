@@ -1091,7 +1091,11 @@
     "nodeValue": "Knooppuntwaarde",
     "seriesName": "Naam van de serie",
     "seriesValue": "Seriewaarde",
-    "axisValue": "Axiswaarde"
+    "axisValue": "Axiswaarde",
+    "folders": "Mappen",
+    "searchFolder": "Folder zoeken",
+    "deleteFolder": "Map verwijderen",
+    "deleteFolderMessage": "Weet je zeker dat je deze map wilt verwijderen?"
   },
   "panel": {
     "header": "Paneel",
@@ -1529,6 +1533,22 @@
       "searchField": "Zoek naar een veld",
       "savedFunctions": "Opgeslagen functies",
       "autoUsesCheckInterval": "Auto (maakt gebruik van controle-interval)"
+    },
+    "steps": {
+      "alertSetup": "Instellen van de waarschuwing",
+      "conditions": "Voorwaarden",
+      "compareWithPast": "Vergelijk met Past",
+      "alertSettings": "Waarschuwingsinstellingen",
+      "deduplication": "Deduplicatie",
+      "advanced": "Geavanceerd"
+    },
+    "stepCaptions": {
+      "alertSetup": "Maak de weg vrij voor je waarschuwing",
+      "conditions": "Wat zou de waarschuwing moeten activeren",
+      "compareWithPast": "Vergelijk de huidige resultaten met gegevens uit een andere periode",
+      "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
+      "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
+      "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
     }
   },
   "alert_templates": {
