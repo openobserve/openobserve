@@ -298,7 +298,7 @@
     "toggleFunctionEditor": "Alternar editor de funciones",
     "hide": "Esconder",
     "show": "Mostrar",
-    "editor": "Redactor"
+    "editor": "Redactor",
     "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL."
   },
   "menu": {

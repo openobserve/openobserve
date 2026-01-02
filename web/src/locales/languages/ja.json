@@ -298,7 +298,7 @@
     "toggleFunctionEditor": "関数エディターの切り替え",
     "hide": "隠す",
     "show": "ショー",
-    "editor": "エディター"
+    "editor": "エディター",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。"
   },
   "menu": {

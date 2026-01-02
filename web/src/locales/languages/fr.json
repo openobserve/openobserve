@@ -298,7 +298,7 @@
     "toggleFunctionEditor": "Éditeur de fonctions Toggle",
     "hide": "Masquer",
     "show": "Afficher",
-    "editor": "Rédacteur"
+    "editor": "Rédacteur",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur."
   },
   "menu": {

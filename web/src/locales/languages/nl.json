@@ -298,7 +298,7 @@
     "toggleFunctionEditor": "Functie-editor in- en uitschakelen",
     "hide": "Verstoppen",
     "show": "Laat zien",
-    "editor": "Redacteur"
+    "editor": "Redacteur",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder."
   },
   "menu": {
