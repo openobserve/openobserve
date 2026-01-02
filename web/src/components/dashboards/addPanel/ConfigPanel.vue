@@ -1993,11 +1993,6 @@ export default defineComponent({
       ) {
         dashboardPanelData.data.config.show_gridlines = true;
       }
-
-      // Initialize axis_label_truncate_width if not set
-      // if (dashboardPanelData.data.config.axis_label_truncate_width === undefined) {
-      //   dashboardPanelData.data.config.axis_label_truncate_width = null;
-      // }
     });
 
     const legendWidthValue = computed({
@@ -2625,11 +2620,9 @@ export default defineComponent({
         // Only clear values when switching TO a time-based field
         if (hasTimeBasedXAxis.value) {
           if (dashboardPanelData.data.config.axis_label_rotate !== 0) {
-            console.log('[hasTimeBasedXAxis] Clearing axis_label_rotate due to time-based x-axis detection');
             dashboardPanelData.data.config.axis_label_rotate = 0;
           }
           if (dashboardPanelData.data.config.axis_label_truncate_width !== null) {
-            console.log('[hasTimeBasedXAxis] Clearing axis_label_truncate_width due to time-based x-axis detection');
             dashboardPanelData.data.config.axis_label_truncate_width = null;
           }
         }
