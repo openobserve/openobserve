@@ -819,4 +819,206 @@ mod tests {
         assert!(response.data.valid_members.is_some());
         assert_eq!(response.data.valid_members.as_ref().unwrap().len(), 1);
     }
+
+    #[test]
+    fn test_trigger_status_from_search_results_pipelines_all_healthy() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 2);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_alerts_with_failures() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_with_warnings() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 2);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_mixed_statuses() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 2); // Completed + ConditionNotSatisfied
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.warning, 1); // Skipped
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_empty() {
+        let results = vec![];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_filter_by_module() {
+        // Mix of different modules - should only count DerivedStream
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 1);
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_no_matching_module() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Completed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        // Query for DerivedStream when only Alert results exist
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_all_failed() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::Alert,
+                status: usage::TriggerDataStatus::Failed,
+            },
+        ];
+
+        let status = TriggerStatus::from_search_results(&results, usage::TriggerDataType::Alert);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 3);
+        assert_eq!(status.warning, 0);
+    }
+
+    #[test]
+    fn test_trigger_status_from_search_results_all_skipped() {
+        let results = vec![
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+            TriggerStatusSearchResult {
+                module: usage::TriggerDataType::DerivedStream,
+                status: usage::TriggerDataStatus::Skipped,
+            },
+        ];
+
+        let status =
+            TriggerStatus::from_search_results(&results, usage::TriggerDataType::DerivedStream);
+
+        assert_eq!(status.healthy, 0);
+        assert_eq!(status.failed, 0);
+        assert_eq!(status.warning, 2);
+    }
 }

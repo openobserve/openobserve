@@ -653,4 +653,147 @@ mod tests {
         };
         assert_eq!(query_desc.sort_order, Some("desc".to_string()));
     }
+
+    #[test]
+    fn test_pipeline_history_entry_serialization() {
+        let entry = PipelineHistoryEntry {
+            timestamp: 1640995200000000,
+            pipeline_name: "test_pipeline".to_string(),
+            org: "test_org".to_string(),
+            status: "success".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 0,
+            error: None,
+            success_response: Some("OK".to_string()),
+            is_partial: Some(false),
+            delay_in_secs: Some(10),
+            evaluation_took_in_secs: Some(1.5),
+            source_node: Some("node1".to_string()),
+            query_took: Some(500),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: PipelineHistoryEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.timestamp, entry.timestamp);
+        assert_eq!(deserialized.pipeline_name, entry.pipeline_name);
+        assert_eq!(deserialized.org, entry.org);
+        assert_eq!(deserialized.status, entry.status);
+        assert_eq!(deserialized.is_realtime, entry.is_realtime);
+        assert_eq!(deserialized.is_silenced, entry.is_silenced);
+    }
+
+    #[test]
+    fn test_pipeline_history_response_serialization() {
+        let entry = PipelineHistoryEntry {
+            timestamp: 1640995200000000,
+            pipeline_name: "test_pipeline".to_string(),
+            org: "test_org".to_string(),
+            status: "success".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+        };
+
+        let response = PipelineHistoryResponse {
+            total: 1,
+            from: 0,
+            size: 10,
+            hits: vec![entry],
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: PipelineHistoryResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.total, 1);
+        assert_eq!(deserialized.from, 0);
+        assert_eq!(deserialized.size, 10);
+        assert_eq!(deserialized.hits.len(), 1);
+    }
+
+    #[test]
+    fn test_pipeline_history_entry_with_error() {
+        let entry = PipelineHistoryEntry {
+            timestamp: 1640995200000000,
+            pipeline_name: "failed_pipeline".to_string(),
+            org: "test_org".to_string(),
+            status: "error".to_string(),
+            is_realtime: false,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 3,
+            error: Some("Connection timeout".to_string()),
+            success_response: None,
+            is_partial: Some(true),
+            delay_in_secs: Some(5),
+            evaluation_took_in_secs: Some(2.5),
+            source_node: Some("node2".to_string()),
+            query_took: Some(1000),
+        };
+
+        assert_eq!(entry.status, "error");
+        assert!(entry.error.is_some());
+        assert_eq!(entry.error.unwrap(), "Connection timeout");
+        assert_eq!(entry.retries, 3);
+    }
+
+    #[test]
+    fn test_pipeline_history_response_empty() {
+        let response = PipelineHistoryResponse {
+            total: 0,
+            from: 0,
+            size: 10,
+            hits: vec![],
+        };
+
+        assert_eq!(response.total, 0);
+        assert_eq!(response.hits.len(), 0);
+    }
+
+    #[test]
+    fn test_pipeline_history_response_pagination() {
+        let entry = PipelineHistoryEntry {
+            timestamp: 1640995200000000,
+            pipeline_name: "test_pipeline".to_string(),
+            org: "test_org".to_string(),
+            status: "success".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+        };
+
+        let response = PipelineHistoryResponse {
+            total: 100,
+            from: 50,
+            size: 10,
+            hits: vec![entry],
+        };
+
+        assert_eq!(response.total, 100);
+        assert_eq!(response.from, 50);
+        assert_eq!(response.size, 10);
+        assert_eq!(response.hits.len(), 1);
+    }
 }
