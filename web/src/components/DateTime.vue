@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
-                <div class="relative-period-name">Custom</div>
+                <div class="relative-period-name">{{ t("common.custom") }}</div>
                 <q-tooltip
                   style="z-index: 10001; font-size: 14px"
                   anchor="center right"

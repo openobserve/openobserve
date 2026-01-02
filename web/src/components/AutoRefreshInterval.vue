@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <div class="row">
-        <div class="col col-12 q-pa-sm" style="text-align: center">
+        <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
           <q-btn
             data-test="logs-search-off-refresh-interval"
             no-caps
@@ -129,7 +129,7 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
-    const refreshTimes = [
+    const refreshTimes = computed(() => [
       [
         { label: `5 ${t("common.sec")}`, value: 5, disabled: false },
         { label: `1 ${t("common.min")}`, value: 60, disabled: false },
@@ -149,7 +149,7 @@ export default defineComponent({
         { label: `30 ${t("common.sec")}`, value: 30, disabled: false },
         { label: `30 ${t("common.min")}`, value: 1800, disabled: false },
       ],
-    ];
+    ]);
 
     // v-model computed value
     const selectedValue = computed({
@@ -166,11 +166,16 @@ export default defineComponent({
     });
 
     // computed label based on the selected value
-    const selectedLabel = computed(
-      () =>
-        refreshTimes.flat().find((it: any) => it.value == selectedValue.value)
-          ?.label || generateDurationLabel(selectedValue.value),
-    );
+    const selectedLabel = computed(() => {
+      // Handle "Off" case (value 0)
+      if (selectedValue.value === 0) {
+        return t("common.off");
+      }
+
+      // Find the label from refreshTimes
+      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
+      return found?.label || generateDurationLabel(selectedValue.value);
+    });
 
     // update model when the selection has changed
     const onItemClick = (item: any) => {
@@ -211,7 +216,7 @@ export default defineComponent({
     };
 
     const updateDisabledFlags = () => {
-      refreshTimes.forEach((row) => {
+      refreshTimes.value.forEach((row) => {
         row.forEach((item) => {
           item.disabled = isDisabled(item.value);
         });
