@@ -277,7 +277,8 @@
     "transformLabel": "Dönüştürün",
     "addToDashboard": "Kontrol Paneline Ekle",
     "selectStream": "Akışı Seç",
-    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor."
+    "pattern_summary": "{totalTime} ms içinde {logsAnalyzed} olaylarında bulunan {totalEvents} olay ve {patternsFound} modelinden 1 ila 50 arası gösteriliyor.",
+    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır."
   },
   "menu": {
     "home": "Ana Sayfa",

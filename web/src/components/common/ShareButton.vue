@@ -20,19 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="buttonClass"
     :size="buttonSize"
     :loading="isLoading"
-    :disable="disabled || !url"
+    :disable="disabled || !url || isWebUrlNotConfigured"
     icon="share"
     @click="handleShareClick"
   >
     <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
-    <q-tooltip v-if="tooltip || !showLabel">
+    <q-tooltip v-if="isWebUrlNotConfigured">
+     <q-icon color="warning" name="warning" class="q-mr-xs" /> {{ t("search.webUrlNotConfigured") }}
+    </q-tooltip>
+    <q-tooltip v-else-if="tooltip || !showLabel">
       {{ tooltip || t("search.shareLink") }}
     </q-tooltip>
   </q-btn>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeUnmount } from "vue";
+import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
@@ -89,6 +92,12 @@ export default defineComponent({
 
     // Detect if browser is Safari
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    // Check if web_url is configured
+    const isWebUrlNotConfigured = computed(() => {
+      const webUrl = store.state.zoConfig?.web_url || "";
+      return !webUrl || webUrl.trim() === "";
+    });
 
     /**
      * Polling mechanism to check store for short URL without blocking main thread
@@ -285,6 +294,7 @@ export default defineComponent({
     return {
       t,
       isLoading,
+      isWebUrlNotConfigured,
       handleShareClick,
     };
   },

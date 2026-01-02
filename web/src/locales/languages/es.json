@@ -277,7 +277,8 @@
     "transformLabel": "Transformar",
     "addToDashboard": "Agregar al panel",
     "selectStream": "Selecciona Stream",
-    "pattern_summary": "Se muestran de 1 a 50 de los eventos y {patternsFound} patrones de {totalEvents} encontrados en eventos de {logsAnalyzed} en {totalTime} ms."
+    "pattern_summary": "Se muestran de 1 a 50 de los eventos y {patternsFound} patrones de {totalEvents} encontrados en eventos de {logsAnalyzed} en {totalTime} ms.",
+    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL."
   },
   "menu": {
     "home": "Inicio",
