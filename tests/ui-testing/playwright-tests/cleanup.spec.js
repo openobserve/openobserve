@@ -54,8 +54,8 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
-    // Clean up all dashboards owned by automation user
-    // This includes: Joins_Test_* (dashboard joins parallel tests), and other test dashboards
+    // Clean up all dashboards owned by automation user OR matching test patterns
+    // This includes: Dashboard_Joins_* (dashboard joins parallel tests), and other test dashboards
     await pm.apiCleanup.cleanupDashboards();
 
     // Clean up all pipelines for e2e_automate streams
