@@ -1534,8 +1534,9 @@ watch(
           if (queryStreamName === oldStreamName) {
             // Replace the stream name in the query
             // Use regex to find and replace the FROM clause
+            const escapedOldStreamName = oldStreamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const fromPattern = new RegExp(
-              `FROM\\s+["'\`]?${oldStreamName}["'\`]?`,
+              `FROM\\s+["'\`]?${escapedOldStreamName}["'\`]?`,
               'i'
             );
             const updatedQuery = query.value.replace(
