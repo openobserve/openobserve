@@ -56,6 +56,9 @@ describe("ShareButton", () => {
       state: {
         selectedOrganization: { identifier: "test-org" },
         pendingShortURL: null,
+        zoConfig: {
+          web_url: "https://example.com",
+        },
       },
       mutations: {
         setPendingShortURL(state, payload) {
@@ -76,6 +79,7 @@ describe("ShareButton", () => {
             linkCopiedSuccessfully: "Link copied successfully",
             errorCopyingLink: "Error copying link",
             errorShorteningLink: "Error shortening link",
+            webUrlNotConfigured: "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
           },
         },
       },
@@ -301,5 +305,76 @@ describe("ShareButton", () => {
 
     const button = wrapper.find("button");
     expect(button.attributes("disable")).toBeDefined();
+  });
+
+  it("should disable button when web_url is not configured", () => {
+    const storeWithoutWebUrl = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        pendingShortURL: null,
+        zoConfig: {
+          web_url: "",
+        },
+      },
+      mutations: {
+        setPendingShortURL(state, payload) {
+          state.pendingShortURL = payload;
+        },
+        clearPendingShortURL(state) {
+          state.pendingShortURL = null;
+        },
+      },
+    });
+
+    const wrapper = mount(ShareButton, {
+      props: {
+        url: "https://example.com/logs",
+      },
+      global: {
+        plugins: [storeWithoutWebUrl, i18n],
+        stubs: {
+          QBtn: {
+            template: '<button :disable="disable"><slot /></button>',
+            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+          },
+          QTooltip: { template: '<div><slot /></div>' },
+        },
+      },
+    });
+
+    const button = wrapper.find("button");
+    expect(button.attributes("disable")).toBeDefined();
+  });
+
+  it("should show warning tooltip when web_url is not configured", () => {
+    const storeWithoutWebUrl = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        pendingShortURL: null,
+        zoConfig: {
+          web_url: "",
+        },
+      },
+      mutations: {
+        setPendingShortURL(state, payload) {
+          state.pendingShortURL = payload;
+        },
+        clearPendingShortURL(state) {
+          state.pendingShortURL = null;
+        },
+      },
+    });
+
+    const wrapper = mount(ShareButton, {
+      props: {
+        url: "https://example.com/logs",
+      },
+      global: {
+        plugins: [storeWithoutWebUrl, i18n],
+      },
+    });
+
+    // Check that isWebUrlNotConfigured computed property is true
+    expect(wrapper.vm.isWebUrlNotConfigured).toBe(true);
   });
 });

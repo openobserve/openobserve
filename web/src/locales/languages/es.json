@@ -299,6 +299,7 @@
     "hide": "Esconder",
     "show": "Mostrar",
     "editor": "Redactor"
+    "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL."
   },
   "menu": {
     "home": "Inicio",

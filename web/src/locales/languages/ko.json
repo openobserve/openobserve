@@ -299,6 +299,7 @@
     "hide": "숨기기",
     "show": "쇼",
     "editor": "에디터"
+    "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다."
   },
   "menu": {
     "home": "홈",

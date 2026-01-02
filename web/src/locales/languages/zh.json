@@ -299,6 +299,7 @@
     "hide": "隐藏",
     "show": "显示",
     "editor": "编辑器"
+    "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。"
   },
   "menu": {
     "home": "主页",

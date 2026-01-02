@@ -299,6 +299,7 @@
     "hide": "Gizle",
     "show": "Göster",
     "editor": "Editör"
+    "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır."
   },
   "menu": {
     "home": "Ana Sayfa",
