@@ -200,6 +200,12 @@ export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = 'horizontal'
 ) => {
+  console.log('[convertServiceGraphToTree] Called with:', {
+    nodeCount: graphData.nodes.length,
+    edgeCount: graphData.edges.length,
+    layoutType
+  });
+
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
   graphData.edges.forEach((edge: any) => {
@@ -209,14 +215,27 @@ export const convertServiceGraphToTree = (
     edgesMap.get(edge.from)!.push(edge);
   });
 
-  // Find root nodes (nodes with no incoming edges)
+  // Build reverse adjacency map (incoming edges)
+  const incomingEdgesMap = new Map<string, any[]>();
+  graphData.edges.forEach((edge: any) => {
+    if (!incomingEdgesMap.has(edge.to)) {
+      incomingEdgesMap.set(edge.to, []);
+    }
+    incomingEdgesMap.get(edge.to)!.push(edge);
+  });
+
+  // Find all root nodes (nodes with no incoming edges)
   const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
   const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
+
+  // Track all visited nodes across all trees to find orphaned components
+  const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
   const buildTree = (nodeId: string, visited = new Set<string>()): any => {
     if (visited.has(nodeId)) return null; // Prevent cycles
     visited.add(nodeId);
+    globalVisited.add(nodeId);
 
     const node = graphData.nodes.find((n: any) => n.id === nodeId);
     if (!node) return null;
@@ -268,12 +287,23 @@ export const convertServiceGraphToTree = (
     };
   };
 
-  // If no clear root nodes, use all nodes with outgoing edges as roots
-  const roots = rootNodes.length > 0
-    ? rootNodes
-    : graphData.nodes.filter((n: any) => edgesMap.has(n.id));
+  // Start with root nodes
+  console.log('[convertServiceGraphToTree] Root nodes:', rootNodes.map((n: any) => n.id));
+  let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
+  console.log('[convertServiceGraphToTree] Trees from roots:', treeData.length);
 
-  const treeData = roots.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
+  // Find unvisited nodes (disconnected components or cycles)
+  const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
+  console.log('[convertServiceGraphToTree] Unvisited nodes:', unvisitedNodes.map((n: any) => n.id));
+
+  // Add unvisited nodes as separate root trees
+  if (unvisitedNodes.length > 0) {
+    const additionalTrees = unvisitedNodes
+      .map((node: any) => buildTree(node.id))
+      .filter((n: any) => n !== null);
+    treeData = [...treeData, ...additionalTrees];
+    console.log('[convertServiceGraphToTree] Total trees after adding unvisited:', treeData.length);
+  }
 
   // If still no tree data, create a flat structure
   if (treeData.length === 0 && graphData.nodes.length > 0) {
@@ -301,6 +331,17 @@ export const convertServiceGraphToTree = (
     };
   }
 
+  // ECharts tree needs a single root - create virtual root if multiple trees
+  const finalTreeData = treeData.length > 1
+    ? [{
+        name: 'Services',
+        symbolSize: 1,
+        itemStyle: { opacity: 0 },
+        label: { show: false },
+        children: treeData,
+      }]
+    : treeData;
+
   const options = {
     tooltip: {
       show: true,
@@ -310,7 +351,7 @@ export const convertServiceGraphToTree = (
     series: [
       {
         type: 'tree',
-        data: treeData,
+        data: finalTreeData,
         layout: layoutType === 'radial' ? 'radial' : 'orthogonal',
         orient: layoutType === 'vertical' ? 'TB' : 'LR',
         initialTreeDepth: -1,
