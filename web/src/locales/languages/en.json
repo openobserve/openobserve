@@ -781,7 +781,14 @@
     "function_definition": "Function Definition",
     "enrichmentTableURL": "Enrichment Table URL",
     "urlCannotBeModified": "URL cannot be modified after creation",
-    "close": "Close"
+    "close": "Close",
+    "filterAll": "All",
+    "filterFile": "File",
+    "filterUrl": "Url",
+    "dataSource": "Data Source",
+    "uploadFile": "Upload File",
+    "fromUrl": "From URL",
+    "addFunction": "Add Function"
   },
   "latencyInsights": {
     "title": "Insights",
