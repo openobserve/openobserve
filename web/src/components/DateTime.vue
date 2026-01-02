@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="saveDate(null)"
             v-close-popup
           >
-            Apply
+            {{ t("common.apply") }}
           </q-btn>
         </div>
       </q-menu>
