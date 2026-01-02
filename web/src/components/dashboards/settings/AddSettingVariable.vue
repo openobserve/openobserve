@@ -22,6 +22,159 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="scrollable-content">
         <q-form greedy ref="addVariableForm" @submit="onSubmit">
+          <div class="q-mt-md">
+            <div class="q-mb-md">
+              <q-select
+                hint="Variables will be applied to all tabs and panels if global is selected."
+                v-model="variableData.scope"
+                :options="scopeOptions"
+                label="Select variable scope"
+                outlined
+                dense
+                emit-value
+                map-options
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-scope-select"
+              />
+            </div>
+
+            <!-- Tab selection section - shown only when scope is tabs or panels -->
+            <div
+              v-if="
+                variableData.scope === 'tabs' || variableData.scope === 'panels'
+              "
+              class="q-mt-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected tabs."
+                v-model="selectedTabs"
+                :options="tabsOptions"
+                label="Select tabs"
+                multiple
+                stack-label
+                outlined
+                dense
+                emit-value
+                map-options
+                @update:model-value="updatePanels"
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                data-test="dashboard-variable-tabs-select"
+                :rules="[
+                  (val: any) =>
+                    (variableData.scope !== 'tabs' &&
+                      variableData.scope !== 'panels') ||
+                    (val && val.length > 0) ||
+                    'At least one tab is required',
+                ]"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+
+            <!-- Panel selection section - shown only when scope is panels -->
+            <div
+              v-if="
+                variableData.scope === 'panels' &&
+                (selectedTabs.length > 0 || isFromAddPanel)
+              "
+              class="q-mt-md"
+            >
+              <q-select
+                hint="Variables will be available only in the selected panels."
+                v-model="selectedPanels"
+                :options="groupedPanelsOptions"
+                label="Select panels"
+                stack-label
+                multiple
+                filled
+                outlined
+                dense
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop q-mb-md"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                emit-value
+                map-options
+                data-test="dashboard-variable-panels-select"
+                :rules="[
+                  (val: any) =>
+                    variableData.scope !== 'panels' ||
+                    (val && val.length > 0) ||
+                    'At least one panel is required',
+                ]"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <!-- Tab separator -->
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <!-- Panel options (including Current Panel) -->
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label
+                        :class="
+                          opt.isCurrentPanel
+                            ? 'text-primary text-weight-bold'
+                            : ''
+                        "
+                      >
+                        {{ opt.label }}
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+          </div>
           <div class="col">
             <div>
               <q-select
@@ -553,159 +706,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="q-mt-md">
-            <div class="q-mb-md">
-              <q-select
-                hint="Variables will be applied to all tabs and panels if global is selected."
-                v-model="variableData.scope"
-                :options="scopeOptions"
-                label="Select variable scope"
-                outlined
-                dense
-                emit-value
-                map-options
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
-                data-test="dashboard-variable-scope-select"
-              />
-            </div>
-
-            <!-- Tab selection section - shown only when scope is tabs or panels -->
-            <div
-              v-if="
-                variableData.scope === 'tabs' || variableData.scope === 'panels'
-              "
-              class="q-mt-md"
-            >
-              <q-select
-                hint="Variables will be available only in the selected tabs."
-                v-model="selectedTabs"
-                :options="tabsOptions"
-                label="Select tabs"
-                multiple
-                stack-label
-                outlined
-                dense
-                emit-value
-                map-options
-                @update:model-value="updatePanels"
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
-                data-test="dashboard-variable-tabs-select"
-                :rules="[
-                  (val: any) =>
-                    (variableData.scope !== 'tabs' &&
-                      variableData.scope !== 'panels') ||
-                    (val && val.length > 0) ||
-                    'At least one tab is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label>{{ opt.label }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-            </div>
-
-            <!-- Panel selection section - shown only when scope is panels -->
-            <div
-              v-if="
-                variableData.scope === 'panels' &&
-                (selectedTabs.length > 0 || isFromAddPanel)
-              "
-              class="q-mt-md"
-            >
-              <q-select
-                hint="Variables will be available only in the selected panels."
-                v-model="selectedPanels"
-                :options="groupedPanelsOptions"
-                label="Select panels"
-                stack-label
-                multiple
-                filled
-                outlined
-                dense
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
-                emit-value
-                map-options
-                data-test="dashboard-variable-panels-select"
-                :rules="[
-                  (val: any) =>
-                    variableData.scope !== 'panels' ||
-                    (val && val.length > 0) ||
-                    'At least one panel is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <!-- Tab separator -->
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <!-- Panel options (including Current Panel) -->
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label
-                        :class="
-                          opt.isCurrentPanel
-                            ? 'text-primary text-weight-bold'
-                            : ''
-                        "
-                      >
-                        {{ opt.label }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-            </div>
-          </div>
           <!-- hide on dashboard toggle -->
           <div class="q-mt-md">
             <q-toggle
@@ -819,6 +819,7 @@ import {
   buildVariablesDependencyGraph,
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import useNotifications from "@/composables/useNotifications";
 
@@ -1548,14 +1549,75 @@ export default defineComponent({
       emit("close");
     };
 
-    const dashboardVariablesFilterItems = computed(() =>
-      props.dashboardVariablesList
-        .map((it: any) => ({
-          label: it.name,
-          value: "$" + it.name,
-        }))
-        .filter((it: any) => it.label !== variableData.name),
-    );
+    const dashboardVariablesFilterItems = computed(() => {
+      // Get current variable's scope context
+      const currentVarScope = variableData.scope || "global";
+      const currentTabs = selectedTabs.value || [];
+      const currentPanels = selectedPanels.value || [];
+
+      // Filter variables based on visibility rules:
+      // - Global variable: can see global only
+      // - Tab variable: can see global + tab (same tab)
+      // - Panel variable: can see global + tab (parent tab) + panel (same panel)
+      const filteredVars = props.dashboardVariablesList.filter((v: any) => {
+        // Exclude the current variable itself
+        if (v.name === variableData.name) return false;
+
+        const scopeType = getScopeType(v);
+
+        // Global variables are always visible
+        if (scopeType === "global") {
+          return true;
+        }
+
+        // If current variable is global, it can only see other global variables
+        if (currentVarScope === "global") {
+          return false;
+        }
+
+        // Tab-scoped variables
+        if (scopeType === "tabs") {
+          if (currentVarScope === "tabs") {
+            // Tab variables can see tab variables from the same tab
+            const hasCommonTab = currentTabs.some((tab: string) =>
+              v.tabs?.includes(tab),
+            );
+            return hasCommonTab;
+          }
+
+          if (currentVarScope === "panels") {
+            // Panel variables can see tab variables from their parent tab
+            const hasCommonTab = currentTabs.some((tab: string) =>
+              v.tabs?.includes(tab),
+            );
+            return hasCommonTab;
+          }
+        }
+
+        // Panel-scoped variables
+        if (scopeType === "panels") {
+          if (currentVarScope === "tabs") {
+            // Tab variables cannot see panel variables (child level)
+            return false;
+          }
+
+          if (currentVarScope === "panels") {
+            // Panel variables can see panel variables from the same panel
+            const hasCommonPanel = currentPanels.some((panel: string) =>
+              v.panels?.includes(panel),
+            );
+            return hasCommonPanel;
+          }
+        }
+
+        return false;
+      });
+
+      return filteredVars.map((it: any) => ({
+        label: it.name,
+        value: "$" + it.name,
+      }));
+    });
 
     // Add new custom value to the array
     const addCustomValue = () => {
