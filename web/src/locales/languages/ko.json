@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "최소 새로 고침 간격은 {interval} 초입니다.그에 따라 최소 새로 고침 간격을 조정하십시오.",
     "min": "분",
     "hr": "시간",
-    "day": "하루"
+    "day": "하루",
+    "switchTo": "로 전환",
+    "lightMode": "라이트 모드",
+    "darkMode": "다크 모드",
+    "manageTheme": "테마 관리"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",

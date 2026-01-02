@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "O intervalo mínimo de atualização é de {interval} segundos. Ajuste o intervalo mínimo de atualização adequadamente.",
     "min": "min",
     "hr": "hr",
-    "day": "dia"
+    "day": "dia",
+    "switchTo": "Mudar para",
+    "lightMode": "Modo de luz",
+    "darkMode": "Modo escuro",
+    "manageTheme": "Gerenciar tema"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

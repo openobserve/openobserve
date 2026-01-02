@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "Minimum yenileme aralığı {interval} saniyedir. Lütfen minimum yenileme aralığını buna göre ayarlayın.",
     "min": "asgari",
     "hr": "saat",
-    "day": "gün"
+    "day": "gün",
+    "switchTo": "Şuraya geç",
+    "lightMode": "Işık Modu",
+    "darkMode": "Karanlık Mod",
+    "manageTheme": "Tema Yönet"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

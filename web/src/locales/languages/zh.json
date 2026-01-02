@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "最小刷新间隔为 {interval} 秒。请相应地调整最小刷新间隔。",
     "min": "分钟",
     "hr": "hr",
-    "day": "天"
+    "day": "天",
+    "switchTo": "切换到",
+    "lightMode": "灯光模式",
+    "darkMode": "黑暗模式",
+    "manageTheme": "管理主题"
   },
   "search": {
     "selectIndex": "选择数据流",

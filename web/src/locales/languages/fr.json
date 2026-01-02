@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "L'intervalle de rafraîchissement minimum est de {interval} secondes. Veuillez ajuster l'intervalle de rafraîchissement minimum en conséquence.",
     "min": "minimum",
     "hr": "heure",
-    "day": "jour"
+    "day": "jour",
+    "switchTo": "Passez à",
+    "lightMode": "Mode d'éclairage",
+    "darkMode": "Mode sombre",
+    "manageTheme": "Gérer le thème"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "Het minimale vernieuwingsinterval is {interval} seconden. Pas het minimale vernieuwingsinterval dienovereenkomstig aan.",
     "min": "min",
     "hr": "hr",
-    "day": "dag"
+    "day": "dag",
+    "switchTo": "Overschakelen naar",
+    "lightMode": "Lichtmodus",
+    "darkMode": "Donkere modus",
+    "manageTheme": "Thema beheren"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

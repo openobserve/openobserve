@@ -100,7 +100,11 @@
     "minRefreshIntervalMessage": "Das minimale Aktualisierungsintervall beträgt {interval} Sekunden. Bitte passen Sie das minimale Aktualisierungsintervall entsprechend an.",
     "min": "Min.",
     "hr": "Std.",
-    "day": "Tag"
+    "day": "Tag",
+    "switchTo": "Wechseln Sie zu",
+    "lightMode": "Licht-Modus",
+    "darkMode": "Dunkler Modus",
+    "manageTheme": "Theme verwalten"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
