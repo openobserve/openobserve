@@ -137,12 +137,16 @@ async fn process_stream(
 
     // Build COALESCE expression for peer identification
     // Try multiple attributes in priority order (following OTel conventions)
+    // NOTE: We use server_address (hostname only) instead of http_url (full URL with path/query)
+    // to avoid creating separate nodes for each URL variation with different query parameters
+    // or path parameters. This follows OpenTelemetry and Grafana Tempo best practices.
     let peer_attr_candidates = [
         "peer_service",   // peer.service - explicit peer service name
-        "server_address", // server.address - logical server name
+        "server_address", // server.address - hostname only (prevents URL cardinality explosion)
         "db_name",        // db.name - database name
-        "db_system",      // db.system - database type
-        "http_url",       // http.url - for HTTP calls (extract hostname)
+        "db_system",      /* db.system - database type
+                           * "http_url" removed - causes node explosion due to query params and
+                           * path variations */
     ];
 
     let mut available_peer_attrs = Vec::new();
