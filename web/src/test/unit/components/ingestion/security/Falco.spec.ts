@@ -76,8 +76,8 @@ describe("Falco.vue", () => {
 
   it("should replace [STREAM_NAME] with falco", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("falco");
-    expect(copyContent.props("content")).not.toContain("[STREAM_NAME]");
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("falco");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });

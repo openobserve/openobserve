@@ -44,7 +44,8 @@ describe("Jumpcloud.vue", () => {
 
   it("should replace [STREAM_NAME] with jumpcloud", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("jumpcloud");
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("jumpcloud");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });

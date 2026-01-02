@@ -44,8 +44,8 @@ describe("GoogleWorkspace.vue", () => {
 
   it("should replace [STREAM_NAME] with googleworkspace", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("googleworkspace");
-    expect(copyContent.props("content")).not.toContain("[STREAM_NAME]");
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("googleworkspace");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });
