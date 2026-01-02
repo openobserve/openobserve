@@ -641,7 +641,14 @@
     "function_definition": "함수 정의",
     "enrichmentTableURL": "인리치먼트 테이블 URL",
     "urlCannotBeModified": "생성 후에는 URL을 수정할 수 없습니다.",
-    "close": "닫기"
+    "close": "닫기",
+    "filterAll": "모두",
+    "filterFile": "파일",
+    "filterUrl": "URL",
+    "dataSource": "데이터 소스",
+    "uploadFile": "파일 업로드",
+    "fromUrl": "URL에서",
+    "addFunction": "함수 추가"
   },
   "confirmDialog": {
     "cancel": "취소",

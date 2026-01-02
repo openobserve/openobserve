@@ -641,7 +641,14 @@
     "function_definition": "Fonksiyon Tanımı",
     "enrichmentTableURL": "Zenginleştirme Tablosu URL",
     "urlCannotBeModified": "URL oluşturulduktan sonra değiştirilemez",
-    "close": "Kapat"
+    "close": "Kapat",
+    "filterAll": "Hepsi",
+    "filterFile": "Dosya",
+    "filterUrl": "URL'si",
+    "dataSource": "Veri Kaynağı",
+    "uploadFile": "Dosya Yükle",
+    "fromUrl": "URL'den",
+    "addFunction": "Fonksiyon Ekle"
   },
   "confirmDialog": {
     "cancel": "İptal",

@@ -658,7 +658,14 @@
     "function_definition": "関数定義",
     "enrichmentTableURL": "エンリッチメントテーブルの URL",
     "urlCannotBeModified": "作成後に URL を変更することはできません",
-    "close": "閉じる"
+    "close": "閉じる",
+    "filterAll": "[すべて]",
+    "filterFile": "[ファイル]",
+    "filterUrl": "URL",
+    "dataSource": "[データソース]",
+    "uploadFile": "[ファイルをアップロード]",
+    "fromUrl": "URL から",
+    "addFunction": "機能追加"
   },
   "confirmDialog": {
     "cancel": "キャンセル",

@@ -641,7 +641,14 @@
     "function_definition": "Definizione della funzione",
     "enrichmentTableURL": "URL della tabella di arricchimento",
     "urlCannotBeModified": "L'URL non può essere modificato dopo la creazione",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "filterAll": "Tutti",
+    "filterFile": "File",
+    "filterUrl": "Url",
+    "dataSource": "Fonte dati",
+    "uploadFile": "Carica file",
+    "fromUrl": "Dall'URL",
+    "addFunction": "Aggiungi funzione"
   },
   "confirmDialog": {
     "cancel": "Annulla",

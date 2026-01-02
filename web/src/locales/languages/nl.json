@@ -641,7 +641,14 @@
     "function_definition": "Definitie van de functie",
     "enrichmentTableURL": "URL van de verrijkingstabel",
     "urlCannotBeModified": "De URL kan na het aanmaken niet worden gewijzigd",
-    "close": "Sluiten"
+    "close": "Sluiten",
+    "filterAll": "Alles",
+    "filterFile": "bestand",
+    "filterUrl": "Url",
+    "dataSource": "Gegevensbron",
+    "uploadFile": "Bestand uploaden",
+    "fromUrl": "Van URL",
+    "addFunction": "Functie toevoegen"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
