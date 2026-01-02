@@ -124,7 +124,7 @@ pub async fn create_dashboard(
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
-    let saved = match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
+    let saved = match dashboards::save_dashboard(&org_id, &folder, dashboard, None).await {
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };
@@ -171,10 +171,9 @@ async fn update_dashboard(
     let mut dashboard: Dashboard = req_body.0.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+    dashboard.set_dashboard_id(dashboard_id);
 
-    let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
-        .await
-    {
+    let saved = match dashboards::save_dashboard(&org_id, &folder, dashboard, hash).await {
         Ok(saved) => saved,
         Err(err) => return err.into(),
     };

@@ -312,29 +312,17 @@ pub fn get_query_variables(
 }
 
 #[tracing::instrument(skip(dashboard))]
-pub async fn create_dashboard(
+pub async fn save_dashboard(
     org_id: &str,
     folder_id: &str,
     dashboard: Dashboard,
+    hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
-
-    let dashboard = if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
-        let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
-        set_ownership(
-            org_id,
-            "dashboards",
-            Authz {
-                obj_id: dashboard_id,
-                parent_type: "folders".to_owned(),
-                parent: folder_id.to_owned(),
-            },
-        )
-        .await;
-        Ok(saved)
+    if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
+        // Folder exists, do nothing
     } else if folder_id == DEFAULT_FOLDER {
+        // Create the default folder
         let folder = Folder {
             folder_id: DEFAULT_FOLDER.to_string(),
             name: DEFAULT_FOLDER.to_string(),
@@ -343,57 +331,38 @@ pub async fn create_dashboard(
         folders::save_folder(org_id, folder, FolderType::Dashboards, true)
             .await
             .map_err(|_| DashboardError::CreateDefaultFolder)?;
-        let dashboard_id = ider::generate();
-        let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
-        set_ownership(
-            org_id,
-            "dashboards",
-            Authz {
-                obj_id: dashboard_id,
-                parent_type: "folders".to_owned(),
-                parent: folder_id.to_owned(),
-            },
-        )
-        .await;
-        Ok(saved)
     } else {
-        Err(DashboardError::CreateFolderNotFound)
-    }?;
+        return Err(DashboardError::CreateFolderNotFound);
+    }
+
+    let dashboard_id = match dashboard.dashboard_id() {
+        Some(id) if !id.is_empty() => id.to_string(),
+        _ => ider::generate(),
+    };
+
+    let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, hash).await?;
+    set_ownership(
+        org_id,
+        "dashboards",
+        Authz {
+            obj_id: dashboard_id,
+            parent_type: "folders".to_owned(),
+            parent: folder_id.to_owned(),
+        },
+    )
+    .await;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
             org_id,
             folder_id,
-            dashboard.clone(),
+            saved.clone(),
         )
         .await;
     }
 
-    Ok(dashboard)
-}
-
-#[tracing::instrument(skip(dashboard))]
-pub async fn update_dashboard(
-    org_id: &str,
-    dashboard_id: &str,
-    folder_id: &str,
-    dashboard: Dashboard,
-    hash: Option<&str>,
-) -> Result<Dashboard, DashboardError> {
-    let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
-            org_id,
-            folder_id,
-            dashboard.clone(),
-        )
-        .await;
-    }
-
-    Ok(dashboard)
+    Ok(saved)
 }
 
 #[tracing::instrument]
