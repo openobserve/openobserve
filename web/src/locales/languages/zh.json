@@ -598,7 +598,12 @@
     "extendedEndDate": "结束日期",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "环境快速模式字段",
-    "sdr": "敏感数据编辑"
+    "sdr": "敏感数据编辑",
+    "fields": "字段",
+    "fieldName": "字段名",
+    "fieldRequired": "字段为必填字段！",
+    "dataType": "数据类型",
+    "dataTypeRequired": "数据类型为必填项！"
   },
   "function": {
     "header": "函数",

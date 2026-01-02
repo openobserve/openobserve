@@ -598,7 +598,12 @@
     "extendedEndDate": "Einddatum",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Veld voor de snelle modus van de omgeving",
-    "sdr": "Redactie van gevoelige gegevens"
+    "sdr": "Redactie van gevoelige gegevens",
+    "fields": "Velden",
+    "fieldName": "Veldnaam",
+    "fieldRequired": "Veld is verplicht!",
+    "dataType": "Gegevenstype",
+    "dataTypeRequired": "Gegevenstype is vereist!"
   },
   "function": {
     "header": "Functies",

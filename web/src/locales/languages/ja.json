@@ -615,7 +615,12 @@
     "flattenLevel": "フラット化レベル",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "環境クイックモードフィールド",
-    "sdr": "機密データの編集"
+    "sdr": "機密データの編集",
+    "fields": "フィールド",
+    "fieldName": "[フィールド名]",
+    "fieldRequired": "フィールドは必須です！",
+    "dataType": "データタイプ",
+    "dataTypeRequired": "データタイプが必要です!"
   },
   "function": {
     "header": "関数",

@@ -598,7 +598,12 @@
     "extendedEndDate": "Data di fine",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Campo in modalità rapida Ambiente",
-    "sdr": "Redazione dei dati sensibili"
+    "sdr": "Redazione dei dati sensibili",
+    "fields": "Campi",
+    "fieldName": "Nome campo",
+    "fieldRequired": "Il campo è obbligatorio!",
+    "dataType": "Tipo di dati",
+    "dataTypeRequired": "Il tipo di dati è obbligatorio!"
   },
   "function": {
     "header": "Funzioni",

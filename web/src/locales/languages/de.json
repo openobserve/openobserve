@@ -598,7 +598,12 @@
     "extendedEndDate": "Enddatum",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Feld für den Umgebungs-Schnellmodus",
-    "sdr": "Redaktion sensibler Daten"
+    "sdr": "Redaktion sensibler Daten",
+    "fields": "Felder",
+    "fieldName": "Feldname",
+    "fieldRequired": "Feld ist erforderlich!",
+    "dataType": "Datentyp",
+    "dataTypeRequired": "Datentyp ist erforderlich!"
   },
   "function": {
     "header": "Funktionen",
