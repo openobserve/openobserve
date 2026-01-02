@@ -44,7 +44,9 @@ describe("OSQuery.vue", () => {
 
   it("should replace [STREAM_NAME] with osquery", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("osquery");
+    // Check the rendered content in the stub
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("osquery");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });

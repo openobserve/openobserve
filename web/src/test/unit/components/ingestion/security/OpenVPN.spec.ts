@@ -44,7 +44,8 @@ describe("OpenVPN.vue", () => {
 
   it("should replace [STREAM_NAME] with openvpn", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("openvpn");
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("openvpn");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });

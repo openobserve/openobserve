@@ -97,10 +97,10 @@ describe("Okta.vue", () => {
   describe("content processing", () => {
     it("should replace [STREAM_NAME] placeholder with okta", () => {
       const wrapper = mountComponent();
-      const copyContent = wrapper.findComponent({ name: "CopyContent" });
+      const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
 
-      expect(copyContent.props("content")).toContain("okta");
-      expect(copyContent.props("content")).not.toContain("[STREAM_NAME]");
+      expect(copyContentStub.text()).toContain("okta");
+      expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
     });
   });
 

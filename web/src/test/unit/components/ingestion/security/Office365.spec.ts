@@ -44,7 +44,8 @@ describe("Office365.vue", () => {
 
   it("should replace [STREAM_NAME] with office365", () => {
     const wrapper = mountComponent();
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
-    expect(copyContent.props("content")).toContain("office365");
+    const copyContentStub = wrapper.find('[data-test="copy-content-stub"]');
+    expect(copyContentStub.text()).toContain("office365");
+    expect(copyContentStub.text()).not.toContain("[STREAM_NAME]");
   });
 });
