@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   :title="t('dashboard.edit')"
                   @click="editVariableFn(variable.name)"
-                  data-test="dashboard-edit-variable"
+                  :data-test="`dashboard-edit-variable-${variable.name}`"
                 />
                 <q-btn
                   :icon="outlinedDelete"
