@@ -1142,7 +1142,9 @@
     "alertTitle": "Alertas",
     "dashboardTitle": "Painéis",
     "streamTotal": "Fluxos",
-    "totalDashboard": "Painéis"
+    "totalDashboard": "Painéis",
+    "viewButton": "Visualizar",
+    "noDataAvailable": "Não há dados disponíveis"
   },
   "billing": {
     "header": "Uso e cobrança",

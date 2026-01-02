@@ -1142,7 +1142,9 @@
     "alertTitle": "Avvisi",
     "dashboardTitle": "Dashboard",
     "streamTotal": "Stream",
-    "totalDashboard": "Dashboard"
+    "totalDashboard": "Dashboard",
+    "viewButton": "Visualizza",
+    "noDataAvailable": "Nessun dato disponibile"
   },
   "billing": {
     "header": "Utilizzo e fatturazione",

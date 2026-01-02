@@ -1142,7 +1142,9 @@
     "alertTitle": "알림",
     "dashboardTitle": "대시보드",
     "streamTotal": "스트림",
-    "totalDashboard": "대시보드"
+    "totalDashboard": "대시보드",
+    "viewButton": "보기",
+    "noDataAvailable": "사용 가능한 데이터 없음"
   },
   "billing": {
     "header": "사용 및 청구",

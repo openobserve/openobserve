@@ -1142,7 +1142,9 @@
     "alertTitle": "告警",
     "dashboardTitle": "仪表板",
     "streamTotal": "数据流",
-    "totalDashboard": "仪表板"
+    "totalDashboard": "仪表板",
+    "viewButton": "查看",
+    "noDataAvailable": "无可用数据"
   },
   "billing": {
     "header": "用量和账单",

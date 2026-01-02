@@ -1142,7 +1142,9 @@
     "alertTitle": "Uyarılar",
     "dashboardTitle": "Gösterge panoları",
     "streamTotal": "Akışlar",
-    "totalDashboard": "Gösterge panoları"
+    "totalDashboard": "Gösterge panoları",
+    "viewButton": "Görünüm",
+    "noDataAvailable": "Veri yok"
   },
   "billing": {
     "header": "Kullanım ve Faturalandırma",

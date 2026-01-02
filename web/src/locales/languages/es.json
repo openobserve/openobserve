@@ -1142,7 +1142,9 @@
     "alertTitle": "Alertas",
     "dashboardTitle": "Tableros",
     "streamTotal": "Transmisiones",
-    "totalDashboard": "Tableros"
+    "totalDashboard": "Tableros",
+    "viewButton": "Ver",
+    "noDataAvailable": "No hay datos disponibles"
   },
   "billing": {
     "header": "Uso y facturación",

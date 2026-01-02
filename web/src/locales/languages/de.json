@@ -1142,7 +1142,9 @@
     "alertTitle": "Warnmeldungen",
     "dashboardTitle": "Dashboards",
     "streamTotal": "Streams",
-    "totalDashboard": "Dashboards"
+    "totalDashboard": "Dashboards",
+    "viewButton": "Ansicht",
+    "noDataAvailable": "Keine Daten verfügbar"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",

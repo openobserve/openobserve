@@ -1142,7 +1142,9 @@
     "alertTitle": "Alertes",
     "dashboardTitle": "Tableaux de bord",
     "streamTotal": "Ruisseaux",
-    "totalDashboard": "Tableaux de bord"
+    "totalDashboard": "Tableaux de bord",
+    "viewButton": "Afficher",
+    "noDataAvailable": "Aucune donnée disponible"
   },
   "billing": {
     "header": "Utilisation et facturation",

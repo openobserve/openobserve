@@ -1156,7 +1156,9 @@
     "alertTitle": "アラート",
     "dashboardTitle": "ダッシュボード",
     "streamTotal": "ストリーム",
-    "totalDashboard": "ダッシュボード"
+    "totalDashboard": "ダッシュボード",
+    "viewButton": "ビュー",
+    "noDataAvailable": "データはありません"
   },
   "billing": {
     "header": "使用状況と請求",

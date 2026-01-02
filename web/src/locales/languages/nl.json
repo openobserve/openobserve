@@ -1142,7 +1142,9 @@
     "alertTitle": "Waarschuwingen",
     "dashboardTitle": "Dashboards",
     "streamTotal": "Streams",
-    "totalDashboard": "Dashboards"
+    "totalDashboard": "Dashboards",
+    "viewButton": "Bekijken",
+    "noDataAvailable": "Geen gegevens beschikbaar"
   },
   "billing": {
     "header": "Gebruik en facturering",
