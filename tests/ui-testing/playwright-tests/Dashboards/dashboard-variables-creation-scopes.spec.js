@@ -678,6 +678,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     // Add global and tab variables
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    // open setting window
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_container_name", {
       scope: "tab",
       assignedTabs: ["tab1"]

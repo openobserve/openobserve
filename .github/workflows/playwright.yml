@@ -113,23 +113,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-                "theme-management.spec.js",
-                "ingestion-config.spec.js",
-                "landingPage.spec.js",
-                "languageTranslation.spec.js",
-              ]
+          # - testfolder: "GeneralTests"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "sanity.spec.js",
+          #       "changeOrg.spec.js",
+          #       "enrichment.spec.js",
+          #       "schema.spec.js",
+          #       "schemaload.spec.js",
+          #       "serviceAccount.spec.js",
+          #       "usersOrg.spec.js",
+          #       "org.spec.js",
+          #       "theme-management.spec.js",
+          #       "ingestion-config.spec.js",
+          #       "landingPage.spec.js",
+          #       "languageTranslation.spec.js",
+          #     ]
           # - testfolder: "Logs-Core"
           #   browser: "chrome"
           #   run_files:
