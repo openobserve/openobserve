@@ -38,6 +38,12 @@
   border-radius: 0.5rem;
 }
 
+.build-container {
+  // Dynamic height - will use CSS variable (same as visualize)
+  height: calc(100vh - var(--splitter-height, 10vh) - 2.5rem); // 40px
+  border-radius: 0.5rem;
+}
+
 /* ============================================================================
    SEARCH HISTORY EMPTY STATE
    ============================================================================ */

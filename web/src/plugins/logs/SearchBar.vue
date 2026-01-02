@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-visualize-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'visualize' ? 'selected' : '',
-                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'button button-center tw:rounded-none',
                   'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
@@ -62,6 +62,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <div>
+              <q-btn
+                data-test="logs-build-toggle"
+                :class="[
+                  searchObj.meta.logsVisualizeToggle === 'build' ? 'selected' : '',
+                  config.isEnterprise == 'true' ? 'button button-center tw:rounded-none' : 'button button-right tw:rounded-l-none!',
+                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32'
+                ]"
+                @click="onLogsVisualizeToggleUpdate('build')"
+                no-caps
+                size="sm"
+                icon="construction"
+              >
+                <q-tooltip>
+                  {{ t("search.buildQuery") }}
                 </q-tooltip>
               </q-btn>
             </div>

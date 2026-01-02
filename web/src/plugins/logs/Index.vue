@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
-            v-show="searchObj.meta.logsVisualizeToggle != 'visualize'"
+            v-show="searchObj.meta.logsVisualizeToggle != 'visualize' && searchObj.meta.logsVisualizeToggle != 'build'"
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <q-splitter
@@ -318,6 +318,19 @@ size="md" />
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
             ></VisualizeLogsQuery>
           </div>
+          <div
+            v-show="searchObj.meta.logsVisualizeToggle == 'build'"
+            class="build-container"
+            :style="{ '--splitter-height': `${splitterModel}vh` }"
+          >
+            <BuildQueryTab
+              :errorData="buildErrorData"
+              :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
+              @query-changed="handleBuildQueryChanged"
+              @visualization-saved="handleVisualizationSaved"
+              @error="handleBuildError"
+            ></BuildQueryTab>
+          </div>
         </template>
       </q-splitter>
     </div>
@@ -464,6 +477,9 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     VisualizeLogsQuery: defineAsyncComponent(
       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
+    ),
+    BuildQueryTab: defineAsyncComponent(
+      () => import("@/plugins/logs/BuildQueryTab.vue"),
     ),
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
@@ -691,6 +707,10 @@ export default defineComponent({
       setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
     const visualizeErrorData: any = reactive({
+      errors: [],
+    });
+
+    const buildErrorData: any = reactive({
       errors: [],
     });
 
@@ -2032,6 +2052,22 @@ export default defineComponent({
       errorList.push(errorMessage);
     };
 
+    // Build tab event handlers
+    const handleBuildQueryChanged = (query: string) => {
+      // Optionally sync generated query back to main search
+      console.log("Generated query from Build tab:", query);
+    };
+
+    const handleVisualizationSaved = (config: any) => {
+      // Show success notification
+      showPositiveNotification("Visualization saved to dashboard");
+    };
+
+    const handleBuildError = (error: any) => {
+      // Handle errors from Build tab
+      console.error("Build tab error:", error);
+    };
+
     // [START] cancel running queries
 
     //reactive object for loading state of variablesData and panels
@@ -2480,6 +2516,10 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
+      buildErrorData,
+      handleBuildQueryChanged,
+      handleVisualizationSaved,
+      handleBuildError,
       disableMoreErrorDetails,
       closeSearchHistoryfn,
       resetHistogramWithError,
