@@ -180,13 +180,9 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_executable_pipeline(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: &StreamType,
-) -> Option<ExecutablePipeline> {
-    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
-    pipeline::get_executable_pipeline(&stream_params).await
+#[inline(always)]
+pub async fn get_stream_executable_pipeline(stream: &StreamParams) -> Option<ExecutablePipeline> {
+    pipeline::get_executable_pipeline(stream).await
 }
 
 pub async fn get_stream_alerts(
