@@ -476,4 +476,181 @@ describe("convertTraceData", () => {
       expect(result.options.series[0].links.length).toBeGreaterThan(0);
     });
   });
+
+  // Additional service graph tests for new functionality
+  describe('convertServiceGraphToTree - edge cases', () => {
+  it('should handle single root node', () => {
+    const graphData = {
+      nodes: [
+        { id: 'root', label: 'root', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'child', label: 'child', requests: 50, errors: 0, error_rate: 0 }
+      ],
+      edges: [
+        { from: 'root', to: 'child', total_requests: 50, failed_requests: 0 }
+      ]
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+    expect(result.options.series[0].type).toBe('tree');
+    expect(result.options.series[0].data).toHaveLength(1);
+  });
+
+  it('should handle multiple disconnected trees with virtual root', () => {
+    const graphData = {
+      nodes: [
+        { id: 'root1', label: 'root1', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'root2', label: 'root2', requests: 50, errors: 0, error_rate: 0 }
+      ],
+      edges: []
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+    expect(result.options.series[0].data).toHaveLength(1);
+    expect(result.options.series[0].data[0].name).toBe('Services');
+    expect(result.options.series[0].data[0].children).toHaveLength(2);
+  });
+
+  it('should handle cycles by tracking visited nodes', () => {
+    const graphData = {
+      nodes: [
+        { id: 'a', label: 'a', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'b', label: 'b', requests: 50, errors: 0, error_rate: 0 }
+      ],
+      edges: [
+        { from: 'a', to: 'b', total_requests: 50, failed_requests: 0 },
+        { from: 'b', to: 'a', total_requests: 50, failed_requests: 0 }
+      ]
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+    expect(result.options.series[0].type).toBe('tree');
+  });
+
+  it('should include unvisited nodes as separate trees', () => {
+    const graphData = {
+      nodes: [
+        { id: 'root', label: 'root', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'child', label: 'child', requests: 50, errors: 0, error_rate: 0 },
+        { id: 'isolated', label: 'isolated', requests: 25, errors: 0, error_rate: 0 }
+      ],
+      edges: [
+        { from: 'root', to: 'child', total_requests: 50, failed_requests: 0 }
+      ]
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+    const data = result.options.series[0].data;
+    expect(data).toHaveLength(1);
+    expect(data[0].children).toHaveLength(2); // root tree + isolated node
+  });
+
+  it('should color nodes based on error rate', () => {
+    const graphData = {
+      nodes: [
+        { id: 'healthy', label: 'healthy', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'warning', label: 'warning', requests: 100, errors: 2, error_rate: 2 },
+        { id: 'critical', label: 'critical', requests: 100, errors: 15, error_rate: 15 }
+      ],
+      edges: []
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+    const data = result.options.series[0].data[0].children;
+
+    expect(data[0].itemStyle.color).toBe('#4CAF50'); // Green for healthy
+    expect(data[1].itemStyle.color).toBe('#FFC107'); // Yellow for warning (>1%)
+    expect(data[2].itemStyle.color).toBe('#F44336'); // Red for critical (>10%)
+  });
+
+  it('should handle vertical layout orientation', () => {
+    const graphData = {
+      nodes: [{ id: 'node', label: 'node', requests: 100, errors: 0, error_rate: 0 }],
+      edges: []
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'vertical');
+
+    expect(result.options.series[0].orient).toBe('TB');
+  });
+
+  it('should handle radial layout', () => {
+    const graphData = {
+      nodes: [{ id: 'node', label: 'node', requests: 100, errors: 0, error_rate: 0 }],
+      edges: []
+    };
+
+    const result = convertServiceGraphToTree(graphData, 'radial');
+
+    expect(result.options.series[0].layout).toBe('radial');
+  });
+
+  it('should handle empty data gracefully', () => {
+    const graphData = { nodes: [], edges: [] };
+
+    const result = convertServiceGraphToTree(graphData, 'horizontal');
+
+    expect(result.options).toBeDefined();
+  });
+});
+
+describe('convertServiceGraphToNetwork', () => {
+  it('should validate node IDs', () => {
+    const graphData = {
+      nodes: [
+        { id: 'valid', label: 'valid', requests: 100, errors: 0 },
+        { id: null, label: 'invalid', requests: 50, errors: 0 }
+      ],
+      edges: []
+    };
+
+    const result = convertServiceGraphToNetwork(graphData, 'force', new Map());
+
+    expect(result.options).toBeDefined();
+  });
+
+  it('should handle force layout', () => {
+    const graphData = {
+      nodes: [
+        { id: 'a', label: 'a', requests: 100, errors: 0, error_rate: 0 },
+        { id: 'b', label: 'b', requests: 50, errors: 0, error_rate: 0 }
+      ],
+      edges: [
+        { from: 'a', to: 'b', total_requests: 50, failed_requests: 0 }
+      ]
+    };
+
+    const result = convertServiceGraphToNetwork(graphData, 'force', new Map());
+
+    expect(result.options).toBeDefined();
+    expect(result.options.series[0].type).toBe('graph');
+    expect(result.options.series[0].layout).toBe('none');
+  });
+
+  it('should handle circular layout', () => {
+    const graphData = {
+      nodes: [
+        { id: 'a', label: 'a', requests: 100, errors: 0, error_rate: 0 }
+      ],
+      edges: []
+    };
+
+    const result = convertServiceGraphToNetwork(graphData, 'circular', new Map());
+
+    expect(result.options).toBeDefined();
+    // Circular uses 'none' layout with manually computed positions
+    expect(result.options.series[0].layout).toBe('none');
+    expect(result.options.series[0].data[0].x).toBeDefined();
+    expect(result.options.series[0].data[0].y).toBeDefined();
+  });
+  });
 });
