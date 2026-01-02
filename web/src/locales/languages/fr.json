@@ -598,7 +598,12 @@
     "extendedEndDate": "Date de fin",
     "regexPatterns": "RDS",
     "envQuickModeMsg": "Champ de mode rapide pour l'environnement",
-    "sdr": "Rédaction de données sensibles"
+    "sdr": "Rédaction de données sensibles",
+    "fields": "Champs",
+    "fieldName": "Nom du champ",
+    "fieldRequired": "Ce champ est obligatoire !",
+    "dataType": "Type de données",
+    "dataTypeRequired": "Le type de données est obligatoire !"
   },
   "function": {
     "header": "Fonctions",

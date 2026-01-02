@@ -598,7 +598,12 @@
     "extendedEndDate": "Bitiş Tarihi",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Ortam hızlı mod alanı",
-    "sdr": "Hassas Veri Düzenleme"
+    "sdr": "Hassas Veri Düzenleme",
+    "fields": "Tarlalar",
+    "fieldName": "Alan Adı",
+    "fieldRequired": "Alan zorunludur!",
+    "dataType": "Veri Türü",
+    "dataTypeRequired": "Veri Türü gereklidir!"
   },
   "function": {
     "header": "Fonksiyonlar",

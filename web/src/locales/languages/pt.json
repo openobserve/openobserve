@@ -598,7 +598,12 @@
     "extendedEndDate": "Data de término",
     "regexPatterns": "SDR",
     "envQuickModeMsg": "Campo de modo rápido do ambiente",
-    "sdr": "Redação de dados confidenciais"
+    "sdr": "Redação de dados confidenciais",
+    "fields": "Campos",
+    "fieldName": "Nome do campo",
+    "fieldRequired": "O campo é obrigatório!",
+    "dataType": "Tipo de dados",
+    "dataTypeRequired": "O tipo de dados é obrigatório!"
   },
   "function": {
     "header": "Funções",
