@@ -1,8 +1,3 @@
-/**
- * Dashboard Variables - Creation & Scope Restrictions Test Suite
- * Tests variable creation rules, scope-based dependency restrictions, and edit panel variable availability
- */
-
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
