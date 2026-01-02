@@ -121,9 +121,13 @@ pub async fn query_edges_from_stream_internal(
 
     let stream_name = "_o2_service_graph";
 
-    // Query last 60 minutes by default
+    // Use configured time range (same as processor)
     let now = chrono::Utc::now().timestamp_micros();
-    let sixty_minutes_ago = now - (60 * 60 * 1_000_000);
+    let window_minutes = o2_enterprise::enterprise::common::config::get_config()
+        .service_graph
+        .query_time_range_minutes;
+    let window_micros = window_minutes * 60 * 1_000_000;
+    let start_time = now - window_micros;
 
     // Query pre-aggregated edge state (already summarized per minute)
     let sql = if let Some(stream) = stream_filter {
@@ -133,7 +137,7 @@ pub async fn query_edges_from_stream_internal(
              AND org_id = '{}'
              AND trace_stream_name = '{}'
              LIMIT 10000",
-            stream_name, sixty_minutes_ago, org_id, stream
+            stream_name, start_time, org_id, stream
         )
     } else {
         format!(
@@ -141,7 +145,7 @@ pub async fn query_edges_from_stream_internal(
              WHERE _timestamp >= {}
              AND org_id = '{}'
              LIMIT 10000",
-            stream_name, sixty_minutes_ago, org_id
+            stream_name, start_time, org_id
         )
     };
 
@@ -151,7 +155,7 @@ pub async fn query_edges_from_stream_internal(
             sql: sql.clone(),
             from: 0,
             size: 100000,
-            start_time: sixty_minutes_ago,
+            start_time,
             end_time: now,
             quick_mode: false,
             query_type: "".to_string(),
