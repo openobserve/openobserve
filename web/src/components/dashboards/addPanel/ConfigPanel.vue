@@ -2474,39 +2474,67 @@ export default defineComponent({
 
     // Check if x-axis has time-based fields (histogram, date_bin, etc.) or time-formatted data
     const hasTimeBasedXAxis = computed(() => {
-      const xFields = dashboardPanelData.data.queries[
+      const currentQuery = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.x || [];
+      ];
+      const xFields = currentQuery?.fields?.x || [];
+      const isCustomQuery = currentQuery?.customQuery || false;
 
-      // Debug logging
-      console.log('[hasTimeBasedXAxis] Checking x-axis fields:', xFields);
-      console.log('[hasTimeBasedXAxis] Panel data available:', !!props.panelData, 'length:', props.panelData?.length);
-      console.log('[hasTimeBasedXAxis] Panel data sample:', props.panelData);
-
-      // Check 1: Field uses time-related functions
-      const timeRelatedFunctions = ["histogram", "date_bin", "date_trunc", "time_bucket"];
-      const hasTimeFunctionField = xFields.some((field: any) =>
-        timeRelatedFunctions.includes(field.functionName)
-      );
-
-      console.log('[hasTimeBasedXAxis] Has time function field:', hasTimeFunctionField);
-
-      if (hasTimeFunctionField) {
+      // For PromQL queries, x-axis is always time-based
+      if (promqlMode.value) {
         return true;
       }
 
-      // Check 1.5: Check if field is using the timestamp column from store
-      const timestampColumn = store.state.zoConfig?.timestamp_column;
-      if (timestampColumn) {
-        const usesTimestampColumn = xFields.some((field: any) => {
-          // Check if field's argument uses the timestamp column
-          const fieldName = field?.args?.[0]?.value?.field || field?.column;
-          return fieldName === timestampColumn;
-        });
+      // For custom queries, check SQL for time functions used in SELECT with x-axis alias patterns
+      if (isCustomQuery && currentQuery?.query) {
+        const queryText = currentQuery.query.toLowerCase();
+        
+        // Extract SELECT clause (from SELECT to FROM/WHERE/GROUP)
+        const selectMatch = queryText.match(/select\s+(.*?)\s+from/is);
+        if (selectMatch) {
+          const selectClause = selectMatch[1];
+          
+          // Check if SELECT contains time functions with x-axis alias
+          const timeRelatedFunctions = ["histogram\\(", "date_bin\\(", "date_trunc\\(", "time_bucket\\("];
+          const timestampColumn = store.state.zoConfig?.timestamp_column?.toLowerCase() || '_timestamp';
+          
+          // Check for time functions or timestamp column specifically in x-axis aliases
+          const xAxisPattern = /as\s+["']?x_axis/i;
+          const hasTimeInXAxis = timeRelatedFunctions.some(func => {
+            const funcRegex = new RegExp(func + '[^)]*\\)\\s*' + xAxisPattern.source, 'i');
+            return funcRegex.test(selectClause);
+          }) || new RegExp(timestampColumn + '\\s*' + xAxisPattern.source, 'i').test(selectClause);
+          
+          if (hasTimeInXAxis) {
+            return true;
+          }
+        }
+      }
 
-        if (usesTimestampColumn) {
-          console.log('[hasTimeBasedXAxis] Field uses timestamp column from store');
+      // For non-custom queries (query builder), check x-axis field structure
+      if (!isCustomQuery) {
+        // Check 1: Field uses time-related functions (only for non-custom queries)
+        const timeRelatedFunctions = ["histogram", "date_bin", "date_trunc", "time_bucket"];
+        const hasTimeFunctionField = xFields.some((field: any) =>
+          timeRelatedFunctions.includes(field.functionName)
+        );
+
+        if (hasTimeFunctionField) {
           return true;
+        }
+
+        // Check 1.5: Check if field is using the timestamp column from store (only for non-custom queries)
+        const timestampColumn = store.state.zoConfig?.timestamp_column;
+        if (timestampColumn) {
+          const usesTimestampColumn = xFields.some((field: any) => {
+            // Check if field's argument uses the timestamp column
+            const fieldName = field?.args?.[0]?.value?.field || field?.column;
+            return fieldName === timestampColumn;
+          });
+
+          if (usesTimestampColumn) {
+            return true;
+          }
         }
       }
 
@@ -2520,8 +2548,6 @@ export default defineComponent({
       if (Array.isArray(xAxisData) && xAxisData.length > 0) {
         const sampleSize = Math.min(20, xAxisData.length);
         const sample = xAxisData.slice(0, sampleSize);
-
-        console.log('[hasTimeBasedXAxis] Sampled x-axis data:', sample.slice(0, 3));
 
         if (sample.length > 0) {
           // Check if data matches time series patterns (ISO8601 or timestamp)
@@ -2552,13 +2578,11 @@ export default defineComponent({
           });
 
           if (matchesTimePattern) {
-            console.log('[hasTimeBasedXAxis] Matched time pattern in data');
             return true;
           }
         }
       }
 
-      console.log('[hasTimeBasedXAxis] No time detection matched, returning false');
       return false;
     });
 
@@ -2590,18 +2614,22 @@ export default defineComponent({
     });
 
     // Clear axis label rotate and truncate when switching to time-based x-axis
-    // Use watch instead of watchEffect to avoid running on every panelData change
+    // Watch multiple sources: x-axis fields, query text, and panelData
     watch(
-      () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
+      () => [
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
+        hasTimeBasedXAxis.value
+      ],
       () => {
         // Only clear values when switching TO a time-based field
         if (hasTimeBasedXAxis.value) {
           if (dashboardPanelData.data.config.axis_label_rotate !== 0) {
-            console.log('[hasTimeBasedXAxis] Clearing axis_label_rotate due to x-axis field change');
+            console.log('[hasTimeBasedXAxis] Clearing axis_label_rotate due to time-based x-axis detection');
             dashboardPanelData.data.config.axis_label_rotate = 0;
           }
           if (dashboardPanelData.data.config.axis_label_truncate_width !== null) {
-            console.log('[hasTimeBasedXAxis] Clearing axis_label_truncate_width due to x-axis field change');
+            console.log('[hasTimeBasedXAxis] Clearing axis_label_truncate_width due to time-based x-axis detection');
             dashboardPanelData.data.config.axis_label_truncate_width = null;
           }
         }
