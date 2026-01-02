@@ -22,7 +22,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await ingestion(page);
   });
 
-  test("should verify old/existing variable defaults to global scope", async ({ page }) => {
+  test("1-should verify old/existing variable defaults to global scope", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_Global_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -68,7 +68,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should call query_values API when clicking on variable dropdown", async ({ page }) => {
+  test("2-should call query_values API when clicking on variable dropdown", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_API_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -118,7 +118,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load variable values when clicking dropdown", async ({ page }) => {
+  test("3-should load variable values when clicking dropdown", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_Load_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -160,7 +160,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should successfully select and apply variable value", async ({ page }) => {
+  test("4-should successfully select and apply variable value", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_Select_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -206,7 +206,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load values with max record size limit", async ({ page }) => {
+  test("5-should load values with max record size limit", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_MaxRecord_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -249,7 +249,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should support multi-select for global variable", async ({ page }) => {
+  test("6-should support multi-select for global variable", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_MultiSelect_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -301,7 +301,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should set and use default value for variable", async ({ page }) => {
+  test("7-should set and use default value for variable", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_Default_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -338,7 +338,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should hide variable when hide option is enabled", async ({ page }) => {
+  test("8-should hide variable when hide option is enabled", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_Hidden_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
@@ -372,7 +372,7 @@ test.describe("Dashboard Variables - Global Level", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should reload values when time range changes", async ({ page }) => {
+  test("9-should reload values when time range changes", async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = `Dashboard_TimeRange_${Date.now()}`;
     const variableName = `var_${Date.now()}`;
