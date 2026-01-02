@@ -142,6 +142,18 @@ export class AlertsPage {
             searchAcrossFoldersToggle: '[data-test="alert-list-search-across-folders-toggle"]',
             alertDeleteOption: 'Delete',
 
+            // View Mode Tabs (Alerts / Incidents) - VERIFIED from source code
+            alertIncidentViewTabs: '[data-test="alert-incident-view-tabs"]',
+            alertsViewTab: '[data-test="tab-alerts"]',
+            incidentsViewTab: '[data-test="tab-incidents"]',
+
+            // Incidents view locators
+            incidentListTable: '[data-test="incident-list-table"]',
+            incidentSearchInput: '[data-test="incident-search-input"]',
+
+            // Import button
+            alertImportButton: '[data-test="alert-import"]',
+
             // Table locators
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
@@ -628,6 +640,107 @@ export class AlertsPage {
         await expect(this.page.getByText(folderName)).toBeVisible();
         await this.page.getByRole('button', { name: 'Clear' }).click();
         await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
+    }
+
+    // ==================== VIEW MODE TABS (ALERTS / INCIDENTS) ====================
+
+    /**
+     * Click the Alerts view tab
+     */
+    async clickAlertsTab() {
+        testLogger.info('Clicking Alerts tab');
+        await this.page.locator(this.locators.alertsViewTab).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        testLogger.info('Switched to Alerts view');
+    }
+
+    /**
+     * Click the Incidents view tab
+     */
+    async clickIncidentsTab() {
+        testLogger.info('Clicking Incidents tab');
+        await this.page.locator(this.locators.incidentsViewTab).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        testLogger.info('Switched to Incidents view');
+    }
+
+    /**
+     * Verify the view mode tabs are visible on page load
+     */
+    async expectViewModeTabsVisible() {
+        testLogger.info('Verifying view mode tabs are visible');
+        await expect(this.page.locator(this.locators.alertIncidentViewTabs)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertsViewTab)).toBeVisible();
+        await expect(this.page.locator(this.locators.incidentsViewTab)).toBeVisible();
+        testLogger.info('View mode tabs verified');
+    }
+
+    /**
+     * Verify Alerts view UI elements are visible
+     */
+    async expectAlertsViewElementsVisible() {
+        testLogger.info('Verifying Alerts view elements');
+        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertSearchInput)).toBeVisible();
+        await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).toBeVisible();
+        await expect(this.page.locator(this.locators.alertImportButton)).toBeVisible();
+        await expect(this.page.locator(this.locators.addAlertButton)).toBeVisible();
+        testLogger.info('Alerts view elements verified');
+    }
+
+    /**
+     * Verify Incidents view UI elements are visible
+     */
+    async expectIncidentsViewElementsVisible() {
+        testLogger.info('Verifying Incidents view elements');
+        await expect(this.page.locator(this.locators.incidentListTable)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.incidentSearchInput)).toBeVisible();
+        testLogger.info('Incidents view elements verified');
+    }
+
+    /**
+     * Verify Alerts-only elements are hidden in Incidents view
+     */
+    async expectAlertsOnlyElementsHidden() {
+        testLogger.info('Verifying Alerts-only elements are hidden');
+        await expect(this.page.locator('[data-test="alert-list-table"]')).not.toBeVisible();
+        await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).not.toBeVisible();
+        await expect(this.page.locator(this.locators.alertImportButton)).not.toBeVisible();
+        await expect(this.page.locator(this.locators.addAlertButton)).not.toBeVisible();
+        testLogger.info('Alerts-only elements confirmed hidden');
+    }
+
+    /**
+     * Verify Incidents-only elements are hidden in Alerts view
+     */
+    async expectIncidentsOnlyElementsHidden() {
+        testLogger.info('Verifying Incidents-only elements are hidden');
+        await expect(this.page.locator(this.locators.incidentListTable)).not.toBeVisible();
+        await expect(this.page.locator(this.locators.incidentSearchInput)).not.toBeVisible();
+        testLogger.info('Incidents-only elements confirmed hidden');
+    }
+
+    /**
+     * Search in Alerts view
+     */
+    async searchInAlertsView(query) {
+        testLogger.info(`Searching in Alerts view: ${query}`);
+        const searchInput = this.page.locator(this.locators.alertSearchInput);
+        await searchInput.click();
+        await searchInput.clear();
+        await searchInput.type(query);
+        await this.page.waitForTimeout(500); // Wait for debounce
+        testLogger.info('Search applied in Alerts view');
+    }
+
+    /**
+     * Search in Incidents view
+     */
+    async searchInIncidentsView(query) {
+        testLogger.info(`Searching in Incidents view: ${query}`);
+        await this.page.locator(this.locators.incidentSearchInput).fill(query);
+        await this.page.waitForTimeout(500); // Wait for debounce
+        testLogger.info('Search applied in Incidents view');
     }
 
     // ==================== IMPORT/EXPORT OPERATIONS ====================
