@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (modelValue.toString() === '0' ? 'selected' : '')
             "
             v-close-popup="true"
-            @click="onItemClick({ label: 'Off', value: 0 })"
+            @click="onItemClick({ label: t('common.off'), value: 0 })"
           >
-            Off
+            {{ t("common.off") }}
           </q-btn>
         </div>
       </div>
@@ -131,7 +131,7 @@ export default defineComponent({
 
     const refreshTimes = [
       [
-        { label: "5 sec", value: 5, disabled: false },
+        { label: `5 ${t("common.sec")}`, value: 5, disabled: false },
         { label: "1 min", value: 60, disabled: false },
         { label: "1 hr", value: 3600, disabled: false },
       ],
@@ -216,7 +216,7 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = `The minimum refresh interval is ${props.minRefreshInterval} seconds. Please adjust the minimum refresh interval accordingly.`;
+      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval });
     };
 
     onMounted(() => {

@@ -484,21 +484,21 @@ export default defineComponent({
     const filteredTimezone: any = ref([]);
 
     let relativePeriods = [
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ];
 
     let relativePeriodsSelect = ref([
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ]);
 
     const relativeDates = {
@@ -764,12 +764,12 @@ export default defineComponent({
 
     const getPeriodLabel = computed(() => {
       const periodMapping = {
-        s: "Seconds",
-        m: "Minutes",
-        h: "Hours",
-        d: "Days",
-        w: "Weeks",
-        M: "Months",
+        s: t("common.seconds"),
+        m: t("common.minutes"),
+        h: t("common.hours"),
+        d: t("common.days"),
+        w: t("common.weeks"),
+        M: t("common.months"),
       };
       return periodMapping[relativePeriod.value];
     });

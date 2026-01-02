@@ -316,17 +316,19 @@ const fnSavedFunctionDialog = () => {
 const getTransformLabelTooltip = computed(() => {
 
   // function selection is not supported for visualization
-  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return t("search.functionSelectionNotSupportedVisualization");
 
-  if (!isActionsEnabled.value) return "Toggle Function Editor";
+  if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
+
+  const editorType = searchObj.data.transformType === "action"
+    ? t("search.actionLabel")
+    : searchObj.data.transformType === "function"
+      ? t("search.functionLabel")
+      : t("search.transformLabel");
 
   return searchObj.meta.showTransformEditor
-    ? "Hide"
-    : "Show" + searchObj.data.transformType === "action"
-      ? "Action"
-      : searchObj.data.transformType === "function"
-        ? "Function"
-        : "Transform" + "Editor";
+    ? t("search.hide")
+    : `${t("search.show")} ${editorType} ${t("search.editor")}`;
 });
 </script>
 
