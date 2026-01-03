@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
-                <div class="relative-period-name">Custom</div>
+                <div class="relative-period-name">{{ t("common.custom") }}</div>
                 <q-tooltip
                   style="z-index: 10001; font-size: 14px"
                   anchor="center right"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="saveDate(null)"
             v-close-popup
           >
-            Apply
+            {{ t("common.apply") }}
           </q-btn>
         </div>
       </q-menu>
@@ -484,21 +484,21 @@ export default defineComponent({
     const filteredTimezone: any = ref([]);
 
     let relativePeriods = [
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ];
 
     let relativePeriodsSelect = ref([
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ]);
 
     const relativeDates = {
@@ -764,12 +764,12 @@ export default defineComponent({
 
     const getPeriodLabel = computed(() => {
       const periodMapping = {
-        s: "Seconds",
-        m: "Minutes",
-        h: "Hours",
-        d: "Days",
-        w: "Weeks",
-        M: "Months",
+        s: t("common.seconds"),
+        m: t("common.minutes"),
+        h: t("common.hours"),
+        d: t("common.days"),
+        w: t("common.weeks"),
+        M: t("common.months"),
       };
       return periodMapping[relativePeriod.value];
     });

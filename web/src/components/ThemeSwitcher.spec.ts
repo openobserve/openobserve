@@ -4,6 +4,7 @@ import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import ThemeSwitcher from './ThemeSwitcher.vue';
 import { createStore } from 'vuex';
 import { Dialog, Notify } from 'quasar';
+import { createI18n } from 'vue-i18n';
 
 // Mock localStorage
 const localStorageMock = {
@@ -26,6 +27,21 @@ const mockStore = createStore({
 // Install Quasar with proper plugins
 installQuasar({
   plugins: [Dialog, Notify],
+});
+
+// Create i18n instance
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  messages: {
+    en: {
+      common: {
+        lightMode: 'Light Mode',
+        darkMode: 'Dark Mode',
+        switchTo: 'Switch to'
+      }
+    }
+  }
 });
 
 describe('ThemeSwitcher', () => {
@@ -55,7 +71,7 @@ describe('ThemeSwitcher', () => {
   const mountComponent = () => {
     return mount(ThemeSwitcher, {
       global: {
-        plugins: [mockStore],
+        plugins: [mockStore, i18n],
       },
     });
   };
