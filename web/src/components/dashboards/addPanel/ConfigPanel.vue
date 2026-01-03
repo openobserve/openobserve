@@ -1794,7 +1794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
+import { computed, defineComponent, inject, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1848,7 +1848,7 @@ export default defineComponent({
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
-    const dashboardPanelDataPageKey = inject<string>(
+    const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
