@@ -1470,7 +1470,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-slot
           :type="'number'"
           placeholder="0"
-          :disable="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_rotate =
@@ -1493,9 +1492,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :offset="[0, 8]"
                   class="bg-grey-8"
                 >
-                  {{ hasTimeBasedXAxis
-                    ? 'Not available for time-series x-axis fields'
-                    : 'Rotate x-axis labels by the specified angle (in degrees)' }}
+                  <div>
+                    Rotate the x-axis label text by a chosen angle (in degrees) to improve readability when labels are long or crowded.
+                    <br /><br />
+                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                  </div>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -1513,7 +1514,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-slot
           :type="'number'"
           placeholder="0"
-          :disable="hasTimeBasedXAxis"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.axis_label_truncate_width =
@@ -1536,9 +1536,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :offset="[0, 8]"
                   class="bg-grey-8"
                 >
-                  {{ hasTimeBasedXAxis
-                    ? 'Not available for time-series x-axis fields'
-                    : 'Truncate x-axis labels to the specified width (in pixels)' }}
+                  <div>
+                    Truncate x-axis labels to the specified width (in pixels).
+                    <br /><br />
+                    <strong>Note:</strong> This option is not supported for time-series x-axis fields.
+                  </div>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -1824,10 +1826,6 @@ import {
   shouldApplyChartAlign,
   shouldShowGridlines,
 } from "@/utils/dashboard/configUtils";
-import {
-  isTimeSeries,
-  isTimeStamp,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export default defineComponent({
   components: {
@@ -2467,122 +2465,6 @@ export default defineComponent({
       );
     });
 
-    // Check if x-axis has time-based fields (histogram, date_bin, etc.) or time-formatted data
-    const hasTimeBasedXAxis = computed(() => {
-      const currentQuery = dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ];
-      const xFields = currentQuery?.fields?.x || [];
-      const isCustomQuery = currentQuery?.customQuery || false;
-
-      // For PromQL queries, x-axis is always time-based
-      if (promqlMode.value) {
-        return true;
-      }
-
-      // For custom queries, check SQL for time functions (without requiring specific alias)
-      if (isCustomQuery && currentQuery?.query) {
-        const queryText = currentQuery.query.toLowerCase();
-
-        // Extract SELECT clause (from SELECT to FROM/WHERE/GROUP)
-        const selectMatch = queryText.match(/select\s+(.*?)\s+from/is);
-        if (selectMatch) {
-          const selectClause = selectMatch[1];
-
-          // Check if SELECT contains time functions anywhere in the clause
-          // Don't rely on specific alias patterns as aliasing is not compulsory
-          const timeRelatedFunctions = ["histogram\\(", "date_bin\\(", "date_trunc\\(", "time_bucket\\("];
-          const timestampColumn = store.state.zoConfig?.timestamp_column?.toLowerCase() || '_timestamp';
-
-          // Check for time functions or timestamp column in SELECT (regardless of alias)
-          const hasTimeFunction = timeRelatedFunctions.some(func => {
-            const funcRegex = new RegExp(func, 'i');
-            return funcRegex.test(selectClause);
-          });
-
-          const hasTimestampColumn = new RegExp('\\b' + timestampColumn + '\\b', 'i').test(selectClause);
-
-          if (hasTimeFunction || hasTimestampColumn) {
-            return true;
-          }
-        }
-      }
-
-      // For non-custom queries (query builder), check x-axis field structure
-      if (!isCustomQuery) {
-        // Check 1: Field uses time-related functions (only for non-custom queries)
-        const timeRelatedFunctions = ["histogram", "date_bin", "date_trunc", "time_bucket"];
-        const hasTimeFunctionField = xFields.some((field: any) =>
-          timeRelatedFunctions.includes(field.functionName)
-        );
-
-        if (hasTimeFunctionField) {
-          return true;
-        }
-
-        // Check 1.5: Check if field is using the timestamp column from store (only for non-custom queries)
-        const timestampColumn = store.state.zoConfig?.timestamp_column;
-        if (timestampColumn) {
-          const usesTimestampColumn = xFields.some((field: any) => {
-            // Check if field's argument uses the timestamp column
-            const fieldName = field?.args?.[0]?.value?.field || field?.column;
-            return fieldName === timestampColumn;
-          });
-
-          if (usesTimestampColumn) {
-            return true;
-          }
-        }
-      }
-
-      // Check 2: Check if data looks like time series by sampling the actual data
-      // This is the ONLY reliable way - check actual data values, not field names
-      // panelData structure: { options: { xAxis: [{ data: [...] }] } } or { options: { xAxis: { data: [...] } } }
-      const xAxisData = Array.isArray(props.panelData?.options?.xAxis)
-        ? props.panelData?.options?.xAxis?.[0]?.data
-        : props.panelData?.options?.xAxis?.data;
-
-      if (Array.isArray(xAxisData) && xAxisData.length > 0) {
-        const sampleSize = Math.min(20, xAxisData.length);
-        const sample = xAxisData.slice(0, sampleSize);
-
-        if (sample.length > 0) {
-          // Check if data matches time series patterns (ISO8601 or timestamp)
-          if (isTimeSeries(sample) || isTimeStamp(sample, null)) {
-            return true;
-          }
-
-          // Check if data looks like formatted time/date strings
-          const timePatterns = [
-            // ISO 8601 formats
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO8601: 2025-10-13T06:58:37 (with optional fractional seconds and timezone)
-            // Date with time formats
-            /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/, // YYYY-MM-DD HH:MM:SS
-            /^\d{2}\/\d{2}\/\d{4}\s\d{2}:\d{2}:\d{2}/, // MM/DD/YYYY HH:MM:SS or DD/MM/YYYY HH:MM:SS
-            // Time only formats
-            /^\d{2}:\d{2}:\d{2}/, // HH:MM:SS (with optional milliseconds)
-            // Date only formats
-            /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-            /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY or DD/MM/YYYY
-            /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY or MM-DD-YYYY
-            // Unix timestamp (seconds - 10 digits, milliseconds - 13 digits)
-            /^\d{10,13}$/,
-          ];
-
-          const matchesTimePattern = sample.every((value: any) => {
-            const strValue = String(value);
-            return timePatterns.some((pattern) => pattern.test(strValue));
-          });
-
-          if (matchesTimePattern) {
-            return true;
-          }
-        }
-      }
-
-      return false;
-    });
-
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
       if (
@@ -2609,28 +2491,6 @@ export default defineComponent({
         }
       }
     });
-
-    // Clear axis label rotate and truncate when switching to time-based x-axis
-    // Watch multiple sources: x-axis fields, query text, and panelData
-    watch(
-      () => [
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
-        hasTimeBasedXAxis.value
-      ],
-      () => {
-        // Only clear values when switching TO a time-based field
-        if (hasTimeBasedXAxis.value) {
-          if (dashboardPanelData.data.config.axis_label_rotate !== 0) {
-            dashboardPanelData.data.config.axis_label_rotate = 0;
-          }
-          if (dashboardPanelData.data.config.axis_label_truncate_width !== null) {
-            dashboardPanelData.data.config.axis_label_truncate_width = null;
-          }
-        }
-      },
-      { deep: true }
-    );
 
     return {
       t,
@@ -2662,7 +2522,6 @@ export default defineComponent({
       showTrellisConfig,
       isBreakdownFieldEmpty,
       hasTimeShifts,
-      hasTimeBasedXAxis,
       dashboardPanelDataPageKey,
       store,
       shouldShowLegendsToggle,

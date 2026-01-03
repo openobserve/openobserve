@@ -499,9 +499,10 @@ export const convertPromQLData = async (
       axisLabel: {
         // hide axis label if overlaps
         hideOverlap: true,
-        rotate: panelSchema.config?.axis_label_rotate || 0,
-        overflow: panelSchema.config?.axis_label_truncate_width ? "truncate" : "none",
-        width: panelSchema.config?.axis_label_truncate_width || undefined,
+        // For time-based x-axis (type: "time"), rotation and truncation are not applicable
+        rotate: 0,
+        overflow: "none",
+        width: undefined,
         margin: 10,
       },
     },

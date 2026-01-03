@@ -2629,9 +2629,21 @@ export const convertSQLData = async (
       if (panelSchema.config.trellis?.layout) {
         options.xAxis.forEach((axis: any) => {
           axis.type = "time";
+          // For time-based x-axis, reset axis label rotation and truncation
+          if (axis.axisLabel) {
+            axis.axisLabel.rotate = 0;
+            axis.axisLabel.overflow = "none";
+            axis.axisLabel.width = undefined;
+          }
         });
       } else {
         options.xAxis[0].type = "time";
+        // For time-based x-axis, reset axis label rotation and truncation
+        if (options.xAxis[0].axisLabel) {
+          options.xAxis[0].axisLabel.rotate = 0;
+          options.xAxis[0].axisLabel.overflow = "none";
+          options.xAxis[0].axisLabel.width = undefined;
+        }
       }
 
       options.xAxis[0].data = [];
@@ -2808,9 +2820,21 @@ export const convertSQLData = async (
       if (panelSchema.config.trellis?.layout) {
         options.xAxis.forEach((axis: any) => {
           axis.type = "time";
+          // For time-based x-axis, reset axis label rotation and truncation
+          if (axis.axisLabel) {
+            axis.axisLabel.rotate = 0;
+            axis.axisLabel.overflow = "none";
+            axis.axisLabel.width = undefined;
+          }
         });
       } else {
         options.xAxis[0].type = "time";
+        // For time-based x-axis, reset axis label rotation and truncation
+        if (options.xAxis[0].axisLabel) {
+          options.xAxis[0].axisLabel.rotate = 0;
+          options.xAxis[0].axisLabel.overflow = "none";
+          options.xAxis[0].axisLabel.width = undefined;
+        }
       }
 
       options.xAxis[0].data = [];
