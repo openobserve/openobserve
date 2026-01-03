@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw:mb-2">Data Source</div>
+              <div class="text-grey-8 text-bold tw:mb-2">{{ t('function.dataSource') }}</div>
               <q-option-group
                 v-model="formData.source"
                 :options="sourceOptions"
@@ -210,8 +210,8 @@ export default defineComponent({
     let compilationErr = ref("");
 
     const sourceOptions = [
-      { label: 'Upload File', value: 'file' },
-      { label: 'From URL', value: 'url' }
+      { label: t('function.uploadFile'), value: 'file' },
+      { label: t('function.fromUrl'), value: 'url' }
     ];
 
     const editorUpdate = (e: any) => {

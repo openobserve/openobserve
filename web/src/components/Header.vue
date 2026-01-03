@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon size="xs" name="color_lens" class="padding-none" />
               </q-item-section>
               <q-item-section>
-                <q-item-label>Manage Theme</q-item-label>
+                <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-separator />

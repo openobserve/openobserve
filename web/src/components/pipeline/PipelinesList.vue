@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     no-caps
                     flat
-                    label="Backfill"
+                    :label="t('pipeline.backfill')"
                     @click="goToBackfillJobs"
                     icon="refresh"
                 />

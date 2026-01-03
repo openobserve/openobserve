@@ -22,10 +22,20 @@ import { createStore } from 'vuex';
 
 const i18n = createI18n({
   locale: 'en',
+  legacy: false,
   messages: {
     en: {
       alert_templates: {
         edit: 'Edit'
+      },
+      logStream: {
+        fields: 'Fields',
+        addField: 'Add Field',
+        fieldName: 'Field Name',
+        fieldRequired: 'Field is required!',
+        indexType: 'Index Type',
+        dataType: 'Data Type',
+        dataTypeRequired: 'Data Type is required!'
       }
     }
   }
