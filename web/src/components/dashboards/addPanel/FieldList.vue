@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="props?.row?.isGroup"
-                class="tw:pl-2 tw:py-1 tw:font-semibold tw:bg-gray-200"
+                class="tw:pl-2 tw:py-1 tw:font-semibold field-group-header"
               >
                 {{ props?.row?.groupName }}
               </div>
@@ -1298,6 +1298,10 @@ export default defineComponent({
       }
     }
   }
+
+  .field-group-header {
+    background-color: var(--o2-header-menu-bg);
+  }
 }
 
 .theme-light {
@@ -1310,6 +1314,10 @@ export default defineComponent({
         opacity: 1;
       }
     }
+  }
+
+  .field-group-header {
+    background-color: rgb(229,231,235);
   }
 }
 
