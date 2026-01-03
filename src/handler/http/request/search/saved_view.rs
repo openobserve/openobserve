@@ -57,7 +57,8 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get saved view details"}))
     )
 )]
 #[get("/{org_id}/savedviews/{view_id}")]
@@ -98,7 +99,8 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all saved views"}))
     )
 )]
 #[get("/{org_id}/savedviews")]
@@ -134,7 +136,8 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a saved view"}))
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
@@ -176,7 +179,8 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a saved view"}))
     )
 )]
 #[post("/{org_id}/savedviews")]
@@ -226,7 +230,8 @@ pub async fn create_view(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a saved view"}))
     )
 )]
 #[put("/{org_id}/savedviews/{view_id}")]

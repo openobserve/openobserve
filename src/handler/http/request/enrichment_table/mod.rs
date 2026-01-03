@@ -47,7 +47,8 @@ use crate::{
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create/update enrichment table"}))
     )
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}")]
@@ -184,7 +185,8 @@ pub struct EnrichmentTableUrlRequest {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create table from URL"}))
     )
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}/url")]

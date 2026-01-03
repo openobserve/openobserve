@@ -1080,7 +1080,8 @@ const fn default_size() -> i64 {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_multi_search_stream")]

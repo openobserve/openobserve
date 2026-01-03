@@ -130,7 +130,8 @@ impl From<AlertError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule"}))
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -183,7 +184,8 @@ pub async fn create_alert(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get alert details by ID"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -224,7 +226,8 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Export alert as JSON"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -266,7 +269,8 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update an existing alert"}))
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -309,7 +313,8 @@ pub async fn update_alert(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID"}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -342,7 +347,8 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/bulk")]
@@ -421,7 +427,8 @@ async fn delete_alert_bulk(
         (status = 200, description = "Success", content_type = "application/json", body = inline(ListAlertsResponseBody)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts")]
@@ -490,7 +497,8 @@ async fn list_alerts(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable an alert"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -534,7 +542,8 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/v2/{org_id}/alerts/bulk/enable")]
@@ -606,7 +615,8 @@ async fn enable_alert_bulk(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Manually trigger an alert"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -641,7 +651,8 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move alerts to another folder"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]
@@ -695,7 +706,8 @@ async fn move_alerts(
         (status = 500, description = "Internal server error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language"}))
     )
 )]
 #[post("/v2/{org_id}/alerts/generate_sql")]

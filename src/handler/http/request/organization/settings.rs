@@ -56,7 +56,8 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create/update org settings"}))
     )
 )]
 #[post("/{org_id}/settings")]
@@ -162,7 +163,8 @@ async fn create(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get organization settings"}))
     )
 )]
 #[get("/{org_id}/settings")]

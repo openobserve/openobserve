@@ -66,7 +66,8 @@ impl From<TemplateError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create alert template"}))
     )
 )]
 #[post("/{org_id}/alerts/templates")]
@@ -109,7 +110,8 @@ pub async fn save_template(
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update alert template"}))
     )
 )]
 #[put("/{org_id}/alerts/templates/{template_name}")]
@@ -147,7 +149,8 @@ pub async fn update_template(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get template details"}))
     )
 )]
 #[get("/{org_id}/alerts/templates/{template_name}")]
@@ -180,7 +183,8 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all alert templates"}))
     )
 )]
 #[get("/{org_id}/alerts/templates")]
@@ -244,7 +248,8 @@ async fn list_templates(
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete alert template"}))
     )
 )]
 #[delete("/{org_id}/alerts/templates/{template_name}")]
@@ -267,7 +272,7 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
     security(
         ("Authorization"= [])
     ),
-    request_body(content = BulkDeleteRequest, description = "Template names", content_type = "application/json"),    
+    request_body(content = BulkDeleteRequest, description = "Template names", content_type = "application/json"),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
@@ -276,7 +281,8 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/alerts/templates/bulk")]
