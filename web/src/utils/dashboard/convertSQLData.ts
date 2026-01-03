@@ -1000,15 +1000,16 @@ export const convertSQLData = async (
   );
 
   // Calculate additional spacing needed for rotated labels
-  // Skip for time-based x-axis
-  let labelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-  let labelWidth = hasTimestampField ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
+  // Skip rotation for time-based x-axis and horizontal chart types (h-bar, h-stacked)
+  // For horizontal charts, labels should always be at 0 degrees (not rotated)
+  let labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
+  let labelWidth = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
 
-  // If truncate width is not set and not time-based, calculate the actual max width from data
-  if (!hasTimestampField && labelWidth === 0 && xAxisKeys.length > 0) {
+  // If truncate width is not set and not time-based/horizontal, calculate the actual max width from data
+  if (!hasTimestampField && !isHorizontalChart && labelWidth === 0 && xAxisKeys.length > 0) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
     labelWidth = calculateWidthText(longestLabelStr, "12px");
-  } else if (!hasTimestampField && labelWidth === 0) {
+  } else if (!hasTimestampField && !isHorizontalChart && labelWidth === 0) {
     labelWidth = 120; // Fallback
   }
 
@@ -1016,7 +1017,8 @@ export const convertSQLData = async (
   const labelMargin = 10;
 
   // Calculate the section height (nameGap) upfront so we can use it for bottom spacing
-  const dynamicXAxisNameGap = calculateDynamicNameGap(
+  // Skip rotation-based calculations for horizontal charts and time-based axes
+  const dynamicXAxisNameGap = (hasTimestampField || isHorizontalChart) ? 25 : calculateDynamicNameGap(
     labelRotation,
     labelWidth,
     labelFontSize,
@@ -1024,8 +1026,8 @@ export const convertSQLData = async (
     labelMargin,
   );
 
-  // Skip bottom space calculation for time-based x-axis
-  const additionalBottomSpace = hasTimestampField ? 0 : calculateRotatedLabelBottomSpace(
+  // Additional bottom space is only needed for non-horizontal, non-time-based charts
+  const additionalBottomSpace = (hasTimestampField || isHorizontalChart) ? 0 : calculateRotatedLabelBottomSpace(
     labelRotation,
     labelWidth,
     labelFontSize,
@@ -1225,9 +1227,9 @@ export const convertSQLData = async (
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
-      // Use 0 for rotation and width if time-based field
-      const labelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-      const labelWidth = hasTimestampField ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
+      // Use 0 for rotation and width if time-based field or horizontal chart
+      const labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
+      const labelWidth = (hasTimestampField || isHorizontalChart) ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
       const labelFontSize = 12;
       const labelMargin = 10;
 
