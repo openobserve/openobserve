@@ -313,33 +313,9 @@ export const convertPromQLData = async (
 
   // For PromQL, xAxis type is always "time" (time-series data)
   // Skip rotation and truncation for time-based x-axis
-  const isTimeBasedXAxis = true; // PromQL always uses time-series data
-  
-  // Calculate additional spacing needed for rotated labels
-  const labelRotation = isTimeBasedXAxis ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-  const labelWidth = isTimeBasedXAxis ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
-  const hasXAxisName = !!panelSchema.queries[0]?.fields?.x?.[0]?.label;
-
-  const labelFontSize = 12;
-  const labelMargin = 10;
-
-  // Calculate the section height (nameGap) upfront
-  const dynamicXAxisNameGap = calculateDynamicNameGap(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    25,
-    labelMargin,
-  );
-
-  // Skip bottom space calculation for time-based x-axis
-  const additionalBottomSpace = isTimeBasedXAxis ? 0 : calculateRotatedLabelBottomSpace(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    hasXAxisName,
-    dynamicXAxisNameGap,
-  );
+  // PromQL always uses time-series data, so no rotation/truncation calculations needed
+  const additionalBottomSpace = 0;
+  const dynamicXAxisNameGap = 25;
 
   const options: any = {
     backgroundColor: "transparent",
