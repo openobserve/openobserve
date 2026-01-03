@@ -233,7 +233,7 @@ jobs:
               browser: "chrome"
               run_files:
                 [
-                  # "dashboard-variables-global.spec.js",
+                  "dashboard-variables-global.spec.js",
                   # "dashboard-variables-tab-level.spec.js",
                   # "dashboard-variables-panel-level.spec.js",
                   # "dashboard-variables-dependency.spec.js",
