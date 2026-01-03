@@ -20,6 +20,8 @@ import {
   getContrastColor,
   applySeriesColorMappings,
   getUnitValue,
+  calculateDynamicNameGap,
+  calculateRotatedLabelBottomSpace,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -309,6 +311,12 @@ export const convertPromQLData = async (
       : Math.max(configValue, dataValue);
   };
 
+  // For PromQL, xAxis type is always "time" (time-series data)
+  // Skip rotation and truncation for time-based x-axis
+  // PromQL always uses time-series data, so no rotation/truncation calculations needed
+  const additionalBottomSpace = 0;
+  const dynamicXAxisNameGap = 25;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -318,14 +326,17 @@ export const convertPromQLData = async (
       left: panelSchema.config?.axis_width ?? 5,
       right: 20,
       top: "15",
-      bottom:
-        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? panelSchema.config?.axis_width == null
-            ? 30
-            : 50
-          : panelSchema.config?.axis_width == null
-            ? 5
-            : 25,
+      bottom: (() => {
+        const baseBottom =
+          legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+            ? panelSchema.config?.axis_width == null
+              ? 30
+              : 50
+            : panelSchema.config?.axis_width == null
+              ? 5
+              : 25;
+        return baseBottom + additionalBottomSpace;
+      })(),
     },
     tooltip: {
       show: true,
@@ -436,6 +447,13 @@ export const convertPromQLData = async (
     },
     xAxis: {
       type: "time",
+      name: panelSchema.queries[0]?.fields?.x?.[0]?.label || "",
+      nameLocation: "middle",
+      nameGap: dynamicXAxisNameGap,
+      nameTextStyle: {
+        fontWeight: "bold",
+        fontSize: 14,
+      },
       axisLine: {
         show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
           ? true
@@ -450,6 +468,11 @@ export const convertPromQLData = async (
       axisLabel: {
         // hide axis label if overlaps
         hideOverlap: true,
+        // For time-based x-axis (type: "time"), rotation and truncation are not applicable
+        rotate: 0,
+        overflow: "none",
+        width: undefined,
+        margin: 10,
       },
     },
     yAxis: {
@@ -1142,6 +1165,8 @@ const calculateWidthText = (text: string): number => {
   span.remove();
   return width;
 };
+
+
 
 /**
  * Retrieves the legend name for a given metric and label.
