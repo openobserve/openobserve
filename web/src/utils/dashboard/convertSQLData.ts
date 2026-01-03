@@ -992,15 +992,23 @@ export const convertSQLData = async (
     panelSchema.queries[0]?.fields?.y?.length == 1 &&
     panelSchema.queries[0]?.fields?.y[0]?.label;
 
-  // Calculate additional spacing needed for rotated labels
-  const labelRotation = panelSchema.config?.axis_label_rotate || 0;
-  let labelWidth = panelSchema.config?.axis_label_truncate_width || 0;
+  // Check if x-axis will be time-based by looking for timestamp fields
+  const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
+    (it: any) =>
+      it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column ||
+      ["histogram", "date_bin"].includes(it.aggregationFunction),
+  );
 
-  // If truncate width is not set, calculate the actual max width from data
-  if (labelWidth === 0 && xAxisKeys.length > 0) {
+  // Calculate additional spacing needed for rotated labels
+  // Skip for time-based x-axis
+  let labelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
+  let labelWidth = hasTimestampField ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
+
+  // If truncate width is not set and not time-based, calculate the actual max width from data
+  if (!hasTimestampField && labelWidth === 0 && xAxisKeys.length > 0) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
     labelWidth = calculateWidthText(longestLabelStr, "12px");
-  } else if (labelWidth === 0) {
+  } else if (!hasTimestampField && labelWidth === 0) {
     labelWidth = 120; // Fallback
   }
 
@@ -1016,7 +1024,8 @@ export const convertSQLData = async (
     labelMargin,
   );
 
-  const additionalBottomSpace = calculateRotatedLabelBottomSpace(
+  // Skip bottom space calculation for time-based x-axis
+  const additionalBottomSpace = hasTimestampField ? 0 : calculateRotatedLabelBottomSpace(
     labelRotation,
     labelWidth,
     labelFontSize,
@@ -1216,8 +1225,9 @@ export const convertSQLData = async (
         if (i == 0 || data[i] != data[i - 1]) arr.push(i);
       }
 
-      const labelRotation = panelSchema.config?.axis_label_rotate || 0;
-      const labelWidth = panelSchema.config?.axis_label_truncate_width || 120;
+      // Use 0 for rotation and width if time-based field
+      const labelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
+      const labelWidth = hasTimestampField ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
       const labelFontSize = 12;
       const labelMargin = 10;
 
@@ -1634,7 +1644,7 @@ export const convertSQLData = async (
             }
           },
         };
-        const xAxisLabelRotation = panelSchema.config?.axis_label_rotate || 0;
+        const xAxisLabelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
         const xAxisLabelWidth = panelSchema.config?.axis_label_truncate_width || 120;
         options.xAxis[0].axisLabel = {
           rotate: xAxisLabelRotation,
@@ -2082,8 +2092,8 @@ export const convertSQLData = async (
           }
         },
       };
-      const stackedXAxisRotation = options.xAxis[0].axisLabel?.rotate || 0;
-      const stackedXAxisWidth = panelSchema.config?.axis_label_truncate_width || 120;
+      const stackedXAxisRotation = hasTimestampField ? 0 : (options.xAxis[0].axisLabel?.rotate || 0);
+      const stackedXAxisWidth = hasTimestampField ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
       options.xAxis[0].axisLabel.margin = 5;
       options.xAxis[0].axisLabel = {
         rotate: stackedXAxisRotation,
@@ -2635,6 +2645,10 @@ export const convertSQLData = async (
             axis.axisLabel.overflow = "none";
             axis.axisLabel.width = undefined;
           }
+          // Recalculate nameGap with 0 rotation for time-based axis
+          if (axis.name) {
+            axis.nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          }
         });
       } else {
         options.xAxis[0].type = "time";
@@ -2643,6 +2657,10 @@ export const convertSQLData = async (
           options.xAxis[0].axisLabel.rotate = 0;
           options.xAxis[0].axisLabel.overflow = "none";
           options.xAxis[0].axisLabel.width = undefined;
+        }
+        // Recalculate nameGap with 0 rotation for time-based axis
+        if (options.xAxis[0].name) {
+          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
         }
       }
 
@@ -2826,6 +2844,10 @@ export const convertSQLData = async (
             axis.axisLabel.overflow = "none";
             axis.axisLabel.width = undefined;
           }
+          // Recalculate nameGap with 0 rotation for time-based axis
+          if (axis.name) {
+            axis.nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          }
         });
       } else {
         options.xAxis[0].type = "time";
@@ -2834,6 +2856,10 @@ export const convertSQLData = async (
           options.xAxis[0].axisLabel.rotate = 0;
           options.xAxis[0].axisLabel.overflow = "none";
           options.xAxis[0].axisLabel.width = undefined;
+        }
+        // Recalculate nameGap with 0 rotation for time-based axis
+        if (options.xAxis[0].name) {
+          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
         }
       }
 

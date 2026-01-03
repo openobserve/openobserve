@@ -311,22 +311,14 @@ export const convertPromQLData = async (
       : Math.max(configValue, dataValue);
   };
 
+  // For PromQL, xAxis type is always "time" (time-series data)
+  // Skip rotation and truncation for time-based x-axis
+  const isTimeBasedXAxis = true; // PromQL always uses time-series data
+  
   // Calculate additional spacing needed for rotated labels
-  const labelRotation = panelSchema.config?.axis_label_rotate || 0;
-  let labelWidth = panelSchema.config?.axis_label_truncate_width || 0;
+  const labelRotation = isTimeBasedXAxis ? 0 : (panelSchema.config?.axis_label_rotate || 0);
+  const labelWidth = isTimeBasedXAxis ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
   const hasXAxisName = !!panelSchema.queries[0]?.fields?.x?.[0]?.label;
-
-  // For PromQL, xAxisData contains [timestamp, formattedDate]
-  // We need to calculate the actual max width of the current labels if truncate is not set
-  if (labelWidth === 0 && xAxisData.length > 0) {
-    // Determine which date format is likely being used
-    // formatDate uses "YY-MM-DD HH:MM:SS" which is roughly 19 characters
-    // But it could be any format. For now, we'll estimate based on a sample
-    const sampleDate = xAxisData[0][1];
-    labelWidth = calculateWidthText(sampleDate?.toString() || "", "12px");
-  } else if (labelWidth === 0) {
-    labelWidth = 120; // Fallback
-  }
 
   const labelFontSize = 12;
   const labelMargin = 10;
@@ -340,7 +332,8 @@ export const convertPromQLData = async (
     labelMargin,
   );
 
-  const additionalBottomSpace = calculateRotatedLabelBottomSpace(
+  // Skip bottom space calculation for time-based x-axis
+  const additionalBottomSpace = isTimeBasedXAxis ? 0 : calculateRotatedLabelBottomSpace(
     labelRotation,
     labelWidth,
     labelFontSize,
