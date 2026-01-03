@@ -804,8 +804,8 @@ export default defineComponent({
         // push the variable to the list
         variablesData.values.push(variableData);
 
-        // set old variables data
-        oldVariablesData[item.name] = initialValue;
+        // set old variables data - use the actual value that was set (which might be custom value, not just initialValue)
+        oldVariablesData[item.name] = variableData.value !== undefined ? variableData.value : initialValue;
 
         variableLog(
           variableData.name,
@@ -896,9 +896,15 @@ export default defineComponent({
         // OR if options are empty (was reset), then clear oldVariablesData
         // so it selects first option when data arrives
         // UNLESS the variable has a valid value (from URL or user), in which case preserve it
+        // ALSO: Don't clear oldVariablesData if variable has custom or "all" default selection configured
+        const hasCustomOrAllDefault =
+          v.selectAllValueForMultiSelect === "custom" ||
+          v.selectAllValueForMultiSelect === "all";
+
         if (
           isCurrentlyReset &&
-          (v.isVariableLoadingPending || v.options.length === 0)
+          (v.isVariableLoadingPending || v.options.length === 0) &&
+          !hasCustomOrAllDefault
         ) {
           // Set to undefined so the selector properly handles first-time selection
           oldVariablesData[v.name] = undefined;
@@ -906,6 +912,18 @@ export default defineComponent({
           // If variable has a valid value (e.g., from URL) and oldVariablesData is undefined,
           // sync it so the value is preserved when API response arrives
           oldVariablesData[v.name] = currentValue;
+        } else if (hasCustomOrAllDefault && oldVariablesData[v.name] === undefined) {
+          // If variable has custom or "all" default configured but oldVariablesData is undefined,
+          // set it to the configured default value so it gets applied when API response arrives
+          if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
+            oldVariablesData[v.name] = v.multiSelect
+              ? v.customMultiSelectValue
+              : v.customMultiSelectValue[0];
+          } else if (v.selectAllValueForMultiSelect === "all") {
+            oldVariablesData[v.name] = v.multiSelect
+              ? [SELECT_ALL_VALUE]
+              : SELECT_ALL_VALUE;
+          }
         }
       });
     };
@@ -1077,6 +1095,33 @@ export default defineComponent({
           // Don't add missing values to options, just keep the existing values
           return;
         }
+
+        // Check if old values should be preserved based on selectAllValueForMultiSelect setting
+        const hasOldValues = Array.isArray(oldVariableSelectedValues) && oldVariableSelectedValues.length > 0;
+
+        if (hasOldValues) {
+          // Check if we should preserve custom values
+          if (
+            currentVariable?.selectAllValueForMultiSelect === "custom" &&
+            currentVariable?.customMultiSelectValue?.length > 0 &&
+            JSON.stringify(oldVariableSelectedValues.sort()) === JSON.stringify(currentVariable.customMultiSelectValue.sort())
+          ) {
+            // Preserve custom values even if not in options
+            currentVariable.value = currentVariable.customMultiSelectValue;
+            return;
+          }
+
+          // Check if we should preserve "all" value
+          if (
+            currentVariable?.selectAllValueForMultiSelect === "all" &&
+            oldVariableSelectedValues.includes(SELECT_ALL_VALUE)
+          ) {
+            // Preserve "all" selection
+            currentVariable.value = [SELECT_ALL_VALUE];
+            return;
+          }
+        }
+
         const optionsValues =
           currentVariable.options.map((option: any) => option.value) ?? [];
         // If we have no values, handle default selection
@@ -1143,12 +1188,45 @@ export default defineComponent({
         return;
       }
 
+      // Apply "all" value if configured (for both multiSelect and single-select)
+      if (
+        !isChildVariable &&
+        currentVariable?.selectAllValueForMultiSelect === "all"
+      ) {
+        currentVariable.value = currentVariable.multiSelect
+          ? [SELECT_ALL_VALUE]
+          : SELECT_ALL_VALUE;
+        currentVariable.isVariableLoadingPending = true;
+        return;
+      }
+
       // Pre-calculate the options values array
       const optionsValues =
         currentVariable.options.map((option: any) => option.value) ?? [];
 
       // For single select, handle old value selection
       if (!currentVariable.multiSelect) {
+        // Check if custom value should be preserved (even if not in options)
+        if (
+          currentVariable.selectAllValueForMultiSelect === "custom" &&
+          currentVariable.customMultiSelectValue?.length > 0 &&
+          oldVariableSelectedValues[0] === currentVariable.customMultiSelectValue[0]
+        ) {
+          // Preserve the custom value even if it's not in the API options
+          currentVariable.value = currentVariable.customMultiSelectValue[0];
+          return;
+        }
+
+        // Check if "all" value should be preserved for single-select
+        if (
+          currentVariable.selectAllValueForMultiSelect === "all" &&
+          oldVariableSelectedValues[0] === SELECT_ALL_VALUE
+        ) {
+          // Preserve the "all" value
+          currentVariable.value = SELECT_ALL_VALUE;
+          return;
+        }
+
         // old selected value
         const oldValue = currentVariable.options.find(
           (option: any) => option.value === oldVariableSelectedValues[0],
@@ -1168,7 +1246,10 @@ export default defineComponent({
 
             // customValue can be undefined or default value
             currentVariable.value =
-              customValue?.value ?? currentVariable.options[0].value;
+              customValue?.value ?? currentVariable.customMultiSelectValue?.[0] ?? currentVariable.options[0].value;
+          } else if (currentVariable.selectAllValueForMultiSelect === "all") {
+            // Use SELECT_ALL_VALUE for single-select "all"
+            currentVariable.value = SELECT_ALL_VALUE;
           } else {
             currentVariable.value = currentVariable.options[0].value;
           }
@@ -1525,6 +1606,43 @@ export default defineComponent({
               variableObject.name,
               `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
             );
+
+            // Check if variable has custom or "all" default selection
+            // If so, skip API call as the value is already set from settings
+            const hasCustomOrAllDefault =
+              variableObject.selectAllValueForMultiSelect === "custom" ||
+              variableObject.selectAllValueForMultiSelect === "all";
+
+            if (hasCustomOrAllDefault) {
+              variableLog(
+                variableObject.name,
+                `Variable has custom or "all" default - skipping API call`,
+              );
+
+              // Ensure value is set according to the configuration
+              if (variableObject.selectAllValueForMultiSelect === "custom" &&
+                  variableObject.customMultiSelectValue?.length > 0) {
+                variableObject.value = variableObject.multiSelect
+                  ? variableObject.customMultiSelectValue
+                  : variableObject.customMultiSelectValue[0];
+              } else if (variableObject.selectAllValueForMultiSelect === "all") {
+                // Set "all" value for both multiSelect and single-select
+                variableObject.value = variableObject.multiSelect
+                  ? [SELECT_ALL_VALUE]
+                  : SELECT_ALL_VALUE;
+              }
+
+              // Mark as loaded without making API call
+              finalizePartialVariableLoading(
+                variableObject,
+                true,
+                isInitialLoad,
+              );
+              finalizeVariableLoading(variableObject, true);
+              emitVariablesData();
+              return true;
+            }
+
             // check for value not null or in case of array it should not be empty array
             // if the value is already set AND has options loaded, we don't need to load it again
             // BUT if it has a value from URL but no options yet, we need to load options

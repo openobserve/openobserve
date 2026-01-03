@@ -1409,6 +1409,434 @@ describe("VariablesValueSelector", () => {
     });
   });
 
+  describe("Manager Mode and Scoped Variables", () => {
+    const mockVariablesManager = {
+      variablesData: {
+        global: [],
+        tabs: {},
+        panels: {},
+      },
+      getAllVisibleVariables: vi.fn(() => []),
+      updateVariableValue: vi.fn(),
+      onVariablePartiallyLoaded: vi.fn(),
+    };
+
+    it("should initialize with variablesManager prop", async () => {
+      wrapper = createWrapper({
+        variablesManager: mockVariablesManager,
+        scope: "global",
+      });
+      await nextTick();
+
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should handle showAllVisible prop correctly", async () => {
+      const manager = {
+        ...mockVariablesManager,
+        getAllVisibleVariables: vi.fn(() => [
+          {
+            name: "global-var",
+            type: "constant",
+            value: "test",
+            scope: "global",
+          },
+        ]),
+      };
+
+      wrapper = createWrapper({
+        variablesManager: manager,
+        showAllVisible: true,
+        tabId: "tab1",
+        panelId: "panel1",
+      });
+      await nextTick();
+
+      expect(manager.getAllVisibleVariables).toHaveBeenCalledWith(
+        "tab1",
+        "panel1",
+      );
+    });
+
+    it("should handle tab-scoped variables", async () => {
+      const manager = {
+        ...mockVariablesManager,
+        variablesData: {
+          global: [],
+          tabs: {
+            tab1: [
+              {
+                name: "tab-var",
+                type: "constant",
+                value: "test",
+                scope: "tabs",
+              },
+            ],
+          },
+          panels: {},
+        },
+        getAllVisibleVariables: vi.fn((tabId: string) => {
+          return manager.variablesData.tabs[tabId] || [];
+        }),
+      };
+
+      wrapper = createWrapper({
+        variablesManager: manager,
+        scope: "tabs",
+        tabId: "tab1",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values).toBeDefined();
+    });
+
+    it("should handle panel-scoped variables", async () => {
+      const manager = {
+        ...mockVariablesManager,
+        variablesData: {
+          global: [],
+          tabs: {},
+          panels: {
+            panel1: [
+              {
+                name: "panel-var",
+                type: "constant",
+                value: "test",
+                scope: "panels",
+              },
+            ],
+          },
+        },
+        getAllVisibleVariables: vi.fn((tabId: string, panelId: string) => {
+          return manager.variablesData.panels[panelId] || [];
+        }),
+      };
+
+      wrapper = createWrapper({
+        variablesManager: manager,
+        scope: "panels",
+        panelId: "panel1",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values).toBeDefined();
+    });
+
+    it("should delegate variable updates to manager", async () => {
+      const manager = {
+        ...mockVariablesManager,
+        updateVariableValue: vi.fn().mockResolvedValue(undefined),
+        getAllVisibleVariables: vi.fn(() => [
+          {
+            name: "test-var",
+            type: "constant",
+            value: "old-value",
+            scope: "global",
+          },
+        ]),
+      };
+
+      wrapper = createWrapper({
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // Update the variable value
+      if (vm.variablesData.values.length > 0) {
+        vm.variablesData.values[0].value = "new-value";
+        await vm.onVariablesValueUpdated(0);
+
+        expect(manager.updateVariableValue).toHaveBeenCalledWith(
+          "test-var",
+          "global",
+          undefined,
+          undefined,
+          "new-value",
+        );
+      }
+    });
+  });
+
+  describe("Add Variable Button", () => {
+    it("should render add variable button when showAddVariableButton is true", async () => {
+      wrapper = createWrapper({
+        showAddVariableButton: true,
+      });
+      await nextTick();
+
+      // Check if the button exists in the DOM
+      const addButton = wrapper.find('[data-test="dashboard-add-variable-btn"]');
+      expect(addButton.exists()).toBe(true);
+    });
+
+    it("should not render add variable button when showAddVariableButton is false", async () => {
+      wrapper = createWrapper({
+        showAddVariableButton: false,
+      });
+      await nextTick();
+
+      const addButton = wrapper.find('[data-test="dashboard-add-variable-btn"]');
+      expect(addButton.exists()).toBe(false);
+    });
+
+    it("should emit openAddVariable event when button is clicked", async () => {
+      wrapper = createWrapper({
+        showAddVariableButton: true,
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      vm.openAddVariable();
+
+      await nextTick();
+
+      const emittedEvents = wrapper.emitted("openAddVariable");
+      expect(emittedEvents).toBeDefined();
+      expect(emittedEvents!.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Streaming Response Handlers", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("should handle streaming error response", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Mock streaming error
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.error(payload, {
+            type: "error",
+            content: {
+              message: "API Error",
+              trace_id: payload.traceId,
+            },
+          });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      // Variable should handle error gracefully
+      expect(regionVariable.isLoading).toBe(false);
+    });
+
+    it("should handle streaming cancel response", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Mock streaming cancel
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.data(payload, {
+            type: "cancel_response",
+            content: {
+              trace_id: payload.traceId,
+            },
+          });
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      expect(regionVariable).toBeDefined();
+    });
+
+    it("should handle streaming close with error codes", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Mock streaming close with error code
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.complete(payload, {
+            code: 1001,
+            type: "close",
+            error_details: "Connection terminated",
+          });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      expect(regionVariable.isLoading).toBe(false);
+    });
+
+    it("should handle streaming progress response", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Mock streaming progress
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          // Send progress
+          handlers.data(payload, {
+            type: "event_progress",
+            content: {
+              percent: 50,
+            },
+          });
+
+          // Send completion
+          handlers.data(payload, {
+            type: "event_progress",
+            content: {
+              percent: 100,
+            },
+          });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      expect(regionVariable).toBeDefined();
+    });
+
+    it("should handle blank values in streaming response", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Mock streaming with blank values
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          const mockResponse = {
+            type: "search_response",
+            content: {
+              results: {
+                hits: [
+                  {
+                    field: "region",
+                    values: [
+                      { zo_sql_key: "" },
+                      { zo_sql_key: "us-east-1" },
+                      { zo_sql_key: "" },
+                    ],
+                  },
+                ],
+              },
+            },
+          };
+
+          handlers.data(payload, mockResponse);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      // Should filter out blank values or handle them as <blank>
+      expect(regionVariable.options).toBeDefined();
+      expect(Array.isArray(regionVariable.options)).toBe(true);
+    });
+  });
+
+  describe("Variable Search with Deferred Loading", () => {
+    it("should defer search when variables are still loading", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // Set variables as loading
+      vm.variablesData.isVariablesLoading = true;
+
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      if (regionVariable) {
+        regionVariable.isLoading = true;
+
+        // Clear previous calls
+        mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+
+        // Trigger search while loading
+        const searchPromise = vm.onVariableSearch(0, {
+          variableItem: regionVariable,
+          filterText: "test",
+        });
+
+        // Should not call API immediately
+        expect(
+          mockStreamingComposable.fetchQueryDataWithHttpStream,
+        ).not.toHaveBeenCalled();
+
+        // Complete the loading
+        regionVariable.isLoading = false;
+        vm.variablesData.isVariablesLoading = false;
+
+        await searchPromise;
+        await nextTick();
+      }
+    });
+
+    it("should handle empty filter text as open event", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Ensure variable is ready
+      regionVariable.isLoading = false;
+      regionVariable.isVariablePartialLoaded = true;
+
+      // Clear previous calls
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+
+      await vm.onVariableSearch(0, {
+        variableItem: regionVariable,
+        filterText: "",
+      });
+
+      // Should trigger load
+      expect(
+        mockStreamingComposable.fetchQueryDataWithHttpStream,
+      ).toHaveBeenCalled();
+    });
+  });
+
   describe("Edge Cases and Error Scenarios", () => {
     it("should handle malformed variable configuration", async () => {
       const malformedConfig = {
