@@ -112,6 +112,9 @@ pub struct View {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
     request_body(content = String, description = "Ingest data (multiple line json)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
@@ -162,6 +165,9 @@ pub async fn data(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "Alfred", "Country": "HUN"},{"Year": 1896, "City": "Athens", "Sport": "Aquatics", "Discipline": "Swimming", "Athlete": "HERSCHMANN", "Country":"CHN"}])),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
@@ -211,6 +217,9 @@ pub async fn log(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
     request_body(
         content = inline(SegmentEvent), content_type = "multipart/form-data",

@@ -176,7 +176,8 @@ impl From<RatelimitError> for HttpResponse {
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/ratelimit/api_modules")]
@@ -228,7 +229,8 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/ratelimit/module_list")]
@@ -298,7 +300,8 @@ pub async fn list_module_ratelimit(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/ratelimit/role_list")]
@@ -388,7 +391,8 @@ pub async fn list_role_ratelimit(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Ratelimit", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/ratelimit/update")]

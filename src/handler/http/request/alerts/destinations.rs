@@ -63,7 +63,8 @@ impl From<DestinationError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create alert destination"}))
     )
 )]
 #[post("/{org_id}/alerts/destinations")]
@@ -109,7 +110,8 @@ pub async fn save_destination(
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update alert destination"}))
     )
 )]
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
@@ -149,7 +151,8 @@ pub async fn update_destination(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get destination details"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations/{destination_name}")]
@@ -183,7 +186,8 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all alert destinations"}))
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
@@ -252,7 +256,8 @@ async fn list_destinations(
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete alert destination"}))
     )
 )]
 #[delete("/{org_id}/alerts/destinations/{destination_name}")]
@@ -279,13 +284,14 @@ async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpRes
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = BulkDeleteRequest, description = "Destination ids", content_type = "application/json"),  
+    request_body(content = BulkDeleteRequest, description = "Destination ids", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/alerts/destinations/bulk")]

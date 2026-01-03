@@ -37,6 +37,9 @@ use crate::{
                    Loki deployments to OpenObserve while maintaining API compatibility.",
     security(("Authorization"= [])),
     params(("org_id" = String, Path, description = "Organization name")),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
     request_body(content = inline(LokiPushRequest), description = "Loki-compatible log push data in JSON format. Stream names are extracted from 'stream_name' label in the stream labels. Also supports Protobuf format (application/x-protobuf) with optional compression (gzip for JSON, snappy for Protobuf)", content_type = "application/json", example = json!({
         "streams": [{
             "stream": {

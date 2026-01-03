@@ -86,7 +86,8 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
         (status = 500, description = "Internal Server Error", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Submit async search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs")]
@@ -252,7 +253,8 @@ pub async fn submit_job(
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all search jobs"}))
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -311,7 +313,8 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job status"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
@@ -369,7 +372,8 @@ pub async fn get_status(
         (status = 400, description = "Bad Request", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Cancel a running search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
@@ -429,7 +433,8 @@ pub async fn cancel_job(
         (status = 404, description = "Not Found", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get search job results"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
@@ -513,7 +518,8 @@ pub async fn get_job_result(
         (status = 404, description = "Not Found", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a search job"}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
@@ -581,7 +587,8 @@ pub async fn delete_job(
         (status = 403, description = "Forbidden - Job cannot be retried", body = Object)
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Retry a failed search job"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]
