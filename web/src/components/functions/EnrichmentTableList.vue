@@ -620,15 +620,15 @@ export default defineComponent({
 
     const filterTabs = reactive([
       {
-        label: "All",
+        label: t("function.filterAll"),
         value: "all",
       },
       {
-        label: "File",
+        label: t("function.filterFile"),
         value: "uploaded",
       },
       {
-        label: "Url",
+        label: t("function.filterUrl"),
         value: "file_url",
       },
     ]);

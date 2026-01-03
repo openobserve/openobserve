@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.buildQuery"
-                    label="Build Query"
+                    :label="t('pipeline.buildQuery')"
                     class="tw:mt-1"
                   />
                 </span>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.setVariables"
-                    label="Set Variables"
+                    :label="t('pipeline.setVariables')"
                     class="tw:mt-1"
                   />
                 </span>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
                     >
                       <div style="width: 130px">
-                        Trigger
+                        {{ t('pipeline.trigger') }}
                         <q-icon
                           :name="outlinedInfo"
                           size="17px"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             filled
                             min="0"
                             style="background: none"
-                            placeholder="Value"
+                            :placeholder="t('pipeline.value')"
                             @update:model-value="updatePromqlCondition"
                           />
                         </div>
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="scheduled-pipeline-aggregation-title"
                         style="width: 172px"
                       >
-                        Aggregation
+                        {{ t('pipeline.aggregation') }}
                       </div>
                       <q-toggle
                         data-test="scheduled-pipeline-aggregation-toggle"
@@ -343,12 +343,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 use-input
                                 emit-value
                                 hide-selected
-                                placeholder="Select column"
+                                :placeholder="t('pipeline.selectColumn')"
                                 fill-input
                                 :input-debounce="400"
                                 @filter="filterFields"
                                 :rules="[
-                                  (val: any) => !!val || 'Field is required!',
+                                  (val: any) => !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="width: 200px"
                                 @update:model-value="updateTrigger"
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   filled
                                   min="0"
                                   style="background: none"
-                                  placeholder="Value"
+                                  :placeholder="t('pipeline.value')"
                                   @update:model-value="updateAggregation"
                                 />
                               </div>
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            Field is required!
+                            {{ t('pipeline.fieldRequired') }}
                           </div>
                         </template>
                         <template v-else>
@@ -549,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 hide-selected
                                 fill-input
                                 :rules="[
-                                  (val: any) => !!val || 'Field is required!',
+                                  (val: any) => !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="
                                   width: 88px;
@@ -608,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            Field is required!
+                            {{ t('pipeline.fieldRequired') }}
                           </div>
                         </template>
                       </div>
@@ -851,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-red-8 q-pt-xs"
                           style="font-size: 11px; line-height: 12px"
                         >
-                          {{ cronJobError || "Field is required!" }}
+                          {{ cronJobError || t('pipeline.fieldRequired') }}
                         </div>
                       </div>
                     </div>
@@ -1075,7 +1075,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="query"
                       v-model:is-expanded="expandState.query"
-                      :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
+                      :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
                       class="tw:mt-1"
                     />
                   </span>
@@ -1104,7 +1104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="output"
                       v-model:is-expanded="expandState.output"
-                      label="Output"
+                      :label="t('pipeline.output')"
                       class="tw:mt-1"
                     />
                   </span>
@@ -1206,7 +1206,7 @@ size="md" />
                   <q-btn
                     data-test="stream-routing-query-save-btn"
                     :label="
-                      validatingSqlQuery ? 'Validating...' : 'Validate and Close'
+                      validatingSqlQuery ? t('pipeline.validating') : t('pipeline.validateAndClose')
                     "
                     class="no-border q-ml-md o2-primary-button tw:h-[36px]"
                     no-caps

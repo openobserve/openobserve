@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Controls>
     </VueFlow>
     <div v-if="isCanvasEmpty" class="empty-text">
-      Drag and drop nodes here
+      {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->
 </template>
@@ -117,6 +117,7 @@ import CustomEdge from "./CustomEdge.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
 import EdgeWithButton from "./EdgeWithButton.vue";
+import { useI18n } from "vue-i18n";
 
 /* import the required styles */
 
@@ -127,6 +128,7 @@ export default {
   components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,CustomEdge
    },
   setup() {
+    const { t } = useI18n();
     const {
       onDragOver,
       onDrop,
@@ -218,6 +220,7 @@ function resetTransform() {
       isCanvasEmpty,
       store,
       setViewport,
+      t,
     };
   },
 };

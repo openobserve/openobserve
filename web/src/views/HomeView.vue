@@ -32,12 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tile-icon icon-bg-blue" aria-hidden="true">
                 <q-icon :name="outlinedWindow" size="1.5rem" />
               </div>
-              <div class="section-header">Streams</div>
+              <div class="section-header">{{ t("home.streams") }}</div>
             </div>
               <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                aria-label="View all streams"
                >
-                <q-tooltip>View</q-tooltip>
+                <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   aria-label="View all functions"
                   class="tw:flex-shrink-0"
                   >
-                      <q-tooltip>View</q-tooltip>
+                      <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   aria-label="View all dashboards"
                   class="tw:flex-shrink-0"
                   >
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                 aria-label="View all alerts">
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                 aria-label="View all pipelines">
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
@@ -594,7 +594,7 @@ export default defineComponent({
       return {
         chartType: "custom_chart",
         title: {
-          text: "No data available",
+          text: t("home.noDataAvailable"),
           left: "center",
           top: "center",
           textStyle: {
@@ -683,7 +683,7 @@ export default defineComponent({
       return {
         chartType: "custom_chart",
         title: {
-          text: "No data available",
+          text: t("home.noDataAvailable"),
           left: "center",
           top: "center",
           textStyle: {
@@ -1130,7 +1130,6 @@ export default defineComponent({
 .tile-content {
   @include tile-base;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
 
   &:hover {
     // transform: translateY(-4px) scale(1.02);

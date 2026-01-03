@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-btn rounded flat dense :ripple="false" @click="toggleDarkMode">
     <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
-      Switch to {{ darkMode ? "Light Mode" : "Dark Mode" }}
+      {{ tooltipText }}
     </q-tooltip>
   </q-btn>
 </template>
@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import {
   outlinedDarkMode,
   outlinedLightMode,
@@ -36,6 +37,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const $q = useQuasar();
+    const { t } = useI18n();
     const darkMode = ref(false);
 
     const DarkModeIcons = {
@@ -63,6 +65,11 @@ export default defineComponent({
 
     const DarkModeIcon = computed(() => {
       return darkMode.value ? DarkModeIcons.dark : DarkModeIcons.light;
+    });
+
+    const tooltipText = computed(() => {
+      const mode = darkMode.value ? t("common.lightMode") : t("common.darkMode");
+      return `${t("common.switchTo")} ${mode}`;
     });
 
     watch(darkMode, () => {
@@ -100,6 +107,7 @@ export default defineComponent({
       store,
       darkMode,
       DarkModeIcon,
+      tooltipText,
       toggleDarkMode,
       outlinedDarkMode,
       outlinedLightMode,
