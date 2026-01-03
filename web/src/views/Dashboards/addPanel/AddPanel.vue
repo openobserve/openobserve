@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="
                 padding-left: 0px !important ;
                 padding-right: 0px !important;
+                display: inline-flex;
               "
               :class="
                 store.state.theme === 'dark'
@@ -162,6 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn-dropdown
                 class="text-bold no-border tw:px-0"
                 no-caps
+                flat
+                dense
                 auto-close
                 dropdown-icon="keyboard_arrow_down"
                 :disable="searchRequestTraceIds.length > 0"
