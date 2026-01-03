@@ -32,7 +32,7 @@ export default class DashboardVariables {
     await variableTab.click();
 
     // Add Variable
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click({timeout:5000});
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click({timeout:5000});
     await this.page.locator('[data-test="dashboard-variable-name"]').fill(name);
 
     // Select Stream Type

@@ -157,6 +157,19 @@ export default class DashboardSetting {
       .click();
   }
 
+  // Navigate to Variables tab after opening settings
+  async goToVariablesTab() {
+    // Wait for settings dialog to be fully visible
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .waitFor({ state: "visible", timeout: 10000 });
+
+    // Click on Variables tab
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .click();
+  }
+
   //Generate unique variable name
   variableName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
@@ -165,9 +178,9 @@ export default class DashboardSetting {
   //variable type: Query Values
   async addVariable(type, variableName, streamType, Stream, field) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -315,9 +328,9 @@ export default class DashboardSetting {
 
   async selectConstantType(type, variableName, value) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -340,9 +353,9 @@ export default class DashboardSetting {
   //select Textbox type
   async selectTextType(type, variableName) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -359,9 +372,9 @@ export default class DashboardSetting {
   //select Custom type
   async selectCustomType(type, variableName, label, value) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });

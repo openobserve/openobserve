@@ -274,8 +274,15 @@ export const usePanelDataLoader = (
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
       log("waitForTheVariablesToLoad: entering...");
-      // Immediately resolve if variables are already loaded
-      if (ifPanelVariablesCompletedLoading()) {
+
+      // CRITICAL: Check if variables are still loading
+      // This prevents premature API calls during initial dashboard load
+      if (variablesData.value?.isVariablesLoading === true) {
+        log(
+          "waitForTheVariablesToLoad: variables are loading (isVariablesLoading=true), waiting...",
+        );
+        // Don't resolve immediately - wait for them to finish loading
+      } else if (ifPanelVariablesCompletedLoading()) {
         log("waitForTheVariablesToLoad: variables are already loaded");
         resolve();
         return;
@@ -283,8 +290,17 @@ export const usePanelDataLoader = (
 
       // Watch for changes in isVisible
       const stopWatching = watch(
-        () => variablesData.value?.values,
-        () => {
+        () => variablesData.value,
+        (newVal) => {
+          // First check: are variables still marked as loading?
+          if (newVal?.isVariablesLoading === true) {
+            log(
+              "waitForTheVariablesToLoad: still loading (isVariablesLoading=true)...",
+            );
+            return; // Keep waiting
+          }
+
+          // Second check: are panel-specific variables ready?
           if (ifPanelVariablesCompletedLoading()) {
             log(
               "waitForTheVariablesToLoad: variables are loaded (inside watch)",
@@ -293,6 +309,7 @@ export const usePanelDataLoader = (
             stopWatching(); // Stop watching once isVisible is true
           }
         },
+        { deep: true }, // Watch nested properties
       );
 
       // Listen to the abort signal
@@ -756,6 +773,21 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    // CRITICAL: Log EXACTLY what variablesData looks like
+
+
+    // // CRITICAL: Final safety check at loadData entry point
+    // if (variablesData?.value?.isVariablesLoading === true) {
+    //   console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': BLOCKED - variables still loading');
+    //   return;
+    // }
+
+    log(
+      "[usePanelDataLoader] " +
+        panelSchema?.value?.title +
+        ": loadData() PROCEEDING",
+    );
+
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
     if (runCount > 0 && !state.isOperationCancelled) {
       state.isPartialData = false;
@@ -1129,6 +1161,7 @@ export const usePanelDataLoader = (
           state.isPartialData = false;
         }
       } else {
+        console.log("loadData: starting SQL query execution...", variablesData.value);
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -1471,6 +1504,18 @@ export const usePanelDataLoader = (
                 );
 
               const query = query2;
+
+              // LOG: Check if variables were properly replaced
+              console.log(
+                "[usePanelDataLoader] " +
+                  panelSchema.value.title +
+                  " NON-TIMESHIFT QUERY AFTER applyDynamicVariables:",
+                {
+                  hasUnreplacedVars: /\$\w+/.test(query),
+                  unreplacedVars: query.match(/\$\w+/g) || "none",
+                  queryPreview: query.substring(0, 200),
+                },
+              );
 
               // Validate that timestamp column is not used as an alias for other fields
               if (!checkTimestampAlias(query)) {
@@ -2004,13 +2049,18 @@ export const usePanelDataLoader = (
 
   const areDependentVariablesStillLoadingWith = (
     newDependentVariablesData: any,
-  ) =>
-    newDependentVariablesData?.some(
-      (it: any) =>
-        (it.value == null ||
-          (Array.isArray(it.value) && it.value.length === 0)) &&
-        (it.isLoading || it.isVariableLoadingPending),
-    );
+  ) => {
+    const result = newDependentVariablesData?.some((it: any) => {
+      const hasNullValue = it.value == null;
+      const hasEmptyArray = Array.isArray(it.value) && it.value.length === 0;
+      const isStillLoading = it.isLoading || it.isVariableLoadingPending;
+
+      const shouldBlock = (hasNullValue || hasEmptyArray) && isStillLoading;
+      return shouldBlock;
+    });
+
+    return result;
+  };
 
   const getDependentVariablesData = () =>
     variablesData.value?.values
