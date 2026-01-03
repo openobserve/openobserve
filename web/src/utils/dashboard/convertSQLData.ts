@@ -995,7 +995,7 @@ export const convertSQLData = async (
   // Check if x-axis will be time-based by looking for timestamp fields
   const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
     (it: any) =>
-      it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column ||
+      it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column ||
       ["histogram", "date_bin"].includes(it.aggregationFunction),
   );
 
@@ -2258,7 +2258,7 @@ export const convertSQLData = async (
           (it: any) =>
             it.functionName == "histogram" &&
             it?.args?.[0]?.value?.field ==
-              store.state.zoConfig.timestamp_column,
+              store.state?.zoConfig?.timestamp_column,
         );
         // if histogram
         if (field) {
@@ -2578,13 +2578,13 @@ export const convertSQLData = async (
     const field = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         it.functionName == "histogram" &&
-        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
+        it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column,
     );
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
         !it.functionName &&
-        it?.args?.[0]?.value?.field == store.state.zoConfig.timestamp_column,
+        it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column,
     );
 
     //if x axis has time series
