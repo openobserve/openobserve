@@ -38,6 +38,7 @@ use crate::{
     get,
     path = "/{org_id}/service_streams/_analytics",
     tag = "Service Streams",
+    operation_id = "GetServiceStreamAnalytics",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
@@ -108,6 +109,7 @@ pub async fn get_dimension_analytics(
     post,
     path = "/{org_id}/service_streams/_correlate",
     tag = "Service Streams",
+    operation_id = "CorrelateServiceStreams",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
@@ -208,6 +210,7 @@ pub struct CorrelationRequest {
     get,
     path = "/{org_id}/service_streams/_grouped",
     tag = "Service Streams",
+    operation_id = "GetServiceStreamGrouped",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
