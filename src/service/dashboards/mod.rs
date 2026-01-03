@@ -340,17 +340,23 @@ pub async fn save_dashboard(
         _ => ider::generate(),
     };
 
+    let is_exist = table::dashboards::get_by_id(org_id, &dashboard_id)
+        .await?
+        .is_some();
+
     let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, hash).await?;
-    set_ownership(
-        org_id,
-        "dashboards",
-        Authz {
-            obj_id: dashboard_id,
-            parent_type: "folders".to_owned(),
-            parent: folder_id.to_owned(),
-        },
-    )
-    .await;
+    if !is_exist {
+        set_ownership(
+            org_id,
+            "dashboards",
+            Authz {
+                obj_id: dashboard_id,
+                parent_type: "folders".to_owned(),
+                parent: folder_id.to_owned(),
+            },
+        )
+        .await;
+    }
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
