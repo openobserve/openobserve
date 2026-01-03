@@ -80,6 +80,8 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         position: null,
         rotate: 0,
       },
+      axis_label_rotate: 0,
+      axis_label_truncate_width: null,
       show_symbol:
         store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",

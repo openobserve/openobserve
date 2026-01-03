@@ -22,6 +22,8 @@ vi.mock("./convertDataIntoUnitValue", () => ({
     }
     return 80;
   }),
+  calculateDynamicNameGap: vi.fn(() => 25),
+  calculateRotatedLabelBottomSpace: vi.fn(() => 0),
 }));
 
 vi.mock("date-fns-tz", () => ({
