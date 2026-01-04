@@ -60,24 +60,13 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{
-        db, file_list,
-        schema::generate_schema_for_defined_schema_fields,
-        search::{
-            DATAFUSION_RUNTIME,
-            datafusion::{
-                exec::TableBuilder,
-                merge::{self, MergeParquetResult},
-            },
-        },
-        tantivy::create_tantivy_index,
-    },
 use crate::service::{
     db, file_list,
     schema::generate_schema_for_defined_schema_fields,
-    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+    search::datafusion::{
+        exec::TableBuilder,
+        merge::{self, MergeParquetResult},
+    },
     tantivy::create_tantivy_index,
 };
 
