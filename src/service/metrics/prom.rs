@@ -43,6 +43,7 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
+    runtime::METRICS_RUNTIME,
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
@@ -52,7 +53,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::stream::SchemaRecords,
+        meta::{ingestion::IngestUser, stream::SchemaRecords},
     },
     service::{
         alerts::alert::AlertExt,
@@ -66,6 +67,22 @@ use crate::{
 };
 
 pub async fn remote_write(
+    org_id: &str,
+    body: web::Bytes,
+    user: IngestUser,
+) -> std::result::Result<(), anyhow::Error> {
+    let org_id = org_id.to_string();
+    let ret = METRICS_RUNTIME
+        .spawn(async move { remote_write_inner(&org_id, body, user).await })
+        .await;
+    match ret {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Error spawning remote write task: {e}")),
+    }
+}
+
+async fn remote_write_inner(
     org_id: &str,
     body: web::Bytes,
     user: crate::common::meta::ingestion::IngestUser,
@@ -169,8 +186,101 @@ pub async fn remote_write(
     }
 
     // parse timeseries
+    let step_start = std::time::Instant::now();
     let mut first_line = true;
+
+    // Detailed performance tracking
+    let mut sample_processing_time = 0u128;
+    let mut event_count = 0;
+    let mut sample_count = 0;
+
+    // Pre-load all configurations for unique metrics to avoid repeated queries
+    let preload_start = std::time::Instant::now();
+    let mut unique_metrics = HashSet::new();
+    for event in &request.timeseries {
+        if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
+            let metric_name = format_stream_name(name_label.value.to_string());
+            unique_metrics.insert(metric_name);
+        }
+    }
+
+    let mut preload_pipeline_time = 0u128;
+    let mut preload_uds_time = 0u128;
+    let mut preload_schema_time = 0u128;
+    let mut preload_alerts_time = 0u128;
+
+    if !unique_metrics.is_empty() {
+        let streams: Vec<StreamParams> = unique_metrics
+            .iter()
+            .map(|name| StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: name.to_owned().into(),
+                stream_type: StreamType::Metrics,
+            })
+            .collect();
+
+        // Preload pipelines
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !stream_executable_pipelines.contains_key(stream_name_str) {
+                let pipeline_params =
+                    crate::service::ingestion::get_stream_executable_pipeline(stream).await;
+                stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
+            }
+        }
+        preload_pipeline_time = t.elapsed().as_micros();
+
+        // Preload UDS
+        let t = std::time::Instant::now();
+        crate::service::ingestion::get_uds_and_original_data_streams(
+            &streams,
+            &mut user_defined_schema_map,
+            &mut streams_need_original_map,
+            &mut streams_need_all_values_map,
+        )
+        .await;
+        preload_uds_time = t.elapsed().as_micros();
+
+        // Preload schemas
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !metric_schema_map.contains_key(stream_name_str) {
+                let _schema_exists = stream_schema_exists(
+                    &stream.org_id,
+                    &stream.stream_name,
+                    stream.stream_type,
+                    &mut metric_schema_map,
+                )
+                .await;
+            }
+        }
+        preload_schema_time = t.elapsed().as_micros();
+
+        // Preload partition keys
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !stream_partitioning_map.contains_key(stream_name_str) {
+                let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    &stream.org_id,
+                    &stream.stream_type,
+                    &stream.stream_name,
+                )
+                .await;
+                stream_partitioning_map.insert(stream.stream_name.to_string(), partition_det);
+            }
+        }
+
+        // Preload alerts
+        let t = std::time::Instant::now();
+        crate::service::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
+        preload_alerts_time = t.elapsed().as_micros();
+    }
+    let total_preload_time = preload_start.elapsed().as_micros();
+
     for mut event in request.timeseries {
+        event_count += 1;
         // get labels
         let mut replica_label = String::new();
 
@@ -200,33 +310,13 @@ pub async fn remote_write(
             None => continue,
         };
 
-        // get stream pipeline
-        if !stream_executable_pipelines.contains_key(&metric_name) {
-            let pipeline_params = crate::service::ingestion::get_stream_executable_pipeline(
-                org_id,
-                &metric_name,
-                &StreamType::Metrics,
-            )
-            .await;
-            stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
-        }
-
-        // get user defined schema
-        let streams = vec![StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_type: StreamType::Metrics,
-            stream_name: metric_name.to_owned().into(),
-        }];
-        crate::service::ingestion::get_uds_and_original_data_streams(
-            &streams,
-            &mut user_defined_schema_map,
-            &mut streams_need_original_map,
-            &mut streams_need_all_values_map,
-        )
-        .await;
+        // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
+        // before the loop to avoid repeated async queries
 
         // parse samples
+        let sample_start = std::time::Instant::now();
         for sample in event.samples {
+            sample_count += 1;
             let mut sample_val = sample.value;
             // revisit in future
             if sample_val.is_infinite() {
@@ -299,38 +389,6 @@ pub async fn remote_write(
                 return Ok(());
             }
 
-            // check for schema
-            let _schema_exists = stream_schema_exists(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-            )
-            .await;
-
-            // get partition keys
-            if !stream_partitioning_map.contains_key(&metric_name) {
-                let partition_det = crate::service::ingestion::get_stream_partition_keys(
-                    org_id,
-                    &StreamType::Metrics,
-                    &metric_name,
-                )
-                .await;
-                stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
-            }
-
-            // Start get stream alerts
-            crate::service::ingestion::get_stream_alerts(
-                &[StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: metric_name.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                }],
-                &mut stream_alerts_map,
-            )
-            .await;
-            // End get stream alert
-
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             value.as_object_mut().unwrap().insert(
@@ -367,6 +425,26 @@ pub async fn remote_write(
                     .push((local_val, timestamp));
             }
         }
+        sample_processing_time += sample_start.elapsed().as_micros();
+    }
+    let parse_timeseries_ms = step_start.elapsed().as_millis();
+
+    // Detailed performance logging
+    if parse_timeseries_ms > 200 {
+        let other_time = parse_timeseries_ms * 1000 - total_preload_time - sample_processing_time;
+
+        log::info!(
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
+            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), sample_proc={:.1}ms, other={:.1}ms",
+            unique_metrics.len(),
+            total_preload_time as f64 / 1000.0,
+            preload_pipeline_time as f64 / 1000.0,
+            preload_uds_time as f64 / 1000.0,
+            preload_schema_time as f64 / 1000.0,
+            preload_alerts_time as f64 / 1000.0,
+            sample_processing_time as f64 / 1000.0,
+            other_time as f64 / 1000.0,
+        );
     }
 
     // process records buffered for pipeline processing
@@ -436,6 +514,7 @@ pub async fn remote_write(
         }
     }
 
+    let step_start = std::time::Instant::now();
     for (stream_name, json_data) in json_data_by_stream {
         // get partition keys
         let partition_det = stream_partitioning_map.get(&stream_name).unwrap();
@@ -538,8 +617,21 @@ pub async fn remote_write(
             // End check for alert trigger
         }
     }
+    let elapsed_ms = step_start.elapsed().as_millis();
+    if elapsed_ms > 200 {
+        log::info!(
+            "[remote_write] org: {org_id}, build records and schema check took: {elapsed_ms} ms",
+        );
+    }
 
     // write data to wal
+    let step_start = std::time::Instant::now();
+    let mut stream_count = 0;
+    let mut get_writer_time = 0u128;
+    let mut write_file_time = 0u128;
+    let mut report_stats_time = 0u128;
+    let mut deletion_check_time = 0u128;
+
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -547,6 +639,7 @@ pub async fn remote_write(
         }
 
         // check if we are allowed to ingest
+        let t = std::time::Instant::now();
         if db::compact::retention::is_deleting_stream(
             org_id,
             StreamType::Metrics,
@@ -556,13 +649,21 @@ pub async fn remote_write(
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+        deletion_check_time += t.elapsed().as_micros();
+
+        stream_count += 1;
 
         // write to file
+        let t = std::time::Instant::now();
         let writer =
             ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        get_writer_time += t.elapsed().as_micros();
+
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
+        let t = std::time::Instant::now();
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
+        write_file_time += t.elapsed().as_micros();
 
         let fns_length: usize =
             stream_executable_pipelines
@@ -579,6 +680,7 @@ pub async fn remote_write(
         } else {
             Some(email_str)
         };
+        let t = std::time::Instant::now();
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -589,6 +691,25 @@ pub async fn remote_write(
             started_at,
         )
         .await;
+        report_stats_time += t.elapsed().as_micros();
+    }
+    let elapsed_ms = step_start.elapsed().as_millis();
+    if elapsed_ms > 200 {
+        let other_time = elapsed_ms * 1000
+            - get_writer_time
+            - write_file_time
+            - report_stats_time
+            - deletion_check_time;
+
+        log::info!(
+            "[remote_write] org: {org_id}, write to WAL took: {elapsed_ms} ms (streams: {stream_count}) | \
+            breakdown: deletion_check={:.1}ms, get_writer={:.1}ms, write_file={:.1}ms, report_stats={:.1}ms, other={:.1}ms",
+            deletion_check_time as f64 / 1000.0,
+            get_writer_time as f64 / 1000.0,
+            write_file_time as f64 / 1000.0,
+            report_stats_time as f64 / 1000.0,
+            other_time as f64 / 1000.0,
+        );
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -618,6 +739,11 @@ pub async fn remote_write(
         if let Some(entry) = entry {
             evaluate_trigger(entry).await;
         }
+    }
+
+    let total_ms = start.elapsed().as_millis();
+    if total_ms > 1000 {
+        log::info!("[remote_write] org: {org_id}, total time: {total_ms} ms");
     }
 
     Ok(())

@@ -727,6 +727,22 @@ impl FromRequest for AuthExtractor {
 
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
+                let path_is_bulk_operation = method.eq("DELETE")
+                    && (path.contains("/cipher_keys/bulk")
+                        || path.contains("/re_patterns/bulk")
+                        || path.contains("/alerts/templates/bulk")
+                        || path.contains("/alerts/destinations/bulk")
+                        || (path.starts_with("v2/") && path.contains("/alerts/bulk"))
+                        || path.contains("/dashboards/bulk")
+                        || path.contains("/pipelines/bulk")
+                        || path.contains("/actions/bulk")
+                        || path.contains("/groups/bulk")
+                        || path.contains("/roles/bulk")
+                        || path.contains("/service_accounts/bulk")
+                        || path.contains("/functions/bulk")
+                        || path.contains("/users/bulk")
+                        || path.contains("/reports/bulk"));
+
                 if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                 || (method.eq("POST")
                     && url_len > 1
@@ -743,7 +759,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
                 // bulk enable of pipelines and alerts
-                || path.contains("/bulk/enable")
+                || path_is_bulk_operation
                 // for license the function itself with do a perm check
                 || (url_len == 1 && path.contains("license"))
                 // service_streams APIs are org-level, not stream-specific
@@ -847,7 +863,7 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 });
             }
-            log::info!(
+            log::debug!(
                 "AuthExtractor::from_request took {} ms",
                 start.elapsed().as_millis()
             );
@@ -1024,12 +1040,12 @@ pub fn generate_presigned_url(
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn check_permissions(
-    _object_id: Option<String>,
+    _object_id: &str,
     _org_id: &str,
     _user_id: &str,
     _object_type: &str,
     _method: &str,
-    _parent_id: &str,
+    _parent_id: Option<&str>,
 ) -> bool {
     false
 }
@@ -1037,12 +1053,12 @@ pub async fn check_permissions(
 /// Returns false if Auth fails
 #[cfg(feature = "enterprise")]
 pub async fn check_permissions(
-    object_id: Option<String>,
+    object_id: &str,
     org_id: &str,
     user_id: &str,
     object_type: &str,
     method: &str,
-    parent_id: &str,
+    parent_id: Option<&str>,
 ) -> bool {
     if !is_root_user(user_id) {
         let user: config::meta::user::User = match get_user(Some(org_id), user_id).await {
@@ -1050,11 +1066,6 @@ pub async fn check_permissions(
             None => return false,
         }
         .clone();
-
-        let object_id = match object_id {
-            Some(id) => id,
-            None => org_id.to_string(),
-        };
 
         return crate::handler::http::auth::validator::check_permissions(
             user_id,
@@ -1070,7 +1081,7 @@ pub async fn check_permissions(
                 ),
                 org_id: org_id.to_string(),
                 bypass_check: false,
-                parent_id: parent_id.to_string(),
+                parent_id: parent_id.unwrap_or("").to_string(),
             },
             user.role,
             user.is_external,
@@ -1443,12 +1454,12 @@ mod tests {
     async fn test_check_permissions_non_enterprise() {
         // In non-enterprise mode, should always return false
         let result = check_permissions(
-            Some("test_object".to_string()),
+            &"test_object",
             "test_org",
             "test_user",
             "dashboard",
             "GET",
-            "",
+            None,
         )
         .await;
 

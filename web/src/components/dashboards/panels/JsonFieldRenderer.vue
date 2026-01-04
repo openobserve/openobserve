@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 
-interface Props {
+export interface Props {
   value: any;
 }
 

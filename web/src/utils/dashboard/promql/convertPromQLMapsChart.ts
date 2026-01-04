@@ -17,6 +17,7 @@ import {
   PromQLChartConverter,
   ProcessedPromQLData,
   MapsConfig,
+  TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getCountryName } from "../countryMappings";
@@ -126,9 +127,11 @@ export class MapsConverter implements PromQLChartConverter {
       ],
       tooltip: {
         trigger: "item",
+        confine: true,
         showDelay: 0,
         transitionDuration: 0.2,
         backgroundColor: "rgba(255,255,255,0.8)",
+        extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           let formattedValue = params.value;
           if (formattedValue === "-" || Number.isNaN(formattedValue)) {

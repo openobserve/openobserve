@@ -85,7 +85,8 @@ impl From<FolderError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new folder"}))
     ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
@@ -132,7 +133,8 @@ pub async fn create_folder(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update folder properties"}))
     ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -166,7 +168,8 @@ pub async fn update_folder(
         (status = StatusCode::OK, body = inline(ListFoldersResponseBody)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}")]
@@ -212,7 +215,8 @@ pub async fn list_folders(
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get folder details by ID"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -247,7 +251,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get folder by name"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
@@ -283,7 +288,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID"}))
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -326,7 +332,8 @@ pub mod deprecated {
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[post("/{org_id}/folders")]
@@ -374,7 +381,8 @@ pub mod deprecated {
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[put("/{org_id}/folders/{folder_id}")]
@@ -409,7 +417,8 @@ pub mod deprecated {
             (status = StatusCode::OK, body = inline(ListFoldersResponseBody)),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[get("/{org_id}/folders")]
@@ -456,7 +465,8 @@ pub mod deprecated {
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[get("/{org_id}/folders/{folder_id}")]
@@ -492,7 +502,8 @@ pub mod deprecated {
             (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[get("/{org_id}/folders/name/{folder_name}")]
@@ -529,7 +540,8 @@ pub mod deprecated {
             (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
         ),
         extensions(
-            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"}))
+            ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
+            ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
     #[delete("/{org_id}/folders/{folder_id}")]

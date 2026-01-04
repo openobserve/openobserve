@@ -48,7 +48,7 @@ pub struct Model {
     #[sea_orm(column_type = "String(StringLen::N(128))")]
     pub org_id: String,
 
-    #[sea_orm(column_type = "String(StringLen::N(2048))")]
+    #[sea_orm(column_type = "String(StringLen::N(512))")]
     pub service_key: String,
 
     /// Correlation key (hash of stable dimensions only)

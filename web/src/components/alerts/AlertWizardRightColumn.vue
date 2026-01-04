@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw-flex-[0_0_calc(32%-0.625rem)] tw-flex tw-flex-col tw-gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
       class="collapsible-section card-container"
       :style="previewSectionStyle"
     >
       <div
-        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="togglePreview"
       >
-        <span class="tw-text-sm tw-font-semibold">Preview</span>
+        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
         <q-btn
           flat
           dense
@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="summarySectionStyle"
     >
       <div
-        class="section-header tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-cursor-pointer"
+        class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw-text-sm tw-font-semibold">Summary</span>
+        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
         <q-btn
           flat
           dense
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
@@ -138,6 +139,7 @@ export default defineComponent({
   },
   setup(props, { expose }) {
     const store = useStore();
+    const { t } = useI18n();
     const previewAlertRef = ref(null);
 
     // Load saved state from localStorage or use defaults
@@ -206,18 +208,6 @@ export default defineComponent({
       }
     });
 
-    // Watch for Query step with custom tab - auto-expand preview if collapsed
-    watch(
-      () => [props.wizardStep, props.selectedTab],
-      ([step, tab]) => {
-        // Step 2 is Query step, and tab is "custom"
-        if (step === 2 && tab === "custom" && !expandState.preview) {
-          expandState.preview = true;
-          saveExpandState();
-        }
-      },
-      { immediate: true }
-    );
 
     // Expose refreshData method from PreviewAlert
     const refreshData = () => {
@@ -232,6 +222,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       previewAlertRef,
       expandState,

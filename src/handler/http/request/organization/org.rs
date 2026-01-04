@@ -36,7 +36,6 @@ use {
 
 use crate::{
     common::{
-        infra::cluster,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
@@ -66,7 +65,8 @@ use crate::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "Get user organizations"}))
     )
 )]
 #[get("/organizations")]
@@ -248,7 +248,8 @@ pub async fn all_organizations(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get organization summary"}))
     )
 )]
 #[get("/{org_id}/summary")]
@@ -277,7 +278,8 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -319,7 +321,8 @@ async fn get_user_passcode(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -361,7 +364,8 @@ async fn update_user_passcode(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -403,7 +407,8 @@ async fn get_user_rumtoken(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -445,7 +450,8 @@ async fn update_user_rumtoken(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Rumtokens", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/rumtoken")]
@@ -484,7 +490,8 @@ async fn create_user_rumtoken(
         (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create an organization"}))
     )
 )]
 #[post("/organizations")]
@@ -515,6 +522,9 @@ async fn create_org(
     request_body(content = inline(ExtendTrialPeriodRequest), description = "Extend free trial request", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "text", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/extend_trial_period")]
@@ -770,6 +780,9 @@ async fn accept_org_invite(
         (status = 200, description = "Success", content_type = "application/json", body = inline(NodeListResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/node/list")]
@@ -859,6 +872,9 @@ pub async fn node_list_impl(
         (status = 200, description = "Success", content_type = "application/json", body = inline(ClusterInfoResponse)),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/cluster/info")]
@@ -916,7 +932,7 @@ async fn get_local_nodes() -> NodeListResponse {
     let mut response = NodeListResponse::new();
 
     // Get all nodes from cache if available
-    if let Some(nodes) = cluster::get_cached_nodes(|_| true).await {
+    if let Some(nodes) = infra::cluster::get_cached_nodes(|_| true).await {
         for node in nodes {
             response.add_node(node.clone(), node.get_region(), node.get_cluster());
         }

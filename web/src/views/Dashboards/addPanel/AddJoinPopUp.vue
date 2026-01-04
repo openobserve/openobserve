@@ -19,7 +19,7 @@
     <div class="join-header">
       <div class="join-section">
         <div class="join-section-header">
-          <LeftJoinSvg class="tw-h-[21px]" />
+          <LeftJoinSvg class="tw:h-[21px]" />
           <label>Join</label>
         </div>
         <q-select
@@ -35,7 +35,7 @@
       </div>
 
       <div class="join-connector">
-        <LeftJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
+        <LeftJoinLineSvg class="tw:h-[40px] tw:w-[58px]" />
       </div>
 
       <div class="join-type-section">
@@ -72,12 +72,12 @@
       </div>
 
       <div class="join-connector">
-        <RightJoinLineSvg class="tw-h-[40px] tw-w-[58px]" />
+        <RightJoinLineSvg class="tw:h-[40px] tw:w-[58px]" />
       </div>
 
       <div class="join-section">
         <div class="join-section-header">
-          <RightJoinSvg class="tw-h-[21px]" />
+          <RightJoinSvg class="tw:h-[21px]" />
           <label>On</label>
         </div>
 
@@ -101,21 +101,21 @@
       </div>
     </div>
 
-    <div class="tw-flex tw-items-center tw-gap-4">
-      <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
+    <div class="tw:flex tw:items-center tw:gap-4">
+      <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
       <div
         :class="[
-          'tw-py-2 tw-text-center tw-text-xs',
-          store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-gray-700',
+          'tw:py-2 tw:text-center tw:text-xs',
+          store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-700',
         ]"
         v-if="showJoinSummary"
       >
         Performing
         <span class="text-primary">{{ joinTypeLabel }} Join</span> between
-        <span class="tw-font-semibold">{{ mainStream }}</span> and
-        <span class="tw-font-semibold">{{ modelValue.stream }}</span>
+        <span class="tw:font-semibold">{{ mainStream }}</span> and
+        <span class="tw:font-semibold">{{ modelValue.stream }}</span>
       </div>
-      <div class="tw-border-t tw-border-gray-200 tw-flex-1"></div>
+      <div class="tw:border-t tw:border-gray-200 tw:flex-1"></div>
     </div>
 
     <div class="clause-section">
@@ -190,7 +190,7 @@
             round
             :disable="modelValue.conditions.length === 1"
             @click="handleRemoveCondition(argIndex)"
-            class="tw-h-10 tw-w-10"
+            class="tw:h-10 tw:w-10"
             :aria-label="t('panel.removeClause')"
           >
             <q-tooltip
@@ -231,31 +231,31 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
-interface StreamOption {
+export interface StreamOption {
   label: string;
   value: string;
 }
 
-interface JoinFieldReference {
+export interface JoinFieldReference {
   streamAlias: string;
   field: string;
 }
 
-interface JoinCondition {
+export interface JoinCondition {
   leftField: JoinFieldReference;
   rightField: JoinFieldReference;
   logicalOperator: "AND" | "OR";
   operation: "=" | "!=" | ">" | "<" | ">=" | "<=";
 }
 
-interface JoinConfig {
+export interface JoinConfig {
   stream: string;
   streamAlias: string;
   joinType: "inner" | "left" | "right";
   conditions: JoinCondition[];
 }
 
-interface StreamReference {
+export interface StreamReference {
   stream: string;
   streamAlias?: string;
 }
@@ -419,7 +419,7 @@ export default defineComponent({
      */
     function getJoinTypeLabelClass(type: string): string {
       return props.modelValue.joinType === type
-        ? "text-primary tw-font-[600]"
+        ? "text-primary tw:font-[600]"
         : "";
     }
 

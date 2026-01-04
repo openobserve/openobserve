@@ -257,12 +257,23 @@ const useLogs = () => {
   const loadLogsData = async () => {
     try {
       resetFunctions();
+
+      // Create initialStreamSelected variable to handle first time load when api call for function & actions are
+      // in-progress and user select stream from dropdown in that case it loads data but it should wait for
+      // additional details from the user like filter conditions and time range selection before load data
+      // it should work in case of page refresh, navigate user from streams page or short url
+      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
+
       await getStreamList();
       await getFunctions();
       if (isActionsEnabled.value) await getActions();
       await extractFields();
       if (searchObj.meta.jobId == "") {
-        await getQueryData();
+        if (initialStreamSelected) {
+          await getQueryData();
+        } else {
+          searchObj.loading = false;
+        }
       } else {
         await getJobData();
       }

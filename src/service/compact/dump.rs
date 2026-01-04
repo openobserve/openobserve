@@ -36,6 +36,7 @@ use config::{
 };
 use futures::StreamExt;
 use infra::{
+    cluster::get_node_from_consistent_hash,
     errors, file_list as infra_file_list,
     file_list::FileRecord,
     schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_settings, unwrap_partition_time_level},
@@ -44,10 +45,7 @@ use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::mpsc;
 
-use crate::{
-    common::infra::cluster::get_node_from_consistent_hash,
-    service::{db, file_list_dump::*},
-};
+use crate::service::{db, file_list_dump::*};
 
 #[derive(Clone)]
 pub struct DumpJob {

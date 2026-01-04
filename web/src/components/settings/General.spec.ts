@@ -381,7 +381,7 @@ describe("General", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
-        message: "something went wrong",
+        message: "Something went wrong",
         timeout: 2000,
       });
     });
@@ -592,7 +592,7 @@ describe("General", () => {
       );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Light mode logo updated successfully.",
+        message: "Light Mode logo updated successfully.",
         timeout: 2000,
       });
     });
@@ -610,7 +610,7 @@ describe("General", () => {
       );
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Dark mode logo updated successfully.",
+        message: "Dark Mode logo updated successfully.",
         timeout: 2000,
       });
     });
@@ -658,7 +658,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Light mode logo deleted successfully.",
+        message: "Light Mode logo deleted successfully.",
         timeout: 2000,
       });
     });
@@ -671,7 +671,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
       expect(mockNotify).toHaveBeenCalledWith({
         type: "positive",
-        message: "Dark mode logo deleted successfully.",
+        message: "Dark Mode logo deleted successfully.",
         timeout: 2000,
       });
     });
@@ -688,7 +688,7 @@ describe("General", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
-        message: "Something went wrong.",
+        message: "Something went wrong",
         timeout: 2000,
       });
     });

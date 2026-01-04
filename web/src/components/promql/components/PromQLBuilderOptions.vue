@@ -2,8 +2,8 @@
   <div>
     <q-separator />
 
-    <!-- Options Row: Legend + Step Value -->
-    <div class="tw-py-[0.25rem]">
+    <!-- Options Row: Query Type Tabs + Legend + Step Value -->
+    <div class="tw:py-[0.25rem]">
       <div style="display: flex; flex-direction: row" class="q-pl-md">
         <div class="layout-name">{{ t("panel.options") }}</div>
         <span class="layout-separator">:</span>
@@ -40,7 +40,10 @@
                   self="bottom middle"
                   max-width="250px"
                 >
+                  ({{ t("dashboard.optional") }}) <b>Legend - </b>
                   {{ t("dashboard.overrideMessage") }}
+                  <br />
+                  {{ t("dashboard.overrideMessageExample") }}
                 </q-tooltip>
               </q-icon>
             </div>
@@ -79,14 +82,55 @@
                     self="bottom middle"
                     max-width="250px"
                   >
-                    <b>Step - </b>
+                    ({{ t("dashboard.optional") }}) <b>Step - </b>
                     {{ t("dashboard.stepValueTooltip") }}
+                    <br />
+                    {{ t("dashboard.stepValueTooltipInfo") }}
                     <br />
                     {{ t("dashboard.stepValueExample") }}
                   </q-tooltip>
                 </q-icon>
               </template>
             </q-input>
+          </div>
+
+                    <!-- Query Type Select (Range/Instant) -->
+          <div class="option-field-wrapper">
+            <span class="field-label">{{ t("common.type") }}</span>
+            <q-select
+              v-model="
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].config.query_type
+              "
+              :options="queryTypeOptions"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              borderless
+              dense
+              emit-value
+              map-options
+              data-test="dashboard-promql-builder-query-type"
+              hide-bottom-space
+              style="width: 120px"
+            >
+              <template v-slot:append>
+                <q-icon name="info" size="16px" class="cursor-pointer">
+                  <q-tooltip
+                    class="bg-grey-8"
+                    anchor="top middle"
+                    self="bottom middle"
+                    max-width="250px"
+                  >
+                    <b>Query Type - </b><br />
+                    Range: Returns time series data over a time range.<br />
+                    Instant: Returns single value at a specific point in time.
+                  </q-tooltip>
+                </q-icon>
+              </template>
+            </q-select>
           </div>
         </div>
       </div>
@@ -112,6 +156,27 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
+
+    // Initialize query_type if not set (default to "range")
+    const currentQuery =
+      props.dashboardPanelData.data.queries[
+        props.dashboardPanelData.layout.currentQueryIndex
+      ];
+    if (!currentQuery.config.query_type) {
+      currentQuery.config.query_type = "range";
+    }
+
+    // Query type options for q-select
+    const queryTypeOptions = [
+      {
+        label: "Range",
+        value: "range",
+      },
+      {
+        label: "Instant",
+        value: "instant",
+      },
+    ];
 
     // Computed property for PromQL legend field suggestions
     const dashboardSelectfieldPromQlList = computed(() => {
@@ -165,6 +230,7 @@ export default defineComponent({
 
     return {
       t,
+      queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
     };

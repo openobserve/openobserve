@@ -16,14 +16,20 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use {
-    crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers},
-    o2_dex::meta::auth::RoleRequest,
-};
+use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
 
-use crate::common::meta::{
-    http::HttpResponse as MetaHttpResponse,
-    user::{UserGroup, UserGroupRequest, UserRoleRequest},
+use crate::{
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{UserGroup, UserGroupRequest, UserRoleRequest},
+        },
+        utils::auth::UserEmail,
+    },
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -46,7 +52,8 @@ use crate::common::meta::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a role"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -131,7 +138,8 @@ pub async fn create_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -146,13 +154,116 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
     }
 }
 
+/// DeleteRoleBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.ids {
+        if !check_permissions(
+            &format!("{org_id}/{name}"),
+            &org_id,
+            &user_id,
+            "roles",
+            "DELETE",
+            None,
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match o2_openfga::authorizer::roles::delete_role(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting role {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "DeleteRoleBulk",
+    summary = "Delete multiple custom role",
+    description = "Permanently removes multiple custom roles from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "names of role to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/roles/bulk")]
+pub async fn delete_role_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+/// DeleteRole
 #[utoipa::path(
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
     summary = "Delete custom role",
-    description = "Permanently removes a custom role from the organization. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    description = "Permanently removes a custom role from the organization. Users and groups assigned to this role will lose the associated permissions. Standard predefined roles cannot be deleted. Requires enterprise features to be enabled.",
     security(
         ("Authorization"= [])
     ),
@@ -192,7 +303,8 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all roles"}))
     )
 )]
 #[get("/{org_id}/roles")]
@@ -288,7 +400,8 @@ pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a role"}))
     )
 )]
 #[put("/{org_id}/roles/{role_id}")]
@@ -937,6 +1050,109 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
     }
 }
 
+/// DeleteGroupBulk
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let user_id = user_email.user_id;
+
+    for name in &req.ids {
+        if !check_permissions(
+            &format!("{org_id}/{name}"),
+            &org_id,
+            &user_id,
+            "groups",
+            "DELETE",
+            None,
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match o2_openfga::authorizer::groups::delete_group(&org_id, &name).await {
+            Ok(_) => {
+                successful.push(name);
+            }
+            Err(e) => {
+                log::error!("error in deleting group {org_id}/{name} : {e}");
+                unsuccessful.push(name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Groups",
+    operation_id = "DeleteGroupBulk",
+    summary = "Delete multiple user group",
+    description = "Permanently removes multiple user groups from the organization. Users in those groups will lose group-based permissions but retain any directly assigned roles. This action cannot be undone. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "user group names", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/groups/bulk")]
+pub async fn delete_group_bulk(
+    _path: web::Path<String>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     context_path = "/api",
@@ -1069,7 +1285,6 @@ mod tests {
             let req = test::TestRequest::delete()
                 .uri("/test_org/roles/test_role")
                 .to_request();
-
             let resp = test::call_service(&app, req).await;
             assert_eq!(resp.status(), 403); // Forbidden in non-enterprise
         }

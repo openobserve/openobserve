@@ -22,13 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.generalPageTitle") }}
       </div>
       <div class="general-page-subtitle">
-        Adjust settings for your Application
+        {{ t("settings.pageSubtitle") }}
       </div>
     </div>
     <!-- platform settings section -->
-    <div class="tw-mx-4">
-      <GroupHeader title="Platform Settings" :showIcon="false" />
-      <div class="tw-w-full tw-flex tw-flex-col">
+    <div class="tw:mx-4">
+      <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
+      <div class="tw:w-full tw:flex tw:flex-col">
         <q-form @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
           <div class="settings-grid-item">
@@ -45,21 +45,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               hide-bottom-space
               data-test="general-settings-scrape-interval"
-              :rules="[(val: any) => !!val || 'Scrape interval is required']"
+              :rules="[(val: any) => !!val || t('settings.scrapeIntervalRequired')]"
               :lazy-rules="true"
               style="width: 120px;"
             />
             <span class="individual-setting-description">
-              The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
+              {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw-items-start">
+          <div class="settings-grid-item tw:items-start">
             <span class="individual-setting-title">
-              Manage Theme
+              {{ t("settings.manageTheme") }}
             </span>
-            <div class="tw-flex tw-gap-2 tw-items-center" style="margin-left: -60px;">
+            <div class="tw:flex tw:gap-2 tw:items-center" style="margin-left: -60px;">
               <!-- Light Mode Theme -->
               <div
                 class="theme-color-chip"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-circle" :style="{ backgroundColor: customLightColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <span class="chip-label">Light</span>
+                <span class="chip-label">{{ t("settings.light") }}</span>
                 <span class="chip-value">{{ customLightColor }}</span>
               </div>
 
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="color-circle" :style="{ backgroundColor: customDarkColor }">
                   <q-icon name="palette" size="14px" color="white" class="palette-icon" />
                 </div>
-                <span class="chip-label">Dark</span>
+                <span class="chip-label">{{ t("settings.dark") }}</span>
                 <span class="chip-value">{{ customDarkColor }}</span>
               </div>
 
@@ -93,11 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="reset-theme-colors-btn"
               >
                 <q-icon name="refresh" size="16px" />
-                <q-tooltip>Reset to default colors</q-tooltip>
+                <q-tooltip>{{ t("settings.resetToDefaultColors") }}</q-tooltip>
               </div>
             </div>
-            <span class="individual-setting-description tw-self-start">
-              Manage your organization's theme colors for both light and dark modes. These colors will be applied at the organization level.
+            <span class="individual-setting-description tw:self-start">
+              {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
 
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
-              class="q-mb-md o2-primary-button no-border tw-h-[36px]"
+              class="q-mb-md o2-primary-button no-border tw:h-[36px]"
               type="submit"
               no-caps
               size="md"
@@ -126,23 +126,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="q-px-md q-py-sm">
-        <GroupHeader title="Enterprise Features" :showIcon="false" />
+        <GroupHeader :title="t('settings.enterpriseFeatures')" :showIcon="false" />
       </div>
       <div class="q-mx-md">
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
             {{ t('settings.customLogoText') }}
           </span>
-          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw-flex tw-gap-3 tw-items-center">
+          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="tw:flex tw:gap-3 tw:items-center">
             <q-input
-              class="showLabelOnTop tw-w-[250px] tw-mr-sm"
+              class="showLabelOnTop tw:w-[250px] tw:mr-sm"
               stack-label
               borderless
               dense
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
-            <div class="btn-group tw-flex tw-h-[28px]">
+            <div class="btn-group tw:flex tw:h-[28px]">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -168,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="tw-w-[190px] tw-text-center tw-truncate">{{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
-              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw-text-center tw-text-[12px] tw-max-w-[250px]">
+            <span class="tw:w-[190px] tw:text-center tw:truncate">{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
+              <q-tooltip v-if="store.state.zoConfig.custom_logo_text.length > 20" class="tw:text-center tw:text-[12px] tw:max-w-[250px]">
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
             </span>
@@ -184,13 +184,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <span class="individual-setting-description">
-            Custom logo text is used to change the default branding text displayed in the application.
+            {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
-            {{ t("settings.customLogoTitle") }} (Light Mode)
+          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+            {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
             v-if="
@@ -216,24 +216,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             ></q-btn>
           </div>
-          <div v-else class="tw-flex tw-items-center tw-gap-3">
+          <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
             data-test="setting_ent_custom_logo_img_file_upload"
             v-model="filesLight"
-            :label="'Drag & drop or click to upload'"
+            :label="t('settings.dragDropUpload')"
             counter
             :counter-label="counterLabelFn"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
             borderless
-            class="q-mx-none o2-file-input tw-w-[250px] "
+            class="q-mx-none o2-file-input tw:w-[250px] "
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
             </template>
           </q-file>
-          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
+          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -258,17 +258,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw-flex tw-flex-col tw-mb-5">
+          <div class="tw:flex tw:flex-col tw:mb-5">
             <span class="individual-setting-description">
-              Custom logo for light mode theme. This will be displayed when users are in light mode.
+              {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
         </div>
 
         <!-- Dark Mode Logo -->
         <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw-mb-5">
-            {{ t("settings.customLogoTitle") }} (Dark Mode)
+          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+            {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
             v-if="
@@ -294,24 +294,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             ></q-btn>
           </div>
-          <div v-else class="tw-flex tw-items-center tw-gap-3">
+          <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
             data-test="setting_ent_custom_logo_dark_img_file_upload"
             v-model="filesDark"
-            :label="'Drag & drop or click to upload'"
+            :label="t('settings.dragDropUpload')"
             counter
             :counter-label="counterLabelFn"
             accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             dense
             borderless
-            class="q-mx-none o2-file-input tw-w-[250px] "
+            class="q-mx-none o2-file-input tw:w-[250px] "
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
             </template>
           </q-file>
-          <div class="btn-group tw-flex tw-h-[28px] tw-mb-5">
+          <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
               <q-btn
                 type="button"
                 class="q-mr-sm"
@@ -336,9 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw-flex tw-flex-col tw-mb-5">
+          <div class="tw:flex tw:flex-col tw:mb-5">
             <span class="individual-setting-description">
-              Custom logo for dark mode theme. This will be displayed when users are in dark mode.
+              {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
         </div>
@@ -357,11 +357,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("settings.deleteLogoMessage") }}
       </q-card-section>
 
-      <q-card-actions align="right" class="tw-flex tw-gap-1">
+      <q-card-actions align="right" class="tw:flex tw:gap-1">
         <q-btn
           data-test="logs-search-bar-confirm-dialog-cancel-btn"
           :label="t('confirmDialog.cancel')"
-          class="o2-secondary-button tw-h-[28px] no-border"
+          class="o2-secondary-button tw:h-[28px] no-border"
           flat
           no-caps
           @click="cancelConfirmDialog"
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="logs-search-bar-confirm-dialog-ok-btn"
           :label="t('confirmDialog.ok')"
-          class="o2-primary-button tw-h-[28px] no-border"
+          class="o2-primary-button tw:h-[28px] no-border"
           no-caps
           flat
           @click="confirmDialogOK"
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
     <q-card style="min-width: 300px">
       <q-card-section>
-        <div class="text-h6">Pick Custom Color</div>
+        <div class="text-h6">{{ t("settings.pickCustomColor") }}</div>
       </q-card-section>
       <q-card-section>
         <q-color
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
+        <q-btn flat :label="t('settings.close')" color="primary" v-close-popup />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -577,13 +577,13 @@ export default defineComponent({
 
         q.notify({
           type: "positive",
-          message: "Organization settings updated",
+          message: t("settings.organizationSettingsUpdated"),
           timeout: 2000,
         });
       } catch (err: any) {
         q.notify({
           type: "negative",
-          message: err?.message || "something went wrong",
+          message: err?.message || t("settings.somethingWentWrong"),
           timeout: 2000,
         });
       }
@@ -622,7 +622,7 @@ export default defineComponent({
             if (res.status == 200) {
               q.notify({
                 type: "positive",
-                message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo updated successfully.`,
+                message: t("settings.logoUpdatedSuccessfully", { mode: theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode') }),
                 timeout: 2000,
               });
 
@@ -640,7 +640,7 @@ export default defineComponent({
             } else {
               q.notify({
                 type: "negative",
-                message: "Something went wrong.",
+                message: t("settings.somethingWentWrong"),
                 timeout: 2000,
               });
             }
@@ -648,7 +648,7 @@ export default defineComponent({
           .catch((e) => {
             q.notify({
               type: "negative",
-              message: e?.message || "Error while uploading image.",
+              message: e?.message || t("settings.errorUploadingImage"),
               timeout: 2000,
             });
           })
@@ -658,13 +658,13 @@ export default defineComponent({
       } else if (config.isEnterprise != "true") {
         q.notify({
           type: "negative",
-          message: "You are not allowed to perform this action.",
+          message: t("settings.notAllowedAction"),
           timeout: 2000,
         });
       } else {
         q.notify({
           type: "negative",
-          message: "Please select a file to upload.",
+          message: t("settings.selectFileToUpload"),
           timeout: 2000,
         });
       }
@@ -687,7 +687,7 @@ export default defineComponent({
           if (res.status == 200) {
             q.notify({
               type: "positive",
-              message: `${theme === 'dark' ? 'Dark mode' : 'Light mode'} logo deleted successfully.`,
+              message: t("settings.logoDeletedSuccessfully", { mode: theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode') }),
               timeout: 2000,
             });
 
@@ -697,7 +697,7 @@ export default defineComponent({
           } else {
             q.notify({
               type: "negative",
-              message: res?.message || "Error while deleting image.",
+              message: res?.message || t("settings.errorDeletingImage"),
               timeout: 2000,
             });
           }
@@ -705,7 +705,7 @@ export default defineComponent({
         .catch(() => {
           q.notify({
             type: "negative",
-            message: "Something went wrong.",
+            message: t("settings.somethingWentWrong"),
             timeout: 2000,
           });
         })
@@ -806,7 +806,7 @@ export default defineComponent({
       // Show notification
       q.notify({
         type: "positive",
-        message: "Theme colors reset to defaults and applied.",
+        message: t("settings.themeColorsResetSuccess"),
         timeout: 2000,
       });
     };
@@ -850,7 +850,7 @@ export default defineComponent({
       if (customText.value.length > 100) {
         q.notify({
           type: "negative",
-          message: "Text should be less than 100 characters.",
+          message: t("settings.textMaxCharacters"),
           timeout: 2000,
         });
         loadingState.value = false;
@@ -867,7 +867,7 @@ export default defineComponent({
           if (res.status == 200) {
             q.notify({
               type: "positive",
-              message: "Logo text updated successfully.",
+              message: t("settings.logoTextUpdatedSuccessfully"),
               timeout: 2000,
             });
 
@@ -878,7 +878,7 @@ export default defineComponent({
           } else {
             q.notify({
               type: "negative",
-              message: res?.message || "Error while updating image.",
+              message: res?.message || t("settings.errorUpdatingImage"),
               timeout: 2000,
             });
           }
@@ -886,7 +886,7 @@ export default defineComponent({
         .catch((err) => {
           q.notify({
             type: "negative",
-            message: err?.message || "Something went wrong.",
+            message: err?.message || t("settings.somethingWentWrong"),
             timeout: 2000,
           });
         })
@@ -913,7 +913,7 @@ export default defineComponent({
       filesDark,
       logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .gif, .bmp formats & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `${t("settings.fileFormatConstraint")} ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
@@ -924,7 +924,7 @@ export default defineComponent({
         // https://quasar.dev/quasar-plugins/notify#Installation
         q.notify({
           type: "negative",
-          message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
+          message: t("settings.filesValidationFailed", { count: rejectedEntries.length }),
         });
       },
       uploadImage,

@@ -1,8 +1,8 @@
 <template>
   <div
-    class="tw-w-full tw-flex tw-justify-between tw-items-center"
+    class="tw:w-full tw:flex tw:justify-between tw:items-center"
   >
-    <div class="tw-flex tw-items-center">
+    <div class="tw:flex tw:items-center">
       <div class="add-function-back-btn">
         <div
           data-test="add-function-back-btn"
@@ -10,28 +10,25 @@
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw-w-6 tw-h-6 tw-flex tw-items-center tw-justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="redirectToFunctions"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
-      <div class="tw-text-lg tw-w-full add-function-title q-mr-sm">
-        Add Function
+      <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
+        {{ t('function.addFunction') }}
       </div>
       <q-form ref="addFunctionForm" class="o2-input">
-        <div class="tw-flex tw-items-center">
+        <div class="tw:flex tw:items-center">
           <q-input
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pa-none tw-w-full"
+            class="q-pa-none tw:w-full"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="disableName"
             v-bind:disable="disableName"
@@ -57,7 +54,7 @@
               self="center left"
               max-width="300px"
               :offset="[2, 0]"
-              class="tw-text-[12px]"
+              class="tw:text-[12px]"
             >
               {{ isValidMethodName() }}
             </q-tooltip>
@@ -82,14 +79,14 @@
             @mouseleave="isHovered = false"
 
           >
-            <div class="row items-center no-wrap tw-gap-2  ">
+            <div class="row items-center no-wrap tw:gap-2  ">
               <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
           </q-btn>
       <q-btn
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
-        class="o2-secondary-button tw-h-[36px]"
+        class="o2-secondary-button tw:h-[36px]"
         :label="t('common.fullscreen')"
         no-caps
         flat
@@ -99,14 +96,14 @@
       <q-btn
         data-test="add-function-test-btn"
         :label="t('function.testFunction')"
-        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
+        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
         no-caps
         icon="play_arrow"
         @click="emit('test')"
       />
       <q-btn
         data-test="add-function-cancel-btn"
-        class="tw-ml-[12px] o2-secondary-button no-border tw-h-[36px]"
+        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
         flat
         :label="t('function.cancel')"
         no-caps
@@ -115,7 +112,7 @@
       <q-btn
         data-test="add-function-save-btn"
         :label="t('function.save')"
-        class="tw-ml-[12px] o2-primary-button no-border tw-h-[36px]"
+        class="tw:ml-[12px] o2-primary-button no-border tw:h-[36px]"
         flat
         type="submit"
         no-caps

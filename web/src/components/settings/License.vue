@@ -7,9 +7,9 @@
       <q-spinner size="40px" />
       <div class="q-mt-md">Loading license information...</div>
     </div>
-    <div v-else class="tw-grid tw-grid-cols-3 tw-gap-4 tw-items-start tw-pb-4">
+    <div v-else class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start tw:pb-4">
 
-    <div class="tw-col-span-2 tw-min-h-0" >
+    <div class="tw:col-span-2 tw:min-h-0" >
       <div v-if="licenseData.license === null || !licenseData.license">
         <q-card class="q-mb-md">
           <q-card-section>
@@ -121,7 +121,7 @@
                 </tr>
               </tbody>
             </q-markup-table>
-            <div class="tw-mt-3 tw-flex tw-gap-3">
+            <div class="tw:mt-3 tw:flex tw:gap-3">
               <q-btn
                 no-caps
                 label="Request new License"
@@ -176,11 +176,11 @@
       </div>
     </div>
 
-    <div class="tw-col-span-1 tw-self-start">
+    <div class="tw:col-span-1 tw:self-start">
             <q-card>
               <q-card-section>
-                <div class="text-h6 q-mb-md tw-mx-auto">Usage Information</div>
-                <div  class="text-center q-mb-md tw-mt-[10px]">
+                <div class="text-h6 q-mb-md tw:mx-auto">Usage Information</div>
+                <div  class="text-center q-mb-md tw:mt-[10px]">
                   <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
                   <q-circular-progress
                     :value="ingestionUsagePercent"

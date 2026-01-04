@@ -45,7 +45,13 @@ use {
     std::str::FromStr,
 };
 
-use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
+use crate::{
+    common::utils::auth::UserEmail,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
+};
 
 #[cfg(feature = "enterprise")]
 const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
@@ -83,7 +89,8 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
@@ -103,6 +110,89 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
+        Ok(HttpResponse::Forbidden().json("Not Supported"))
+    }
+}
+
+/// Delete Action
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Actions",
+    operation_id = "DeleteActionBulk",
+    summary = "Delete multiple automated action",
+    description = "Permanently removes multiple automated actions from the organization. Any action must not be in use by active \
+                   workflows or schedules before deletion. Once deleted, any scheduled executions or trigger-based \
+                   invocations will stop, and the action configuration cannot be recovered.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Ids for actions to be deleted", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/actions/bulk")]
+pub async fn delete_action_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id = path.into_inner();
+        let req = req.into_inner();
+        let user_id = user_email.user_id;
+
+        for id in &req.ids {
+            if Ksuid::from_str(id).is_err() {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "invalid action id {id}"
+                )));
+            };
+            if !check_permissions(id, &org_id, &user_id, "actions", "DELETE", None).await {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+
+        let mut successful = Vec::with_capacity(req.ids.len());
+        let mut unsuccessful = Vec::with_capacity(req.ids.len());
+        let mut err = None;
+
+        for id in req.ids {
+            // we have already checked the conversion in the perm checks above,
+            // so can unwrap safely
+            let action_id = Ksuid::from_str(&id).unwrap();
+            match delete_app_from_target_cluster(&org_id, action_id).await {
+                Ok(_) => {
+                    remove_ownership(&org_id, "actions", Authz::new(&id.to_string())).await;
+                    successful.push(id);
+                }
+                Err(e) => {
+                    log::error!("error while deleting action {org_id}/{id} : {e}");
+                    unsuccessful.push(id);
+                    err = Some(e.to_string());
+                }
+            }
+        }
+        Ok(MetaHttpResponse::json(BulkDeleteResponse {
+            successful,
+            unsuccessful,
+            err,
+        }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop(path);
+        drop(user_email);
+        drop(req);
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
@@ -128,7 +218,8 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
         (status = 400, description = "Error",   content_type = "application/json",body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions/download/{ksuid}")]
@@ -181,7 +272,8 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/actions/{action_id}")]
@@ -257,7 +349,8 @@ pub async fn update_action_details(
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions")]
@@ -310,7 +403,8 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
         (status = 400, description = "Error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/{org_id}/actions/{action_id}")]
@@ -365,7 +459,8 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/actions/upload")]
@@ -643,13 +738,18 @@ pub async fn upload_zipped_action(
             Some(_) => "PUT",
             None => "POST",
         };
+        // the default to org_id is what the original check_permission impl would do
+        let action_id = action
+            .id
+            .map(|ksuid| ksuid.to_string())
+            .unwrap_or(org_id.clone());
         if !check_permissions(
-            action.id.map(|ksuid| ksuid.to_string()),
+            &action_id,
             &org_id,
             &user_email.user_id,
             "actions",
             method,
-            "",
+            None,
         )
         .await
         {

@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="overflow-y: auto" class="scroll">
-    <div class="row tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" style="height: 48px; overflow-y: auto">
-    <div class="card-container tw-w-full tw-h-full tw-flex" >
+    <div class="row tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" style="height: 48px; overflow-y: auto">
+    <div class="card-container tw:w-full tw:h-full tw:flex" >
       <div class="flex items-center col">
         <div
-          class="flex items-center q-table__title q-mx-md tw-font-semibold tw-text-xl"
+          class="flex items-center q-table__title q-mx-md tw:font-semibold tw:text-xl"
         >
           <span>
             {{ t("search.metrics") }}
@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          class="dashboard-icons tw-mx-2"
+          class="dashboard-icons tw:mx-2"
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="tw-text-xs tw-font-bold no-border"
+            class="tw:text-xs tw:font-bold no-border"
             data-test="metrics-cancel"
             padding="sm md"
             color="negative"
@@ -72,9 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-else
-            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
             data-test="metrics-apply"
-            padding="sm"
             :loading="disable"
             :disable="disable"
             no-caps
@@ -87,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div>
       <div class="row" style="overflow-y: auto">
-         <div class="tw-pl-[0.625rem]">
+         <div class="tw:pl-[0.625rem]">
           <div
-            class="col scroll card-container tw-mr-[0.625rem]"
+            class="col scroll card-container tw:mr-[0.625rem]"
             style="
               overflow-y: auto;
               height: 100%;
@@ -111,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.type,
             )
           "
-          class="col tw-mr-[0.625rem]"
+          class="col tw:mr-[0.625rem]"
           style="display: flex; flex-direction: row; overflow-x: hidden"
         >
           <!-- collapse field list bar -->
@@ -137,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <template #before>
-              <div class="tw-w-full tw-h-full tw-pb-[0.625rem]">
+              <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
                 class="col scroll card-container"
@@ -174,155 +173,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #after>
               <div class="row card-container">
                 <div
-                  class="row"
+                  class="col scroll"
                   style="height: calc(100vh - 106px); overflow-y: auto"
                 >
-                  <div class="col" style="height: 100%">
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="dashboardPanelData.layout.querySplitter"
-                      horizontal
-                      @update:model-value="querySplitterUpdated"
-                      reverse
-                      unit="px"
-                      :limits="
-                        !dashboardPanelData.layout.showQueryBar
-                          ? [43, 400]
-                          : [140, 400]
-                      "
-                      :disable="!dashboardPanelData.layout.showQueryBar"
-                      style="height: 100%"
-                    >
-                      <template #before>
-                        <div
-                          class="layout-panel-container col"
-                          style="height: 100%"
-                        >
-                          <DashboardQueryBuilder
-                            :dashboardData="currentDashboardData.data"
-                          />
-                          <q-separator />
+                  <div class="layout-panel-container col">
+                    <DashboardQueryBuilder
+                      :dashboardData="currentDashboardData.data"
+                    />
+                    <q-separator />
 
-                          <div v-if="isOutDated" class="tw-p-2">
-                            <div
-                              :style="{
-                                borderColor: '#c3920d',
-                                borderWidth: '1px',
-                                borderStyle: 'solid',
-                                backgroundColor:
-                                  store.state.theme == 'dark'
-                                    ? '#2a1f03'
-                                    : '#faf2da',
-                                padding: '1%',
-                                borderRadius: '5px',
-                              }"
-                            >
-                              <div style="font-weight: 700">
-                                Your chart is not up to date
-                              </div>
-                              <div>
-                                Chart Configuration / Variables has been updated,
-                                but the chart was not updated automatically. Click
-                                on the "Apply" button to run the query again
-                              </div>
-                            </div>
-                          </div>
-                          <div class="tw-flex tw-justify-end tw-mr-2">
-                            <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                              <span class="lastRefreshedAtIcon">🕑</span
-                              ><RelativeTime
-                                :timestamp="lastTriggeredAt"
-                                fullTimePrefix="Last Refreshed At: "
-                              />
-                            </span>
-                          </div>
-                          <div
-                            class="col"
-                            style="position: relative; height: 100%; width:100%"
-                          >
-                            <div
-                              style="
-                                flex: 1;
-                                min-height: calc(100% - 24px);
-                                height: calc(100% - 24px);
-                                width: 100%;
-                                margin-top: 24px;
-                              "
-                            >
-                              <PanelSchemaRenderer
-                                v-if="chartData"
-                                @metadata-update="metaDataValue"
-                                :key="dashboardPanelData.data.type"
-                                :panelSchema="chartData"
-                                :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                                :variablesData="{}"
-                                :width="6"
-                                @error="handleChartApiError"
-                                @updated:data-zoom="onDataZoom"
-                                :allowAlertCreation="true"
-                                @updated:vrl-function-field-list="
-                                  updateVrlFunctionFieldList
-                                "
-                                @last-triggered-at-update="
-                                  handleLastTriggeredAtUpdate
-                                "
-                                @series-data-update="seriesDataUpdate"
-                                searchType="ui"
-                              />
-                            </div>
-                            <div
-                              class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
-                              style="position: absolute; top: 4px; right: 0px;"
-                            >
-                              <q-btn
-                                size="md"
-                                class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
-                                no-caps
-                                dense
-                                style="padding: 2px 4px; z-index: 1"
-                                @click="addToDashboard"
-                                :title="t('search.addToDashboard')"
-                                >{{ t("search.addToDashboard") }}</q-btn
-                              >
-                            </div>
-                          </div>
-                          <DashboardErrorsComponent
-                            :errors="errorData"
-                            class="col-auto"
-                            style="flex-shrink: 0"
-                          />
+                    <div v-if="isOutDated" class="tw:p-2">
+                      <div
+                        :style="{
+                          borderColor: '#c3920d',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          backgroundColor:
+                            store.state.theme == 'dark'
+                              ? '#2a1f03'
+                              : '#faf2da',
+                          padding: '1%',
+                          borderRadius: '5px',
+                        }"
+                      >
+                        <div style="font-weight: 700">
+                          Your chart is not up to date
                         </div>
-                      </template>
-                      <template #separator>
-                        <div
-                          class="splitter"
-                          :class="
-                            dashboardPanelData.layout.showQueryBar
-                              ? 'splitter-enabled'
-                              : ''
+                        <div>
+                          Chart Configuration / Variables has been updated,
+                          but the chart was not updated automatically. Click
+                          on the "Apply" button to run the query again
+                        </div>
+                      </div>
+                    </div>
+                    <div class="tw:flex tw:justify-end tw:mr-2">
+                      <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                        <span class="lastRefreshedAtIcon">🕑</span
+                        ><RelativeTime
+                          :timestamp="lastTriggeredAt"
+                          fullTimePrefix="Last Refreshed At: "
+                        />
+                      </span>
+                    </div>
+                    <div class="col tw:relative" >
+                      <div
+                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]"
+                      >
+                        <PanelSchemaRenderer
+                          v-if="chartData"
+                          @metadata-update="metaDataValue"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="{}"
+                          :width="6"
+                          :showLegendsButton="true"
+                          @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
+                          :allowAlertCreation="true"
+                          @updated:vrl-function-field-list="
+                            updateVrlFunctionFieldList
                           "
-                        ></div>
-                      </template>
-                      <template #after>
-                        <div style="height: 100%; width: 100%" class="row column ">
-                          <DashboardQueryEditor />
-                        </div>
-                      </template>
-                    </q-splitter>
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
+                          "
+                          @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
+                          ref="panelSchemaRendererRef"
+                          searchType="ui"
+                        />
+                      </div>
+                      <div
+                        class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
+                        style="position: absolute; top: 4px; right: 0px"
+                      >
+                        <q-btn
+                          size="md"
+                          class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+                          no-caps
+                          dense
+                          style="padding: 2px 4px;"
+                          @click="addToDashboard"
+                          :title="t('search.addToDashboard')"
+                          >{{ t("search.addToDashboard") }}</q-btn
+                        >
+                      </div>
+                    </div>
+                    <DashboardErrorsComponent
+                      :errors="errorData"
+                      class="col-auto"
+                      style="flex-shrink: 0"
+                    />
                   </div>
-                  <q-separator vertical />
-                  <div class="col-auto ">
-                    <PanelSidebar
-                      :title="t('dashboard.configLabel')"
-                      v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                    >
-                      <ConfigPanel
-                        :dashboardPanelData="dashboardPanelData"
-                        :variablesData="{}"
-                        :panelData="seriesData"
-                      />
-                    </PanelSidebar>
+                  <div class="row column tw:h-[calc(100vh-180px)]">
+                    <DashboardQueryEditor />
                   </div>
+                </div>
+                <q-separator vertical />
+                <div class="col-auto">
+                  <PanelSidebar
+                    :title="t('dashboard.configLabel')"
+                    v-model="dashboardPanelData.layout.isConfigPanelOpen"
+                  >
+                    <ConfigPanel
+                      :dashboardPanelData="dashboardPanelData"
+                      :variablesData="{}"
+                      :panelData="seriesData"
+                    />
+                  </PanelSidebar>
                 </div>
               </div>
             </template>
@@ -330,35 +288,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'html'"
-          class="col column tw-mr-[0.625rem]"
+          class="col column tw:mr-[0.625rem]"
           style="height: calc(100vh - 106px); flex: 1"
         >
-          <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="card-container tw:h-full tw:flex tw:flex-col">
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
               style="flex: 1; min-height: 0"
             />
-            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+            <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
           </div>
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'markdown'"
-          class="col column tw-mr-[0.625rem]"
+          class="col column tw:mr-[0.625rem]"
           style="height: calc(100vh - 106px); flex: 1"
         >
-          <div class="card-container tw-h-full tw-flex tw-flex-col">
+          <div class="card-container tw:h-full tw:flex tw:flex-col">
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
               style="flex: 1; min-height: 0"
             />
-            <DashboardErrorsComponent :errors="errorData" class="tw-flex-shrink-0" />
+            <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
           </div>
         </div>
         <div
           v-if="dashboardPanelData.data.type == 'custom_chart'"
-          class="col tw-mr-[0.625rem]"
+          class="col tw:mr-[0.625rem]"
           style="
-            height: calc(100vh - 106px);
             overflow-y: auto;
             display: flex;
             flex-direction: row;
@@ -377,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #before>
               <div
-                class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]"
+                class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
               >
                 <div
                   class="col scroll card-container"
@@ -421,10 +378,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="row card-container"
                 style="height: calc(100vh - 106px); overflow-y: auto"
               >
-                <div class="col scroll" style="height: 100%">
-                  <div
-                    class="layout-panel-container tw-h-[calc(100vh-200px)] col"
-                  >
+                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column">
+                  <div style="height: 500px; flex-shrink: 0; overflow: hidden">
                     <q-splitter
                       class="query-editor-splitter"
                       v-model="splitterModel"
@@ -432,10 +387,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="layoutSplitterUpdated"
                     >
                       <template #before>
-                        <CustomChartEditor
-                          v-model="dashboardPanelData.data.customChartContent"
-                          style="width: 100%; height: 100%"
-                        />
+                        <div style="position: relative; width: 100%; height: 100%">
+                          <CustomChartEditor
+                            v-model="dashboardPanelData.data.customChartContent"
+                            style="width: 100%; height: 100%"
+                          />
+                        </div>
                       </template>
                       <template #separator>
                         <div class="splitter-vertical splitter-enabled"></div>
@@ -457,16 +414,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="{}"
                           :width="6"
+                          :showLegendsButton="true"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           :allowAlertCreation="true"
-                          @updated:vrl-function-field-list="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
+                          @updated:vrl-function-field-list="updateVrlFunctionFieldList"
+                          @last-triggered-at-update="handleLastTriggeredAtUpdate"
                           @series-data-update="seriesDataUpdate"
+                          @show-legends="showLegendsDialog = true"
                           searchType="ui"
                         />
                       </template>
@@ -479,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex-shrink: 0"
                     />
                   </div>
-                  <div class="row column tw-h-[calc(100vh-200px)]">
+                  <div class="row column tw:h-[calc(100vh-180px)]">
                     <DashboardQueryEditor />
                   </div>
                 </div>
@@ -511,6 +466,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <add-to-dashboard
         @save="addPanelToDashboard"
         :dashboardPanelData="dashboardPanelData"
+      />
+    </q-dialog>
+    <q-dialog v-model="showLegendsDialog">
+      <ShowLegendsPopup
+        :panelData="currentPanelData"
+        @close="showLegendsDialog = false"
       />
     </q-dialog>
   </div>
@@ -571,6 +532,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
 
+const ShowLegendsPopup = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
+});
+
 export default defineComponent({
   name: "Metrics",
   props: ["metaData"],
@@ -597,11 +562,14 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     CustomChartEditor,
+    ShowLegendsPopup,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // This will be used to copy the chart data to the chart renderer component
+    const showLegendsDialog = ref(false);
+    const panelSchemaRendererRef: any = ref(null);
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18n();
@@ -819,17 +787,8 @@ export default defineComponent({
     // resize the chart when query editor is opened and closed
     watch(
       () => dashboardPanelData.layout.showQueryBar,
-      (newValue) => {
-        // console.time("watch:dashboardPanelData.layout.showQueryBar");
-        if (!newValue) {
-          dashboardPanelData.layout.querySplitter = 41;
-        } else {
-          if (expandedSplitterHeight.value !== null) {
-            dashboardPanelData.layout.querySplitter =
-              expandedSplitterHeight.value;
-          }
-        }
-        // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
+      () => {
+        window.dispatchEvent(new Event("resize"));
       },
     );
 
@@ -935,15 +894,6 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
       if (!dashboardPanelData.layout.showFieldList) {
         dashboardPanelData.layout.splitter = 0;
-      }
-    };
-
-    const expandedSplitterHeight = ref(null);
-
-    const querySplitterUpdated = (newHeight: any) => {
-      window.dispatchEvent(new Event("resize"));
-      if (dashboardPanelData.layout.showQueryBar) {
-        expandedSplitterHeight.value = newHeight;
       }
     };
 
@@ -1225,13 +1175,20 @@ export default defineComponent({
     };
 
     // [END] cancel running queries
+
+    const currentPanelData = computed(() => {
+      const rendererData = panelSchemaRendererRef.value?.panelData || {};
+      return {
+        ...rendererData,
+        config: dashboardPanelData.data.config || {},
+      };
+    });
+
     return {
       t,
       updateDateTime,
       runQuery,
       layoutSplitterUpdated,
-      expandedSplitterHeight,
-      querySplitterUpdated,
       dashboardPanelData,
       chartData,
       editMode,
@@ -1262,6 +1219,9 @@ export default defineComponent({
       refreshInterval,
       splitterModel,
       collapseFieldList,
+      showLegendsDialog,
+      currentPanelData,
+      panelSchemaRendererRef,
     };
   },
 });
@@ -1277,10 +1237,6 @@ export default defineComponent({
   height: 32px;
 }
 
-.splitter {
-  height: 4px;
-  width: 100%;
-}
 .splitter-vertical {
   width: 4px;
   height: 100%;
@@ -1293,10 +1249,6 @@ export default defineComponent({
 
 .splitter-enabled:hover {
   background-color: orange;
-}
-
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
 }
 
 .field-list-sidebar-header-collapsed {

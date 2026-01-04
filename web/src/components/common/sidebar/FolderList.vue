@@ -17,16 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container tw-h-full tw-flex tw-flex-col tw-pb-[0.3rem]">
+  <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
-          Folders
+        <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
+          {{ t('dashboard.folders') }}
           <div>
             <q-btn
-              class="text-bold o2-secondary-button tw-h-[28px] tw-w-[32px]"
+              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
-              style="min-width: 0px !important; min-height: 0px !important;"
               flat
               @click.stop="addFolder"
               data-test="dashboard-new-folder-btn"
@@ -36,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
           </div>
         </div>
-        <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
+        <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
 
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
@@ -45,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             borderless
             data-test="folder-search"
-            placeholder="Search Folder"
+            :placeholder="t('dashboard.searchFolder')"
             style="width: 100%;"
             clearable
-            class="tw-mx-2 q-px-xs"
+            class="tw:mx-2 q-px-xs"
             :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
@@ -57,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div class="folders-tabs tw-flex-1 tw-overflow-y-auto">
+      <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
         <q-tabs
           indicator-color="transparent"
           inline-label
@@ -100,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-icon :name="outlinedEdit" size="xs" />
                       </q-item-section>
                       <q-item-section>
-                          <q-item-label>Edit</q-item-label>
+                          <q-item-label>{{ t('common.edit') }}</q-item-label>
                       </q-item-section>
                       </q-item>
                       <q-item
@@ -113,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-icon :name="outlinedDelete" size="xs" />
                       </q-item-section>
                       <q-item-section>
-                          <q-item-label>Delete</q-item-label>
+                          <q-item-label>{{ t('common.delete') }}</q-item-label>
                       </q-item-section>
                       </q-item>
                   </q-list>
@@ -142,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-dialog>
     <ConfirmDialog
-    title="Delete Folder"
+    :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
-    message="Are you sure you want to delete this Folder?"
+    :message="t('dashboard.deleteFolderMessage')"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"
@@ -225,6 +224,7 @@ export default defineComponent({
     emits: ['update:folders', 'update:activeFolderId'],
     setup(props, { emit }) {
       const store = useStore();
+      const { t } = useI18n();
       const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const activeFolderId = ref("");
@@ -325,6 +325,7 @@ export default defineComponent({
 
 
       return {
+        t,
         activeFolderId,
         showAddFolderDialog,
         isFolderEditMode,

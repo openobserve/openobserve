@@ -925,12 +925,27 @@ export const usePanelDataLoader = (
               // This way we can detect the first chunk properly
 
               const { traceId } = generateTraceContext();
+
+              const queryStepValue = it.config?.step_value?.trim()?.length
+                ? it.config?.step_value?.trim()
+                : undefined;
+
+              const panelStepValue = panelSchema.value.config.step_value?.trim()
+                ?.length
+                ? panelSchema.value.config?.step_value?.trim()
+                : undefined;
+
               const payload = {
                 queryReq: {
                   query: query,
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
-                  step: it.config.step_value ?? panelSchema.value.config.step_value ?? "0",
+                  step: queryStepValue
+                    ? queryStepValue
+                    : panelStepValue
+                      ? panelStepValue
+                      : "0",
+                  query_type: it.config.query_type || "range", // Add query_type from config (default: range)
                 },
                 type: "promql" as const,
                 traceId: traceId,

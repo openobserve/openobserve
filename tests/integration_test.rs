@@ -309,6 +309,12 @@ mod tests {
         test_enrichment_table_integration().await;
         test_enrichment_table_local_all_sequential().await;
 
+        // backfill jobs
+        test_backfill_job_list_and_delete().await;
+        test_backfill_job_get_nonexistent().await;
+        test_backfill_job_delete_by_pipeline().await;
+        test_backfill_job_enable_disable().await;
+
         // others
         e2e_health_check().await;
         e2e_config().await;
@@ -4257,5 +4263,93 @@ mod tests {
             retrieved_data[0]["data"].is_null(),
             "Should preserve null values"
         );
+    }
+
+    // ========================================================================
+    // Backfill Jobs Integration Tests
+    // ========================================================================
+
+    async fn test_backfill_job_list_and_delete() {
+        use openobserve::service::alerts::backfill::{delete_backfill_job, list_backfill_jobs};
+
+        // Test listing backfill jobs
+        let org_id = "e2e";
+        let jobs_result = list_backfill_jobs(org_id).await;
+        assert!(
+            jobs_result.is_ok(),
+            "Should successfully list backfill jobs"
+        );
+
+        let jobs = jobs_result.unwrap();
+        // If there are any jobs, test delete functionality
+        if let Some(first_job) = jobs.first() {
+            let job_id = first_job.job_id.clone();
+            let delete_result = delete_backfill_job(org_id, &job_id).await;
+            // Delete may fail if job is in progress, which is acceptable
+            if delete_result.is_ok() {
+                log::info!("Successfully deleted backfill job: {}", job_id);
+            } else {
+                log::warn!(
+                    "Could not delete backfill job (may be in progress): {}",
+                    delete_result.unwrap_err()
+                );
+            }
+        }
+    }
+
+    async fn test_backfill_job_get_nonexistent() {
+        use openobserve::service::alerts::backfill::get_backfill_job;
+
+        // Test getting a non-existent job
+        let org_id = "e2e";
+        let fake_job_id = "nonexistent_job_12345";
+        let result = get_backfill_job(org_id, fake_job_id).await;
+        assert!(result.is_err(), "Should fail to get non-existent job");
+    }
+
+    async fn test_backfill_job_delete_by_pipeline() {
+        use openobserve::service::alerts::backfill::delete_backfill_jobs_by_pipeline;
+
+        // Test deleting jobs by pipeline
+        let org_id = "e2e";
+        let pipeline_id = "test_nonexistent_pipeline";
+
+        // Should succeed even if no jobs exist for this pipeline
+        let result = delete_backfill_jobs_by_pipeline(org_id, pipeline_id).await;
+        assert!(
+            result.is_ok(),
+            "Should successfully delete jobs by pipeline (even if none exist)"
+        );
+    }
+
+    async fn test_backfill_job_enable_disable() {
+        use openobserve::service::alerts::backfill::{enable_backfill_job, list_backfill_jobs};
+
+        // Test enable/disable on existing jobs
+        let org_id = "e2e";
+        let jobs_result = list_backfill_jobs(org_id).await;
+
+        if let Ok(jobs) = jobs_result {
+            if let Some(first_job) = jobs.first() {
+                let job_id = first_job.job_id.clone();
+
+                // Try to disable
+                let disable_result = enable_backfill_job(org_id, &job_id, false).await;
+                if disable_result.is_ok() {
+                    log::info!("Successfully disabled backfill job: {}", job_id);
+
+                    // Try to enable back
+                    let enable_result = enable_backfill_job(org_id, &job_id, true).await;
+                    if enable_result.is_ok() {
+                        log::info!("Successfully re-enabled backfill job: {}", job_id);
+                    }
+                } else {
+                    log::warn!(
+                        "Could not modify job state: {}",
+                        disable_result.unwrap_err()
+                    );
+                }
+            }
+        }
     }
 }

@@ -22,7 +22,7 @@ import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -367,7 +367,7 @@ export const getPath = () => {
   const pos = window.location.pathname.indexOf("/web/");
   const path =
     window.location.origin == "http://localhost:8081"
-      ? "/"
+      ? pos > -1 ? "/web/" : "/"
       : pos > -1
         ? window.location.pathname.slice(0, pos + 5)
         : "";
@@ -1140,9 +1140,13 @@ export function convertUnixToQuasarFormat(unixMicroseconds: any) {
 }
 
 export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
-  // Parse the cron expression using cron-parser
+  // Parse the cron expression using cron-parser v5
   try {
-    const interval = cronParser.parseExpression(cronExpression);
+    // Note: cron-parser v5 uses CronExpressionParser.parse() instead of parseExpression()
+    const interval = CronExpressionParser.parse(cronExpression, {
+      currentDate: new Date(),
+      utc: true,
+    });
 
     // Get the first and second execution times
     const firstExecution = interval.next();

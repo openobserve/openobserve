@@ -95,20 +95,18 @@ pub async fn ingest(
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
-    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, stream_type)];
-    let mut derived_streams = HashSet::new();
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
 
+    let mut derived_streams = HashSet::new();
     if is_derived {
         derived_streams.insert(stream_name.to_string());
     }
 
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &stream_type,
-    )
-    .await;
+    let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
@@ -304,17 +302,20 @@ pub async fn ingest(
             {
                 let mut values = Vec::with_capacity(local_val.len());
                 for (k, value) in local_val.iter() {
-                    if [
+                    if ![
                         TIMESTAMP_COL_NAME,
                         ID_COL_NAME,
                         ORIGINAL_DATA_COL_NAME,
                         ALL_VALUES_COL_NAME,
                     ]
                     .contains(&k.as_str())
+                        && (index_all_max_value_length == 0
+                            || value
+                                .as_str()
+                                .is_none_or(|s| s.len() <= index_all_max_value_length))
                     {
-                        continue;
+                        values.push(value.to_string());
                     }
-                    values.push(value.to_string());
                 }
                 local_val.insert(
                     ALL_VALUES_COL_NAME.to_string(),
@@ -448,17 +449,20 @@ pub async fn ingest(
                         {
                             let mut values = Vec::with_capacity(local_val.len());
                             for (k, value) in local_val.iter() {
-                                if [
+                                if ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
                                     ORIGINAL_DATA_COL_NAME,
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || value
+                                            .as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                                 {
-                                    continue;
+                                    values.push(value.to_string());
                                 }
-                                values.push(value.to_string());
                             }
                             local_val.insert(
                                 ALL_VALUES_COL_NAME.to_string(),

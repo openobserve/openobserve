@@ -1,9 +1,9 @@
 <template>
-    <q-card flat class="tw-h-full">
-      <q-card-section class="tw-p-[0.375rem] tw-h-full card-container">
+    <q-card flat class="tw:h-full">
+      <q-card-section class="tw:p-[0.375rem] tw:h-full card-container">
         <!-- Top row with search and control buttons -->
         <div class="row items-center q-col-gutter-sm q-mb-md">
-          <div class="col-12 col-md-5 tw-flex tw-gap-[0.5rem]">
+          <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
             <!-- Stream selector - always show, populated once streams are discovered -->
             <q-select
               v-model="streamFilter"
@@ -14,7 +14,7 @@
               outlined
               emit-value
               map-options
-              class="tw-w-[180px] tw-flex-shrink-0"
+              class="tw:w-[180px] tw:flex-shrink-0"
               @update:model-value="onStreamFilterChange"
               :disable="availableStreams.length === 0"
             >
@@ -31,7 +31,7 @@
               v-model="searchFilter"
               borderless
               dense
-              class="no-border tw-h-[36px] tw-flex-grow"
+              class="no-border tw:h-[36px] tw:flex-grow"
               placeholder="Search services..."
               debounce="300"
               @update:model-value="applyFilters"
@@ -41,7 +41,7 @@
               </template>
             </q-input>
           </div>
-          <div class="col-12 col-md-7 tw-flex tw-justify-end tw-items-center tw-gap-[0.75rem]">
+          <div class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]">
             <!-- 1. Refresh button -->
             <q-btn
               data-test="service-graph-refresh-btn"
@@ -49,20 +49,20 @@
               flat
               dense
               icon="refresh"
-              class="tw-border tw-border-solid tw-border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw-bg-[var(--o2-hover-accent)]"
+              class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
               @click="loadServiceGraph"
               :loading="loading"
             >
               <q-tooltip>Refresh Service Graph</q-tooltip>
             </q-btn>
 
-            <!-- 2. Tree/Graph view toggle buttons -->
+            <!-- 2. Graph/Tree view toggle buttons -->
             <q-btn-toggle
               v-model="visualizationType"
               toggle-color="primary"
               :options="[
-                { label: 'Tree View', value: 'tree', icon: 'account_tree' },
-                { label: 'Graph View', value: 'graph', icon: 'hub' }
+                { label: 'Graph View', value: 'graph', icon: 'hub' },
+                { label: 'Tree View', value: 'tree', icon: 'account_tree' }
               ]"
               dense
               no-caps
@@ -75,7 +75,7 @@
               :options="layoutOptions"
               dense
               filled
-              class="tw-w-[160px]"
+              class="tw:w-[160px]"
               emit-value
               map-options
               @update:model-value="setLayout"
@@ -84,24 +84,24 @@
         </div>
 
         <!-- Graph Visualization -->
-        <q-card flat bordered class="graph-card tw-h-[calc(100%-4rem)]">
-          <q-card-section class="q-pa-none tw-h-full" style="height: 100%;">
+        <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
+          <q-card-section class="q-pa-none tw:h-full" style="height: 100%;">
             <div
-              class="graph-container tw-h-full tw-bg-[var(--o2-bg)]"
+              class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             >
-              <div v-if="loading" class="flex flex-center tw-h-full">
-                <div class="text-center tw-flex tw-flex-col tw-items-center">
+              <div v-if="loading" class="flex flex-center tw:h-full">
+                <div class="text-center tw:flex tw:flex-col tw:items-center">
                   <q-spinner-hourglass color="primary" size="4em" />
                   <div class="text-subtitle1 q-mt-md text-grey-7">Loading service graph...</div>
                 </div>
               </div>
               <div
                 v-else-if="error"
-                class="flex flex-center tw-h-full text-center tw-p-[0.675rem]"
+                class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
               >
                 <div>
                   <q-icon name="error_outline" size="4em" color="negative" />
-                  <div class="text-h6 q-mt-md tw-text-[var(--o2-text-primary)]">{{ error }}</div>
+                  <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">{{ error }}</div>
                   <q-btn
                     outline
                     color="primary"
@@ -113,7 +113,7 @@
               </div>
               <div
                 v-else-if="!graphData.nodes.length"
-                class="flex flex-center tw-h-full text-center tw-p-[0.675rem]"
+                class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
               >
                 <div>
                   <q-icon name="hub" size="5em" color="grey-4" />
@@ -156,13 +156,13 @@
                   />
                 </div>
               </div>
-              <div v-else class="tw-h-full">
+              <div v-else class="tw:h-full">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="service-graph-chart"
                   :data="chartData"
                   :key="chartKey"
-                  class="tw-h-full"
+                  class="tw:h-full"
                 />
               </div>
             </div>
@@ -188,8 +188,8 @@
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn flat dense no-caps label="Close" color="primary" v-close-popup class="o2-secondary-button tw-h-[2rem]" />
-          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw-h-[2rem]" />
+          <q-btn flat dense no-caps label="Close" color="primary" v-close-popup class="o2-secondary-button tw:h-[2rem]" />
+          <q-btn label="Reset" @click="resetSettings" class="o2-primary-button tw:h-[2rem]" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -220,14 +220,14 @@ export default defineComponent({
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem('serviceGraph_visualizationType');
     const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "tree"
+      (storedVisualizationType as "tree" | "graph") || "graph"
     );
 
     // Initialize layout type based on visualization type
     const storedLayoutType = localStorage.getItem('serviceGraph_layoutType');
-    let defaultLayoutType = "horizontal";
-    if (visualizationType.value === "graph") {
-      defaultLayoutType = "force";
+    let defaultLayoutType = "force";
+    if (visualizationType.value === "tree") {
+      defaultLayoutType = "horizontal";
     }
     const layoutType = ref(storedLayoutType || defaultLayoutType);
     const chartRendererRef = ref<any>(null);
@@ -303,7 +303,7 @@ export default defineComponent({
       //   };
       // }
 
-      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value);
+      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value, 'visualizationType:', visualizationType.value);
       const newOptions = visualizationType.value === "tree"
         ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
         : convertServiceGraphToNetwork(

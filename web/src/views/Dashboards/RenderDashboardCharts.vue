@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="card-container"
-    :class="store.state.printMode ? '' : 'tw-h-full tw-overflow-y-auto'"
+    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
   >
-    <div class="tw-px-[0.625rem]">
+    <div class="tw:px-[0.625rem]">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :dashboardName="dashboardName"
             :folderName="folderName"
+            :showLegendsButton="showLegendsButton"
             @updated:data-zoom="$emit('updated:data-zoom', $event)"
             @onMovePanel="onMovePanel"
             @refreshPanelRequest="refreshPanelRequest"
@@ -148,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dashboardName="dashboardName"
                 :folderName="folderName"
                 :allowAlertCreation="allowAlertCreation"
+                :showLegendsButton="showLegendsButton"
                 @updated:data-zoom="$emit('updated:data-zoom', $event)"
                 @onMovePanel="onMovePanel"
                 @refreshPanelRequest="refreshPanelRequest"
@@ -280,6 +282,10 @@ export default defineComponent({
       default: "",
     },
     allowAlertCreation: {
+      type: Boolean,
+      default: false,
+    },
+    showLegendsButton: {
       type: Boolean,
       default: false,
     },
@@ -633,7 +639,7 @@ export default defineComponent({
       grid.removeAll(false);
 
       if (panels.value.length === 0) {
-        grid.commit();
+        grid.batchUpdate(false);
         gridStackUpdateInProgress = false;
         return;
       }
@@ -666,7 +672,7 @@ export default defineComponent({
         }
       }
 
-      grid.commit();
+      grid.batchUpdate(false);
 
       gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));

@@ -152,44 +152,6 @@ fn is_system_field(field: &str) -> bool {
         || field == ALL_VALUES_COL_NAME
 }
 
-#[cfg(feature = "enterprise")]
-pub async fn check_resource_permissions(
-    org_id: &str,
-    user_id: &str,
-    resource_type: &str,
-    resource_id: &str,
-    method: &str,
-) -> Option<HttpResponse> {
-    if !is_root_user(user_id) {
-        let user: User = get_user(Some(org_id), user_id).await.unwrap();
-
-        if !crate::handler::http::auth::validator::check_permissions(
-            user_id,
-            AuthExtractor {
-                auth: "".to_string(),
-                method: method.to_string(),
-                o2_type: format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get(resource_type)
-                        .map_or(resource_type, |model| model.key),
-                    resource_id
-                ),
-                org_id: org_id.to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-            },
-            user.role,
-            user.is_external,
-        )
-        .await
-        {
-            return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use hashbrown::HashMap;
@@ -278,11 +240,15 @@ mod tests {
         // Create UDS settings:
         // - "oly" has UDS with "continent" field (allowed)
         // - "test1" has UDS with "other_field" but NOT "continent" (should fail)
-        let mut settings_a = StreamSettings::default();
-        settings_a.defined_schema_fields = vec!["continent".to_string()];
+        let settings_a = StreamSettings {
+            defined_schema_fields: vec!["continent".to_string()],
+            ..Default::default()
+        };
 
-        let mut settings_b = StreamSettings::default();
-        settings_b.defined_schema_fields = vec!["other_field".to_string()]; // UDS without continent
+        let settings_b = StreamSettings {
+            defined_schema_fields: vec!["other_field".to_string()], // UDS without continent
+            ..Default::default()
+        };
 
         {
             let mut w = STREAM_SETTINGS.write().await;
@@ -411,30 +377,32 @@ mod validate_query_edge_cases {
         /// UDS Configuration: UDS WITHOUT continent field
         /// Fields: body, id, name, total_medals, unique_id
         pub(super) fn uds_without_continent() -> StreamSettings {
-            let mut settings = StreamSettings::default();
-            settings.defined_schema_fields = vec![
-                "body".to_string(),
-                "id".to_string(),
-                "name".to_string(),
-                "total_medals".to_string(),
-                "unique_id".to_string(),
-            ];
-            settings
+            StreamSettings {
+                defined_schema_fields: vec![
+                    "body".to_string(),
+                    "id".to_string(),
+                    "name".to_string(),
+                    "total_medals".to_string(),
+                    "unique_id".to_string(),
+                ],
+                ..Default::default()
+            }
         }
 
         /// UDS Configuration: UDS WITH continent field
         /// Fields: body, continent, id, name, total_medals, unique_id
         pub(super) fn uds_with_continent() -> StreamSettings {
-            let mut settings = StreamSettings::default();
-            settings.defined_schema_fields = vec![
-                "body".to_string(),
-                "continent".to_string(),
-                "id".to_string(),
-                "name".to_string(),
-                "total_medals".to_string(),
-                "unique_id".to_string(),
-            ];
-            settings
+            StreamSettings {
+                defined_schema_fields: vec![
+                    "body".to_string(),
+                    "continent".to_string(),
+                    "id".to_string(),
+                    "name".to_string(),
+                    "total_medals".to_string(),
+                    "unique_id".to_string(),
+                ],
+                ..Default::default()
+            }
         }
 
         /// Initialize test context with schemas and UDS settings

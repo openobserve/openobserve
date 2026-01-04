@@ -52,6 +52,7 @@ mod promql;
 mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
+mod session_cleanup;
 mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
@@ -127,6 +128,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(mmdb_downloader::run());
+    }
+
+    // Initialize URL job processor for enrichment tables on ingesters
+    // This ensures the stale job recovery task starts even if this ingester
+    // never receives a URL enrichment event. Critical for distributed deployments.
+    if LOCAL_NODE.is_ingester() {
+        crate::service::enrichment_table::init_url_processor();
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -352,6 +360,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
+    session_cleanup::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

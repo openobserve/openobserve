@@ -29,8 +29,9 @@ use actix_web::{
     route, web,
 };
 use hashbrown::HashMap;
+use infra::cluster;
 
-use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
+use crate::common::utils::http::get_search_type_from_request;
 
 struct URLDetails {
     is_error: bool,
@@ -284,6 +285,7 @@ async fn default_proxy(
     let http_response = if query_str.ends_with("/_search_stream")
         || query_str.ends_with("/_values_stream")
         || query_str.ends_with("/ai/chat_stream")
+        || query_str.ends_with("/prometheus/api/v1/query_range")
     {
         // Add headers to disable response buffering
         new_resp
@@ -486,6 +488,7 @@ async fn proxy_querier_by_body(
     let http_response = if query_str.ends_with("/_search_stream")
         || query_str.ends_with("/_values_stream")
         || query_str.ends_with("/ai/chat_stream")
+        || query_str.ends_with("/prometheus/api/v1/query_range")
     {
         // Add headers to disable response buffering
         new_resp

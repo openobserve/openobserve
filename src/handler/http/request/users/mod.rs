@@ -43,6 +43,7 @@ use crate::{
     common::{
         meta::{
             self,
+            http::HttpResponse as MetaHttpResponse,
             user::{
                 AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
                 UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
@@ -50,7 +51,10 @@ use crate::{
         },
         utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
-    handler::http::extractors::Headers,
+    handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     service::users,
 };
 
@@ -76,7 +80,8 @@ pub mod service_accounts;
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all users"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -98,12 +103,12 @@ pub async fn list(
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            Some(format!("_all_{org_id}")),
+            &format!("_all_{org_id}"),
             &org_id,
             &user_email.user_id,
             "users",
             "GET",
-            "",
+            None,
         )
         .await
     {
@@ -141,7 +146,8 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new user"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -202,7 +208,8 @@ pub async fn save(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update user details"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -275,7 +282,8 @@ pub async fn update(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Add user to organization"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -331,7 +339,8 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove user from organization"}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]
@@ -342,6 +351,81 @@ pub async fn delete(
     let (org_id, email_id) = path.into_inner();
     let initiator_id = user_email.user_id;
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+}
+
+/// BulkRemoveUserFromOrganization
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "BulkRemoveUserFromOrg",
+    summary = "Remove multiple users from organization",
+    description = "Removes multiple users from the organization, immediately revoking their access to all organization resources, \
+                   data, and services. The user account itself remains active and can be added back to organizations \
+                   later. This action is permanent and cannot be undone without re-adding the user explicitly.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/users/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let initiator_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for email in &req.ids {
+        if !check_permissions(email, &org_id, &initiator_id, "users", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for email in req.ids {
+        match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
+            Ok(v) => {
+                if v.status().is_success() {
+                    successful.push(email);
+                } else {
+                    log::error!(
+                        "error in deleting service account {org_id}/{email} : {:?}",
+                        v.status().canonical_reason()
+                    );
+                    unsuccessful.push(email);
+                    err = v.status().canonical_reason().map(|v| v.to_string());
+                }
+            }
+            Err(e) => {
+                log::error!("error in deleting service account {org_id}/{email} : {e}");
+                unsuccessful.push(email);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// AuthenticateUser
@@ -359,7 +443,8 @@ context_path = "/auth",
         (status = 200, description = "Success", content_type = "application/json", body = inline(SignInResponse)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/login")]

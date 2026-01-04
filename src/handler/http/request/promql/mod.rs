@@ -54,6 +54,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/prometheus/api/v1/write")]
@@ -128,7 +131,8 @@ pub async fn remote_write(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL instant query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -316,7 +320,8 @@ async fn query(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL range query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -664,7 +669,8 @@ async fn query_range(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus metadata"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -732,7 +738,8 @@ pub async fn metadata(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -904,7 +911,8 @@ async fn series(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label names"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -994,7 +1002,8 @@ async fn labels(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label values"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -1115,7 +1124,8 @@ fn validate_metadata_params(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Format PromQL query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]

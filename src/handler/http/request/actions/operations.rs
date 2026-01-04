@@ -64,12 +64,12 @@ pub async fn test_action(
     let inputs = req.inputs.drain(..).collect_vec();
 
     if !check_permissions(
-        Some(action_id.clone()),
+        &action_id,
         &org_id,
         &user_email.user_id,
         "actions",
         "POST",
-        "",
+        None,
     )
     .await
     {

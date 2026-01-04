@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="date-time-table relative column">
               <div
-                class="relative-row q-px-md q-py-sm"
+                class="relative-row q-pl-md q-py-sm"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
-                <div class="relative-period-name">Custom</div>
+                <div class="relative-period-name">{{ t("common.custom") }}</div>
                 <q-tooltip
                   style="z-index: 10001; font-size: 14px"
                   anchor="center right"
@@ -204,16 +204,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label tw-px-2">Start time</td>
-                    <td class="label tw-px-2">End time</td>
+                    <td class="label tw:px-2">Start time</td>
+                    <td class="label tw:px-2">End time</td>
                   </tr>
                   <tr>
                     <td>
                       <q-input
                         v-model="selectedTime.startTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
+                        hide-bottom-space
                         :rules="['fulltime']"
                         @blur="
                           resetTime(
@@ -251,9 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="selectedTime.endTime"
                         dense
-                        filled
+                        borderless
                         mask="fulltime"
                         :rules="['fulltime']"
+                        hide-bottom-space
                         @blur="
                           resetTime(
                             selectedTime.startTime,
@@ -322,13 +324,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
-            class="q-pa-none o2-primary-button tw-h-[30px] element-box-shadow"
+            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
             no-caps
             size="sm"
             @click="saveDate(null)"
             v-close-popup
           >
-            Apply
+            {{ t("common.apply") }}
           </q-btn>
         </div>
       </q-menu>
@@ -482,21 +484,21 @@ export default defineComponent({
     const filteredTimezone: any = ref([]);
 
     let relativePeriods = [
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ];
 
     let relativePeriodsSelect = ref([
-      { label: "Seconds", value: "s" },
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-      { label: "Days", value: "d" },
-      { label: "Weeks", value: "w" },
-      { label: "Months", value: "M" },
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
     ]);
 
     const relativeDates = {
@@ -762,12 +764,12 @@ export default defineComponent({
 
     const getPeriodLabel = computed(() => {
       const periodMapping = {
-        s: "Seconds",
-        m: "Minutes",
-        h: "Hours",
-        d: "Days",
-        w: "Weeks",
-        M: "Months",
+        s: t("common.seconds"),
+        m: t("common.minutes"),
+        h: t("common.hours"),
+        d: t("common.days"),
+        w: t("common.weeks"),
+        M: t("common.months"),
       };
       return periodMapping[relativePeriod.value];
     });
@@ -970,7 +972,7 @@ export default defineComponent({
         "yyyy/MM/dd",
       );
       if (props.disableRelative) {
-        return date >= props.minDate;
+        return date >= props.minDate && date <= formattedDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
     };
@@ -1333,8 +1335,10 @@ export default defineComponent({
   }
 }
 .startEndTime {
-  .q-field {
-    padding-bottom: 0.125rem;
+  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  .q-field__control-container{
+    min-height: 32px;
+    height: 32px;
   }
   .label {
     font-size: 0.75rem;
@@ -1377,5 +1381,6 @@ export default defineComponent({
   .q-item:nth-child(2) {
     border-bottom: 1px solid #dcdcdc;
   }
+  margin: 0.5rem 0.4rem 0.5rem 0.4rem;
 }
 </style>

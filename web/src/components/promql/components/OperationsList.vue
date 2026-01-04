@@ -1,5 +1,5 @@
 <template>
-  <div class="tw-py-[0.25rem]">
+  <div class="tw:py-[0.25rem]">
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
@@ -42,10 +42,10 @@
                 >
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
-                      <div class="text-weight-medium q-mb-sm">
+                      <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-caption text-grey-7 q-mb-md">
+                      <div class="text-caption text-grey-7">
                         {{ getOperationDef(element.id)?.documentation }}
                       </div>
 
@@ -88,14 +88,18 @@
                         <q-select
                           v-else-if="param.type === 'select'"
                           v-model="element.params[paramIndex] as string[]"
-                          :options="availableLabels"
+                          :options="filteredLabels"
                           :label="param.name"
                           dense
                           borderless
                           stack-label
                           hide-bottom-space
                           multiple
-                          class="showLabelOnTop q-mb-sm"
+                          use-input
+                          input-debounce="300"
+                          @filter="filterOperationLabels"
+                          class="operation-label-selector showLabelOnTop no-case q-mb-sm"
+                          input-class="tw:normal-case!"
                           :data-test="`promql-operation-param-${paramIndex}`"
                           :hint="
                             availableLabels.length
@@ -139,7 +143,7 @@
           size="sm"
           color="primary"
           @click="showOperationSelector = true"
-          class="add-operation-btn tw-ml-[0.25rem]"
+          class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
           <q-tooltip>Add operation</q-tooltip>
@@ -150,11 +154,11 @@
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
       <q-card style="min-width: 500px">
-        <q-card-section class="!tw-pt-[0.625rem] !tw-pb-[0.625rem]">
-          <div class="tw-text-[1.2rem]">Add Operation</div>
+        <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
+          <div class="tw:text-[1.2rem]">Add Operation</div>
         </q-card-section>
 
-        <q-card-section class="!tw-py-[0.625rem]">
+        <q-card-section class="tw:py-[0.625rem]!">
           <q-input
             v-model="searchQuery"
             dense
@@ -170,7 +174,10 @@
           </q-input>
         </q-card-section>
 
-        <q-card-section class="q-pt-none" style="max-height: 400px; overflow-y: auto">
+        <q-card-section
+          class="q-pt-none"
+          style="max-height: 400px; overflow-y: auto"
+        >
           <q-list bordered separator>
             <template v-for="category in categories" :key="category">
               <q-expansion-item
@@ -188,7 +195,9 @@
                   >
                     <q-item-section>
                       <q-item-label>{{ op.name }}</q-item-label>
-                      <q-item-label caption>{{ op.documentation }}</q-item-label>
+                      <q-item-label caption>{{
+                        op.documentation
+                      }}</q-item-label>
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -229,7 +238,12 @@ const showOperationSelector = ref(false);
 const searchQuery = ref("");
 
 // Access shared label options from meta
-const availableLabels = computed(() => props.dashboardData?.meta?.promql?.availableLabels || []);
+const availableLabels = computed(
+  () => props.dashboardData?.meta?.promql?.availableLabels || [],
+);
+
+// State for filtered labels in the select
+const filteredLabels = ref<string[]>([]);
 
 const categories = computed(() => promQueryModeller.getCategories());
 
@@ -267,10 +281,10 @@ const getOperationDef = (id: string): QueryBuilderOperationDef | undefined => {
 };
 
 const getFilteredOperationsForCategory = (
-  category: string
+  category: string,
 ): QueryBuilderOperationDef[] => {
   const operations = promQueryModeller.getOperationsForCategory(category);
-  console.log("category operations ------ ", category, operations);
+  // Operations for this category
   if (!searchQuery.value) return operations;
 
   const needle = searchQuery.value.toLowerCase();
@@ -279,15 +293,14 @@ const getFilteredOperationsForCategory = (
       op.name.toLowerCase().includes(needle) ||
       op.id.toLowerCase().includes(needle) ||
       op.documentation?.toLowerCase().includes(needle) ||
-      op.category?.toLowerCase().includes(needle)
+      op.category?.toLowerCase().includes(needle),
   );
 };
 
 const handleDragUpdate = (newVal: QueryBuilderOperation[]) => {
-  // Clear and repopulate the array to maintain reactivity
-  props.operations.splice(0, props.operations.length, ...newVal);
-  // Emit the update to trigger parent watcher
-  emit("update:operations", props.operations);
+  // Create new array instead of mutating props
+  const newOperations = [...newVal];
+  emit("update:operations", newOperations);
 };
 
 const addOperation = (opDef: QueryBuilderOperationDef) => {
@@ -295,14 +308,40 @@ const addOperation = (opDef: QueryBuilderOperationDef) => {
     id: opDef.id,
     params: [...opDef.defaultParams],
   };
-  props.operations.push(newOp);
+  const newOperations = [...props.operations, newOp];
+  emit("update:operations", newOperations);
   showOperationSelector.value = false;
   searchQuery.value = "";
 };
 
 const removeOperation = (index: number) => {
-  props.operations.splice(index, 1);
+  const newOperations = props.operations.filter((_, idx) => idx !== index);
+  emit("update:operations", newOperations);
 };
+
+// Filter operation labels with autocomplete
+const filterOperationLabels = (val: string, update: any) => {
+  update(() => {
+    if (val === "") {
+      filteredLabels.value = availableLabels.value;
+    } else {
+      // Filter labels based on input
+      const needle = val.toLowerCase();
+      filteredLabels.value = availableLabels.value.filter((label: string) =>
+        label.toLowerCase().includes(needle)
+      );
+    }
+  });
+};
+
+// Initialize filtered labels when available labels change
+watch(
+  availableLabels,
+  (newLabels) => {
+    filteredLabels.value = newLabels;
+  },
+  { immediate: true }
+);
 
 defineExpose({
   availableLabels,
@@ -340,9 +379,14 @@ defineExpose({
   align-items: center;
 }
 
-.operation-item {
-  display: flex;
-  align-items: center;
+:deep(
+  .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
+    .q-field__control-container
+    .q-field__native
+    > :first-child
+) {
+  text-transform: none;
+  max-width: 75% !important;
 }
 
 .drag-handle {

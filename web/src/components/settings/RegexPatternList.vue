@@ -1,9 +1,9 @@
 <template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
-    <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[68px] tw-border-b-[1px]"
+    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
-      <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">
+      <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
           </div>
           <q-input
@@ -18,7 +18,7 @@
                 </template>
               </q-input>
           <q-btn
-            class="o2-secondary-button q-ml-sm tw-h-[36px]"
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.import`)"
@@ -27,7 +27,7 @@
           />
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
-            class="o2-primary-button q-ml-sm tw-h-[36px]"
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
             no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
@@ -41,10 +41,12 @@
           :rows="visibleRows"
           :columns="columns"
           row-key="id"
+          selection="multiple"
+          v-model:selected="selectedPatterns"
           :pagination="pagination"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;' 
+            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
             : 'width: 100%'"
         >
         <template #no-data>
@@ -58,9 +60,22 @@
             <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
 
           </div>
-        </template> 
+        </template>
+        <template v-slot:body-selection="scope">
+          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        </template>
         <template v-slot:header="props">
          <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th v-if="columns.length > 0" auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
+                />
+              </q-th>
+
               <!-- render the table headers -->
               <q-th
                 v-for="col in props.cols"
@@ -75,6 +90,10 @@
         </template>
         <template v-slot:body="props">
           <q-tr :props="props">
+          <!-- render checkbox column -->
+          <q-td auto-width>
+            <q-checkbox v-model="props.selected" size="sm" class="o2-table-checkbox" />
+          </q-td>
 
           <!-- render the body of the columns -->
           <q-td v-for="col in columns" :key="col.name " :props="props" :style="col.style">
@@ -84,7 +103,7 @@
               </div>
             </template>
             <template v-else>
-              <div class="tw-flex tw-items-center tw-gap-1 tw-justify-center">
+              <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
                 <q-btn
                   :data-test="`regex-pattern-list-${props.row.id}-export-regex-pattern`"
                   padding="sm"
@@ -128,17 +147,33 @@
         </q-tr>
         </template>
         <template #bottom="scope">
-          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
-            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
-                  {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
-                </div>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+              {{ resultTotal }} {{ t('regex_patterns.bottom_header') }}
+            </div>
+            <q-btn
+              v-if="selectedPatterns.length > 0"
+              data-test="regex-pattern-list-delete-patterns-btn"
+              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              no-caps
+              dense
+              @click="openBulkDeleteDialog"
+            >
+              <q-icon name="delete" size="16px" />
+              <span class="tw:ml-2">Delete</span>
+            </q-btn>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
           </div>
         </template>
         </q-table>
@@ -154,6 +189,14 @@
           :message="deleteDialog.message"
           @update:ok="deleteRegexPattern"
           @update:cancel="deleteDialog.show = false"
+        />
+
+        <ConfirmDialog
+          title="Delete Regex Patterns"
+          :message="`Are you sure you want to delete ${selectedPatterns.length} regex pattern(s)?`"
+          @update:ok="bulkDeleteRegexPatterns"
+          @update:cancel="confirmBulkDelete = false"
+          v-model="confirmBulkDelete"
         />
         <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
           <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
@@ -254,6 +297,8 @@
     });
 
     const regexPatterns = ref([]);
+    const selectedPatterns: Ref<any[]> = ref([]);
+    const confirmBulkDelete = ref(false);
 
     const resultTotal = ref(0);
 
@@ -451,6 +496,52 @@
       return visibleRows.value.length > 0;
     });
 
+    const openBulkDeleteDialog = () => {
+      confirmBulkDelete.value = true;
+    };
+
+    const bulkDeleteRegexPatterns = async () => {
+      const patternIds = selectedPatterns.value.map((pattern: any) => pattern.id);
+
+      try {
+        const res = await regexPatternsService.bulkDelete(store.state.selectedOrganization.identifier, { ids: patternIds });
+        const { successful, unsuccessful } = res.data;
+
+        if (successful.length > 0 && unsuccessful.length === 0) {
+          $q.notify({
+            message: `Successfully deleted ${successful.length} regex pattern(s)`,
+            color: "positive",
+            timeout: 2000,
+          });
+        } else if (successful.length > 0 && unsuccessful.length > 0) {
+          $q.notify({
+            message: `Deleted ${successful.length} regex pattern(s), but ${unsuccessful.length} failed`,
+            color: "warning",
+            timeout: 3000,
+          });
+        } else if (unsuccessful.length > 0) {
+          $q.notify({
+            message: `Failed to delete ${unsuccessful.length} regex pattern(s)`,
+            color: "negative",
+            timeout: 2000,
+          });
+        }
+
+        selectedPatterns.value = [];
+        confirmBulkDelete.value = false;
+        await getRegexPatterns();
+      } catch (error: any) {
+        const errorMessage = error?.data?.message || error?.message || "Error while deleting regex patterns";
+        if (error.response?.status != 403 || error?.status != 403) {
+          $q.notify({
+            message: errorMessage,
+            color: "negative",
+            timeout: 2000,
+          });
+        }
+      }
+    };
+
     return {
         t,
         store,
@@ -479,7 +570,11 @@
         closeAddRegexPatternDialog,
         visibleRows,
         hasVisibleRows,
-        outlinedDelete
+        outlinedDelete,
+        selectedPatterns,
+        confirmBulkDelete,
+        openBulkDeleteDialog,
+        bulkDeleteRegexPatterns,
     }
     }
 })

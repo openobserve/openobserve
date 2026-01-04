@@ -19,15 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="q-pa-none o2-custom-bg"
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw-mb-[0.675rem]"
+      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
     >
-      <div class="flex items-center tw-h-[60px]">
+      <div class="flex items-center tw:h-[60px]">
         <div
           no-caps
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw-w-6 tw-h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
           title="Go Back"
           @click="$emit('cancel')"
         >
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="card-container tw-py-2 q-px-md tw-h-[calc(100vh-120px)] tw-overflow-auto">
-      <div class="tw-w-[50vw]">
+    <div class="card-container tw:py-2 q-px-md tw:h-[calc(100vh-120px)] tw:overflow-auto">
+      <div class="tw:w-[50vw]">
         <CreateDestinationForm
           :destination="destination"
           @created="handleDestinationCreated"

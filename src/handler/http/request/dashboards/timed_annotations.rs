@@ -52,7 +52,8 @@ use crate::{
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create time annotations"}))
     )
 )]
 #[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
@@ -103,7 +104,8 @@ pub async fn create_annotations(
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "Get annotations"}))
     )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
@@ -163,7 +165,8 @@ pub async fn get_annotations(
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete annotations"}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
@@ -213,7 +216,8 @@ pub async fn delete_annotations(
         (status = 500, description = "Failed to update timed annotations", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update annotations"}))
     )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
@@ -267,7 +271,8 @@ pub async fn update_annotations(
         (status = 500, description = "Failed to remove timed annotation from panels", content_type = "application/json")
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Remove annotation from panel"}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]

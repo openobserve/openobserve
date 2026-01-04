@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, patch, post, put, web};
+use std::str::FromStr;
+
+use actix_web::{
+    HttpRequest, HttpResponse, delete, get,
+    http::StatusCode,
+    patch, post, put,
+    web::{self, Query},
+};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     triggers::{Trigger, TriggerModule},
@@ -21,11 +28,12 @@ use config::meta::{
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
-
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::{
-    check_resource_permissions, check_stream_permissions,
+use {
+    crate::common::utils::auth::check_permissions,
+    crate::handler::http::request::search::utils::check_stream_permissions,
 };
+
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
@@ -41,7 +49,10 @@ use crate::{
                 GenerateSqlResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
             },
         },
-        request::dashboards::{get_folder, is_overwrite},
+        request::{
+            BulkDeleteRequest, BulkDeleteResponse,
+            dashboards::{get_folder, is_overwrite},
+        },
     },
     service::{
         alerts::{
@@ -119,7 +130,8 @@ impl From<AlertError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule"}))
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -172,7 +184,8 @@ pub async fn create_alert(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get alert details by ID"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -213,7 +226,8 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Export alert as JSON"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -255,7 +269,8 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update an existing alert"}))
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -298,7 +313,8 @@ pub async fn update_alert(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID"}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -310,6 +326,87 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(e) => e.into(),
     }
+}
+
+/// DeleteAlertBulk
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "DeleteAlertBulk",
+    summary = "Delete multiple alerts",
+    description = "Permanently removes multiple alerts and all their configurations including conditions, triggers, and notification settings. This action cannot be undone and will stop all monitoring and notifications for the deleted alerts.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Alert ids", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/v2/{org_id}/alerts/bulk")]
+async fn delete_alert_bulk(
+    path: web::Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+    let _folder_id = crate::common::utils::http::get_folder(&query);
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if Ksuid::from_str(id).is_err() {
+            return MetaHttpResponse::bad_request(format!("invalid alert id {id}"));
+        };
+        if !check_permissions(
+            id,
+            &org_id,
+            &_user_id,
+            "alerts",
+            "DELETE",
+            Some(&_folder_id),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for id in req.ids {
+        // already checked this is valid, so ok to unwrap
+        let alert_id = Ksuid::from_str(&id).unwrap();
+        match alert::delete_by_id(client, &org_id, alert_id).await {
+            Ok(_) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting alert {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string())
+            }
+        }
+    }
+
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
 }
 
 /// ListAlerts
@@ -330,7 +427,8 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 200, description = "Success", content_type = "application/json", body = inline(ListAlertsResponseBody)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts")]
@@ -399,7 +497,8 @@ async fn list_alerts(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable an alert"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -443,7 +542,8 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/v2/{org_id}/alerts/bulk/enable")]
@@ -464,10 +564,8 @@ async fn enable_alert_bulk(
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) =
-                check_resource_permissions(&org_id, user_id, "alerts", &id.to_string(), "PUT").await
-            {
-                return res;
+            if !check_permissions(&id.to_string(), &org_id, user_id, "alerts", "PUT", None).await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
     }
@@ -517,7 +615,8 @@ async fn enable_alert_bulk(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Manually trigger an alert"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -552,7 +651,8 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Move alerts to another folder"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]
@@ -606,7 +706,8 @@ async fn move_alerts(
         (status = 500, description = "Internal server error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"}))
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language"}))
     )
 )]
 #[post("/v2/{org_id}/alerts/generate_sql")]

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width q-mx-lg q-pt-xs">
-    <div class="row items-center no-wrap card-container tw-mx-[0.625rem]  tw-mb-[0.625rem]">
-      <div class="flex items-center justify-between tw-w-full card-container tw-h-[68px] tw-px-2 tw-py-3">
+    <div class="row items-center no-wrap card-container tw:mx-[0.625rem]  tw:mb-[0.625rem]">
+      <div class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3">
         <div class="flex items-center">
           <div
           data-test="add-alert-back-btn"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.addTitle") }}
         </div>
         </div>
-        <div class="flex items-center tw-gap-2">
+        <div class="flex items-center tw:gap-2">
           <q-btn
             outline
             class="pipeline-icons q-px-sm hideOnPrintMode"
@@ -58,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- WIZARD VIEW -->
     <div
-      class="wizard-view-container tw-mb-2"
+      class="wizard-view-container tw:mb-2"
       style="
         max-height: calc(100vh - 194px);
         overflow-y: auto;
         scroll-behavior: smooth;
       "
     >
-      <div class="card-container tw-px-2 tw-mx-[0.675rem] tw-py-2">
+      <div class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2">
         <!-- Stepper Header (Full Width) -->
         <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <q-stepper
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:message>
           <div
             v-if="currentStepCaption"
-            class="persistent-step-caption tw-px-3 tw-py-1 tw-mb-1 tw-mt-2"
+            class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
             :class="store.state.theme === 'dark' ? 'dark-mode-caption' : 'light-mode-caption'"
           >
             {{ currentStepCaption }}
@@ -91,17 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Alert Setup -->
         <q-step
           :name="1"
-          title="Alert Setup *"
+          :title="t('alerts.steps.alertSetup') + ' *'"
           caption=""
           icon="settings"
           :done="wizardStep > 1"
           :disable="1 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <AlertSetup
                   ref="step1Ref"
                   :formData="formData"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -141,17 +141,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Query Configuration -->
         <q-step
           :name="2"
-          title="Conditions *"
+          :title="t('alerts.steps.conditions') + ' *'"
           caption=""
           icon="search"
           :done="wizardStep > 2"
           :disable="2 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <QueryConfig
                   ref="step2Ref"
                   :tab="formData.query_condition.type || 'custom'"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -202,17 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="3"
-          title="Compare with Past"
+          :title="t('alerts.steps.compareWithPast')"
           caption=""
           icon="compare_arrows"
           :done="wizardStep > 3"
           :disable="3 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <CompareWithPast
                   ref="step3Ref"
                   :multiTimeRange="formData.query_condition.multi_time_range"
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -248,17 +248,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 4: Alert Settings -->
         <q-step
           :name="4"
-          title="Alert Settings *"
+          :title="t('alerts.steps.alertSettings') + ' *'"
           caption=""
           icon="tune"
           :done="wizardStep > 4"
           :disable="4 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <AlertSettings
                   ref="step4Ref"
                   :formData="formData"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -298,17 +298,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="5"
-          title="Deduplication"
+          :title="t('alerts.steps.deduplication')"
           caption=""
           icon="filter_list"
           :done="wizardStep > 5"
           :disable="5 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: calc(100vh - 302px); overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <Deduplication
                   :deduplication="formData.deduplication"
                   :columns="filteredColumns"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -338,17 +338,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 6: Advanced Settings -->
         <q-step
           :name="6"
-          title="Advanced"
+          :title="t('alerts.steps.advanced')"
           caption=""
           icon="settings_applications"
           :done="false"
           :disable="6 > lastValidStep"
         >
           <!-- 60/40 Split Layout with Equal Heights -->
-          <div class="tw-flex tw-gap-[0.625rem] tw-items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
+          <div class="tw:flex tw:gap-[0.625rem] tw:items-stretch" style="height: calc(100vh - 302px); overflow-x: hidden;">
             <!-- Left Column: Step Content (60%) -->
-            <div class="tw-flex-[0_0_60%] tw-flex tw-flex-col" style="height: 100%; overflow: hidden;">
-              <div class="tw-flex-1" style="overflow: auto;">
+            <div class="tw:flex-[0_0_60%] tw:flex tw:flex-col" style="height: 100%; overflow: hidden;">
+              <div class="tw:flex-1" style="overflow: auto;">
                 <Advanced
                   :contextAttributes="formData.context_attributes"
                   :description="formData.description"
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
 
-            <div class="tw-flex-1">
+            <div class="tw:flex-1">
               <AlertWizardRightColumn
                 ref="previewAlertRef"
                 :formData="formData"
@@ -383,19 +383,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
       </div>
     </div>
-    <div class="tw-mx-2">
+    <div class="tw:mx-2">
       <div
-          class="flex q-px-md full-width tw-py-3 card-container tw-justify-end"
+          class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
           style="position: sticky; bottom: 0px; z-index: 2"
         >
         <!-- All Buttons (Right Side) -->
-        <div class="tw-flex tw-items-center tw-gap-2">
+        <div class="tw:flex tw:items-center tw:gap-2">
           <!-- Wizard Navigation Buttons -->
           <q-btn
             flat
             label="Back"
             icon="arrow_back"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="wizardStep === 1"
             no-caps
@@ -405,19 +405,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             label="Continue"
             icon-right="arrow_forward"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             :disable="isLastStep"
             no-caps
             @click="goToNextStep"
           />
-          <q-separator vertical class="tw-mx-2" style="height: 36px;" />
+          <q-separator vertical class="tw:mx-2" style="height: 36px;" />
 
           <!-- Cancel and Save Buttons -->
           <q-btn
             data-test="add-alert-cancel-btn"
             v-close-popup="true"
-            class="o2-secondary-button tw-h-[36px]"
+            class="o2-secondary-button tw:h-[36px]"
             :label="t('alerts.cancel')"
             no-caps
             flat
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw-h-[36px]"
+            class="o2-primary-button no-border tw:h-[36px]"
             :label="t('alerts.save')"
             type="submit"
             no-caps
@@ -736,12 +736,12 @@ export default defineComponent({
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
       const captions: Record<number, string> = {
-        1: 'Set the stage for your alert',
-        2: 'What should trigger the alert',
-        3: 'Compare current results with data from another time period',
-        4: 'Set your alert rules and choose how you\'d like to be notified.',
-        5: 'Avoid sending the same alert multiple times by grouping similar alerts together.',
-        6: 'Context variables, description, and row template',
+        1: t('alerts.stepCaptions.alertSetup'),
+        2: t('alerts.stepCaptions.conditions'),
+        3: t('alerts.stepCaptions.compareWithPast'),
+        4: t('alerts.stepCaptions.alertSettings'),
+        5: t('alerts.stepCaptions.deduplication'),
+        6: t('alerts.stepCaptions.advanced'),
       };
       return captions[wizardStep.value] || '';
     });
@@ -1936,7 +1936,10 @@ export default defineComponent({
         wizardStep.value = wizardStep.value + 1;
       }
 
-      lastValidStep.value = wizardStep.value;
+      // Only update lastValidStep if moving forward (don't reduce it when editing)
+      if (wizardStep.value > lastValidStep.value) {
+        lastValidStep.value = wizardStep.value;
+      }
     };
 
     // Validate a specific step (used by both Continue button and header navigation)
@@ -2229,6 +2232,8 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+      // Enable all steps when editing an existing alert
+      this.lastValidStep = 6;
 
       if (!this.formData.trigger_condition?.timezone) {
         if (this.formData.tz_offset === 0) {
@@ -2252,15 +2257,21 @@ export default defineComponent({
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
-    this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes,
-    ).map((attr) => {
-      return {
-        key: attr,
-        value: this.formData.context_attributes[attr],
-        id: getUUID(),
-      };
-    });
+    // Convert context_attributes from object to array format (only if it's an object)
+    if (this.formData.context_attributes && typeof this.formData.context_attributes === 'object' && !Array.isArray(this.formData.context_attributes)) {
+      this.formData.context_attributes = Object.keys(
+        this.formData.context_attributes,
+      ).map((attr) => {
+        return {
+          key: attr,
+          value: this.formData.context_attributes[attr],
+          id: getUUID(),
+        };
+      });
+    } else if (!this.formData.context_attributes) {
+      // If null or undefined, initialize as empty array
+      this.formData.context_attributes = [];
+    }
     // VERSION DETECTION AND CONVERSION
     // Supports three versions:
     // - V0: Flat array of conditions with implicit AND between all (no groups)

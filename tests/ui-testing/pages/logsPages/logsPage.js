@@ -329,29 +329,47 @@ export class LogsPage {
         await this.page.waitForTimeout(2000);
 
         // Open dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-        await this.page.waitForTimeout(3000);
+        const dropdownArrow = this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+        await dropdownArrow.click();
+        await this.page.waitForTimeout(2000);
 
-        // Select first stream with explicit wait
+        // Use search box to filter for first stream (much faster than scrolling)
+        const searchInput = this.page.locator('[data-test="log-search-index-list-select-stream"]');
+        const searchVisible = await searchInput.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+
+        // Select first stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamA}`);
+            await searchInput.click();
+            await searchInput.fill(streamA);
+        }
+
         const streamASelector = `[data-test="log-search-index-list-stream-toggle-${streamA}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamASelector}`);
         const streamAToggle = this.page.locator(streamASelector).first();
-        await streamAToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamAToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
-        await this.page.waitForTimeout(1000);
 
-        // Select second stream (dropdown stays open after first selection)
+        // Clear search and filter for second stream
+        if (searchVisible) {
+            testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
+            await searchInput.click();
+            await searchInput.fill('');
+            await searchInput.fill(streamB);
+        }
+
+        // Select second stream
         const streamBSelector = `[data-test="log-search-index-list-stream-toggle-${streamB}"] div`;
         testLogger.debug(`selectIndexAndStreamJoinUnion: Looking for stream toggle: ${streamBSelector}`);
         const streamBToggle = this.page.locator(streamBSelector).first();
-        await streamBToggle.waitFor({ state: 'visible', timeout: 15000 });
+        await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamBToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
-        await this.page.waitForTimeout(1000);
 
         // Close dropdown
-        await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+        await dropdownArrow.click();
         testLogger.info(`selectIndexAndStreamJoinUnion: Successfully selected both streams`);
     }
 
@@ -430,15 +448,19 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3) {
+    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
         testLogger.info(`selectStream: Selecting stream: ${stream}`);
 
-        // First, wait for the stream to be available via API
-        const streamAvailable = await this.waitForStreamAvailable(stream, 30000, 3000);
-        if (!streamAvailable) {
-            testLogger.warn(`selectStream: Stream ${stream} not found via API after 30s, will still try UI selection`);
+        // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
+        if (apiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+            if (!streamAvailable) {
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+            } else {
+                testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            }
         } else {
-            testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
+            testLogger.info(`selectStream: Skipping API wait (apiWaitMs=0)`);
         }
 
         // Navigate to logs page via URL to ensure fresh stream list (no page.reload which can cause issues)
@@ -3329,15 +3351,47 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                const colorDiv = row.querySelector('div[class*="tw-absolute"][class*="tw-left-0"]');
+                // Find the color indicator div - it's a div with inline backgroundColor style
+                // The div has classes like "tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
+                // Use multiple selector approaches for robustness
+                let colorDiv = row.querySelector('div[style*="background"]');
+
+                // Fallback: try class-based selector with escaped colon
+                if (!colorDiv) {
+                    colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
+                }
+
+                // Fallback: try finding the first absolute positioned child div
+                if (!colorDiv) {
+                    const divs = row.querySelectorAll('div');
+                    for (const div of divs) {
+                        const style = window.getComputedStyle(div);
+                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                            colorDiv = div;
+                            break;
+                        }
+                    }
+                }
 
                 if (!colorDiv) continue;
 
                 const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
 
-                // Check for severity value in the row text - look for "severity":"X" or "severity":X
+                // Skip if no valid background color
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
+
+                // Check for severity value in the row text - look for various patterns
                 for (let sev = 0; sev <= 7; sev++) {
-                    if (text.includes(`"severity":"${sev}"`) || text.includes(`"severity":${sev},`)) {
+                    // Match "severity":"X", "severity":X, "severity": X, or severity: X patterns
+                    const patterns = [
+                        `"severity":"${sev}"`,
+                        `"severity":${sev},`,
+                        `"severity":${sev}}`,
+                        `"severity": ${sev}`,
+                        `severity: ${sev}`
+                    ];
+
+                    if (patterns.some(pattern => text.includes(pattern))) {
                         findings.push({
                             severity: sev,
                             color: bgColor

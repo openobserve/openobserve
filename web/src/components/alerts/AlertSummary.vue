@@ -16,15 +16,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="alert-summary">
-    <div class="summary-content">
+    <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
       <p v-if="summaryText" class="summary-text" v-html="summaryText" @click="handleSummaryClick"></p>
       <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
+    </div>
+
+    <!-- Scroll to bottom button -->
+    <div
+      v-show="showScrollToBottom"
+      class="scroll-to-bottom-container"
+    >
+      <q-btn
+        round
+        flat
+        icon="arrow_downward"
+        class="scroll-to-bottom-btn"
+        @click="scrollToBottomSmooth"
+        size="sm"
+      >
+        <q-tooltip anchor="top middle" self="bottom middle">
+          Scroll to bottom
+        </q-tooltip>
+      </q-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 
@@ -58,6 +77,9 @@ const props = defineProps({
   }
 });
 
+const summaryContainer = ref<HTMLElement | null>(null);
+const showScrollToBottom = ref(false);
+
 const summaryText = computed(() => {
   return generateAlertSummary(props.formData, props.destinations, t, props.wizardStep, props.previewQuery, props.generatedSqlQuery);
 });
@@ -70,6 +92,43 @@ const handleSummaryClick = (event: MouseEvent) => {
     props.focusManager.focusField(focusTarget);
   }
 };
+
+const checkIfShouldShowScrollButton = () => {
+  if (!summaryContainer.value) return;
+
+  const { scrollTop, scrollHeight, clientHeight } = summaryContainer.value;
+
+  // Show scroll to bottom button when user scrolls up significantly
+  // Only show if there's enough content to scroll and user is not at bottom
+  const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
+  const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
+
+  showScrollToBottom.value = hasScrollableContent && isScrolledUp;
+};
+
+const scrollToBottomSmooth = async () => {
+  await nextTick();
+  if (summaryContainer.value) {
+    summaryContainer.value.scrollTo({
+      top: summaryContainer.value.scrollHeight,
+      behavior: 'smooth'
+    });
+    // Hide the button immediately when user clicks it
+    showScrollToBottom.value = false;
+  }
+};
+
+// Check scroll state when summary text changes
+watch(summaryText, async () => {
+  await nextTick();
+  checkIfShouldShowScrollButton();
+});
+
+// Check scroll state on mount
+onMounted(async () => {
+  await nextTick();
+  checkIfShouldShowScrollButton();
+});
 </script>
 
 <style scoped lang="scss">
@@ -77,6 +136,7 @@ const handleSummaryClick = (event: MouseEvent) => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .summary-content {
@@ -164,4 +224,62 @@ const handleSummaryClick = (event: MouseEvent) => {
   font-style: italic;
   opacity: 0.6;
 }
+
+// Scroll to bottom button styling
+.scroll-to-bottom-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.scroll-to-bottom-btn {
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  body.body--light & {
+    border: 2px solid var(--q-primary) !important;
+    color: var(--q-primary) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+
+  body.body--dark & {
+    border: 2px solid var(--q-primary) !important;
+    color: var(--q-primary) !important;
+    background: rgba(30, 30, 30, 0.9) !important;
+  }
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+    body.body--light & {
+      border: 2px solid var(--q-primary) !important;
+      color: var(--q-primary) !important;
+      background: rgba(255, 255, 255, 1) !important;
+      opacity: 0.8;
+    }
+
+    body.body--dark & {
+      border: 2px solid var(--q-primary) !important;
+      color: var(--q-primary) !important;
+      background: rgba(40, 40, 40, 0.95) !important;
+      opacity: 0.8;
+    }
+  }
+
+  &:active {
+    transform: scale(1);
+  }
+
+  .q-icon {
+    font-size: 18px;
+    font-weight: bold;
+  }
+}
+
 </style>

@@ -78,14 +78,29 @@ pub async fn ingest(
 
     let mut stream_key_cache: HashMap<String, String> = HashMap::new();
     let mut streams_data: HashMap<String, Vec<json::Value>> = HashMap::new();
-    let reader = BufReader::new(body.as_ref());
     let mut next_line_is_data = false;
-    for line in reader.lines() {
-        let line = line?;
-        if line.is_empty() {
+    // Read lines as bytes to handle potential invalid UTF-8 characters
+    let mut line_buffer = Vec::new();
+    let mut reader = BufReader::new(body.as_ref());
+    loop {
+        line_buffer.clear();
+        let bytes_read = reader.read_until(b'\n', &mut line_buffer)?;
+        if bytes_read == 0 {
+            break; // EOF
+        }
+
+        // Remove trailing newline characters
+        while line_buffer.last() == Some(&b'\n') || line_buffer.last() == Some(&b'\r') {
+            line_buffer.pop();
+        }
+
+        if line_buffer.is_empty() {
             continue;
         }
-        let mut value: json::Value = json::from_slice(line.as_bytes())?;
+        // Use from_utf8_lossy to handle potential invalid UTF-8 characters
+        // Invalid UTF-8 sequences will be replaced with the replacement character (�)
+        let line_str = String::from_utf8_lossy(&line_buffer);
+        let mut value: json::Value = json::from_slice(line_str.as_bytes())?;
 
         if !next_line_is_data {
             // check bulk operate
@@ -103,7 +118,7 @@ pub async fn ingest(
             doc_id = line_doc_id.map(|id| id.to_string());
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
-                let err_msg = "Invalid stream name: ".to_string() + &line;
+                let err_msg = "Invalid stream name: ".to_string() + &line_str;
                 log::warn!("[LOGS:BULK] {err_msg}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(

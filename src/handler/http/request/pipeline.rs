@@ -23,12 +23,13 @@ use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
 #[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::check_resource_permissions;
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
         models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{db::pipeline::PipelineError, pipeline},
 };
@@ -64,7 +65,8 @@ impl From<PipelineError> for HttpResponse {
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -111,7 +113,8 @@ pub async fn save_pipeline(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -204,7 +207,8 @@ async fn list_pipelines(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PipelineList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -236,7 +240,8 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -249,6 +254,70 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         ))),
         Err(e) => Ok(e.into()),
     }
+}
+
+/// DeletePipelineBulk
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "deletePipelineBulk",
+    summary = "Delete multiple pipelines",
+    description = "Permanently deletes multiple data processing pipelines. This will stop any ongoing data transformations using these pipelines",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Pipeline data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/pipelines/bulk")]
+async fn delete_pipeline_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "pipelines", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for id in req.ids {
+        match pipeline::delete_pipeline(&id).await {
+            Ok(()) => {
+                successful.push(id);
+            }
+            Err(e) => {
+                log::error!("error deleting pipeline {org_id}/{id} : {e}");
+                unsuccessful.push(id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// UpdatePipeline
@@ -271,7 +340,8 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
@@ -307,7 +377,8 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpRespo
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]
@@ -360,7 +431,8 @@ pub async fn enable_pipeline(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/pipelines/bulk/enable")]
@@ -385,10 +457,8 @@ pub async fn enable_pipeline_bulk(
         let user_id = _user_email.user_id;
 
         for id in &req.ids {
-            if let Some(res) =
-                check_resource_permissions(&org_id, &user_id, "pipelines", id, "PUT").await
-            {
-                return Ok(res);
+            if !check_permissions(id, &org_id, &user_id, "pipelines", "PUT", None).await {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
         }
     }

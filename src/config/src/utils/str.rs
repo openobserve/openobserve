@@ -78,6 +78,52 @@ mod tests {
     }
 
     #[test]
+    fn test_find_not_found() {
+        let haystack = "This is search-unitTest";
+        let needle = "notfound";
+        assert!(!find(haystack, needle));
+    }
+
+    #[test]
+    fn test_find_empty_needle() {
+        let haystack = "This is search-unitTest";
+        let needle = "";
+        assert!(find(haystack, needle));
+    }
+
+    #[test]
+    fn test_find_empty_haystack() {
+        let haystack = "";
+        let needle = "test";
+        assert!(!find(haystack, needle));
+    }
+
+    #[test]
+    fn test_optional_empty_string() {
+        let s = "".to_string();
+        assert_eq!(s.optional(), None);
+    }
+
+    #[test]
+    fn test_optional_non_empty_string() {
+        let s = "hello".to_string();
+        assert_eq!(s.optional(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_optional_whitespace_string() {
+        let s = " ".to_string();
+        assert_eq!(s.optional(), Some(" ".to_string()));
+    }
+
+    #[test]
+    fn test_string_find_trait() {
+        let s = "Hello world".to_string();
+        assert!(s.find("world"));
+        assert!(!s.find("test"));
+    }
+
+    #[test]
     fn test_truncate_ascii() {
         let s = "Hello, World!".to_string();
         assert_eq!(s.truncate_utf8(5), "Hello");

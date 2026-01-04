@@ -42,7 +42,9 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
+    cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
+    runtime::DATAFUSION_RUNTIME,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
@@ -72,6 +74,11 @@ use crate::{
         },
         tantivy::create_tantivy_index,
     },
+use crate::service::{
+    db, file_list,
+    schema::generate_schema_for_defined_schema_fields,
+    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
+    tantivy::create_tantivy_index,
 };
 
 /// Generate merging job by stream

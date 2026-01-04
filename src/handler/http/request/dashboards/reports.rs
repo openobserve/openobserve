@@ -21,11 +21,14 @@ use config::meta::{
     triggers::{Trigger, TriggerModule},
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::check_permissions;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::{
         extractors::Headers,
         models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
+        request::{BulkDeleteRequest, BulkDeleteResponse},
     },
     service::{
         dashboards::reports::{self, ReportError},
@@ -88,7 +91,8 @@ impl From<ReportError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a scheduled report"}))
     )
 )]
 #[post("/{org_id}/reports")]
@@ -137,7 +141,8 @@ pub async fn create_report(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the report", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a report"}))
     )
 )]
 #[put("/{org_id}/reports/{name}")]
@@ -176,7 +181,8 @@ async fn update_report(
         (status = StatusCode::OK, body = inline(Vec<Report>)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all reports"}))
     )
 )]
 #[get("/{org_id}/reports")]
@@ -280,7 +286,8 @@ async fn list_reports(
         (status = StatusCode::NOT_FOUND, description = "Report not found", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get report details"}))
     )
 )]
 #[get("/{org_id}/reports/{name}")]
@@ -315,7 +322,8 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a report"}))
     )
 )]
 #[delete("/{org_id}/reports/{name}")]
@@ -328,6 +336,75 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
             e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
+}
+
+/// DeleteReportBulk
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "DeleteReportBulk",
+    summary = "Delete multiple dashboard reports",
+    description = "Removes multiple dashboard reports configuration from the organization. This action cancels any scheduled \
+                   report deliveries and permanently removes the report configuration. Recipients will no longer receive \
+                   automated report deliveries, and the report configuration cannot be recovered once deleted.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = BulkDeleteRequest,
+        description = "Reports to delete",
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/reports/bulk")]
+async fn delete_report_bulk(
+    path: web::Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    req: web::Json<BulkDeleteRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let req = req.into_inner();
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for name in req.ids {
+        match reports::delete(&org_id, &name).await {
+            Ok(_) => successful.push(name),
+            Err(e) => match e {
+                ReportError::ReportNotFound => successful.push(name),
+                e => {
+                    log::error!("error in deleting report {org_id}/{name} : {e}");
+                    unsuccessful.push(name);
+                    err = Some(e.to_string());
+                }
+            },
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 /// EnableReport
@@ -399,6 +476,9 @@ async fn enable_report(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/reports/{name}/trigger")]

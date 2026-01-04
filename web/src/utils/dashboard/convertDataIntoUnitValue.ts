@@ -1741,3 +1741,91 @@ export const getUTCTimestampFromZonedTimestamp = (
 
   return Math.trunc(utcMs * 1000); // milliseconds to microseconds
 };
+/**
+ * Calculates a dynamic nameGap for the x-axis based on label rotation.
+ * When labels are rotated, we need more space between the labels and the axis name.
+ *
+ * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
+ * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
+ * @param {number} fontSize - The font size of the labels in pixels (default: 12).
+ * @param {number} defaultNameGap - The default nameGap to use when rotation is 0 (default: 25).
+ * @param {number} axisLabelMargin - The margin between axis and labels (default: 10).
+ * @return {number} The calculated nameGap value.
+ */
+export const calculateDynamicNameGap = (
+  rotate: number = 0,
+  labelWidth: number = 120,
+  fontSize: number = 12,
+  defaultNameGap: number = 25,
+  axisLabelMargin: number = 10,
+): number => {
+  // If no rotation, return the default nameGap
+  if (rotate === 0) {
+    return defaultNameGap;
+  }
+
+  // Convert rotation to radians
+  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
+
+  // Calculate the vertical height occupied by rotated label (Section Height)
+  // When a label of width W is rotated by angle θ:
+  // - The vertical height = W * sin(θ) + fontSize * cos(θ)
+  const verticalHeight =
+    labelWidth * Math.sin(rotationInRadians) +
+    fontSize * Math.cos(rotationInRadians);
+
+  // Calculate nameGap: vertical height + axis label margin + small buffer (8px)
+  // The buffer ensures there's slight spacing between longest label tip and axis name
+  const calculatedNameGap = Math.ceil(verticalHeight + axisLabelMargin + 8);
+
+  // Return the maximum of calculated and default to ensure minimum spacing
+  return Math.max(calculatedNameGap, defaultNameGap);
+};
+
+/**
+ * Calculates the additional bottom spacing needed for rotated x-axis labels.
+ * This ensures rotated labels don't overlap with legends or get cut off.
+ *
+ * @param {number} rotate - The rotation angle of the labels in degrees (0-90).
+ * @param {number} labelWidth - The maximum width of truncated labels in pixels (default: 120).
+ * @param {number} fontSize - The font size of the labels in pixels (default: 12).
+ * @param {boolean} hasAxisName - Whether the axis has a name/title (default: false).
+ * @param {number} nameGap - The gap between axis and its name (optional).
+ * @return {number} The additional spacing needed in pixels.
+ */
+export const calculateRotatedLabelBottomSpace = (
+  rotate: number = 0,
+  labelWidth: number = 120,
+  fontSize: number = 12,
+  hasAxisName: boolean = false,
+  nameGap: number = 0,
+): number => {
+  // If no rotation, no additional space needed
+  if (rotate === 0) {
+    return 0;
+  }
+
+  // Convert rotation to radians
+  const rotationInRadians = (Math.abs(rotate) * Math.PI) / 180;
+
+  // Calculate the vertical height occupied by rotated label
+  const verticalHeight =
+    labelWidth * Math.sin(rotationInRadians) +
+    fontSize * Math.cos(rotationInRadians);
+
+  if (hasAxisName) {
+    // If there's an axis name, nameGap already covers the label height.
+    // We just need to add enough space for the axis name itself (~20px)
+    // and some buffer.
+    const axisNameEstimatedHeight = 20;
+    const totalNeededSpace = (nameGap || verticalHeight + 10) + axisNameEstimatedHeight;
+
+    // Default bottom spacing in charts is typically ~35-50px.
+    // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)
+    return Math.max(0, Math.ceil(totalNeededSpace - 40));
+  } else {
+    // Without axis name, just add enough space for labels plus a margin
+    // verticalHeight already includes the diagonal extent
+    return Math.max(0, Math.ceil(verticalHeight - 15)); // Assuming ~15px is already available
+  }
+};

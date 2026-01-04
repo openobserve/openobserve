@@ -63,6 +63,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <q-icon
+                v-if="promqlMode"
+                :name="
+                  dashboardPanelData.layout.hiddenQueries.includes(index)
+                    ? 'visibility_off'
+                    : 'visibility'
+                "
+                class="q-ml-xs dashboard-query-visibility-icon"
+                @click.stop="toggleQueryVisibility(index)"
+                style="cursor: pointer"
+                size="18px"
+                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+              >
+                <q-tooltip>
+                  {{
+                    dashboardPanelData.layout.hiddenQueries.includes(index)
+                      ? "Show query results"
+                      : "Hide query results"
+                  }}
+                </q-tooltip>
+              </q-icon>
+              <q-icon
                 v-if="
                   index > 0 ||
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
@@ -102,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Toggle Function Editor"
           @update:model-value="onFunctionToggle"
           :disable="promqlMode"
-          class="float-left tw-h-[36px] o2-toggle-button-xs tw-mt-2"
+          class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
           size="xs"
           :class="
             store.state.theme === 'dark'
@@ -142,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #before>
               <QueryEditor
                 ref="queryEditorRef"
-                class="monaco-editor !tw-h-full"
+                class="monaco-editor tw:h-full!"
                 style="width: 100%"
                 v-model:query="
                   dashboardPanelData.data.queries[
@@ -430,6 +451,21 @@ export default defineComponent({
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
+      // For metrics page: when switching from custom to builder in PromQL, set sample query
+      if (
+        dashboardPanelData.data.queryType === "promql" &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      ) {
+        const streamName =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream;
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = `${streamName}{}`;
+      }
     };
 
     const updatePromQLQuery = async (value, event) => {
@@ -487,6 +523,19 @@ export default defineComponent({
       )
         dashboardPanelData.layout.currentQueryIndex -= 1;
       removeQuery(index);
+    };
+
+    const toggleQueryVisibility = (index) => {
+      const hiddenQueries = dashboardPanelData.layout.hiddenQueries;
+      const queryIndex = hiddenQueries.indexOf(index);
+
+      if (queryIndex > -1) {
+        // Query is currently hidden, show it
+        hiddenQueries.splice(queryIndex, 1);
+      } else {
+        // Query is currently visible, hide it
+        hiddenQueries.push(index);
+      }
     };
 
     // toggle show query view
@@ -581,6 +630,7 @@ export default defineComponent({
       onUpdateToggle,
       addTab,
       removeTab,
+      toggleQueryVisibility,
       promqlAutoCompleteKeywords,
       sqlAutoCompleteKeywords,
       sqlAutoCompleteSuggestions,
@@ -611,6 +661,11 @@ export default defineComponent({
 }
 
 .dashboard-query-remove-icon:hover {
+  background-color: #eaeaeaa5;
+  border-radius: 50%;
+}
+
+.dashboard-query-visibility-icon:hover {
   background-color: #eaeaeaa5;
   border-radius: 50%;
 }

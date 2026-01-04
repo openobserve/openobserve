@@ -66,12 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="latitude or lat"
         borderless
         dense
-        class="tw-mb-3 showLabelOnTop"
+        class="tw:mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-lat-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
+          <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoLatLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -88,12 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="longitude or lon"
         borderless
         dense
-        class="tw-mb-3 showLabelOnTop"
+        class="tw:mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-lon-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
+          <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoLonLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -110,12 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="weight"
         borderless
         dense
-        class="tw-mb-3 showLabelOnTop"
+        class="tw:mb-3 showLabelOnTop"
         stack-label
         data-test="dashboard-config-geo-weight-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
+          <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.geoWeightLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-name-label"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
+          <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.mapsNameLabel") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="300px">
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-type"
       >
         <template v-slot:label>
-          <div class="row items-center all-pointer-events tw-mb-[-5px]">
+          <div class="row items-center all-pointer-events tw:mb-[-5px]">
             {{ t("dashboard.mapsMapType") }}
             <q-icon class="q-ml-xs" size="20px" name="info" />
             <q-tooltip class="bg-grey-8" max-width="250px">
@@ -260,8 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Column Filters -->
       <template
         v-if="
-          promqlTableMode === 'all' ||
-          promqlTableMode === 'single_with_metadata'
+          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
@@ -284,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getVisibleColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events tw-mb-[-5px]">
+            <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
               <q-icon class="q-ml-xs" size="18px" name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
@@ -340,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getHiddenColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events tw-mb-[-5px]">
+            <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
               <q-icon class="q-ml-xs" size="18px" name="info">
                 <q-tooltip class="bg-grey-8" max-width="400px">
@@ -382,8 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Sticky Columns -->
       <template
         v-if="
-          promqlTableMode === 'all' ||
-          promqlTableMode === 'single_with_metadata'
+          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
         <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
@@ -393,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-sticky-first-column"
         >
           <template v-slot:default>
-            <div class="row items-center all-pointer-events tw-mb-[-5px]">
+            <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.stickyFirstColumn") }}
               <q-icon class="q-ml-xs" size="20px" name="info" />
               <q-tooltip class="bg-grey-8" max-width="300px">
@@ -621,8 +619,8 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "TimeSeries", value: "single" },
-      { label: "TimeSeries with Metadata", value: "single_with_metadata" },
+      { label: "Time series", value: "single" },
+      { label: "Expanded Time series", value: "expanded_timeseries" },
       { label: "Aggregate", value: "all" },
     ];
 
@@ -874,6 +872,11 @@ export default defineComponent({
   :deep(.q-field__label) {
     padding-top: 4px;
     padding-bottom: 4px;
+  }
+
+  // Prevent capitalization for column filter fields
+  :deep(.q-field__native > :first-child) {
+    text-transform: none !important;
   }
 }
 </style>

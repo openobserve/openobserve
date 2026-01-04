@@ -81,12 +81,12 @@ fn create_service_streams_table_statement() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(ServiceStreams::Dimensions)
-                .custom(Alias::new(&text_type))
+                .custom(Alias::new(text_type))
                 .not_null(),
         )
         .col(
             ColumnDef::new(ServiceStreams::Streams)
-                .custom(Alias::new(&text_type))
+                .custom(Alias::new(text_type))
                 .not_null(),
         )
         .col(
@@ -101,7 +101,7 @@ fn create_service_streams_table_statement() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(ServiceStreams::Metadata)
-                .custom(Alias::new(&text_type))
+                .custom(Alias::new(text_type))
                 .null(),
         )
         .to_owned()

@@ -41,8 +41,8 @@ use tracing::Span;
 use crate::common::utils::http::get_extract_patterns_from_request;
 #[cfg(feature = "enterprise")]
 use crate::{
-    common::meta::search::AuditContext,
-    handler::http::request::search::utils::{check_resource_permissions, check_stream_permissions},
+    common::meta::search::AuditContext, common::utils::auth::check_permissions,
+    handler::http::request::search::utils::check_stream_permissions,
     service::self_reporting::audit,
 };
 use crate::{
@@ -97,7 +97,8 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_search_stream")]
@@ -345,12 +346,13 @@ pub async fn search_http2_stream(
     #[cfg(feature = "enterprise")]
     if get_clear_cache_from_request(&query) {
         for stream_name in stream_names.iter() {
-            if let Some(res) = check_resource_permissions(
+            if !check_permissions(
+                stream_name,
                 &org_id,
                 &user_id,
                 stream_type.as_str(),
-                stream_name,
                 "PUT",
+                None,
             )
             .await
             {
@@ -359,7 +361,7 @@ pub async fn search_http2_stream(
                     user_id,
                     org_id,
                     trace_id,
-                    res.status().into(),
+                    403,
                     Some(
                         "Unauthorized to clear cache - requires stream edit permission".to_string(),
                     ),
@@ -367,7 +369,7 @@ pub async fn search_http2_stream(
                     body_bytes,
                 )
                 .await;
-                return res;
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
     }
@@ -609,7 +611,8 @@ pub async fn report_to_audit(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_values_stream")]

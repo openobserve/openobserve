@@ -21,11 +21,15 @@ use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
+    crate::common::utils::auth::check_permissions,
     crate::common::{
         meta::authz::Authz,
         utils::auth::{UserEmail, remove_ownership, set_ownership},
     },
-    crate::handler::http::extractors::Headers,
+    crate::handler::http::{
+        extractors::Headers,
+        request::{BulkDeleteRequest, BulkDeleteResponse},
+    },
     actix_web::http,
     actix_web::web::Json,
     config::utils::time::now_micros,
@@ -59,7 +63,10 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
@@ -125,7 +132,10 @@ pub async fn save(
     responses(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[post("/{org_id}/cipher_keys")]
 pub async fn save(
@@ -158,7 +168,10 @@ pub async fn save(
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[get("/{org_id}/cipher_keys/{key_name}")]
 pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -216,7 +229,10 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
             content_type = "application/json",
         ),
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[get("/{org_id}/cipher_keys")]
 pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
@@ -276,7 +292,10 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
             content_type = "application/json",
         ),
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[delete("/{org_id}/cipher_keys/{key_name}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
@@ -305,6 +324,77 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         drop(path);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }
+}
+
+/// delete multiple key credentials
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    context_path = "/api",
+    operation_id = "DeleteCipherKeysBulk",
+    summary = "Delete multiple encryption key",
+    description = "Permanently removes multiple encryption key from the organization. This action cannot be undone and will \
+                   prevent any future data decryption operations that depend on this key. Ensure all data encrypted \
+                   with this key is either migrated or no longer needed before deletion. Only available in enterprise \
+                   deployments for enhanced security management.",
+    params(
+        ("org_id" = String, Path, description = "name of the organization from which delete", example = "default")
+    ),
+    request_body(content = BulkDeleteRequest, description = "Key name list", content_type = "application/json"),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+    ),
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+#[delete("/{org_id}/cipher_keys/bulk")]
+pub async fn delete_bulk(
+    path: web::Path<String>,
+    body: web::Json<BulkDeleteRequest>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let body = body.into_inner();
+    let user_id = &user_email.user_id;
+    for key in &body.ids {
+        if !check_permissions(key, &org_id, user_id, "cipher_keys", "DELETE", None).await {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+    }
+    let mut successful = Vec::with_capacity(body.ids.len());
+    let mut unsuccessful = Vec::with_capacity(body.ids.len());
+    let mut err = None;
+    for key_name in body.ids {
+        match crate::service::db::keys::remove(
+            &org_id,
+            infra::table::cipher::EntryKind::CipherKey,
+            &key_name,
+        )
+        .await
+        {
+            Ok(_) => {
+                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
+                successful.push(key_name);
+            }
+            Err(e) => {
+                log::error!("error in deleting key {key_name} : {e}");
+                unsuccessful.push(key_name);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    }))
 }
 
 #[cfg(feature = "enterprise")]
@@ -336,7 +426,10 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "Key"
+    tag = "Key",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
@@ -429,7 +522,10 @@ pub async fn update(
     responses(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
-    tag = "Keys"
+    tag = "Keys",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(

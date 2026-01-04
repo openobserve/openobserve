@@ -63,15 +63,20 @@ export interface OverrideConfig {
 export default defineComponent({
   name: "OverrideConfig",
   components: { OverrideConfigPopup },
-  setup() {
+  props: {
+    panelData: {
+      type: Object,
+      default: () => ({}),
+    },
+  },
+  setup(props) {
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
@@ -80,43 +85,66 @@ export default defineComponent({
     const fetchColumns = () => {
       // Different logic for PromQL vs SQL queries
       if (promqlMode.value) {
-        // PromQL mode: Get fields from stream schema across ALL queries
-        const allFieldNames = new Set<string>();
+        // PromQL mode: Get actual columns from the rendered table data
+        // This ensures we get exactly what's shown in the table
+        const columnNames = new Set<string>();
 
-        if (!dashboardPanelData.meta?.streamFields?.groupedFields) {
-          columns.value = [];
-          return;
+        // Try to get columns from the actual rendered panelData first
+        if (props.panelData?.options?.columns) {
+          props.panelData.options.columns.forEach((col: any) => {
+            if (col.name) {
+              columnNames.add(col.name);
+            }
+          });
+        } else {
+          // Fallback: Build columns based on table mode and available labels
+          const config = dashboardPanelData.data.config || {};
+          const tableMode = config.promql_table_mode || "single";
+
+          if (tableMode === "single") {
+            // In "single" (Timestamp) mode: timestamp + value columns
+            columnNames.add("timestamp");
+            columnNames.add("value");
+          } else if (
+            tableMode === "expanded_timeseries" ||
+            tableMode === "all"
+          ) {
+            if (tableMode === "expanded_timeseries") {
+              columnNames.add("timestamp");
+            }
+
+            // Collect label keys from available labels (from PromQL label discovery)
+            if (dashboardPanelData.meta?.promql?.availableLabels) {
+              dashboardPanelData.meta.promql.availableLabels.forEach(
+                (label: string) => {
+                  columnNames.add(label);
+                },
+              );
+            }
+
+            // Add value column(s)
+            const aggregations = config.table_aggregations || [
+              config.aggregation || "last",
+            ];
+            if (aggregations.length === 1) {
+              columnNames.add("value");
+            } else {
+              aggregations.forEach((agg: string) => {
+                columnNames.add(`value_${agg}`);
+              });
+            }
+          }
         }
 
-        // Iterate through ALL queries and collect unique field names
-        dashboardPanelData.data.queries.forEach((query: any) => {
-          const streamName = query?.fields?.stream;
-
-          if (!streamName) return;
-
-          // Find the stream in groupedFields
-          const streamFields =
-            dashboardPanelData.meta.streamFields.groupedFields.find(
-              (group: any) => group.name === streamName,
-            );
-
-          if (streamFields?.schema) {
-            // Extract field names from schema and add to set (automatically removes duplicates)
-            streamFields.schema.forEach((field: any) => {
-              if (field.name) {
-                allFieldNames.add(field.name);
-              }
-            });
-          }
-        });
+        // Convert Set to Array and sort
+        let columnArray = Array.from(columnNames).sort();
 
         // Convert to column format expected by OverrideConfigPopup
-        columns.value = Array.from(allFieldNames)
-          .sort()
-          .map((fieldName) => ({
-            alias: fieldName,
-            label: fieldName,
-          }));
+        columns.value = columnArray.map((columnName) => ({
+          alias: columnName,
+          label: columnName,
+        }));
+
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
@@ -124,7 +152,16 @@ export default defineComponent({
       }
     };
 
-    const openOverrideConfigPopup = () => {
+    const openOverrideConfigPopup = async () => {
+      // For PromQL mode, fetch labels first to ensure we have the latest label data
+      if (promqlMode.value) {
+        const query = dashboardPanelData.data.queries[0];
+        const metric = query?.fields?.stream;
+        if (metric) {
+          await fetchPromQLLabels(metric);
+        }
+      }
+
       fetchColumns();
       showOverrideConfigPopup.value = true;
     };

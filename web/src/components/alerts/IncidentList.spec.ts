@@ -123,8 +123,9 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.list).toHaveBeenCalledWith(
         "default",
         undefined,
-        25,
-        0
+        1000,
+        0,
+        undefined
       );
       expect(wrapper.vm.incidents).toHaveLength(3);
     });
@@ -136,7 +137,7 @@ describe("IncidentList.vue", () => {
         sortBy: "last_alert_at",
         descending: true,
         page: 1,
-        rowsPerPage: 25,
+        rowsPerPage: 20,
         rowsNumber: 0,
       });
     });
@@ -411,19 +412,17 @@ describe("IncidentList.vue", () => {
         pagination: {
           page: 2,
           rowsPerPage: 50,
+          sortBy: "last_alert_at",
+          descending: true,
         },
+        searchQuery: "",
       };
 
       await wrapper.vm.onRequest(props);
 
       expect(wrapper.vm.pagination.page).toBe(2);
       expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(incidentsService.list).toHaveBeenCalledWith(
-        "default",
-        undefined,
-        50,
-        50
-      );
+      // onRequest no longer calls API, it just filters FE data
     });
 
     it("should handle rows per page change", async () => {
@@ -448,20 +447,25 @@ describe("IncidentList.vue", () => {
       await flushPromises();
     });
 
-    it("should open detail drawer when viewing incident", () => {
+    it("should set selected incident and navigate when viewing incident", async () => {
       const incident = wrapper.vm.incidents[0];
 
+      // viewIncident sets selectedIncident and navigates via router
       wrapper.vm.viewIncident(incident);
 
-      expect(wrapper.vm.showDetailDrawer).toBe(true);
+      // selectedIncident is set synchronously
       expect(wrapper.vm.selectedIncident).toBe(incident);
+
+      // showDetailDrawer is set after router navigation completes
+      // In tests, we just verify the navigation intent by checking selectedIncident
     });
 
-    it("should set correct incident when viewing", () => {
+    it("should set correct incident when viewing", async () => {
       const incident = createIncident({ id: "test-123", title: "Test Incident" });
       wrapper.vm.incidents.push(incident);
 
-      wrapper.vm.viewIncident(incident);
+      await wrapper.vm.viewIncident(incident);
+      await flushPromises();
 
       expect(wrapper.vm.selectedIncident.id).toBe("test-123");
       expect(wrapper.vm.selectedIncident.title).toBe("Test Incident");
@@ -736,14 +740,14 @@ describe("IncidentList.vue", () => {
     });
 
     it("should have correct number of columns", () => {
-      expect(wrapper.vm.columns).toHaveLength(6);
+      expect(wrapper.vm.columns).toHaveLength(7);
     });
 
     it("should have status column with correct config", () => {
       const statusCol = wrapper.vm.columns.find((c: any) => c.name === "status");
 
       expect(statusCol).toBeDefined();
-      expect(statusCol.sortable).toBe(true);
+      expect(statusCol.sortable).toBe(false);
       expect(statusCol.field).toBe("status");
     });
 
@@ -751,7 +755,7 @@ describe("IncidentList.vue", () => {
       const severityCol = wrapper.vm.columns.find((c: any) => c.name === "severity");
 
       expect(severityCol).toBeDefined();
-      expect(severityCol.sortable).toBe(true);
+      expect(severityCol.sortable).toBe(false);
       expect(severityCol.field).toBe("severity");
     });
 
@@ -921,8 +925,9 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.list).toHaveBeenCalledWith(
         "custom-org",
         undefined,
-        25,
-        0
+        1000,
+        0,
+        undefined
       );
     });
 

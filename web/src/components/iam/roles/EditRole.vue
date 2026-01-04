@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw-pb-[0.625rem]"
+      class="tw:pb-[0.625rem]"
     >
     <div class="card-container q-py-sm">
           <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container tw-h-[calc(100vh-200px)]"
+          class="card-container tw:h-[calc(100vh-200px)]"
         >
           <div
             class="flex justify-between items-center"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   :debounce="500"
                   dense
-                  class="no-border q-mr-md o2-search-input tw-h-[36px] tw-w-[200px]"
+                  class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
@@ -273,10 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw-w-full"
+        class="flex justify-end tw:w-full"
         style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
-      <div class="card-container tw-w-full tw-py-2 tw-px-3 tw-justify-end tw-flex">
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
         <q-btn
           data-test="edit-role-cancel-btn"
           class="o2-secondary-button"
@@ -335,6 +335,7 @@ import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
+import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 
@@ -830,7 +831,13 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-  router.push({ name: "roles" });
+  router.push(
+    { name: "roles",
+    query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+        }
+     } 
+);
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -1366,6 +1373,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
+    re_patterns: getRePatterns,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1729,6 +1737,24 @@ const getCipherKeys = async () => {
   );
 
   updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getRePatterns = async () => {
+  const data: any = await RePatternsService.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "re_patterns",
+    ["id"],
+    [...data.data.patterns],
+    false,
+    "name",
+  );
 
   return new Promise((resolve, reject) => {
     resolve(true);

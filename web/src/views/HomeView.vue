@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw-px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw-w-full tw-h-full tw-px-[0.625rem] tw-py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
+  <q-page class="tw:px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.zoConfig.ai_enabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
           <TrialPeriod></TrialPeriod>
@@ -28,16 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-label="Streams overview section"
          >
           <div class="row justify-between items-center streams-header">
-            <div class="row tw-items-center tw-gap-2">
+            <div class="row tw:items-center tw:gap-2">
               <div class="tile-icon icon-bg-blue" aria-hidden="true">
                 <q-icon :name="outlinedWindow" size="1.5rem" />
               </div>
-              <div class="section-header">Streams</div>
+              <div class="section-header">{{ t("home.streams") }}</div>
             </div>
               <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                aria-label="View all streams"
                >
-                <q-tooltip>View</q-tooltip>
+                <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                 <q-icon name="arrow_forward" class="view-arrow-icon" />
                 <router-link
                   exact
@@ -219,16 +219,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Functions count statistics">
               <div class="column justify-between">
-                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
                     <img :src="functionsIcon" alt="" />
                   </div>
-                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.functionTitle") }}</div>
+                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.functionTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all functions"
-                  class="tw-flex-shrink-0"
+                  class="tw:flex-shrink-0"
                   >
-                      <q-tooltip>View</q-tooltip>
+                      <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
@@ -255,16 +255,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               role="article"
               aria-label="Dashboards count statistics">
               <div class="column justify-between">
-                <div class="row tw-items-center tw-gap-2 tw-flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw-flex-shrink-0" aria-hidden="true">
+                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
                     <img :src="dashboardsIcon" alt="" />
                   </div>
-                  <div class="tile-title tw-flex-1 tw-text-left tw-whitespace-nowrap tw-overflow-hidden tw-text-ellipsis">{{ t("home.dashboardTitle") }}</div>
+                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.dashboardTitle") }}</div>
                   <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                   aria-label="View all dashboards"
-                  class="tw-flex-shrink-0"
+                  class="tw:flex-shrink-0"
                   >
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                     <router-link
                       exact
@@ -285,14 +285,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
                   <!-- Chart 1 -->
-          <div class="feature-card first-chart-container rounded-borders tw-p-4"
+          <div class="feature-card first-chart-container rounded-borders tw:p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Alerts overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
-                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                <span class="text-title tw:flex tw:items-center tw:gap-2">
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
                       <img :src="alertsIcon" alt="" />
                   </div>
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                 aria-label="View all alerts">
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
@@ -325,22 +325,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="custom-first-chart tw-my-auto xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)] tw-w-full"  >
+            <div class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"  >
               <CustomChartRenderer
                 :key="alertsPanelDataKey"
                 :data="alertsPanelData"
-                class="tw-w-full tw-h-full md:tw-h-[calc(100vh-400px)] "
+                class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)] "
               />
             </div>
           </div>
-          <div class="feature-card second-chart-container rounded-borders tw-p-4"
+          <div class="feature-card second-chart-container rounded-borders tw:p-4"
           :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
           role="region"
           aria-label="Pipelines overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
-                <span class="text-title tw-flex tw-items-center tw-gap-2">
+                <span class="text-title tw:flex tw:items-center tw:gap-2">
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
                       <img :src="pipelinesIcon" alt="" />
                   </div>
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
                 aria-label="View all pipelines">
-                  <q-tooltip>View</q-tooltip>
+                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
@@ -373,11 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="custom-second-chart tw-my-auto xl:tw-min-h-[200px] tw-h-[calc(100vh-500px)]  md:tw-h-[calc(100vh-500px)] lg:tw-h-[calc(100vh-550px)] xl:tw-h-[calc(100vh-645px)]"  >
+            <div class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"  >
               <CustomChartRenderer
                 :key="pipelinesPanelDataKey"
                 :data="pipelinesPanelData"
-                class="tw-w-full tw-h-full "
+                class="tw:w-full tw:h-full "
               />
             </div>
           </div>
@@ -594,7 +594,7 @@ export default defineComponent({
       return {
         chartType: "custom_chart",
         title: {
-          text: "No data available",
+          text: t("home.noDataAvailable"),
           left: "center",
           top: "center",
           textStyle: {
@@ -683,7 +683,7 @@ export default defineComponent({
       return {
         chartType: "custom_chart",
         title: {
-          text: "No data available",
+          text: t("home.noDataAvailable"),
           left: "center",
           top: "center",
           textStyle: {
@@ -1130,7 +1130,6 @@ export default defineComponent({
 .tile-content {
   @include tile-base;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
 
   &:hover {
     // transform: translateY(-4px) scale(1.02);

@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
-    <div class="card-container tw-h-[calc(100vh-50px)]">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
+    <div class="card-container tw:h-[calc(100vh-50px)]">
       <div class="flex justify-between items-start q-py-sm q-px-sm">
-        <div class="flex items-center tw-pl-3">
+        <div class="flex items-center tw:pl-3">
           <div class="text-h6" v-if="pipelineObj.isEditPipeline == true">
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               borderless
               dense
               hide-bottom-space
-              class="tw-w-[300px]"
+              class="tw:w-[300px]"
               :error="pipelineNameError"
               :error-message="pipelineNameErrorMessage"
             />
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-end items-center">
           <!-- this is normal secondary button but only icon is there without label -->
             <q-btn
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button tw-min-w-0"
+              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
               :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               no-caps
               flat
@@ -48,13 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-json-edit-btn"
               @click="openJsonEditor"
             >
-                  <q-tooltip>Edit Pipeline Json</q-tooltip>
+                  <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
                 </q-btn>
           <q-btn
             data-test="add-pipeline-cancel-btn"
-            label="Cancel"
+            :label="t('pipeline.cancel')"
             flat
-            class="q-ml-md o2-secondary-button tw-h-[36px]"
+            class="q-ml-md o2-secondary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             no-caps
             @click="openCancelDialog"
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <q-btn
             data-test="add-pipeline-save-btn"
-            label="Save"
-            class="q-ml-md o2-primary-button tw-h-[36px]"
+            :label="t('common.save')"
+            class="q-ml-md o2-primary-button tw:h-[36px]"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             flat
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <JsonEditor
           :data="pipelineObj.currentSelectedPipeline"
-          :title="'Edit Pipeline JSON'"
+          :title="t('pipeline.editPipelineJSON')"
           :type="'pipelines'"
           :validation-errors="validationErrors"
           @close="showJsonEditorDialog = false"
@@ -175,8 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="confirmDialogMeta.show"
   />
   <ConfirmDialog
-    title="Save Pipeline"
-    message="Are you sure you want to save this Pipeline, as it does not have any impact?"
+    :title="t('pipeline.savePipeline')"
+    :message="t('pipeline.savePipelineConfirm')"
     @update:ok="confirmSaveBasicPipeline"
     @update:cancel="resetBasicDialog"
     v-model="confirmDialogBasicPipeline"
@@ -636,7 +636,7 @@ const getPipeline = () => {
 
       if (!_pipeline) {
         q.notify({
-          message: "Pipeline not found",
+          message: t("pipeline.pipelineNotFound"),
           color: "negative",
           position: "bottom",
           timeout: 3000,
@@ -691,7 +691,7 @@ const savePipeline = async () => {
   forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
     pipelineNameError.value = true;
-    pipelineNameErrorMessage.value = "Pipeline name is required";
+    pipelineNameErrorMessage.value = t("pipeline.pipelineNameRequired");
 
     // Focus the input field
     if (pipelineNameInputRef.value) {
@@ -699,7 +699,7 @@ const savePipeline = async () => {
     }
 
     q.notify({
-      message: "Pipeline name is required",
+      message: t("pipeline.pipelineNameRequired"),
       color: "negative",
       position: "bottom",
       timeout: 3000,
@@ -723,24 +723,24 @@ const savePipeline = async () => {
 
   if (inputNodeIndex === -1) {
     q.notify({
-      message: "Source node is required",
+      message: t("pipeline.sourceNodeRequired"),
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
-      validationErrors.value = ["Source node is required"];
+      validationErrors.value = [t("pipeline.sourceNodeRequired")];
     }
     return;
   } else if (outputNodeIndex === -1) {
     q.notify({
-      message: "Destination node is required",
+      message: t("pipeline.destinationNodeRequired"),
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
-      validationErrors.value = ["Destination node is required"];
+      validationErrors.value = [t("pipeline.destinationNodeRequired")];
     }
     return;
   } else {
@@ -768,13 +768,13 @@ const savePipeline = async () => {
     store.state.selectedOrganization.identifier;
   if (findMissingEdges()) {
     q.notify({
-      message: "Please connect all nodes before saving",
+      message: t("pipeline.connectAllNodes"),
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
-      validationErrors.value = ["Please connect all nodes before saving"];
+      validationErrors.value = [t("pipeline.connectAllNodes")];
     }
     return;
   }
@@ -809,8 +809,7 @@ const validatePipeline = () => {
     outputNode.data?.stream_type === "enrichment_tables"
   ) {
     q.notify({
-      message:
-        "Enrichment tables as destination stream is only available for scheduled pipelines",
+      message: t("pipeline.enrichmentTablesScheduledOnly"),
       color: "negative",
       position: "bottom",
       timeout: 2000,
@@ -834,7 +833,7 @@ const onSubmitPipeline = async () => {
     }
   }
   const dismiss = q.notify({
-    message: "Saving pipeline...",
+    message: t("pipeline.savingPipeline"),
     position: "bottom",
     spinner: true,
   });
@@ -861,7 +860,7 @@ const onSubmitPipeline = async () => {
           },
       });
       q.notify({
-        message: "Pipeline Updated successfully",
+        message: t("pipeline.pipelineUpdated"),
         color: "positive",
         position: "bottom",
         timeout: 3000,
@@ -876,7 +875,7 @@ const onSubmitPipeline = async () => {
           },
       });
         q.notify({
-          message: "Pipeline saved successfully",
+          message: t("pipeline.pipelineSaved"),
           color: "positive",
           position: "bottom",
           timeout: 3000,
@@ -885,7 +884,7 @@ const onSubmitPipeline = async () => {
       else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
         showJsonEditorDialog.value = false;
         q.notify({
-          message: "Pipeline Updated successfully",
+          message: t("pipeline.pipelineUpdated"),
           color: "positive",
           position: "bottom",
           timeout: 3000,
@@ -900,7 +899,7 @@ const onSubmitPipeline = async () => {
           },
         });
         q.notify({
-          message: "Pipeline Saved successfully",
+          message: t("pipeline.pipelineSaved"),
           color: "positive",
           position: "bottom",
           timeout: 3000,
@@ -918,25 +917,25 @@ const onSubmitPipeline = async () => {
         error.response?.data?.message === "Invalid Pipeline: empty edges list"
       ) {
         q.notify({
-          message: "Please connect all nodes",
+          message: t("pipeline.connectAllNodesShort"),
           color: "negative",
           position: "bottom",
           timeout: 3000,
         });
         if(showJsonEditorDialog.value == true){
-          validationErrors.value = ["Please connect all nodes before saving"];
+          validationErrors.value = [t("pipeline.connectAllNodes")];
         }
       } else {
         if (error.response.status != 403) {
           q.notify({
             message:
-              error.response?.data?.message || "Error while saving pipeline",
+              error.response?.data?.message || t("pipeline.errorSavingPipeline"),
             color: "negative",
             position: "bottom",
             timeout: 3000,
           });
           if(showJsonEditorDialog.value == true){
-            validationErrors.value = [error.response?.data?.message || "Error while saving pipeline"];
+            validationErrors.value = [error.response?.data?.message || t("pipeline.errorSavingPipeline")];
           }
         }
       }
@@ -959,8 +958,7 @@ const openCancelDialog = () => {
   ) {
     confirmDialogMeta.value.show = true;
     confirmDialogMeta.value.title = t("common.cancelChanges");
-    confirmDialogMeta.value.message =
-      "Are you sure you want to cancel changes?";
+    confirmDialogMeta.value.message = t("pipeline.cancelChangesConfirm");
     confirmDialogMeta.value.onConfirm = () => {
       resetPipelineData();
       router.push({

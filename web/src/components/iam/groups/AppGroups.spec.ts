@@ -31,12 +31,31 @@ vi.mock("@/services/iam", () => ({
   deleteGroup: vi.fn(),
 }));
 
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({
+    track: vi.fn(),
+  }),
+}));
+
+// Create mock states that will be returned by the composable
+const mockGroupsState = { groups: [] };
+const mockPermissionsState = { permissions: [], selectedResources: {} };
+const mockRolesState = { roles: [] };
+const mockUsersState = { users: [], getOrgUsers: vi.fn() };
+const mockServiceAccountsState = { service_accounts_users: [], getServiceAccounts: vi.fn() };
+
 vi.mock("@/composables/iam/usePermissions", () => ({
-  default: vi.fn(() => ({
-    groupsState: {
-      groups: [],
-    },
-  })),
+  default: () => ({
+    groupsState: mockGroupsState,
+    permissionsState: mockPermissionsState,
+    rolesState: mockRolesState,
+    usersState: mockUsersState,
+    serviceAccountsState: mockServiceAccountsState,
+    resetPermissionsState: vi.fn(),
+    resetGroupsState: vi.fn(),
+    resetRolesState: vi.fn(),
+    resetUsersState: vi.fn(),
+  }),
 }));
 
 const mockNotify = vi.fn();
@@ -79,21 +98,31 @@ vi.mock("./AddGroup.vue", () => ({
   },
 }));
 
+// Helper to create mock Axios response
+const createMockAxiosResponse = (data: any) => ({
+  data,
+  status: 200,
+  statusText: "OK",
+  headers: {},
+  config: {} as any,
+});
+
 describe("AppGroups Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
-    const mockGroupsState = {
-      groups: [
-        { group_name: "admin" },
-        { group_name: "developers" },
-        { group_name: "users" },
-      ],
-    };
+    // Mock getGroups to return a resolved promise by default
+    const { getGroups } = await import("@/services/iam");
+    vi.mocked(getGroups).mockResolvedValue(
+      createMockAxiosResponse(["admin", "developers", "users"]) as any
+    );
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue({
-      groupsState: mockGroupsState,
-    });
+    // Update the mock groups state
+    mockGroupsState.groups = [
+      { group_name: "admin" },
+      { group_name: "developers" },
+      { group_name: "users" },
+    ] as any;
 
     wrapper = mount(AppGroups, {
       global: {
@@ -146,9 +175,9 @@ describe("AppGroups Component", () => {
 
     it("displays groups data in rows", async () => {
       const { getGroups } = await import("@/services/iam");
-      vi.mocked(getGroups).mockResolvedValue({
-        data: ["admin", "developers", "users"],
-      });
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse(["admin", "developers", "users"]) as any
+      );
 
       await wrapper.vm.setupGroups();
       await flushPromises();
@@ -161,9 +190,9 @@ describe("AppGroups Component", () => {
 
     it("formats row numbers correctly", async () => {
       const { getGroups } = await import("@/services/iam");
-      vi.mocked(getGroups).mockResolvedValue({
-        data: ["group1", "group2", "group3"],
-      });
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse(["group1", "group2", "group3"]) as any
+      );
 
       await wrapper.vm.setupGroups();
       await flushPromises();
@@ -256,13 +285,16 @@ describe("AppGroups Component", () => {
     it("navigates to edit page when edit icon is clicked", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
       const testGroup = { group_name: "test-group" };
-      
+
       await wrapper.vm.editGroup(testGroup);
-      
+
       expect(routerPushSpy).toHaveBeenCalledWith({
         name: "editGroup",
         params: {
           group_name: "test-group",
+        },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     });
@@ -371,9 +403,9 @@ describe("AppGroups Component", () => {
   describe("Data Loading", () => {
     it("loads groups on component mount", async () => {
       const { getGroups } = await import("@/services/iam");
-      vi.mocked(getGroups).mockResolvedValue({
-        data: ["group1", "group2"],
-      });
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse(["group1", "group2"]) as any
+      );
 
       const wrapper = mount(AppGroups, {
         global: {
@@ -401,9 +433,9 @@ describe("AppGroups Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes", () => {
-      const header = wrapper.find('.tw-flex.tw-justify-between.tw-items-center.tw-px-4.tw-py-3');
+      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
-      
+
       expect(header.exists()).toBe(true);
       expect(table.exists()).toBe(true);
       // Just check that theme classes exist, exact class names might vary
@@ -426,8 +458,8 @@ describe("AppGroups Component", () => {
       });
 
       await flushPromises();
-      
-      const header = wrapper.find('.tw-flex.tw-justify-between.tw-items-center.tw-px-4.tw-py-3');
+
+      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);
@@ -439,7 +471,9 @@ describe("AppGroups Component", () => {
   describe("Edge Cases", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
-      vi.mocked(getGroups).mockResolvedValue({ data: [] });
+      vi.mocked(getGroups).mockResolvedValue(
+        createMockAxiosResponse([]) as any
+      );
 
       await wrapper.vm.setupGroups();
       await flushPromises();

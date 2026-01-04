@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div class="col-auto tw-mx-[0.625rem]">
+    <div class="col-auto tw:mx-[0.625rem]">
       <!-- stream type selection will be hidden for metrics page -->
       <q-select
         v-if="dashboardPanelDataPageKey !== 'metrics'"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot:prepend
         >
           <q-icon
-            style="margin-top: 14px"
+            style="margin-top: 24px"
             size="xs"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="props?.row?.isGroup"
-                class="tw-pl-2 tw-py-1 tw-font-semibold tw-bg-gray-200"
+                class="tw:pl-2 tw:py-1 tw:font-semibold field-group-header"
               >
                 {{ props?.row?.groupName }}
               </div>
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
-            class="tw-mx-[0.625rem]"
+            class="tw:mx-[0.625rem]"
            hide-bottom-space>
             <template #prepend>
               <q-icon name="search" />
@@ -981,7 +981,7 @@ export default defineComponent({
       () => {
         updateGroupedFields();
       },
-      { deep: true },
+      { deep: true, immediate: true },
     );
 
     watch(
@@ -1298,6 +1298,10 @@ export default defineComponent({
       }
     }
   }
+
+  .field-group-header {
+    background-color: var(--o2-header-menu-bg);
+  }
 }
 
 .theme-light {
@@ -1310,6 +1314,10 @@ export default defineComponent({
         opacity: 1;
       }
     }
+  }
+
+  .field-group-header {
+    background-color: rgb(229,231,235);
   }
 }
 

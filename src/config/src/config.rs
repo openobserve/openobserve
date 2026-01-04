@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 19;
+pub const DB_SCHEMA_VERSION: u64 = 22;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -694,6 +694,14 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    /// Session cleanup interval in seconds (default: 3600 = 1 hour)
+    /// How often to run the background job that deletes expired sessions
+    #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]
+    pub session_cleanup_interval: u64,
+    /// Default session expiry in hours for migration (default: 24 hours)
+    /// Used for existing sessions when migrating to add expires_at column
+    #[env_config(name = "ZO_SESSION_DEFAULT_EXPIRY_HOURS", default = 24)]
+    pub session_default_expiry_hours: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1401,9 +1409,18 @@ pub struct Limit {
     pub grpc_ingest_timeout: u64,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
-    // default equal to query_timeout
+    #[env_config(
+        name = "ZO_QUERY_INGESTER_TIMEOUT",
+        default = 0,
+        help = "Timeout for ingester query, default equal to query_timeout"
+    )]
     pub query_ingester_timeout: u64,
+    #[env_config(
+        name = "ZO_QUERY_QUERIER_TIMEOUT",
+        default = 0,
+        help = "Timeout for querier query, default equal to query_timeout"
+    )]
+    pub query_querier_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
@@ -1626,6 +1643,12 @@ pub struct Limit {
     )]
     pub inverted_index_max_token_length: usize,
     #[env_config(
+        name = "ZO_INDEX_ALL_MAX_VALUE_LENGTH",
+        default = 0,
+        help = "Maximum length of a value in the index all feature."
+    )]
+    pub index_all_max_value_length: usize,
+    #[env_config(
         name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
         default = 0,
         help = "unit: Days. Global default max query range for all streams. If set to a value > 0, this will be used as the default max query range. Can be overridden by stream settings."
@@ -1637,12 +1660,6 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
-    #[env_config(
-        name = "ZO_TEXT_DATA_TYPE",
-        default = "longtext",
-        help = "Default data type for LongText compliant DB's"
-    )]
-    pub db_text_data_type: String,
     #[env_config(
         name = "ZO_MAX_DASHBOARD_SERIES",
         default = 100,
@@ -2479,6 +2496,17 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // reset to default if given zero
     if cfg.limit.max_dashboard_series < 1 {
         cfg.limit.max_dashboard_series = 100;
+    }
+
+    // check query timeout
+    if cfg.limit.query_timeout == 0 {
+        cfg.limit.query_timeout = 600;
+    }
+    if cfg.limit.query_ingester_timeout == 0 {
+        cfg.limit.query_ingester_timeout = cfg.limit.query_timeout;
+    }
+    if cfg.limit.query_querier_timeout == 0 {
+        cfg.limit.query_querier_timeout = cfg.limit.query_timeout;
     }
 
     // check for uds

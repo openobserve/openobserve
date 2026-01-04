@@ -16,23 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw-px-3 tw-py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+    <div class="step-content card-container tw:px-3 tw:py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
       <!-- Alert set for header -->
-      <div class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-md">
+      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
         <span>Alert set for</span>
-        <div class="tw-h-px border-line tw-flex-1"></div>
+        <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
       <!-- Current Window -->
-      <div class="tw-flex tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start multi-window-container q-px-md q-py-sm">
-        <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+      <div class="tw:flex tw:flex-col lg:tw:flex-row tw:justify-between tw:items-start multi-window-container q-px-md q-py-sm">
+        <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
           Current window
         </div>
 
-        <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
-          <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+        <div class="tw:flex lg:tw:flex-col tw:items-start tw:gap-2">
+          <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
             Cycle
-            <span class="tw-cursor-pointer">
+            <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -45,12 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="tw-flex tw-justify-between tw-items-start tw-gap-4">
-            <div class="tw-w-full lg:tw-w-[300px] running-text">
+          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
+            <div class="tw:w-full lg:tw:w-[300px] running-text">
               Running for {{ convertMinutesToDisplayValue(period) }} in the interval of every {{ convertMinutesToDisplayValue(frequency) }}
             </div>
             <div>
-              <span class="tw-inline-block">
+              <span class="tw:inline-block">
                 <q-btn
                   icon="delete_outline"
                   class="iconHoverBtn q-ml-xs q-mr-sm"
@@ -77,27 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw-flex tw-items-center tw-gap-2 q-py-sm q-mt-sm">
+      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-sm">
         <span>Comparing with</span>
-        <div class="tw-h-px border-line tw-flex-1"></div>
+        <div class="tw:h-px border-line tw:flex-1"></div>
       </div>
 
       <!-- Reference Windows List -->
       <div
         v-for="(picker, index) in localMultiTimeRange"
         :key="picker.uuid"
-        class="tw-flex tw-flex-col lg:tw-flex-row tw-justify-between tw-items-start reference-window-container tw-mt-2 q-px-md q-py-sm"
+        class="tw:flex tw:flex-col lg:tw:flex-row tw:justify-between tw:items-start reference-window-container tw:mt-2 q-px-md q-py-sm"
       >
-        <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+        <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
           Reference Window {{ index + 1 }}
         </div>
 
         <!-- Time Frame -->
-        <div class="tw-flex tw-flex-col tw-gap-2 tw-items-center">
-          <div class="tw-flex tw-items-center">
-            <span class="tw-mr-1"><q-icon name="schedule" size="16px" /></span>
+        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-center">
+          <div class="tw:flex tw:items-center">
+            <span class="tw:mr-1"><q-icon name="schedule" size="16px" /></span>
             Time Frame
-            <span class="tw-ml-2 tw-cursor-pointer">
+            <span class="tw:ml-2 tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="datetime-picker-wrapper tw-mt-2">
+          <div class="datetime-picker-wrapper tw:mt-2">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
@@ -122,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cycle Info -->
-        <div class="tw-flex lg:tw-flex-col tw-items-start tw-gap-2">
-          <div class="multi-window-text tw-w-full tw-text-center lg:tw-w-auto lg:tw-text-left">
+        <div class="tw:flex lg:tw:flex-col tw:items-start tw:gap-2">
+          <div class="multi-window-text tw:w-full tw:text-center lg:tw:w-auto lg:tw:text-left">
             Cycle
-            <span class="tw-cursor-pointer">
+            <span class="tw:cursor-pointer">
               <q-icon
                 name="info"
                 size="17px"
@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </span>
           </div>
-          <div class="tw-flex tw-justify-between tw-items-start tw-gap-4">
-            <div class="tw-w-full lg:tw-w-[300px] reference-text">
+          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
+            <div class="tw:w-full lg:tw:w-[300px] reference-text">
               Comparing current window query result with query result from previous {{ getDisplayValue(picker.offSet) }}.
             </div>
             <div>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Action Buttons Section -->
-      <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-gap-3 q-mt-sm">
+      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 q-mt-sm">
         <q-btn
           data-test="multi-time-range-alerts-add-btn"
           label="Add Comparison Window"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
 
         <!-- Go to View Editor Button with Info Icon - shows when comparison windows are added -->
-        <div v-if="localMultiTimeRange.length > 0" class="tw-flex tw-items-center tw-gap-2">
+        <div v-if="localMultiTimeRange.length > 0" class="tw:flex tw:items-center tw:gap-2">
           <q-btn
             data-test="go-to-view-editor-btn"
             label="Go to Conditions"
@@ -192,9 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-secondary-button"
             style="font-size: 14px;"
             no-caps
-            @click="goToSqlEditor"
+            @click="handleGoToSqlEditor"
           >
           <q-tooltip
+              ref="goToConditionsTooltipRef"
               anchor="top middle"
               self="bottom middle"
               max-width="300px"
@@ -258,6 +259,7 @@ export default defineComponent({
     const store = useStore();
 
     const multiWindowContainerRef = ref<HTMLElement | null>(null);
+    const goToConditionsTooltipRef = ref<any>(null);
     const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
 
     // Watch for prop changes
@@ -348,10 +350,19 @@ export default defineComponent({
       emit("goToSqlEditor");
     };
 
+    const handleGoToSqlEditor = () => {
+      // Hide the tooltip before navigating
+      if (goToConditionsTooltipRef.value) {
+        goToConditionsTooltipRef.value.hide();
+      }
+      goToSqlEditor();
+    };
+
     return {
       t,
       store,
       multiWindowContainerRef,
+      goToConditionsTooltipRef,
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
@@ -361,6 +372,7 @@ export default defineComponent({
       isComparisonDisabled,
       comparisonDisabledTooltip,
       goToSqlEditor,
+      handleGoToSqlEditor,
     };
   },
 });

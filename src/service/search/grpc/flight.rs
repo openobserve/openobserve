@@ -263,7 +263,11 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!("[trace_id {trace_id}] flight->search: handle tantivy optimize"),
+                format!(
+                    "[trace_id {trace_id}] flight->search: handle tantivy optimize, tantivy files: {}, datafusion files: {}",
+                    tantivy_file_list.len(),
+                    file_list.len()
+                ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search handle tantivy optimize".to_string())

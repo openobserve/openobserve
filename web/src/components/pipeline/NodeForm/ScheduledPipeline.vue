@@ -49,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <div class="row items-center no-wrap tw-gap-2">
+          <div class="row items-center no-wrap tw:gap-2">
             <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
         </q-btn>
-        <div class="flex items-center app-tabs-container tw-h-[36px] q-mr-sm">
+        <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
           <AppTabs
             data-test="scheduled-pipeline-tabs"
             :tabs="tabOptions"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           flat
           no-caps
           :title="t('search.runQuery')"
-          class="q-pa-none q-mr-sm o2-primary-button tw-h-[36px]"
+          class="q-pa-none q-mr-sm o2-primary-button tw:h-[36px]"
           :class="
             store.state.theme === 'dark'
               ? 'o2-primary-button-dark'
@@ -102,9 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
 
-    <div class="q-mb-sm stepper-header tw-w-full tw-flex tw-h-full">
+    <div class="q-mb-sm stepper-header tw:w-full tw:flex tw:h-full">
       <div
-        :class="store.state.isAiChatEnabled ? 'tw-w-[75%]' : 'tw-w-[100%]'"
+        :class="store.state.isAiChatEnabled ? 'tw:w-[75%]' : 'tw:w-[100%]'"
         style="height: 100% !important"
       >
         <q-splitter
@@ -127,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.buildQuery"
-                    label="Build Query"
-                    class="tw-mt-1"
+                    :label="t('pipeline.buildQuery')"
+                    class="tw:mt-1"
                   />
                 </span>
                 <div class="q-pt-sm" v-show="expandState.buildQuery">
@@ -202,8 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="query"
                     v-model:is-expanded="expandState.setVariables"
-                    label="Set Variables"
-                    class="tw-mt-1"
+                    :label="t('pipeline.setVariables')"
+                    class="tw:mt-1"
                   />
                 </span>
                 <div
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex justify-start items-center text-bold q-mb-sm q-mt-md o2-input"
                     >
                       <div style="width: 130px">
-                        Trigger
+                        {{ t('pipeline.trigger') }}
                         <q-icon
                           :name="outlinedInfo"
                           size="17px"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             filled
                             min="0"
                             style="background: none"
-                            placeholder="Value"
+                            :placeholder="t('pipeline.value')"
                             @update:model-value="updatePromqlCondition"
                           />
                         </div>
@@ -293,14 +293,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="scheduled-pipeline-aggregation-title"
                         style="width: 172px"
                       >
-                        Aggregation
+                        {{ t('pipeline.aggregation') }}
                       </div>
                       <q-toggle
                         data-test="scheduled-pipeline-aggregation-toggle"
                         v-model="_isAggregationEnabled"
                         size="md"
                         color="primary"
-                        class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
+                        class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
                         :disable="tab === 'sql' || tab === 'promql'"
                         @update:model-value="updateAggregation"
                       />
@@ -343,12 +343,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 use-input
                                 emit-value
                                 hide-selected
-                                placeholder="Select column"
+                                :placeholder="t('pipeline.selectColumn')"
                                 fill-input
                                 :input-debounce="400"
                                 @filter="filterFields"
                                 :rules="[
-                                  (val: any) => !!val || 'Field is required!',
+                                  (val: any) => !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="width: 200px"
                                 @update:model-value="updateTrigger"
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   filled
                                   min="0"
                                   style="background: none"
-                                  placeholder="Value"
+                                  :placeholder="t('pipeline.value')"
                                   @update:model-value="updateAggregation"
                                 />
                               </div>
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            Field is required!
+                            {{ t('pipeline.fieldRequired') }}
                           </div>
                         </template>
                         <template v-else>
@@ -549,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 hide-selected
                                 fill-input
                                 :rules="[
-                                  (val: any) => !!val || 'Field is required!',
+                                  (val: any) => !!val || t('pipeline.fieldRequired'),
                                 ]"
                                 style="
                                   width: 88px;
@@ -608,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-red-8 q-pt-xs absolute"
                             style="font-size: 11px; line-height: 12px"
                           >
-                            Field is required!
+                            {{ t('pipeline.fieldRequired') }}
                           </div>
                         </template>
                       </div>
@@ -655,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-cron-toggle-btn"
                               size="md"
                               color="primary"
-                              class="text-bold q-pl-0 o2-toggle-button-sm tw-h-[36px] tw-ml-1"
+                              class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
                               v-model="triggerData.frequency_type"
                               :true-value="'cron'"
                               :false-value="'minutes'"
@@ -724,18 +724,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-icon
                             :name="outlinedWarning"
                             size="18px"
-                            class="cursor-pointer tw-ml-[8px]"
+                            class="cursor-pointer tw:ml-[8px]"
                             :class="
                               store.state.theme === 'dark'
-                                ? 'tw-text-orange-500'
-                                : 'tw-text-orange-500'
+                                ? 'tw:text-orange-500'
+                                : 'tw:text-orange-500'
                             "
                           >
                             <q-tooltip
                               anchor="center right"
                               self="center left"
                               max-width="auto"
-                              class="tw-text-[14px]"
+                              class="tw:text-[14px]"
                             >
                               Warning: The displayed timezone is approximate.
                               Verify and select the correct timezone manually.
@@ -775,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                             <div
                               v-else
-                              class="tw-flex tw-items-center o2-input"
+                              class="tw:flex tw:items-center o2-input"
                             >
                               <q-input
                                 data-test="scheduled-pipeline-cron-input-field"
@@ -851,7 +851,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-red-8 q-pt-xs"
                           style="font-size: 11px; line-height: 12px"
                         >
-                          {{ cronJobError || "Field is required!" }}
+                          {{ cronJobError || t('pipeline.fieldRequired') }}
                         </div>
                       </div>
                     </div>
@@ -1065,9 +1065,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </template>
           <template #after>
-            <div class="full-width tw-flex tw-flex-col" style="height: 100%">
+            <div class="full-width tw:flex tw:flex-col" style="height: 100%">
               <div
-                class="tw-flex-1 tw-overflow-auto"
+                class="tw:flex-1 tw:overflow-auto"
                 style="height: calc(100vh - 200px) !important; width: 100%"
               >
                 <div class="query-editor-container scheduled-pipelines">
@@ -1075,8 +1075,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="query"
                       v-model:is-expanded="expandState.query"
-                      :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
-                      class="tw-mt-1"
+                      :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
+                      class="tw:mt-1"
                     />
                   </span>
                   <query-editor
@@ -1104,8 +1104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="output"
                       v-model:is-expanded="expandState.output"
-                      label="Output"
-                      class="tw-mt-1"
+                      :label="t('pipeline.output')"
+                      class="tw:mt-1"
                     />
                   </span>
                   <TenstackTable
@@ -1177,7 +1177,7 @@ size="md" />
               </div>
 
               <div
-                class="scheduled-pipeline-footer tw-sticky tw-bottom-0 tw-px-4 tw-py-3 tw-z-10"
+                class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
                 :class="
                   store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
                 "
@@ -1186,7 +1186,7 @@ size="md" />
                   <q-btn
                     v-if="pipelineObj.isEditNode"
                     data-test="stream-routing-query-delete-btn"
-                    class="o2-secondary-button tw-h-[36px]"
+                    class="o2-secondary-button tw:h-[36px]"
                     flat
                     no-caps
                     @click="$emit('delete:node')"
@@ -1197,7 +1197,7 @@ size="md" />
 
                   <q-btn
                     data-test="stream-routing-query-cancel-btn"
-                    class="o2-secondary-button tw-h-[36px] q-ml-md"
+                    class="o2-secondary-button tw:h-[36px] q-ml-md"
                     :label="t('alerts.cancel')"
                     flat
                     no-caps
@@ -1206,9 +1206,9 @@ size="md" />
                   <q-btn
                     data-test="stream-routing-query-save-btn"
                     :label="
-                      validatingSqlQuery ? 'Validating...' : 'Validate and Close'
+                      validatingSqlQuery ? t('pipeline.validating') : t('pipeline.validateAndClose')
                     "
-                    class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                    class="no-border q-ml-md o2-primary-button tw:h-[36px]"
                     no-caps
                     @click.prevent="$emit('submit:form')"
                     :disable="validatingSqlQuery"
@@ -1277,7 +1277,7 @@ import {
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar, copyToClipboard } from "quasar";
-import cronParser from "cron-parser";
+import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
@@ -1733,9 +1733,12 @@ const updateFrequency = async () => {
 
 function convertCronToMinutes(cronExpression: string) {
   cronJobError.value = "";
-  // Parse the cron expression using cron-parser
+  // Parse the cron expression using cron-parser v5
   try {
-    const interval = cronParser.parseExpression(cronExpression);
+    const interval = CronExpressionParser.parse(cronExpression, {
+      currentDate: new Date(),
+      utc: true,
+    });
     // Get the first and second execution times
     const firstExecution = interval.next();
     const secondExecution = interval.next();
@@ -2050,9 +2053,11 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if (tab.value === "sql") {
+        // Only set default query if query is empty
+        // Don't overwrite user's custom query when they change streams
+        if (tab.value === "sql" && !query.value.trim()) {
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql") {
+        } else if (tab.value === "promql" && !query.value.trim()) {
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;

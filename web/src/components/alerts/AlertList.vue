@@ -21,24 +21,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw-w-full tw-px-[0.625rem] tw-mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
+          class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
         >
-          <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
-            {{ t("alerts.header") }}
+          <div class="tw:flex tw:items-center tw:gap-4">
+            <!-- View Mode Tabs (Alerts / Incidents) -->
+            <div class="view-mode-tabs-container">
+              <app-tabs
+                :tabs="viewTabs"
+                v-model:active-tab="viewMode"
+                @update:active-tab="onViewModeChange"
+                data-test="alert-incident-view-tabs"
+              />
+            </div>
           </div>
-          <div class="flex q-ml-auto tw-ps-2 items-center">
-            <div class="app-tabs-container tw-h-[36px] q-mr-sm">
+          <div class="flex q-ml-auto tw:ps-2 items-center">
+            <!-- Tabs only visible in Alerts view -->
+            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw:h-[36px] q-mr-sm">
               <app-tabs
               class="tabs-selection-container"
-              :tabs="tabs"
+              :tabs="alertTabs"
               v-model:active-tab="activeTab"
               @update:active-tab="filterAlertsByTab"
             />
             </div>
+            <!-- Search for Alerts view -->
             <q-input
+              v-if="viewMode === 'alerts'"
               v-model="dynamicQueryModel"
               dense
               borderless
@@ -50,19 +61,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-
               class="o2-search-input"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <div class="tw-mb-2">
+            <!-- Search for Incidents view -->
+            <q-input
+              v-if="viewMode === 'incidents'"
+              v-model="incidentSearchQuery"
+              dense
+              borderless
+              placeholder="Search incidents..."
+              data-test="incident-search-input"
+              clearable
+              class="o2-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+            <!-- All Folders toggle (only for alerts view) -->
+            <div v-if="viewMode === 'alerts'" class="tw:mb-2">
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
                 label="All Folders"
-                class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+                class="tw:mr-3 tw:h-[36px] o2-toggle-button-lg"
                 size="lg"
               >
               </q-toggle>
@@ -77,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-btn
             v-if="false"
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            class="q-ml-sm o2-secondary-button tw:h-[36px]"
             no-caps
             flat
             label="Alert Insights"
@@ -85,18 +111,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-insights-btn"
             icon="insights"
           />
+          <!-- Import button (only for alerts view) -->
           <q-btn
-            class="q-ml-sm o2-secondary-button tw-h-[36px]"
+            v-if="viewMode === 'alerts'"
+            class="q-ml-sm o2-secondary-button tw:h-[36px]"
             no-caps
             flat
             :label="t(`dashboard.import`)"
             @click="importAlert"
             data-test="alert-import"
-
           />
+          <!-- Add Alert button (only for alerts view) -->
           <q-btn
+            v-if="viewMode === 'alerts'"
             data-test="alert-list-add-alert-btn"
-            class="q-ml-sm o2-primary-button tw-h-[36px]"
+            class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
             flat
             :disable="!destinations.length"
@@ -112,7 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="full-width alert-list-table"
       style="height: calc(100vh - 116px)"
     >
+      <!-- Incidents View (no folders) -->
+      <div v-if="viewMode === 'incidents'" class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+        <IncidentList :searchQuery="incidentSearchQuery" />
+      </div>
+
+      <!-- Alerts View (with folders) -->
       <q-splitter
+        v-else
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
@@ -120,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-list-splitter"
       >
         <template #before>
-          <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem]">
-            <div class="tw-h-full">
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full">
               <FolderList
                 type="alerts"
                 @update:activeFolderId="updateActiveFolderId"
@@ -130,13 +166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-            <div class="tw-h-full card-container">
-              <!-- Incidents List (shown when incidents tab is active) -->
-              <IncidentList v-if="activeTab === 'incidents'" />
+          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full card-container">
               <!-- Alert List Table -->
               <q-table
-                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -202,14 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <q-td v-for="col in columns" :key="col.name" :props="props">
                       <template v-if="col.name === 'name'">
-                        <div class="tw-flex tw-items-center tw-gap-1">
+                        <div class="tw:flex tw:items-center tw:gap-1">
                           <span>{{ computedName(props.row[col.field]) }}</span>
-                          <O2AIContextAddBtn
-                            @sendToAiChat="openSREChat(props.row)"
-                            :size="'6px'"
-                            :imageHeight="'16px'"
-                            :imageWidth="'16px'"
-                          />
                         </div>
                         <q-tooltip
                           v-if="props.row[col.field]?.length > 30"
@@ -251,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                       <template v-else-if="col.name === 'dedup_status'">
-                        <div class="tw-flex tw-items-center tw-justify-center">
+                        <div class="tw:flex tw:items-center tw:justify-center">
                           <q-icon
                             v-if="props.row.deduplication?.enabled"
                             name="check_circle"
@@ -272,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </template>
                       <template v-else-if="col.name == 'actions'">
-                        <div class="tw-flex tw-items-center actions-container"
+                        <div class="tw:flex tw:items-center actions-container"
                         >
                           <div
                             data-test="alert-list-loading-alert"
@@ -484,58 +511,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template> -->
 
                 <template #bottom="scope">
-                  <div class="bottom-btn tw-h-[48px]">
-                    <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                  <div class="bottom-btn tw:h-[48px]">
+                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('alerts.header') }}
                     </div>
 
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-move-across-folders-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
                       @click="moveMultipleAlerts"
                       >
                         <q-icon :name="outlinedDriveFileMove" size="16px" />
-                        <span class="tw-ml-2">Move</span>
+                        <span class="tw:ml-2">Move</span>
                     </q-btn>
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
                       @click="multipleExportAlert"
                     >
                       <q-icon name="download" size="16px" />
-                      <span class="tw-ml-2">Export</span>
+                      <span class="tw:ml-2">Export</span>
                   </q-btn>
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw-h-[36px]"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
                       @click="bulkToggleAlerts('pause')"
                     >
                       <q-icon name="pause" size="16px" />
-                      <span class="tw-ml-2">Pause</span>
+                      <span class="tw:ml-2">Pause</span>
                   </q-btn>
                   <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw-flex items-center no-border o2-secondary-button tw-h-[36px] tw-ml-sm tw-w-[141px]"
+                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[180px]"
                       :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                       no-caps
                       dense
                       @click="bulkToggleAlerts('resume')"
                     >
                       <q-icon name="play_arrow" size="16px" />
-                      <span class="tw-ml-2">Resume</span>
+                      <span class="tw:ml-2">Resume</span>
+                  </q-btn>
+                  <q-btn
+                      v-if="selectedAlerts.length > 0"
+                      data-test="alert-list-delete-alerts-btn"
+                      class="tw:flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px] tw:ml-sm"
+                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                      no-caps
+                      dense
+                      @click="openBulkDeleteDialog"
+                    >
+                      <q-icon name="delete" size="16px" />
+                      <span class="tw:ml-2">Delete</span>
                   </q-btn>
                     <QTablePagination
                       :scope="scope"
@@ -581,6 +620,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDelete"
     />
 
+    <ConfirmDialog
+      title="Delete Alerts"
+      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      @update:ok="bulkDeleteAlerts"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
+
     <!-- Alert Details Drawer -->
     <q-drawer
       v-model="showAlertDetailsDrawer"
@@ -591,12 +638,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       behavior="mobile"
       class="alert-details-drawer"
     >
-      <div class="tw-h-full tw-flex tw-flex-col">
+      <div class="tw:h-full tw:flex tw:flex-col">
         <!-- Drawer Header -->
-        <div class="tw-px-6 tw-py-4 tw-border-b tw-flex tw-items-center tw-justify-between">
-          <div class="tw-flex tw-items-center">
-            <q-icon name="info" size="24px" class="tw-mr-2" />
-            <h6 class="tw-text-lg tw-font-semibold tw-m-0">{{ t('alert_list.alert_details') }}</h6>
+        <div class="tw:px-6 tw:py-4 tw:border-b tw:flex tw:items-center tw:justify-between">
+          <div class="tw:flex tw:items-center">
+            <q-icon name="info" size="24px" class="tw:mr-2" />
+            <h6 class="tw:text-lg tw:font-semibold tw:m-0">{{ t('alert_list.alert_details') }}</h6>
           </div>
           <q-btn
             flat
@@ -608,17 +655,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Drawer Content -->
-        <div class="tw-flex-1 tw-overflow-y-auto tw-px-6 tw-py-4" v-if="selectedAlertDetails">
+        <div class="tw:flex-1 tw:overflow-y-auto tw:px-6 tw:py-4" v-if="selectedAlertDetails">
           <!-- Alert Name -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-mb-1" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Alert Name</div>
-            <div class="tw-text-base">{{ selectedAlertDetails.name }}</div>
+          <div class="tw:mb-6">
+            <div class="tw:text-sm tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Alert Name</div>
+            <div class="tw:text-base">{{ selectedAlertDetails.name }}</div>
           </div>
 
           <!-- SQL Query / Conditions -->
-          <div class="tw-mb-6">
-            <div class="tw-flex tw-items-center tw-justify-between tw-mb-2">
-              <div class="tw-text-sm tw-font-semibold" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+          <div class="tw:mb-6">
+            <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
+              <div class="tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
                 {{ selectedAlertDetails.type == "sql" ? "SQL Query" : "Conditions" }}
               </div>
               <q-btn
@@ -628,12 +675,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 dense
                 icon="content_copy"
-                class="tw-ml-2"
+                class="tw:ml-2"
               >
                 <q-tooltip>Copy</q-tooltip>
               </q-btn>
             </div>
-            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm tw-overflow-x-auto" style="white-space: pre-wrap">{{
+            <pre :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-900'" class="tw:p-3 tw:rounded tw:text-sm tw:overflow-x-auto" style="white-space: pre-wrap">{{
               selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
                 ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
                 : "No condition"
@@ -641,23 +688,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Description -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-mb-2" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Description</div>
-            <pre :class="store.state.theme === 'dark' ? 'tw-bg-gray-800 tw-text-gray-200' : 'tw-bg-gray-100 tw-text-gray-900'" class="tw-p-3 tw-rounded tw-text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
+          <div class="tw:mb-6">
+            <div class="tw:text-sm tw:font-semibold tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Description</div>
+            <pre :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-900'" class="tw:p-3 tw:rounded tw:text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
           </div>
 
           <!-- Alert History Table -->
-          <div class="tw-mb-6">
-            <div class="tw-text-sm tw-font-semibold tw-mb-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Evaluation History</div>
+          <div class="tw:mb-6">
+            <div class="tw:text-sm tw:font-semibold tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Evaluation History</div>
 
-            <div v-if="isLoadingHistory" class="tw-text-center tw-py-8">
+            <div v-if="isLoadingHistory" class="tw:text-center tw:py-8">
               <q-spinner size="32px" color="primary" />
-              <div class="tw-text-sm tw-mt-3" :class="store.state.theme === 'dark' ? 'tw-text-gray-400' : 'tw-text-gray-600'">Loading history...</div>
+              <div class="tw:text-sm tw:mt-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Loading history...</div>
             </div>
 
-            <div v-else-if="expandedAlertHistory.length === 0" class="tw-text-center tw-py-8" :class="store.state.theme === 'dark' ? 'tw-text-gray-500' : 'tw-text-gray-500'">
-              <q-icon name="history" size="48px" class="tw-mb-2 tw-opacity-30" />
-              <div class="tw-text-sm">No evaluation history available for this alert</div>
+            <div v-else-if="expandedAlertHistory.length === 0" class="tw:text-center tw:py-8" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'">
+              <q-icon name="history" size="48px" class="tw:mb-2 tw:opacity-30" />
+              <div class="tw:text-sm">No evaluation history available for this alert</div>
             </div>
 
             <q-table
@@ -668,7 +715,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               dense
               :pagination="{ rowsPerPage: 10 }"
-              class="tw-shadow-sm"
+              class="tw:shadow-sm"
             >
               <template v-slot:body-cell-status="props">
                 <q-td :props="props">
@@ -728,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="updateStreams()"
                 borderless
                 dense
-                class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
+                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
               />
               <q-select
                 data-test="to-be-clone-stream-name"
@@ -745,7 +792,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :input-debounce="400"
                 borderless
                 dense
-                class="showLabelOnTop no-case tw-mt-[1px] q-mb-sm"
+                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
               />
               <div class="q-mb-lg">
                 <SelectFolderDropDown
@@ -758,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="clone-alert-cancel-btn"
                   v-close-popup="true"
-                  class="o2-secondary-button tw-h-[36px]"
+                  class="o2-secondary-button tw:h-[36px]"
                   :label="t('alerts.cancel')"
                   text-color="light-text"
                   padding="sm md"
@@ -767,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   data-test="clone-alert-submit-btn"
                   :label="t('alerts.save')"
-                  class="o2-primary-button tw-h-[36px] q-ml-md"
+                  class="o2-primary-button tw:h-[36px] q-ml-md"
                   padding="sm xl"
                   type="submit"
                   :disable="isSubmitting"
@@ -1090,11 +1137,48 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
+    // Initialize viewMode from URL query parameter
+    const viewMode = ref(
+      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
+    );
+
     // Initialize activeTab from URL query parameter, default to "all"
     const activeTab = ref(
       (router.currentRoute.value.query.tab as string) || "all"
     );
 
+    // Incident search query
+    const incidentSearchQuery = ref("");
+
+    // View mode tabs (Alerts / Incidents)
+    const viewTabs = computed(() => [
+      {
+        label: t('alerts.header'),
+        value: 'alerts',
+      },
+      {
+        label: t('alerts.incidents.title'),
+        value: 'incidents',
+      }
+    ]);
+
+    // Tabs for alerts view only (removed incidents tab)
+    const alertTabs = reactive([
+      {
+        label: t("alerts.all"),
+        value: "all",
+      },
+      {
+        label: t("alerts.scheduled"),
+        value: "scheduled",
+      },
+      {
+        label: t("alerts.realTime"),
+        value: "realTime",
+      },
+    ]);
+
+    // Keep old tabs for backward compatibility if needed
     const tabs = reactive([
       {
         label: t("alerts.all"),
@@ -1113,6 +1197,26 @@ export default defineComponent({
         value: "incidents",
       },
     ]);
+
+    const onViewModeChange = (newMode: string) => {
+      // Update viewMode immediately
+      viewMode.value = newMode;
+
+      // Update URL query parameter
+      router.push({
+        query: {
+          ...router.currentRoute.value.query,
+          view: newMode,
+          // Reset tab to 'all' when switching to alerts view
+          tab: newMode === "alerts" ? "all" : undefined,
+        },
+      });
+
+      // Reset active tab when switching to alerts view
+      if (newMode === "alerts") {
+        activeTab.value = "all";
+      }
+    };
 
     const columns = computed(() => {
       const baseColumns: any = [
@@ -2074,7 +2178,6 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        console.log(row,'row here')
         await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
@@ -2460,6 +2563,104 @@ export default defineComponent({
       }
     };
 
+  const confirmBulkDelete = ref<boolean>(false);
+
+  const openBulkDeleteDialog = () => {
+    confirmBulkDelete.value = true;
+  };
+
+  const bulkDeleteAlerts = async () => {
+    const dismiss = $q.notify({
+      spinner: true,
+      message: "Deleting alerts...",
+      timeout: 0,
+    });
+
+    try {
+      if (selectedAlerts.value.length === 0) {
+        $q.notify({
+          type: "negative",
+          message: "No alerts selected for deletion",
+          timeout: 2000,
+        });
+        dismiss();
+        return;
+      }
+
+      // Extract alert ids
+      const payload = {
+        ids: selectedAlerts.value.map((a: any) => a.alert_id),
+      };
+
+      const response = await alertsService.bulkDelete(
+        store.state.selectedOrganization.identifier,
+        payload,
+        activeFolderId.value
+      );
+
+      dismiss();
+
+      // Handle response based on successful/unsuccessful arrays
+      if (response.data) {
+        const { successful = [], unsuccessful = [] } = response.data;
+        const successCount = successful.length;
+        const failCount = unsuccessful.length;
+
+        if (failCount > 0 && successCount > 0) {
+          // Partial success
+          $q.notify({
+            type: "warning",
+            message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+            timeout: 5000,
+          });
+        } else if (failCount > 0) {
+          // All failed
+          $q.notify({
+            type: "negative",
+            message: `Failed to delete ${failCount} alert(s)`,
+            timeout: 3000,
+          });
+        } else {
+          // All successful
+          $q.notify({
+            type: "positive",
+            message: `${successCount} alert(s) deleted successfully`,
+            timeout: 2000,
+          });
+        }
+      } else {
+        // Fallback success message
+        $q.notify({
+          type: "positive",
+          message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+          timeout: 2000,
+        });
+      }
+
+      selectedAlerts.value = [];
+      // Refresh alerts
+      await getAlertsFn(store, activeFolderId.value);
+
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
+    } catch (error: any) {
+      dismiss();
+
+      // Show error message from response if available
+      const errorMessage = error.response?.data?.message || error?.message || "Error deleting alerts. Please try again.";
+      if (error.response?.status != 403 || error?.status != 403) {
+        $q.notify({
+          type: "negative",
+          message: errorMessage,
+          timeout: 3000,
+        });
+      }
+    }
+
+    confirmBulkDelete.value = false;
+  };
+
     const openSREChat = (alert?: any) => {
       store.state.sreChatContext = {
         type: 'alert',
@@ -2573,6 +2774,11 @@ export default defineComponent({
       computedName,
       computedOwner,
       tabs,
+      alertTabs,
+      viewMode,
+      viewTabs,
+      onViewModeChange,
+      incidentSearchQuery,
       filterAlertsByTab,
       showHistoryDrawer,
       selectedHistoryAlertId,
@@ -2583,6 +2789,9 @@ export default defineComponent({
       transformToExpression,
       filterAlertsByQuery,
       bulkToggleAlerts,
+      openBulkDeleteDialog,
+      bulkDeleteAlerts,
+      confirmBulkDelete,
       symOutlinedSoundSampler,
       openSREChat,
       config,
@@ -2592,6 +2801,29 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.view-mode-tabs-container {
+  margin-right: 24px;
+
+  // Customize app-tabs for view mode switching
+  ::v-deep .app-tabs {
+    .q-tabs {
+      min-height: 36px;
+    }
+
+    .q-tab {
+      padding: 0 20px;
+      min-height: 36px;
+      text-transform: none;
+      font-weight: 600;
+
+      &__icon {
+        font-size: 18px;
+        margin-right: 8px;
+      }
+    }
+  }
+}
+
 .bottom-btn {
   display: flex;
   width: 100%;

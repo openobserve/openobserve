@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
  * Build tooltip configuration with unit formatting and decimals
@@ -30,9 +31,12 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
 
   return {
     trigger: triggerType,
+    confine: true,
     textStyle: {
       fontSize: 12,
     },
+    enterable: true,
+    extraCssText: TOOLTIP_SCROLL_STYLE,
     axisPointer: {
       type: "cross",
     },
@@ -46,11 +50,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
         params = [params];
       }
 
-      let tooltip = "";
+      const tooltipItems: string[] = [];
 
       // Add axis label (timestamp for time-series)
       if (params[0]?.axisValue) {
-        tooltip += `<div style="margin-bottom: 4px;"><strong>${params[0].axisValue}</strong></div>`;
+        tooltipItems.push(params[0].axisValue);
       }
 
       // Add series data with unit formatting
@@ -64,11 +68,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
             getUnitValue(value, unit, unitCustom, decimals)
           );
 
-          tooltip += `<div>${marker} ${param.seriesName}: <strong>${formattedValue}</strong></div>`;
+          tooltipItems.push(`${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`);
         }
       });
 
-      return tooltip;
+      return tooltipItems.join("<br/>");
     },
   };
 }

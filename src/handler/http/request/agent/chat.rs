@@ -79,6 +79,9 @@ pub fn init_agent_client() -> Result<(), String> {
         (status = StatusCode::BAD_REQUEST, description = "Agent not enabled"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to query agent"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 #[post("/{org_id}/agent/chat")]
 pub async fn agent_chat(
@@ -176,6 +179,9 @@ pub async fn agent_chat(
         (status = StatusCode::OK, description = "SSE stream of agent response", content_type = "text/event-stream"),
         (status = StatusCode::BAD_REQUEST, description = "Agent not enabled"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to query agent"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
 #[post("/{org_id}/agent/chat/stream")]
