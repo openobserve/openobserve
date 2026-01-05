@@ -47,7 +47,7 @@ dependencies = [
  "actix-utils",
  "base64 0.22.1",
  "bitflags 2.9.0",
- "brotli",
+ "brotli 8.0.1",
  "bytes",
  "bytestring",
  "derive_more 2.0.1",
@@ -300,7 +300,7 @@ checksum = "c13f506cf23af2c79505d155ebd2724677761cf0aa4b636a3c011a2b1e60a358"
 dependencies = [
  "actix-web",
  "base64 0.22.1",
- "brotli",
+ "brotli 8.0.1",
  "chrono",
  "flate2",
  "futures-core",
@@ -907,6 +907,7 @@ version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06575e6a9673580f52661c92107baabffbf41e2141373441cbcdc47cb733003c"
 dependencies = [
+ "brotli 7.0.0",
  "bzip2 0.5.2",
  "flate2",
  "futures-core",
@@ -1840,13 +1841,34 @@ dependencies = [
 
 [[package]]
 name = "brotli"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc97b8f16f944bba54f0433f07e30be199b6dc2bd25937444bbad560bcea29bd"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+ "brotli-decompressor 4.0.3",
+]
+
+[[package]]
+name = "brotli"
 version = "8.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9991eea70ea4f293524138648e41ee89b0b2b12ddef3b255effa43c8056e0e0d"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
- "brotli-decompressor",
+ "brotli-decompressor 5.0.0",
+]
+
+[[package]]
+name = "brotli-decompressor"
+version = "4.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a334ef7c9e23abf0ce748e8cd309037da93e606ad52eb372e4ce327a0dcfbdfd"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
 ]
 
 [[package]]
@@ -6727,7 +6749,7 @@ dependencies = [
  "bitflags 2.9.0",
  "bitvec",
  "blake3",
- "brotli",
+ "brotli 8.0.1",
  "byteorder",
  "bytes",
  "chromiumoxide",
@@ -7133,7 +7155,7 @@ dependencies = [
  "arrow-schema",
  "arrow-select",
  "base64 0.22.1",
- "brotli",
+ "brotli 8.0.1",
  "bytes",
  "chrono",
  "flate2",
@@ -8573,6 +8595,7 @@ version = "0.12.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a77c62af46e79de0a562e1a9849205ffcb7fc1238876e9bd743357570e04046f"
 dependencies = [
+ "async-compression",
  "base64 0.22.1",
  "bytes",
  "futures-channel",
@@ -8839,7 +8862,7 @@ version = "11.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86772bd192343b5305aba01078be9e55e2c7b169b9e69dcee637473120bff9d7"
 dependencies = [
- "brotli",
+ "brotli 8.0.1",
  "flate2",
  "globset",
  "proc-macro2",

@@ -331,6 +331,9 @@ regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
+    "gzip",
+    "brotli",
+    "deflate",
 ] }
 roaring = "0.11.2"
 rustls-pemfile = "2"
