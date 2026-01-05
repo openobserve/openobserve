@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             flat
             :title="t('search.runQuery')"
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+            class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow tw:leading-8!"
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
