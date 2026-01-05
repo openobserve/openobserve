@@ -1504,55 +1504,27 @@ watch(
   },
 );
 
-// Watch for stream name changes and auto-update SQL query
-// Fix for issue #9658: Auto-update FROM clause when stream selection changes
+// Watch for stream name changes and handle query
+// Fix for issue #9658: Clear query on stream change, generate on initial selection
 watch(
   () => selectedStreamName.value,
   (newStreamName, oldStreamName) => {
-    // Only update if:
-    // 1. We're in SQL tab (not PromQL)
-    // 2. Both old and new stream names exist (not initial load)
-    // 3. Query exists and is not empty
-    // 4. Names are actually different
-    if (
-      tab.value === "sql" &&
-      oldStreamName &&
-      newStreamName &&
-      oldStreamName !== newStreamName &&
-      query.value.trim()
-    ) {
-      try {
-        // Parse the current query
-        const parsedQuery = parser?.parse(query.value);
-
-        if (parsedQuery?.ast?.from?.[0]?.table) {
-          // Get the old stream name from the parsed query
-          const queryStreamName = parsedQuery.ast.from[0].table;
-
-          // Only update if the query's stream matches the old selected stream
-          // This prevents overwriting user's manual edits
-          if (queryStreamName === oldStreamName) {
-            // Replace the stream name in the query
-            // Use regex to find and replace the FROM clause
-            const escapedOldStreamName = oldStreamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const fromPattern = new RegExp(
-              `FROM\\s+["'\`]?${escapedOldStreamName}["'\`]?`,
-              'i'
-            );
-            const updatedQuery = query.value.replace(
-              fromPattern,
-              `FROM "${newStreamName}"`
-            );
-
-            // Update the query
-            query.value = updatedQuery;
-            updateQueryValue(updatedQuery);
-          }
+    if (newStreamName) {
+      if (oldStreamName && oldStreamName !== newStreamName) {
+        // Stream CHANGED: Clear the query completely
+        if (tab.value === "sql") {
+          query.value = "";
+          updateQueryValue("");
         }
-      } catch (error) {
-        // If parsing fails, don't update the query
-        // This gracefully handles complex queries that parser can't handle
-        console.warn('Could not auto-update stream in query:', error);
+      } else if (!oldStreamName && newStreamName) {
+        // Initial stream selection: Generate default query
+        if (tab.value === "sql" && !query.value.trim()) {
+          query.value = `SELECT * FROM "${newStreamName}"`;
+          updateQueryValue(query.value);
+        } else if (tab.value === "promql" && !query.value.trim()) {
+          query.value = `${newStreamName}{}`;
+          updateQueryValue(query.value);
+        }
       }
     }
   }
@@ -2110,13 +2082,9 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        // Only set default query if query is empty
-        // Don't overwrite user's custom query when they change streams
-        if (tab.value === "sql" && !query.value.trim()) {
-          query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && !query.value.trim()) {
-          query.value = `${selectedStreamName.value}{}`;
-        }
+        // Note: Default query generation removed
+        // Query is now cleared when stream changes (see watch on selectedStreamName)
+        // Initial query generation happens in onMounted
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);

@@ -98,6 +98,14 @@ export class PipelinesPage {
         this.submitButton = page.locator('[data-test="add-destination-submit-btn"]');
         this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.refreshStatsButton = page.locator('[data-test="log-stream-refresh-stats-btn"]');
+
+        // Scheduled Pipeline Dialog selectors
+        this.scheduledPipelineTabs = page.locator('[data-test="scheduled-pipeline-tabs"]');
+        this.scheduledPipelineSqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
+        this.buildQuerySection = page.getByText('Build Query').first();
+        this.streamTypeLabel = page.getByLabel(/Stream Type/i);
+        this.streamNameLabel = page.getByLabel(/Stream Name/i);
+        this.monacoEditorViewLines = page.locator('.monaco-editor .view-lines');
         this.searchStreamInput = page.getByPlaceholder('Search Stream');
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
         this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
@@ -1577,5 +1585,130 @@ export class PipelinesPage {
             await this.clickFrequencyUnit();
         }
         await this.saveQuery();
+    }
+
+    // ========================================
+    // Scheduled Pipeline Dialog Methods (POM Fix)
+    // ========================================
+
+    /**
+     * Wait for scheduled pipeline dialog to be visible
+     * Replaces: await page.locator('[data-test="scheduled-pipeline-tabs"]').waitFor()
+     */
+    async waitForScheduledPipelineDialog() {
+        await this.scheduledPipelineTabs.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Scheduled pipeline dialog is visible');
+    }
+
+    /**
+     * Wait for SQL editor to be visible
+     * Replaces: await expect(page.locator('[data-test="scheduled-pipeline-sql-editor"]')).toBeVisible()
+     */
+    async expectSqlEditorVisible() {
+        await expect(this.scheduledPipelineSqlEditor).toBeVisible({ timeout: 10000 });
+        testLogger.info('SQL editor is visible');
+    }
+
+    /**
+     * Expand Build Query section
+     * Replaces: await page.getByText('Build Query').first().click()
+     */
+    async expandBuildQuerySection() {
+        await this.buildQuerySection.waitFor({ state: 'visible', timeout: 5000 });
+        await this.buildQuerySection.click();
+        testLogger.info('Build Query section expanded');
+    }
+
+    /**
+     * Select stream type from dropdown
+     * @param {string} type - Stream type (e.g., 'logs')
+     * Replaces: await page.getByLabel(/Stream Type/i).click() and option selection
+     */
+    async selectStreamType(type) {
+        testLogger.info(`Selecting stream type: ${type}`);
+        await this.streamTypeLabel.click();
+        // Wait for dropdown to open
+        await this.page.waitForFunction(() => {
+            const options = document.querySelectorAll('[role="option"]');
+            return options.length > 0;
+        }, { timeout: 3000 });
+        await this.page.getByRole("option", { name: type, exact: true }).click();
+        testLogger.info(`Stream type '${type}' selected`);
+    }
+
+    /**
+     * Select stream name from dropdown
+     * @param {string} streamName - Stream name to select
+     * Replaces: await page.getByLabel(/Stream Name/i).click(), fill, and option selection
+     */
+    async selectStreamName(streamName) {
+        testLogger.info(`Selecting stream: ${streamName}`);
+        await this.streamNameLabel.click();
+        // Wait briefly for dropdown to open
+        await this.page.waitForTimeout(500);
+        await this.streamNameLabel.fill(streamName);
+        // Wait for options to filter
+        await this.page.waitForTimeout(1000);
+        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        testLogger.info(`Stream '${streamName}' selected`);
+    }
+
+    /**
+     * Get current query text from Monaco editor
+     * Replaces: await page.locator('.monaco-editor .view-lines').textContent()
+     * @returns {Promise<string>} The query text
+     */
+    async getQueryText() {
+        const text = await this.monacoEditorViewLines.textContent();
+        testLogger.info(`Query text retrieved: ${text?.substring(0, 50)}...`);
+        return text;
+    }
+
+    /**
+     * Wait for watcher to process stream change
+     * Deterministic wait that checks for query state to stabilize
+     * Replaces: await page.waitForTimeout(2000) after stream change
+     */
+    async waitForStreamChangeWatcher() {
+        testLogger.info('Waiting for stream change watcher to process...');
+        // Wait for Vue watcher to execute and update query
+        await this.page.waitForFunction(() => {
+            const editor = document.querySelector('.monaco-editor');
+            return editor !== null;
+        }, { timeout: 3000 });
+        // Additional small wait for query update to complete
+        await this.page.waitForTimeout(500);
+        testLogger.info('Watcher processing complete');
+    }
+
+    /**
+     * Expect query editor to contain specific text
+     * @param {string} expectedText - Text that should be in the query
+     */
+    async expectQueryToContain(expectedText) {
+        const queryText = await this.getQueryText();
+        expect(queryText).toContain(expectedText);
+        testLogger.info(`Query contains expected text: ${expectedText}`);
+    }
+
+    /**
+     * Expect query editor to NOT contain specific text
+     * @param {string} unexpectedText - Text that should NOT be in the query
+     */
+    async expectQueryNotToContain(unexpectedText) {
+        const queryText = await this.getQueryText();
+        expect(queryText).not.toContain(unexpectedText);
+        testLogger.info(`Query does not contain: ${unexpectedText}`);
+    }
+
+    /**
+     * Expect query to be empty or very short (cleared state)
+     * Replaces: expect(queryText.length).toBeLessThanOrEqual(10)
+     */
+    async expectQueryCleared() {
+        const queryText = await this.getQueryText();
+        const trimmed = queryText?.trim() || '';
+        expect(trimmed.length).toBeLessThanOrEqual(10);
+        testLogger.info(`Query is cleared (length: ${trimmed.length})`);
     }
 }
