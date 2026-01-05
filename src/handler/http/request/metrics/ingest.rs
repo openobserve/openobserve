@@ -74,16 +74,13 @@ pub async fn json(
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let mut resp = match metrics::json::ingest(&org_id, body, user).await {
@@ -142,16 +139,13 @@ pub async fn otlp_metrics_write(
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
