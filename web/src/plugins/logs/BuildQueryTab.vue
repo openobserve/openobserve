@@ -306,6 +306,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 // Import utilities
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import { parseSQLQueryToPanelObject } from "@/utils/dashboard/sqlQueryParser";
 
 // Import icons
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
@@ -396,8 +397,82 @@ export default defineComponent({
         };
       }
 
-      // Generate initial SQL (auto SQL mode)
-      makeAutoSQLQuery();
+      // Try to parse existing query from logs/visualize tab
+      let queryParsed = false;
+      if (logsPageSearchObj?.data?.query) {
+        const existingQuery = logsPageSearchObj.data.query;
+
+        try {
+          // Skip if query is empty or an array (multiple queries not supported)
+          if (existingQuery && typeof existingQuery === "string" && existingQuery.trim()) {
+            // Parse the SQL query to panel object
+            const streamType = store.state.organizationData.organizationSettings?.stream_type || "logs";
+            const parsedQuery = parseSQLQueryToPanelObject(existingQuery, streamType);
+
+            // Populate dashboard panel fields from parsed query
+            if (parsedQuery && parsedQuery.fields) {
+              // Set stream name
+              if (parsedQuery.fields.stream) {
+                dashboardPanelData.data.queries[0].fields.stream = parsedQuery.fields.stream;
+              }
+
+              // Set stream type
+              if (parsedQuery.fields.stream_type) {
+                dashboardPanelData.data.queries[0].fields.stream_type = parsedQuery.fields.stream_type;
+              }
+
+              // Set x-axis fields (GROUP BY fields)
+              if (parsedQuery.fields.x && parsedQuery.fields.x.length > 0) {
+                dashboardPanelData.data.queries[0].fields.x = cloneDeep(parsedQuery.fields.x);
+              }
+
+              // Set y-axis fields (aggregations)
+              if (parsedQuery.fields.y && parsedQuery.fields.y.length > 0) {
+                dashboardPanelData.data.queries[0].fields.y = cloneDeep(parsedQuery.fields.y);
+              }
+
+              // Set breakdown field
+              if (parsedQuery.fields.z && parsedQuery.fields.z.length > 0) {
+                dashboardPanelData.data.queries[0].fields.z = cloneDeep(parsedQuery.fields.z);
+              }
+
+              // Set filters (WHERE clause)
+              if (parsedQuery.fields.filter && parsedQuery.fields.filter.length > 0) {
+                dashboardPanelData.data.queries[0].fields.filter = cloneDeep(parsedQuery.fields.filter);
+              }
+
+              // Set joins
+              if (parsedQuery.joins && parsedQuery.joins.length > 0) {
+                dashboardPanelData.data.queries[0].joins = cloneDeep(parsedQuery.joins);
+              }
+
+              // Set config options (limit, sort)
+              if (parsedQuery.config) {
+                if (parsedQuery.config.limit !== undefined) {
+                  dashboardPanelData.data.config.limit = parsedQuery.config.limit;
+                }
+              }
+
+              queryParsed = true;
+            }
+          }
+        } catch (error) {
+          // If parsing fails, log warning and fall back to default initialization
+          console.warn(
+            "[BuildQueryTab] Failed to parse existing query, using default initialization.",
+            "\nQuery:",
+            existingQuery,
+            "\nError:",
+            error
+          );
+          queryParsed = false;
+        }
+      }
+
+      // If no query was parsed, generate initial SQL (auto SQL mode)
+      if (!queryParsed) {
+        makeAutoSQLQuery();
+      }
     };
 
     // Handle chart type change
