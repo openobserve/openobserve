@@ -45,10 +45,10 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
 
   // P0 - Smoke Tests
 
-  test("should clear SQL query when stream changes", {
+  test("should auto-generate SELECT * query when stream changes", {
     tag: ['@smoke', '@P0']
   }, async ({ page }) => {
-    testLogger.info('Testing query is cleared when stream changes');
+    testLogger.info('Testing query is auto-generated when stream changes');
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
@@ -88,21 +88,18 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
     await pageManager.pipelinesPage.selectStreamName('k8s_json');
     await pageManager.pipelinesPage.waitForStreamChangeWatcher();
 
-    // Verify query is completely cleared
-    await pageManager.pipelinesPage.expectQueryCleared();
-    await pageManager.pipelinesPage.expectQueryNotToContain('SELECT');
-    await pageManager.pipelinesPage.expectQueryNotToContain('FROM');
+    // Verify query is auto-generated with new stream name
+    await pageManager.pipelinesPage.expectQueryToContain('SELECT');
+    await pageManager.pipelinesPage.expectQueryToContain('FROM');
+    await pageManager.pipelinesPage.expectQueryToContain('k8s_json');
+    await pageManager.pipelinesPage.expectQueryNotToContain('e2e_automate');
 
-    testLogger.info('✅ Test passed: Query cleared correctly on stream change');
+    testLogger.info('✅ Test passed: Query auto-generated correctly on stream change');
   });
 
-  // OBSOLETE TEST: Removed because query is now cleared completely on stream change
-  // Previously tested WHERE clause preservation, but new behavior clears entire query
-  // test.skip("should preserve WHERE clause when stream changes", { ...
-
-  // OBSOLETE TEST: Removed because query is now cleared completely on stream change
-  // Previously tested complex query preservation, but new behavior clears entire query
-  // test.skip("should preserve complex query clauses when stream changes", { ...
+  // Note: WHERE clause preservation tests removed
+  // New behavior auto-generates fresh SELECT * query on stream change
+  // This prevents field reference issues when switching between streams with different schemas
 
   test("should handle initial stream selection (existing behavior)", {
     tag: ['@regression', '@P1']
@@ -204,7 +201,6 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
     testLogger.info('✅ Test passed: PromQL tab independent of SQL watcher');
   });
 
-  // OBSOLETE TEST: Removed because manual edit protection no longer needed
-  // New behavior: query is always cleared when stream changes
-  // test.skip("should not overwrite manual query edits (manual edit protection)", { ...
+  // Note: Manual edit protection test removed
+  // New behavior always auto-generates SELECT * query on stream change for data safety
 });

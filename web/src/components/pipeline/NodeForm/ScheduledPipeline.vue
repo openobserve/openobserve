@@ -1504,27 +1504,28 @@ watch(
   },
 );
 
-// Watch for stream name changes and handle query
-// Fix for issue #9658: Clear query on stream change, generate on initial selection
+// Watch for stream name changes and auto-generate query
+// Fix for issue #9658: Auto-generate SELECT * query when stream changes
 watch(
   () => selectedStreamName.value,
   (newStreamName, oldStreamName) => {
-    if (newStreamName) {
-      if (oldStreamName && oldStreamName !== newStreamName) {
-        // Stream CHANGED: Clear the query completely
-        if (tab.value === "sql") {
-          query.value = "";
-          updateQueryValue("");
-        }
-      } else if (!oldStreamName && newStreamName) {
-        // Initial stream selection: Generate default query
-        if (tab.value === "sql" && !query.value.trim()) {
-          query.value = `SELECT * FROM "${newStreamName}"`;
-          updateQueryValue(query.value);
-        } else if (tab.value === "promql" && !query.value.trim()) {
-          query.value = `${newStreamName}{}`;
-          updateQueryValue(query.value);
-        }
+    if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
+      // Stream changed: Generate new SELECT * query for the new stream
+      if (tab.value === "sql") {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql") {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
+      }
+    } else if (!oldStreamName && newStreamName) {
+      // Initial stream selection: Generate default query
+      if (tab.value === "sql" && !query.value.trim()) {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql" && !query.value.trim()) {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
       }
     }
   }
