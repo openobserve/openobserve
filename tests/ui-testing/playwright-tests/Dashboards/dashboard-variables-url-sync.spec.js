@@ -158,9 +158,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Get panel ID from the saved panel
     const panelElement = await page.locator('[data-panel-id]').first();
@@ -479,9 +483,13 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", () => {
     // This would typically be in panel settings
     // For now, verify the concept
 
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Set variable value
     const varDropdown = page.getByLabel(variableName, { exact: true });

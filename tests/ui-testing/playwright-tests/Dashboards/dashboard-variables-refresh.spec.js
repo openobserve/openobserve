@@ -53,9 +53,13 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change variable value
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -107,9 +111,13 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
 
@@ -167,16 +175,23 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
 
-    await pm.dashboardCreate.addPanel();
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
+    await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel2");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for second panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Change variable
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -240,18 +255,25 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     const panelId1 = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
 
-    await pm.dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel2");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for second panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Change variable
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -315,9 +337,13 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change variable
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -328,7 +354,6 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
     const selectedOption = page.locator('[role="option"]').first();
     await selectedOption.waitFor({ state: "visible", timeout: 5000 });
-    const selectedValue = await selectedOption.textContent();
     await selectedOption.click();
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
@@ -384,9 +409,13 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change variable
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -449,9 +478,13 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
 
@@ -513,19 +546,26 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel1");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     const panelId1 = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
 
     // Add Panel2
-    await pm.dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.dashboardCreate.savePanelAs("Panel2");
-    // Wait for panel to be saved and UI to stabilize
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for second panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     const panelId2 = await page.locator('[data-test*="dashboard-panel-"]').nth(1).getAttribute("data-panel-id");
 
