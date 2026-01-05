@@ -120,8 +120,8 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `val` - Access token to store
-/// * `expires_at` - Expiration timestamp (seconds since epoch)
-///   All sessions must have an expiry - either from JWT or default 24 hours
+/// * `expires_at` - Expiration timestamp (seconds since epoch) All sessions must have an expiry -
+///   either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
     val: &str,
