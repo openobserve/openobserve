@@ -156,6 +156,14 @@ fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
         && value == placeholder
     {
         true
+    } else if let Expr::CompoundIdentifier(ident) = expr
+        && ident[0].value == placeholder
+    {
+        true
+    } else if let Expr::Identifier(ident) = expr
+        && ident.value == placeholder
+    {
+        true
     } else {
         false
     }
@@ -297,6 +305,20 @@ mod tests {
         let sql = format!(
             "select * from t where match_field(field1, '{placeholder}') and field2 = 'value2'"
         );
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter_not_string() {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let sql = format!("select * from t where field1 = {placeholder} and field2 = 'value2'");
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
             .unwrap()
             .pop()
