@@ -2017,13 +2017,7 @@
     "confirmRefreshMsg": "정말 이 서비스 계정 토큰을 새로 고치시겠습니까?",
     "confirmRefreshHead": "리프레시 서비스 토큰",
     "downloadToken": "토큰 다운로드",
-    "token": "토큰",
-    "viewAllTokens": "모든 토큰 보기",
-    "viewAndCopyTokens": "토큰 보기 및 복사",
-    "copyAllTokens": "모든 토큰 복사",
-    "downloadAllTokens": "모든 토큰 다운로드",
-    "serviceAccountToken": "서비스 어카운트 토큰",
-    "serviceAccountTokensAllOrgs": "서비스 계정 토큰 (모든 조직)"
+    "token": "토큰"
   },
   "pipeline_destinations": {
     "header": "파이프라인 목적지",

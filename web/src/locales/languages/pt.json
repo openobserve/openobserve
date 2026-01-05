@@ -2017,13 +2017,7 @@
     "confirmRefreshMsg": "Tem certeza de que deseja atualizar esse token da conta de serviço?",
     "confirmRefreshHead": "Atualizar token de serviço",
     "downloadToken": "Baixar Token",
-    "token": "Ficha",
-    "viewAllTokens": "Exibir todos os tokens",
-    "viewAndCopyTokens": "Exibir e copiar tokens",
-    "copyAllTokens": "Copiar todos os tokens",
-    "downloadAllTokens": "Baixe todos os tokens",
-    "serviceAccountToken": "Token da conta de serviço",
-    "serviceAccountTokensAllOrgs": "Tokens de conta de serviço (todas as organizações)"
+    "token": "Ficha"
   },
   "pipeline_destinations": {
     "header": "Destinos do pipeline",
