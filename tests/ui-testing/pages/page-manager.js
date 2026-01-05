@@ -17,6 +17,7 @@ import DateTimeHelper from "./dashboardPages/dashboard-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
+const DashboardPanelQueryEditor = require("./dashboardPages/dashboard-panel-query-editor.js");
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -84,6 +85,7 @@ class PageManager {
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.dashboardQueryEditor = new DashboardPanelQueryEditor(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);

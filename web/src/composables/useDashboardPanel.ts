@@ -1167,11 +1167,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
+        // Removed SQL query reset - SQL mode now supports multi-query like PromQL
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -1224,11 +1220,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             }
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
+        // Removed SQL query reset - SQL mode now supports multi-query like PromQL
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -1262,11 +1254,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.target = null;
           query.fields.value = null;
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
+        // Removed SQL query reset - SQL mode now supports multi-query like PromQL
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -1316,11 +1304,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
+        // Removed SQL query reset - SQL mode now supports multi-query like PromQL
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -1365,11 +1349,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
+        // Removed SQL query reset - SQL mode now supports multi-query like PromQL
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =

@@ -24,22 +24,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         style="display: flex; flex-direction: row; align-items: center"
         :style="
-          promqlMode || dashboardPanelData.data.type == 'geomap'
+          promqlMode || dashboardPanelData.data.type == 'geomap' || showMultiQueryUI
             ? 'flex: 1; min-width: 0'
             : ''
         "
         data-test="dashboard-query-data"
       >
         <q-space
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap' || showMultiQueryUI)"
         />
         <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
+          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap' || showMultiQueryUI)"
           class="text-subtitle2 text-weight-bold"
           >{{ t("panel.sql") }}</span
         >
         <div
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          v-if="promqlMode || dashboardPanelData.data.type == 'geomap' || showMultiQueryUI"
           style="max-width: 600px; overflow: hidden"
         >
           <q-tabs
@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <q-icon
-                v-if="promqlMode"
                 :name="
                   dashboardPanelData.layout.hiddenQueries.includes(index)
                     ? 'visibility_off'
@@ -106,14 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div> -->
         </div>
         <q-btn
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+          v-if="promqlMode || dashboardPanelData.data.type == 'geomap' || showMultiQueryUI"
           round
           flat
           @click.stop="addTab"
           icon="add"
           style="margin-right: 10px"
-          data-test="`dashboard-panel-query-tab-add`"
-        ></q-btn>
+          data-test="dashboard-panel-query-tab-add"
+        >
+          <q-tooltip>Add Query</q-tooltip>
+        </q-btn>
       </div>
       <div style="display: flex; gap: 4px; flex-shrink: 0">
         <q-toggle
@@ -415,6 +416,15 @@ export default defineComponent({
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
+    // Enable multi-query UI for SQL queries
+    const showMultiQueryUI = computed(() => {
+      // Show tabs if there are multiple queries OR if in SQL mode (to show + button)
+      return (
+        dashboardPanelData.data.queries.length > 1 ||
+        !promqlMode.value
+      );
+    });
+
     const splitterModel = ref(
       promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
     );
@@ -647,6 +657,7 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
+      showMultiQueryUI,
     };
   },
 });
