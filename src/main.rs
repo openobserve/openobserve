@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -783,8 +783,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client =
-                router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
             let factory = factory.wrap(
@@ -793,22 +791,20 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 )),
             );
 
-            app = app
-                .service(
-                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    factory
-                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .service(get_metrics)
-                        .service(router::http::config)
-                        .service(router::http::config_paths)
-                        .service(router::http::api)
-                        .service(router::http::aws)
-                        .service(router::http::gcp)
-                        .service(router::http::rum)
-                        .configure(get_basic_routes)
-                        .configure(get_proxy_routes),
-                )
-                .app_data(web::Data::new(http_client))
+            app = app.service(
+                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                factory
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
+                    .service(get_metrics)
+                    .service(router::http::config)
+                    .service(router::http::config_paths)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
+            )
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
@@ -887,8 +883,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client =
-                router::http::create_http_client().expect("Failed to create http tls client");
             let factory = web::scope(&cfg.common.base_uri);
             #[cfg(feature = "enterprise")]
             let factory = factory.wrap(
@@ -897,22 +891,20 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 )),
             );
 
-            app = app
-                .service(
-                    // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                    factory
-                        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .service(get_metrics)
-                        .service(router::http::config)
-                        .service(router::http::config_paths)
-                        .service(router::http::api)
-                        .service(router::http::aws)
-                        .service(router::http::gcp)
-                        .service(router::http::rum)
-                        .configure(get_basic_routes)
-                        .configure(get_proxy_routes),
-                )
-                .app_data(web::Data::new(http_client))
+            app = app.service(
+                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
+                factory
+                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
+                    .service(get_metrics)
+                    .service(router::http::config)
+                    .service(router::http::config_paths)
+                    .service(router::http::api)
+                    .service(router::http::aws)
+                    .service(router::http::gcp)
+                    .service(router::http::rum)
+                    .configure(get_basic_routes)
+                    .configure(get_proxy_routes),
+            )
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
