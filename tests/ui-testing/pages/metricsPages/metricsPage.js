@@ -108,7 +108,15 @@ export class MetricsPage {
     }
 
     async openDatePicker() {
-        await this.page.locator(this.datePicker).click();
+        // Close any open menus/modals first by pressing Escape
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+
+        // Wait for any overlays to disappear
+        await this.page.waitForTimeout(500);
+
+        // Click with force to handle potential overlay interception
+        await this.page.locator(this.datePicker).click({ force: true });
     }
 
     async expectDatePickerVisible() {
@@ -542,6 +550,108 @@ export class MetricsPage {
             }
         }
         return false;
+    }
+
+    // ===== CHART TYPE SELECTION METHODS (Added by Sentinel Auto-Fix) =====
+
+    async selectChartType(chartType) {
+        // Chart buttons mapping
+        const chartButtons = {
+          'line': 'button[title*="Line"], [aria-label*="Line"], .chart-type-line',
+          'pie': 'button[title*="Pie"], [aria-label*="Pie"], .chart-type-pie',
+          'table': 'button[title*="Table"], [aria-label*="Table"], .chart-type-table',
+          'heatmap': 'button[title*="Heatmap"], [aria-label*="Heat"], .chart-type-heatmap',
+          'gauge': 'button[title*="Gauge"], [aria-label*="Gauge"], .chart-type-gauge',
+          'bar': 'button[title*="Bar"], [aria-label*="Bar"], .chart-type-bar'
+        };
+
+        let chartButton = this.page.locator(chartButtons[chartType]).first();
+
+        if (await chartButton.count() === 0) {
+          // Try Quasar icon names
+          const iconNames = {
+            'line': 'show_chart',
+            'pie': 'pie_chart',
+            'table': 'table_chart',
+            'heatmap': 'grid_on',
+            'gauge': 'speed',
+            'bar': 'bar_chart'
+          };
+          chartButton = this.page.locator(`q-icon[name="${iconNames[chartType]}"]`).first();
+        }
+
+        if (await chartButton.count() === 0) {
+          // Try text matching
+          const chartNames = {
+            'line': 'Line',
+            'pie': 'Pie',
+            'table': 'Table',
+            'heatmap': 'Heatmap',
+            'gauge': 'Gauge',
+            'bar': 'Bar'
+          };
+          chartButton = this.page.getByText(chartNames[chartType], { exact: false }).first();
+        }
+
+        const exists = await chartButton.count() > 0;
+        if (exists) {
+          await chartButton.click();
+          await this.page.waitForTimeout(1000);
+          return true;
+        }
+        return false;
+    }
+
+    async expectChartTypeRendered(chartType) {
+        const chartSelectors = {
+          'line': 'canvas, svg path, .apexcharts-line-series',
+          'pie': 'svg path[class*="pie"], .apexcharts-pie, path[class*="slice"]',
+          'table': 'table tbody tr, .q-table tbody tr, .data-table tbody tr',
+          'heatmap': 'svg rect, .apexcharts-heatmap, .heatmap-cell',
+          'gauge': 'svg circle, .gauge-chart, .apexcharts-radialbar',
+          'bar': 'svg rect[class*="bar"], .apexcharts-bar-series, rect[class*="column"]'
+        };
+
+        const selector = chartSelectors[chartType] || 'canvas, svg, table';
+        await this.page.waitForTimeout(2000); // Wait for chart rendering
+        const element = this.page.locator(selector).first();
+        return await element.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    async getPieSliceCount() {
+        return await this.page.locator('svg path[class*="pie"], svg path[class*="slice"]').count();
+    }
+
+    async getTableRowCount() {
+        return await this.page.locator('table tbody tr, .q-table tbody tr').count();
+    }
+
+    async getTableHeaderCount() {
+        return await this.page.locator('table thead th, .q-table thead th').count();
+    }
+
+    async getHeatmapCellCount() {
+        return await this.page.locator('svg rect, .heatmap-cell').count();
+    }
+
+    async getGaugeElementCount() {
+        return await this.page.locator('svg circle, svg path[class*="gauge"], .apexcharts-radialbar').count();
+    }
+
+    async getBarElementCount() {
+        return await this.page.locator('svg rect[class*="bar"], svg rect[class*="column"]').count();
+    }
+
+    async selectLast15Minutes() {
+        await this.openDatePicker();
+        const last15Min = this.page.locator('.q-item__label, .q-item, [role="option"]')
+          .filter({ hasText: /Last 15 minutes|15m/i }).first();
+        if (await last15Min.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await last15Min.click();
+        } else {
+          await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForTimeout(500);
     }
 
 }
