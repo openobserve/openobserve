@@ -366,7 +366,7 @@ ORDER BY x_axis_1`;
 
     const whereClause = whereConditions ? `WHERE ${whereConditions}` : "";
 
-    const query = `SELECT * FROM "${streamName}" ${whereClause} ORDER BY _timestamp DESC`;
+    const query = `SELECT * FROM "${streamName}" ${whereClause} ORDER BY _timestamp DESC LIMIT 100`;
 
     console.log("[useMetricsCorrelationDashboard] Generated logs query:", query);
     console.log("[useMetricsCorrelationDashboard] Using stream:", streamName);
