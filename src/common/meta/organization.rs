@@ -249,19 +249,6 @@ pub struct IngestionPasscode {
     pub user: String,
 }
 
-#[derive(Serialize, ToSchema, Clone)]
-pub struct OrgTokenInfo {
-    pub org_id: String,
-    pub org_name: String,
-    pub token: String,
-}
-
-#[derive(Serialize, ToSchema, Clone)]
-pub struct MetaServiceAccountTokens {
-    pub user: String,
-    pub tokens: Vec<OrgTokenInfo>,
-}
-
 #[derive(Serialize, ToSchema)]
 pub struct PasscodeResponse {
     pub data: IngestionPasscode,

@@ -80,25 +80,24 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
     match session {
         Some(session) => {
             // Check if session has expired
-            if let Some(expires_at) = session.expires_at {
-                let now = chrono::Utc::now().timestamp();
-                if now > expires_at {
-                    log::warn!(
-                        "Session expired (db): {} (expired at {})",
-                        session_id,
-                        expires_at
-                    );
-                    // Delete expired session from DB
-                    if let Err(e) = delete(session_id).await {
-                        log::error!("Failed to delete expired session {}: {}", session_id, e);
-                    } else {
-                        log::debug!("Deleted expired session: {}", session_id);
-                    }
-                    return Err(anyhow::anyhow!("Session expired"));
+            let expires_at = session.expires_at;
+            let now = chrono::Utc::now().timestamp();
+            if now > expires_at {
+                log::warn!(
+                    "Session expired (db): {} (expired at {})",
+                    session_id,
+                    expires_at
+                );
+                // Delete expired session from DB
+                if let Err(e) = delete(session_id).await {
+                    log::error!("Failed to delete expired session {}: {}", session_id, e);
+                } else {
+                    log::debug!("Deleted expired session: {}", session_id);
                 }
-                // Cache the expiry time
-                USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
+                return Err(anyhow::anyhow!("Session expired"));
             }
+            // Cache the expiry time
+            USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
 
             let access_token = session.access_token.clone();
             // Cache the token
@@ -116,22 +115,17 @@ pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
     }
 }
 
-pub async fn set(session_id: &str, val: &str) -> Result<(), anyhow::Error> {
-    set_with_expiry(session_id, val, None).await
-}
-
-/// Creates or updates a session with optional expiration
+/// Creates or updates a session with expiration
 ///
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `val` - Access token to store
-/// * `expires_at` - Optional expiration timestamp (seconds since epoch)
-///   - None: Session never expires (default for JWT/Dex sessions)
-///   - Some(timestamp): Session expires at this timestamp (for assumed role sessions)
+/// * `expires_at` - Expiration timestamp (seconds since epoch)
+///   All sessions must have an expiry - either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
     val: &str,
-    expires_at: Option<i64>,
+    expires_at: i64,
 ) -> Result<(), anyhow::Error> {
     infra::table::sessions::set_with_expiry(session_id, val, expires_at).await?;
     let key = format!("{USER_SESSION_KEY}{session_id}");
@@ -150,11 +144,8 @@ pub async fn set_with_expiry(
     }
 
     USER_SESSIONS.insert(session_id.to_string(), val.to_string());
-
-    // Cache the expiry time if provided
-    if let Some(exp) = expires_at {
-        USER_SESSIONS_EXPIRY.insert(session_id.to_string(), exp);
-    }
+    // Cache the expiry time
+    USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
 
     Ok(())
 }
@@ -202,10 +193,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Ok(Some(session)) => {
                         if !session.access_token.is_empty() {
                             USER_SESSIONS.insert(session_id.to_string(), session.access_token);
-                            // Cache expiry time if present
-                            if let Some(expires_at) = session.expires_at {
-                                USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
-                            }
+                            // Cache expiry time
+                            USER_SESSIONS_EXPIRY.insert(session_id.to_string(), session.expires_at);
                             log::debug!("Session added to cache: {}", session_id);
                         }
                     }
@@ -258,10 +247,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for session in sessions_list {
         if !session.access_token.is_empty() {
             USER_SESSIONS.insert(session.session_id.clone(), session.access_token);
-            // Cache expiry time if present
-            if let Some(expires_at) = session.expires_at {
-                USER_SESSIONS_EXPIRY.insert(session.session_id, expires_at);
-            }
+            // Cache expiry time
+            USER_SESSIONS_EXPIRY.insert(session.session_id, session.expires_at);
         }
     }
 

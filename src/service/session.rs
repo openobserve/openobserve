@@ -77,7 +77,7 @@ fn extract_jwt_expiry(access_token: &str) -> i64 {
 
 pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
     let expires_at = extract_jwt_expiry(val);
-    db::session::set_with_expiry(session_id, val, Some(expires_at))
+    db::session::set_with_expiry(session_id, val, expires_at)
         .await
         .ok()
 }

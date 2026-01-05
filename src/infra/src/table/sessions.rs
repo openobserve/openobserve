@@ -31,23 +31,17 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
     Ok(session)
 }
 
-/// Creates or updates a session atomically using upsert
-pub async fn set(session_id: &str, access_token: &str) -> Result<(), errors::Error> {
-    set_with_expiry(session_id, access_token, None).await
-}
-
-/// Creates or updates a session with optional expiration
+/// Creates or updates a session with expiration
 ///
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `access_token` - Access token to store
-/// * `expires_at` - Optional expiration timestamp (seconds since epoch)
-///   - None: Session never expires (default for JWT/Dex sessions)
-///   - Some(timestamp): Session expires at this timestamp (for assumed role sessions)
+/// * `expires_at` - Expiration timestamp (seconds since epoch)
+///   All sessions must have an expiry - either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
     access_token: &str,
-    expires_at: Option<i64>,
+    expires_at: i64,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -97,7 +91,6 @@ pub async fn delete_expired() -> Result<u64, errors::Error> {
     let now = chrono::Utc::now().timestamp();
 
     let result = Entity::delete_many()
-        .filter(Column::ExpiresAt.is_not_null())
         .filter(Column::ExpiresAt.lt(now))
         .exec(client)
         .await?;

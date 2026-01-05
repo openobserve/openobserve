@@ -48,8 +48,8 @@ use crate::{
         infra::config::ORG_USERS,
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
-            MetaServiceAccountTokens, OrgSummary, OrgTokenInfo, Organization, PipelineSummary,
-            RumIngestionToken, StreamSummary, TriggerStatus, TriggerStatusSearchResult,
+            OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+            TriggerStatus, TriggerStatusSearchResult,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -195,42 +195,6 @@ pub async fn get_passcode(
     Ok(IngestionPasscode {
         user: user.email,
         passcode,
-    })
-}
-
-/// Get all tokens for a meta service account across all organizations
-/// Only accessible from _meta org
-pub async fn get_meta_service_account_tokens(
-    user_email: &str,
-) -> Result<MetaServiceAccountTokens, anyhow::Error> {
-    // Get user with all their organizations
-    let Some(db_user) = db::user::get_user_by_email(user_email).await else {
-        return Err(anyhow::Error::msg("User not found"));
-    };
-
-    // Check if user is a service account
-    if !db_user
-        .organizations
-        .iter()
-        .any(|org| org.role.eq(&UserRole::ServiceAccount))
-    {
-        return Err(anyhow::Error::msg("User is not a service account"));
-    }
-
-    // Collect all tokens (unmasked)
-    let tokens: Vec<OrgTokenInfo> = db_user
-        .organizations
-        .into_iter()
-        .map(|org| OrgTokenInfo {
-            org_id: org.name,
-            org_name: org.org_name,
-            token: org.token,
-        })
-        .collect();
-
-    Ok(MetaServiceAccountTokens {
-        user: user_email.to_string(),
-        tokens,
     })
 }
 
