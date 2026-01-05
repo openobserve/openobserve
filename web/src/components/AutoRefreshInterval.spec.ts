@@ -282,8 +282,8 @@ describe("AutoRefreshInterval", () => {
       expect(wrapper.vm.selectedLabel).toBe("5 min");
 
       wrapper = createWrapper({ modelValue: 0 });
-      // For value 0, it should show the generated duration label since it's not in refreshTimes
-      expect(wrapper.vm.selectedLabel).toBe("0 seconds");
+      // For value 0, it should show "Off" (translated)
+      expect(wrapper.vm.selectedLabel).toBe("Off");
     });
 
     it("should generate correct selectedLabel for custom values", async () => {

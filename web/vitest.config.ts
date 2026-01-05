@@ -98,6 +98,30 @@ export default mergeConfig(
           "quasar.conf.js",
           "env.d.ts",
           "src/assets/dashboard/**",
+          // Language/translation files - no tests needed
+          "src/locales/languages/**/*.json",
+          // Main entry point - bootstrapping code
+          "src/main.ts",
+          // Chart template data files - static configuration
+          "src/components/dashboards/addPanel/customChartExamples/chartTemplates/**/*.ts",
+          "src/components/dashboards/addPanel/customChartExamples/index.ts",
+          "src/components/dashboards/addPanel/customChartExamples/exampleTypes.ts",
+          // Type definition files
+          "**/*.d.ts",
+          "src/contextProviders/types.ts",
+          // Index files that only re-export
+          "src/components/alerts/index.ts",
+          "src/components/functions/index.ts",
+          "src/contextProviders/index.ts",
+          // Layout mixins (tested via integration)
+          "src/enterprise/mixins/layout.mixin.ts",
+          "src/mixins/layout.mixin.ts",
+          // Plugin index (just exports)
+          "src/plugins/index.ts",
+          // AWS exports (configuration)
+          "src/aws-exports.ts",
+          // Constants/config files with only static data
+          "src/constants/cards.ts",
         ],
       },
     },

@@ -57,7 +57,7 @@
     {
       "id": "Panel_ID4891410",
       "type": "metric",
-      "title": "First Input Delay ( FID )",
+      "title": "Interaction to Next Paint ( INP )",
       "description": "",
       "config": {
         "show_legends": true,
@@ -74,7 +74,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(view_first_input_delay/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version'",
+          "query": "SELECT avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version'",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -82,7 +82,7 @@
             "x": [],
             "y": [
               {
-                "label": "View First Input Delay",
+                "label": "View Interaction to Next Paint",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": null,

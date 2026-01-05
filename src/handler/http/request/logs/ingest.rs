@@ -15,7 +15,12 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
+use actix_http::header::HeaderMap;
+use actix_web::{
+    HttpRequest, HttpResponse, http,
+    http::header::{HeaderName, HeaderValue},
+    post, web,
+};
 use config::meta::otlp::OtlpRequestType;
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
@@ -42,6 +47,26 @@ use crate::{
     service::logs::{self, otlp::handle_request},
 };
 
+const HEADER_O2_PROCESS_TIME: HeaderName = HeaderName::from_static("o2_process_time");
+
+/// Returns the current time, accounting for `ZO_ACTIX_SLOW_LOG_THRESHOLD` env
+fn get_process_time() -> i64 {
+    if config::get_config().limit.http_slow_log_threshold > 0 {
+        config::utils::time::now_micros()
+    } else {
+        0
+    }
+}
+
+fn insert_process_time_header(time: i64, headers: &mut HeaderMap) {
+    if time > 0 {
+        headers.insert(
+            HEADER_O2_PROCESS_TIME,
+            HeaderValue::from_str(&time.to_string()).unwrap(),
+        );
+    }
+}
+
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     context_path = "/api",
@@ -61,6 +86,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"took":2,"errors":true,"items":[{"index":{"_index":"olympics","_id":1,"status":200,"error":{"type":"Too old data, only last 5 hours data can be ingested. Data discarded.","reason":"Too old data, only last 5 hours data can be ingested. Data discarded.","index_uuid":"1","shard":"1","index":"olympics"},"original_record":{"athlete":"CHASAPIS, Spiridon","city":"BER","country":"USA","discipline":"Swimming","event":"100M Freestyle For Sailors","gender":"Men","medal":"Silver","onemore":1,"season":"summer","sport":"Aquatics","year":1986}}}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_bulk")]
@@ -69,30 +97,22 @@ pub async fn bulk(
     org_id: web::Path<String>,
     body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
     let mut resp = match logs::bulk::ingest(
         **thread_id,
@@ -120,12 +140,7 @@ pub async fn bulk(
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
     Ok(resp)
 }
@@ -150,6 +165,9 @@ pub async fn bulk(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_multi")]
@@ -158,30 +176,22 @@ pub async fn multi(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
     let mut resp = match logs::ingest::ingest(
         **thread_id,
@@ -215,12 +225,7 @@ pub async fn multi(
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
     Ok(resp)
 }
@@ -245,7 +250,7 @@ pub async fn multi(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
-    )
+    ),
 )]
 #[post("/{org_id}/{stream_name}/_json")]
 pub async fn json(
@@ -253,30 +258,22 @@ pub async fn json(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
     let mut resp = match logs::ingest::ingest(
         **thread_id,
@@ -304,18 +301,12 @@ pub async fn json(
                     e,
                 ))
             } else {
-                HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+                MetaHttpResponse::bad_request(e)
             }
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
     Ok(resp)
 }
@@ -340,6 +331,9 @@ pub async fn json(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
         (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
@@ -348,23 +342,19 @@ pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
     post_data: web::Json<KinesisFHRequest>,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
     let request_id = post_data.request_id.clone();
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let request_time = post_data
@@ -416,22 +406,18 @@ pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
     post_data: web::Json<GCPIngestionRequest>,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     Ok(
@@ -479,6 +465,9 @@ pub async fn handle_gcp_request(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/v1/logs")]
@@ -498,16 +487,13 @@ pub async fn otlp_logs_write(
         .map(|header| header.to_str().unwrap());
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let (request, request_type) = match content_type {
@@ -534,10 +520,7 @@ pub async fn otlp_logs_write(
             }
         }
         _ => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Bad Request",
-            )));
+            return Ok(MetaHttpResponse::bad_request("Bad Request"));
         }
     };
 
@@ -593,6 +576,9 @@ pub async fn otlp_logs_write(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Success","code": 200})),
         (status = 200, description = "Failure", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/_hec")]
@@ -601,30 +587,22 @@ pub async fn hec(
     org_id: web::Path<String>,
     body: web::Bytes,
     Headers(user_email): Headers<UserEmail>,
-    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = &user_email.user_id;
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
     let mut resp = match logs::hec::ingest(**thread_id, &org_id, body, user_email).await {
         Ok(v) => {
@@ -648,12 +626,7 @@ pub async fn hec(
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
     Ok(resp)
 }

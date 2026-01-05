@@ -18,7 +18,7 @@
         </div>
       </div>
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
-        Add Function
+        {{ t('function.addFunction') }}
       </div>
       <q-form ref="addFunctionForm" class="o2-input">
         <div class="tw:flex tw:items-center">
@@ -26,12 +26,9 @@
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
             class="q-pa-none tw:w-full"
             stack-label
-            outlined
-            filled
+            borderless
             dense
             v-bind:readonly="disableName"
             v-bind:disable="disableName"

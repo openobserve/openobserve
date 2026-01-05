@@ -130,6 +130,7 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     ingestion_url: String,
+    web_url: String,
     #[cfg(feature = "enterprise")]
     streaming_aggregation_enabled: bool,
     min_auto_refresh_interval: u32,
@@ -193,6 +194,9 @@ struct Rum {
                    and orchestration platforms to determine service availability and readiness.",
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"}))
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/healthz")]
@@ -221,6 +225,9 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
     responses(
         (status = 200, description="Status OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "ok"})),
         (status = 404, description="Status Not OK", content_type = "application/json", body = inline(HealthzResponse), example = json!({"status": "not ok"})),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[get("/schedulez")]
@@ -409,6 +416,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled,
         usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
+        web_url: cfg.common.web_url.to_string(),
         #[cfg(feature = "enterprise")]
         streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,

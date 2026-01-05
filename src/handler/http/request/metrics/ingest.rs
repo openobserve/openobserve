@@ -48,6 +48,9 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
     request_body(content = String, description = "Ingest data (json array)", content_type = "application/json", example = json!([{"__name__":"metrics stream name","__type__":"counter / gauge / histogram / summary","label_name1":"label_value1","label_name2":"label_value2", "_timestamp":1687175143,"value":1.2}])),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "up","successful": 3,"failed": 0}]})),
@@ -71,16 +74,13 @@ pub async fn json(
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let mut resp = match metrics::json::ingest(&org_id, body, user).await {
@@ -112,6 +112,9 @@ pub async fn json(
     description = "Ingests metrics data using OpenTelemetry Protocol (OTLP) format. Supports both Protocol Buffers and JSON \
                    content types for OTLP metrics ingestion. This is the standard endpoint for OpenTelemetry SDK and \
                    collector integrations to send metrics data.",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
     request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
@@ -136,16 +139,13 @@ pub async fn otlp_metrics_write(
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
-        }
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        return Ok(
+            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                http::StatusCode::TOO_MANY_REQUESTS,
+                e,
+            )),
+        );
     }
 
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
