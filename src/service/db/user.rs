@@ -461,6 +461,7 @@ mod tests {
             organizations: vec![UserOrg {
                 role: UserRole::Admin,
                 name: org_id.clone(),
+                org_name: org_id.clone(),
                 token: "Abcd".to_string(),
                 rum_token: Some("rumAbcd".to_string()),
             }],

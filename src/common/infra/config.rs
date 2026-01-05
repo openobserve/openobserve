@@ -161,6 +161,7 @@ mod tests {
             identifier: "test_org".to_string(),
             name: "Test Organization".to_string(),
             org_type: "standard".to_string(),
+            service_account: None,
         };
         write_guard.insert("test_org".to_string(), org);
         assert_eq!(write_guard.len(), 1);

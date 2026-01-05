@@ -647,11 +647,13 @@ mod tests {
             identifier: Default::default(),
             name: "Test Org".to_string(),
             org_type: Default::default(),
+            service_account: None,
         };
 
         assert_eq!(org.identifier, "");
         assert_eq!(org.name, "Test Org");
         assert_eq!(org.org_type, "");
+        assert_eq!(org.service_account, None);
     }
 
     #[test]
