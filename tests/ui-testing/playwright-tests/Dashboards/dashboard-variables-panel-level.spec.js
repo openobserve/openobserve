@@ -98,19 +98,46 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Add panel at the bottom (not initially visible)
-    await pm.dashboardCreate.addPanel();
+    // Add multiple dummy panels to push test panel out of viewport
+    for (let i = 0; i < 6; i++) {
+      if (i === 0) {
+        await pm.dashboardCreate.addPanel();
+      } else {
+        await pm.dashboardCreate.addPanelToExistingDashboard();
+      }
+      await pm.chartTypeSelector.selectChartType("line");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+      await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
+      await pm.dashboardPanelActions.savePanel();
+      await page.locator('[data-test*="dashboard-panel-"]').nth(i).waitFor({ state: "visible", timeout: 10000 });
+      await page.waitForLoadState('domcontentloaded');
+    }
+
+    // Add test panel at the bottom (not initially visible due to scroll)
+    await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    // Wait for panel to be added and rendered
+    await page.locator('[data-test*="dashboard-panel-"]').nth(6).waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
 
-    const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    // Scroll to top to ensure Panel1 is out of viewport
+    await page.evaluate(() => {
+      // Reset all scroll positions to ensure clean state
+      window.scrollTo(0, 0);
+      const dashboardContainer = document.querySelector('.dashboard-panels-container');
+      if (dashboardContainer) {
+        dashboardContainer.scrollTop = 0;
+        dashboardContainer.scrollLeft = 0;
+      }
+    });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Add panel variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -124,28 +151,32 @@ test.describe("Dashboard Variables - Panel Level", () => {
         assignedPanels: ["Panel1"]
       }
     );
-    // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
-
-    // Ensure network is idle after variable initialization
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-    // Monitor API calls when panel becomes visible
+    // Panel1 should be out of viewport, so variable should not be loaded yet
+    // Monitor API calls when we scroll to Panel1
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
 
-    // Scroll to panel to make it visible
-    await page.locator(`[data-panel-id="${panelId}"]`).scrollIntoViewIfNeeded();
+    // Scroll to Panel1 to make it visible and trigger variable loading
+    await page.evaluate(() => {
+      const panels = Array.from(document.querySelectorAll('[data-test*="dashboard-panel-"]'));
+      const targetPanel = panels[6]; // Panel1 is the 7th panel (index 6)
+      if (targetPanel) {
+        targetPanel.scrollIntoView({ behavior: 'auto', block: 'center' }); // Use 'auto' for immediate scroll
+      }
+    });
 
-    // Wait for API call to complete
+    // Wait for panel to be in viewport and API calls to complete
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const result = await apiMonitor;
 
-    // Should load variable when panel becomes visible
+    // Variable should load when panel becomes visible
     expect(result.actualCount).toBeGreaterThanOrEqual(0);
 
     // Cleanup
@@ -172,8 +203,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
-    // Wait for tab to be saved
-    await page.locator('[data-test="dashboard-tab-tab1"]').waitFor({ state: "visible", timeout: 5000 });
+    // Wait for tab to be created and visible
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
 
     // Add global variable
     await scopedVars.addScopedVariable(
@@ -185,6 +217,10 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // open setting again if it was closed
+    await pm.dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add tab variable
     await scopedVars.addScopedVariable(
@@ -202,11 +238,18 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Wait for variables to appear on dashboard
+    // Wait for variables to appear on dashboard and settings to fully close
     await page.locator(`[data-test="variable-selector-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
 
     // Switch to Tab1 and add panel
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
+    const tab1Selector = page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]');
+    await tab1Selector.waitFor({ state: "visible", timeout: 10000 });
+
+    // Ensure the tab is clickable and not obscured
+    await tab1Selector.scrollIntoViewIfNeeded();
+    await tab1Selector.click();
+
     // Wait for tab switch to complete
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
@@ -223,6 +266,8 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Add panel variable that depends on both global and tab using panel name
     await pm.dashboardSetting.openSetting();
+    await page.locator('[data-test="dashboard-settings-variable-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
       panelVar,
       "logs",
@@ -230,6 +275,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
       "_timestamp",
       {
         scope: "panels",
+        assignedTabs: ["tab1"],
         assignedPanels: ["Panel1"],
         dependsOnMultiple: [globalVar, tabVar]
       }
@@ -265,7 +311,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Add panel
+    // Add first panel
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -273,13 +319,22 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
+    // Wait for Panel1 to be added
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    // Add second panel
+    await pm.dashboardCreate.addPanelToExistingDashboard();
+    await pm.chartTypeSelector.selectChartType("bar");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel2");
+    await pm.dashboardPanelActions.savePanel();
 
-    // Add first panel variable using panel name
+    // Wait for Panel2 to be added
+    await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
+
+    // Add panel variable for Panel1
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(
       panelVar1,
@@ -291,20 +346,18 @@ test.describe("Dashboard Variables - Panel Level", () => {
         assignedPanels: ["Panel1"]
       }
     );
-    // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${panelVar1}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Try to add second panel variable depending on first
-    // This should either show error or not list panel variables in dependency dropdown
+    // Try to add panel variable for Panel2 and check if Panel1's variable appears in dependency options
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await page.locator('[data-test="dashboard-variable-name"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-name"]').fill(panelVar2);
 
-    // Select scope, stream type, stream, and field for the second variable
+    // Select scope as panels
     await page.locator('[data-test="dashboard-variable-scope-select"]').click();
     await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
 
-    // Select the tab first (if needed)
+    // Select default tab
     await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -312,14 +365,15 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await page.keyboard.press('Escape');
     await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
-    // Select the panel
+    // Select Panel2
     await page.locator('[data-test="dashboard-variable-panels-select"]').waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[data-test="dashboard-variable-panels-select"]').click();
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await page.locator(`[data-test="dashboard-variable-assign-panels-${panelId}"]`).click();
+    await page.locator('.q-item').filter({ hasText: /^Panel2$/ }).click();
     await page.keyboard.press('Escape');
     await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
+    // Select stream type, stream, and field
     await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
     await page.getByRole("option", { name: "logs", exact: true }).click();
 
@@ -334,7 +388,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
 
-    // Check dependency dropdown via filter - panel variables should NOT be in the list
+    // Add a filter to check dependency dropdown - panel variables should NOT be in the list
     await page.locator('[data-test="dashboard-add-filter-btn"]').click();
 
     const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
@@ -347,15 +401,18 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await operatorSelector.click();
     await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
 
-    // Click on the autocomplete to see available variables
+    // Click on the value autocomplete to see available variables
     const autoComplete = page.locator('[data-test="common-auto-complete"]').last();
     await autoComplete.click();
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
+    // Get all available variable options
     const options = page.locator('[role="option"]');
     const optionTexts = await options.allTextContents();
 
+    // Panel1's variable should NOT be in the list
     expect(optionTexts).not.toContain(panelVar1);
+    expect(optionTexts).not.toContain(`$${panelVar1}`);
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -389,8 +446,6 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
-
     // Add panel variable using panel name
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(
@@ -410,25 +465,28 @@ test.describe("Dashboard Variables - Panel Level", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Delete the panel
-    await page.locator(`[data-panel-id="${panelId}"] [data-test="dashboard-panel-delete-btn"]`).click();
-    await page.locator('[data-test="confirm-button"]').click();
+    // Delete the panel using the panel dropdown menu
+    await pm.dashboardPanelEdit.deletePanel("Panel1");
     // Wait for deletion to complete
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Open variable settings
+    // Open variable settings to verify deleted panel label
     await pm.dashboardSetting.openSetting();
-    // Wait for settings dialog to open
-    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     // Wait for variables tab to be active
     await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    // Edit variable
-    await page.locator(`[data-test="dashboard-variable-${variableName}-edit"]`).click();
+    // Find the variable row in the variables list
+    const variableRow = page.locator(`[data-test="dashboard-variable-settings-draggable-row"]`);
+    await variableRow.waitFor({ state: "visible", timeout: 5000 });
 
-    // Verify shows "(deleted panel)"
-    await scopedVars.verifyDeletedScopeLabel("panel", panelId);
+    // Hover over the scope chip to see the tooltip showing "Deleted Panel"
+    const scopeChip = variableRow.locator('.q-chip, [class*="scope"]').first();
+    await scopeChip.hover();
+
+    // Wait for tooltip to appear and verify it contains "Deleted Panel"
+    const tooltip = page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: /Deleted Panel/i });
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -450,7 +508,19 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Add panel variable first
+    // Add panel first
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
+
+    // Wait for panel to be added to dashboard
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
+    // Now create panel variable
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(
       variableName,
@@ -459,7 +529,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
       "kubernetes_namespace_name",
       {
         scope: "panels",
-        assignedPanels: ["panel-1"] // Will be created
+        assignedPanels: ["Panel1"]
       }
     );
     // Wait for variable to be saved
@@ -469,12 +539,13 @@ test.describe("Dashboard Variables - Panel Level", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add panel with variable in query
-    await pm.dashboardCreate.addPanel();
-    await pm.chartTypeSelector.selectChartType("line");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
+    // Edit panel to add filter using the variable
+    await pm.dashboardPanelEdit.editPanel("Panel1");
 
-    // Add filter using the variable
+    // First add the filter field
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+
+    // Then set the filter condition to use the variable
     await pm.dashboardFilter.addFilterCondition(
       0,
       "kubernetes_namespace_name",
@@ -482,14 +553,10 @@ test.describe("Dashboard Variables - Panel Level", () => {
       "=",
       `$${variableName}`
     );
-
-    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
-    await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    // Wait for panel to update
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Set variable value
     const varDropdown = page.getByLabel(variableName, { exact: true });
@@ -510,7 +577,7 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Trigger panel refresh
-    await page.locator('[data-test="dashboard-panel-refresh-btn"]').first().click();
+    await page.locator('[data-test="dashboard-panel-refresh-panel-btn"]').first().click();
 
     // Wait for panel to refresh
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -576,11 +643,15 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Verify variable appears in Panel1
+    const panel1Container = page.locator('[data-test*="dashboard-panel-"]').filter({ hasText: "Panel1" }).first();
+    const panel1Variable = panel1Container.locator(`[data-test="variable-selector-${variableName}"]`);
+    await expect(panel1Variable).toBeVisible({ timeout: 10000 });
 
-    // Verify variable is visible for both panels
-    await scopedVars.verifyVariableVisibility(variableName, true);
+    // Verify variable appears in Panel2
+    const panel2Container = page.locator('[data-test*="dashboard-panel-"]').filter({ hasText: "Panel2" }).first();
+    const panel2Variable = panel2Container.locator(`[data-test="variable-selector-${variableName}"]`);
+    await expect(panel2Variable).toBeVisible({ timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();

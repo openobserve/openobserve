@@ -235,7 +235,7 @@ jobs:
                 [
                   "dashboard-variables-global.spec.js",
                   # "dashboard-variables-tab-level.spec.js",
-                  # "dashboard-variables-panel-level.spec.js",
+                  "dashboard-variables-panel-level.spec.js",
                   # "dashboard-variables-dependency.spec.js",
                   # "dashboard-variables-refresh.spec.js",
                   # "dashboard-variables-url-sync.spec.js",
