@@ -86,8 +86,6 @@ mod m20251219_000001_add_org_id_to_search_queue;
 mod m20251221_000001_create_enrichment_table_urls;
 mod m20251226_000001_add_enrichment_table_urls_is_local_region;
 mod m20251229_000001_create_backfill_jobs;
-mod m20251222_000002_add_is_meta_service_account_to_org_users;
-mod m20251226_000001_add_expires_at_to_sessions;
 mod m20251230_000001_add_allow_static_token_to_org_users;
 
 pub struct Migrator;
@@ -164,8 +162,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20251218_000001_add_expires_at_to_sessions::Migration),
             Box::new(m20251226_000001_add_enrichment_table_urls_is_local_region::Migration),
             Box::new(m20251229_000001_create_backfill_jobs::Migration),
-            Box::new(m20251222_000002_add_is_meta_service_account_to_org_users::Migration),
-            Box::new(m20251226_000001_add_expires_at_to_sessions::Migration),
             Box::new(m20251230_000001_add_allow_static_token_to_org_users::Migration),
         ]
     }

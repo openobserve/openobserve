@@ -395,80 +395,12 @@ pub async fn delete_bulk(
 #[get("/{org_id}/service_accounts/{email_id}")]
 pub async fn get_api_token(
     path: web::Path<(String, String)>,
-    Headers(user_email): Headers<UserEmail>,
+    Headers(_user_email): Headers<UserEmail>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org, user_id) = path.into_inner();
 
-    // If accessing from _meta org, check if this is a meta service account
-    // and return all tokens if so
-    if org == config::META_ORG_ID {
-        // Extract requester identity for authorization check
-        let requester_email = &user_email.user_id;
-
-        // Verify requester has permission to view tokens
-        #[cfg(feature = "enterprise")]
-        {
-            use crate::common::utils::auth::check_permissions;
-
-            // Check if requester has permission to view this service account's tokens
-            // We check for "GET" permission on the service account resource
-            let has_permission = check_permissions(
-                Some(user_id.to_string()),
-                config::META_ORG_ID,
-                requester_email,
-                "service_accounts",
-                "GET",
-                "",
-            )
-            .await;
-
-            if !has_permission {
-                log::warn!(
-                    "Unauthorized multi-token access attempt | requester={} | target_sa={} | org={}",
-                    requester_email,
-                    user_id,
-                    org
-                );
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN,
-                    "Insufficient permissions to view tokens",
-                )));
-            }
-        }
-
-        // Audit log for multi-token retrieval
-        log::warn!(
-            "Multi-token retrieval | requester={} | target_sa={} | org={}",
-            requester_email,
-            user_id,
-            org
-        );
-
-        // Try to get all tokens for meta service account
-        match crate::service::organization::get_meta_service_account_tokens(&user_id).await {
-            Ok(tokens) => {
-                // Log number of tokens exposed
-                log::info!(
-                    "Multi-token response sent | requester={} | target_sa={} | num_tokens={}",
-                    requester_email,
-                    user_id,
-                    tokens.tokens.len()
-                );
-                return Ok(HttpResponse::Ok().json(tokens));
-            }
-            Err(e) => {
-                log::debug!(
-                    "Failed to retrieve meta service account tokens | target_sa={} | error={}",
-                    user_id,
-                    e
-                );
-                // Not a meta service account or error, fall through to regular behavior
-            }
-        }
-    }
-
-    // Regular behavior: return single token for the requested org
+    // Always return single token for the requested org
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {

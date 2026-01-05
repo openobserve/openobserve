@@ -78,7 +78,7 @@ pub async fn validator(
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         validate_credentials_ext(user_id, password, path, auth_token).await
     } else {
-        validate_credentials(user_id, password.trim(), path).await
+        validate_credentials(user_id, password.trim(), path, auth_info.bypass_check).await
     } {
         Ok(res) => {
             if res.is_valid {
@@ -153,6 +153,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    from_session: bool,
 ) -> Result<TokenValidationResponse, Error> {
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
@@ -270,12 +271,17 @@ pub async fn validate_credentials(
     }
 
     if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
-        // Check if static token is allowed for this service account
-        if let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
+        // Check if static token usage is allowed for this service account
+        // allow_static_token=false means the token cannot be used directly,
+        // user must use assume_service_account API to get a temporary session
+        // However, tokens from assume_service_account sessions (from_session=true) bypass this
+        // check
+        if !from_session
+            && let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
             && !org_user.allow_static_token
         {
             log::warn!(
-                "Service account '{}' in org '{}' attempted to use static token but allow_static_token=false. Use assume_service_account API instead.",
+                "Service account '{}' in org '{}' attempted direct token auth but allow_static_token=false. Use assume_service_account API instead.",
                 user.email,
                 user.org
             );
@@ -290,6 +296,7 @@ pub async fn validate_credentials(
             });
         }
 
+        // Service account authentication succeeded
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
@@ -615,7 +622,7 @@ pub async fn validator_aws(
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>();
 
-                match validate_credentials(&creds[0], &creds[1], path).await {
+                match validate_credentials(&creds[0], &creds[1], path, false).await {
                     Ok(res) => {
                         if res.is_valid {
                             let mut req = req;
@@ -659,7 +666,7 @@ pub async fn validator_gcp(
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();
 
-            match validate_credentials(&creds[0], &creds[1], path).await {
+            match validate_credentials(&creds[0], &creds[1], path, false).await {
                 Ok(res) => {
                     if res.is_valid {
                         let mut req = req;
@@ -741,7 +748,19 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if let Some(info) = auth_info.auth.strip_prefix("Basic ").map(str::trim) {
+    // Check if this is a session-based auth (marked with Session:: prefix)
+    let (is_from_session, auth_str) = if let Some(rest) = auth_info.auth.strip_prefix("Session::") {
+        // Format: "Session::<session_id>::<actual_token>"
+        if let Some((_session_id, token)) = rest.split_once("::") {
+            (true, token.to_string())
+        } else {
+            (false, auth_info.auth.clone())
+        }
+    } else {
+        (false, auth_info.auth.clone())
+    };
+
+    if let Some(info) = auth_str.strip_prefix("Basic ").map(str::trim) {
         let decoded = match base64::decode(info) {
             Ok(val) => val,
             Err(_) => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
@@ -751,8 +770,11 @@ async fn oo_validator_internal(
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
-        validator(req, &username, &password, auth_info, path_prefix).await
-    } else if auth_info.auth.starts_with("Bearer") {
+        // Pass is_from_session flag through a modified auth_info
+        let mut modified_auth_info = auth_info.clone();
+        modified_auth_info.bypass_check = is_from_session || auth_info.bypass_check;
+        validator(req, &username, &password, modified_auth_info, path_prefix).await
+    } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         super::token::token_validator(req, auth_info).await
     } else if let Ok(auth_tokens) = config::utils::json::from_str::<AuthTokensExt>(&auth_info.auth)
@@ -1252,20 +1274,25 @@ mod tests {
         .await;
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk")
+            validate_credentials(init_user, pwd, "default/_bulk", false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk")
+            !validate_credentials("", pwd, "default/_bulk", false)
                 .await
                 .unwrap()
                 .is_valid
         );
-        assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
-            !validate_credentials(user_id, pwd, "/")
+            !validate_credentials("", pwd, "/", false)
+                .await
+                .unwrap()
+                .is_valid
+        );
+        assert!(
+            !validate_credentials(user_id, pwd, "/", false)
                 .await
                 .unwrap()
                 .is_valid
@@ -1279,7 +1306,7 @@ mod tests {
         //         .is_valid
         // );
         assert!(
-            !validate_credentials(user_id, "x", "default/user")
+            !validate_credentials(user_id, "x", "default/user", false)
                 .await
                 .unwrap()
                 .is_valid

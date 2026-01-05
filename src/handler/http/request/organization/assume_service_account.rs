@@ -122,6 +122,9 @@ pub async fn assume_service_account(
         // Step 2: Call enterprise implementation
         use crate::service::{db, users};
 
+        // Clone for use in the session creation closure
+        let target_service_account_for_session = target_service_account.clone();
+
         // Set the service_account field to the resolved value
         req.service_account = Some(target_service_account);
 
@@ -165,7 +168,8 @@ pub async fn assume_service_account(
                 },
                 |session_id, token, expires_at| {
                     let session_id = session_id.to_string();
-                    let email = user_email.to_string();
+                    // Use the target service account email, not the caller's email
+                    let email = target_service_account_for_session.to_string();
                     // Create Basic auth token in format: Basic base64(email:token)
                     let basic_auth = format!("{}:{}", email, token);
                     let basic_auth_encoded = config::utils::base64::encode(&basic_auth);

@@ -214,7 +214,7 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
     pub method: String,
@@ -959,8 +959,9 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
                     log::debug!("Session '{}' resolved to token", session_key);
                     // Check if token already has auth prefix
                     if token.starts_with("Basic ") || token.starts_with("Bearer ") {
-                        // Already has prefix (e.g., assume_service_account sessions)
-                        token
+                        // Add session marker prefix to bypass allow_static_token check
+                        // Format: "Session::<session_id>::<actual_token>"
+                        format!("Session::{}::{}", session_key, token)
                     } else {
                         // Plain JWT token from Dex/OAuth, needs Bearer prefix
                         format!("Bearer {}", token)
@@ -988,8 +989,9 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
                         log::debug!("Session '{}' resolved to token from header", session_key);
                         // Check if token already has auth prefix
                         if token.starts_with("Basic ") || token.starts_with("Bearer ") {
-                            // Already has prefix (e.g., assume_service_account sessions)
-                            token
+                            // Add session marker prefix to bypass allow_static_token check
+                            // Format: "Session::<session_id>::<actual_token>"
+                            format!("Session::{}::{}", session_key, token)
                         } else {
                             // Plain JWT token from Dex/OAuth, needs Bearer prefix
                             format!("Bearer {}", token)
