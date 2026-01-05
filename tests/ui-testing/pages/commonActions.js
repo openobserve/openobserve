@@ -25,8 +25,8 @@ export class CommonActions {
     async navigateToAlerts() {
         await this.page.locator(this.alertsMenuItem).click();
         await this.page.waitForTimeout(2000);
-        // Updated to check for view mode tabs instead of old title element
-        await expect(this.page.locator('[data-test="alert-incident-view-tabs"]')).toBeVisible();
+        // Check for alerts page loaded - use alert list page element
+        await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible();
     }
 
     async navigateToSettings() {
