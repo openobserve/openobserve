@@ -20,6 +20,7 @@ import {
   extractVariableNames,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface VariableConfig {
   name: string;
@@ -84,23 +85,51 @@ const expandVariablesForScopes = (
 ): VariableRuntimeState[] => {
   const expanded: VariableRuntimeState[] = [];
 
+  // Helper to get initial value for a variable
+  const getInitialValue = (variable: VariableConfig) => {
+    // If value is explicitly set (not empty string), use it
+    if (variable.value !== "" && variable.value !== undefined && variable.value !== null) {
+      return variable.value;
+    }
+
+    // For query_values with custom or "all" configuration, set the appropriate default
+    if (variable.type === "query_values") {
+      if (
+        variable.selectAllValueForMultiSelect === "custom" &&
+        (variable as any).customMultiSelectValue?.length > 0
+      ) {
+        return variable.multiSelect
+          ? (variable as any).customMultiSelectValue
+          : (variable as any).customMultiSelectValue[0];
+      } else if (variable.selectAllValueForMultiSelect === "all") {
+        return variable.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE;
+      }
+    }
+
+    // Default: empty array for multiSelect, null otherwise
+    return variable.multiSelect ? [] : null;
+  };
+
   variables.forEach((variable) => {
     const scope = variable.scope || "global";
+    const initialValue = getInitialValue(variable);
+
+    // Check if variable has custom or "all" default - mark as partially loaded immediately
+    const hasCustomOrAllDefault =
+      variable.type === "query_values" &&
+      (variable.selectAllValueForMultiSelect === "custom" ||
+        variable.selectAllValueForMultiSelect === "all");
 
     if (scope === "global") {
       expanded.push({
         ...variable,
         scope: "global",
-        value:
-          variable.value === ""
-            ? variable.multiSelect
-              ? []
-              : null
-            : variable.value,
+        value: initialValue,
         isVariableLoadingPending: false,
         isLoading: false,
         // Non-query types are immediately ready
-        isVariablePartialLoaded: variable.type !== "query_values",
+        // Custom and "all" variables are also immediately ready (no API call needed)
+        isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
       });
     } else if (scope === "tabs" && variable.tabs && variable.tabs.length > 0) {
       variable.tabs.forEach((tabId) => {
@@ -108,15 +137,10 @@ const expandVariablesForScopes = (
           ...variable,
           scope: "tabs",
           tabId,
-          value:
-            variable.value === ""
-              ? variable.multiSelect
-                ? []
-                : null
-              : variable.value,
+          value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: variable.type !== "query_values",
+          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
         });
       });
     } else if (
@@ -129,15 +153,10 @@ const expandVariablesForScopes = (
           ...variable,
           scope: "panels",
           panelId,
-          value:
-            variable.value === ""
-              ? variable.multiSelect
-                ? []
-                : null
-              : variable.value,
+          value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: variable.type !== "query_values",
+          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
         });
       });
     }
@@ -456,8 +475,52 @@ export const useVariablesManager = () => {
 
     independentGlobalVars.forEach((v) => {
       // Mark as pending so selector will fire API
+      // Skip custom and "all" variables during initial load - they don't need API calls
       if (v.type === "query_values") {
-        v.isVariableLoadingPending = true;
+        const hasCustomOrAllDefault =
+          v.selectAllValueForMultiSelect === "custom" ||
+          v.selectAllValueForMultiSelect === "all";
+
+        if (!hasCustomOrAllDefault) {
+          v.isVariableLoadingPending = true;
+        }
+      }
+    });
+
+    // Step 5.5: Mark child variables of custom/all parents as pending
+    // These children need to fire API calls even though their parents don't
+    const dependentGlobalVars = globalVars.filter((v) => {
+      const key = getVariableKey(v.name, v.scope);
+      const parents = dependencyGraph.value[key]?.parents || [];
+      return parents.length > 0;
+    });
+
+    dependentGlobalVars.forEach((v) => {
+      if (v.type === "query_values") {
+        const key = getVariableKey(v.name, v.scope);
+        const parentKeys = dependencyGraph.value[key]?.parents || [];
+
+        // Check if all parents are custom/all variables (and thus already loaded)
+        const allParentsAreCustomOrAll = parentKeys.every((parentKey) => {
+          const parentVar = globalVars.find((gv) => {
+            const gvKey = getVariableKey(gv.name, gv.scope);
+            return gvKey === parentKey;
+          });
+
+          if (!parentVar) return false;
+
+          const parentIsCustomOrAll =
+            parentVar.type === "query_values" &&
+            (parentVar.selectAllValueForMultiSelect === "custom" ||
+              parentVar.selectAllValueForMultiSelect === "all");
+
+          return parentIsCustomOrAll;
+        });
+
+        // If all parents are custom/all, mark this child as pending to load
+        if (allParentsAreCustomOrAll && parentKeys.length > 0) {
+          v.isVariableLoadingPending = true;
+        }
       }
     });
 
@@ -673,7 +736,12 @@ export const useVariablesManager = () => {
       const tabVars = variablesData.tabs[tabId] || [];
       tabVars.forEach((v) => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
-          if (canVariableLoad(v)) {
+          // Skip custom and "all" variables - they don't need API calls on visibility change
+          const hasCustomOrAllDefault =
+            v.selectAllValueForMultiSelect === "custom" ||
+            v.selectAllValueForMultiSelect === "all";
+
+          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
             v.isVariableLoadingPending = true;
           }
         }
@@ -690,7 +758,12 @@ export const useVariablesManager = () => {
       const panelVars = variablesData.panels[panelId] || [];
       panelVars.forEach((v) => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
-          if (canVariableLoad(v)) {
+          // Skip custom and "all" variables - they don't need API calls on visibility change
+          const hasCustomOrAllDefault =
+            v.selectAllValueForMultiSelect === "custom" ||
+            v.selectAllValueForMultiSelect === "all";
+
+          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
             v.isVariableLoadingPending = true;
           }
         }

@@ -1599,24 +1599,24 @@ export default defineComponent({
       );
       switch (variableObject.type) {
         case "query_values": {
+          // Check if variable has custom or "all" default selection
+          // If so, skip API call during initial load as the value is already set from settings
+          const hasCustomOrAllDefault =
+            variableObject.selectAllValueForMultiSelect === "custom" ||
+            variableObject.selectAllValueForMultiSelect === "all";
+
           // for initial loading check if the value is already available,
           // do not load the values
           if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
-              `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
+              `Initial load check for variable: ${variableObject.name}, hasCustomOrAllDefault: ${hasCustomOrAllDefault}, value: ${JSON.stringify(variableObject.value)}`,
             );
-
-            // Check if variable has custom or "all" default selection
-            // If so, skip API call as the value is already set from settings
-            const hasCustomOrAllDefault =
-              variableObject.selectAllValueForMultiSelect === "custom" ||
-              variableObject.selectAllValueForMultiSelect === "all";
 
             if (hasCustomOrAllDefault) {
               variableLog(
                 variableObject.name,
-                `Variable has custom or "all" default - skipping API call`,
+                `Variable has custom or "all" default - skipping API call on initial load`,
               );
 
               // Ensure value is set according to the configuration
@@ -1631,6 +1631,9 @@ export default defineComponent({
                   ? [SELECT_ALL_VALUE]
                   : SELECT_ALL_VALUE;
               }
+
+              // Update oldVariablesData to track the initial value
+              oldVariablesData[variableObject.name] = variableObject.value;
 
               // Mark as loaded without making API call
               finalizePartialVariableLoading(
@@ -2146,8 +2149,6 @@ export default defineComponent({
     const loadVariableOptions = async (variableObject: any) => {
       console.log("variableObject", variableObject);
 
-      // If options already loaded and variable is partially loaded, skip fetching on open
-
       // Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
@@ -2193,8 +2194,18 @@ export default defineComponent({
       }
 
       // Set loading state for all variables
+      // Skip setting isVariableLoadingPending for custom/"all" variables during initial load
       variablesData.values.forEach((variable: any) => {
-        variable.isVariableLoadingPending = true;
+        // Check if variable has custom or "all" default selection
+        const hasCustomOrAllDefault =
+          variable.type === "query_values" &&
+          (variable.selectAllValueForMultiSelect === "custom" ||
+            variable.selectAllValueForMultiSelect === "all");
+
+        // Only set pending state if not initial load OR not custom/all variable
+        if (!isInitialLoad || !hasCustomOrAllDefault) {
+          variable.isVariableLoadingPending = true;
+        }
       });
 
       // Find all independent variables (variables with no dependencies)
