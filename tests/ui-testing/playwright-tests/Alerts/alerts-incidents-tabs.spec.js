@@ -23,7 +23,7 @@
  * Incidents are created automatically when alerts fire on an enterprise environment.
  */
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
@@ -31,18 +31,11 @@ const logData = require('../../fixtures/log.json');
 test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
-    let sharedRandomValue;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-
-        // Generate shared random value for test isolation
-        if (!sharedRandomValue) {
-            sharedRandomValue = pm.alertsPage.generateRandomString();
-            testLogger.info('Generated shared random value', { sharedRandomValue });
-        }
 
         // Navigate directly to alerts page
         await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
