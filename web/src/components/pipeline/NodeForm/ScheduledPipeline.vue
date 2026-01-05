@@ -1498,9 +1498,39 @@ watch(
 watch(
   () => selectedStreamName.value,
   (val) => {
-    searchObj.data.stream.pipelineQueryStream = [val];
+    if (searchObj?.data?.stream) {
+      searchObj.data.stream.pipelineQueryStream = [val];
+    }
   },
 );
+
+// Watch for stream name changes and auto-generate query
+// Fix for issue #9658: Auto-generate SELECT * query when stream changes
+watch(
+  () => selectedStreamName.value,
+  (newStreamName, oldStreamName) => {
+    if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
+      // Stream changed: Generate new SELECT * query for the new stream
+      if (tab.value === "sql") {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql") {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
+      }
+    } else if (!oldStreamName && newStreamName) {
+      // Initial stream selection: Generate default query
+      if (tab.value === "sql" && !query.value.trim()) {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql" && !query.value.trim()) {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
+      }
+    }
+  }
+);
+
 watch(
   () => triggerData.value.frequency_type,
   (val) => {
@@ -2053,13 +2083,9 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        // Only set default query if query is empty
-        // Don't overwrite user's custom query when they change streams
-        if (tab.value === "sql" && !query.value.trim()) {
-          query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && !query.value.trim()) {
-          query.value = `${selectedStreamName.value}{}`;
-        }
+        // Note: Default query generation removed
+        // Query is now cleared when stream changes (see watch on selectedStreamName)
+        // Initial query generation happens in onMounted
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);
