@@ -88,7 +88,8 @@
     "showMore": "Show More",
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
-    "status": "Status"
+    "status": "Status",
+    "chunkLoadError": "A new version of the application is available. Please refresh the page to continue."
   },
   "search": {
     "resetFields": "Reset selected table fields",

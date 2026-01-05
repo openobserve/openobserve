@@ -32,6 +32,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
+import { buildVersionChecker } from "./utils/buildVersionChecker";
 
 
 const app = createApp(App);
@@ -113,5 +114,77 @@ const getConfig = async () => {
 };
 
 getConfig();
+
+// ===== Smart Stale Build Detection (Industry Standard) =====
+// Detects stale build errors (new deployment, old chunks deleted) and prompts user to refresh
+
+// Track if notification is already shown to prevent duplicates
+let staleNotificationShown = false;
+
+// Helper: Show new version notification (only once)
+function showNewVersionNotification() {
+  if (staleNotificationShown) {
+    return;
+  }
+
+  staleNotificationShown = true;
+  Notify.create({
+    type: "negative",
+    message: "A new version is available. Please refresh to get the latest updates.",
+    html: true,
+    timeout: 0, // Don't auto-dismiss
+    actions: [
+      {
+        label: i18n.global.t("common.refresh"),
+        color: "white",
+        handler: () => {
+          window.location.reload();
+        }
+      }
+    ],
+    position: "top",
+    icon: "update",
+    color: "negative",
+    textColor: "white",
+    classes: "stale-build-notification"
+  });
+}
+
+// Handle resource load errors (script/link tags)
+window.addEventListener("error", async (event) => {
+  const target = event.target as HTMLScriptElement | HTMLLinkElement;
+
+  // Check if the error is from loading a script or stylesheet
+  if (target && (target.tagName === "SCRIPT" || target.tagName === "LINK")) {
+    const isChunkLoadError =
+      (target.tagName === "SCRIPT" && (target as HTMLScriptElement).src) ||
+      (target.tagName === "LINK" && (target as HTMLLinkElement).href);
+
+    if (isChunkLoadError) {
+      // Smart detection: Check if it's stale build
+      const isStale = await buildVersionChecker.isStaleResourceError(target);
+
+      if (isStale) {
+        showNewVersionNotification();
+        event.preventDefault();
+      }
+    }
+  }
+}, true);
+
+// Handle dynamic import errors (for code splitting)
+router.onError(async (error) => {
+  const chunkFailedPattern = /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
+
+  if (chunkFailedPattern.test(error.message)) {
+
+    // Smart detection: Check if it's stale build or network error
+    const isStale = await buildVersionChecker.isStaleChunkError(error);
+
+    if (isStale) {
+      showNewVersionNotification();
+    }
+  }
+});
 
 app.mount("#app");
