@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
+import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import { Quasar } from "quasar";
@@ -130,7 +130,6 @@ describe("AppSessions.vue", () => {
   let wrapper: VueWrapper<any>;
   let store: any;
   let router: any;
-  let i18n: any;
 
   const createMockStore = () =>
     createStore({
@@ -170,31 +169,11 @@ describe("AppSessions.vue", () => {
       ],
     });
 
-  const createMockI18n = () =>
-    createI18n({
-      legacy: false,
-      locale: "en",
-      messages: {
-        en: {
-          rum: {
-            timestamp: "Timestamp",
-            timeSpent: "Time Spent",
-            errorCount: "Error Count",
-            location: "Location",
-          },
-          login: {
-            userEmail: "User Email",
-          },
-        },
-      },
-    });
-
   beforeEach(async () => {
     vi.clearAllMocks();
 
     store = createMockStore();
     router = createMockRouter();
-    i18n = createMockI18n();
 
     await router.push({
       name: "Sessions",
@@ -408,13 +387,14 @@ describe("AppSessions.vue", () => {
   describe("Session Data Management", () => {
     it("should initialize with correct columns structure", () => {
       const columns = wrapper.vm.columns;
-      
-      expect(columns).toHaveLength(6);
+
+      expect(columns).toHaveLength(7);
       expect(columns[0].name).toBe("action_play");
       expect(columns[1].name).toBe("timestamp");
       expect(columns[2].name).toBe("user_email");
       expect(columns[3].name).toBe("time_spent");
       expect(columns[4].name).toBe("error_count");
+      expect(columns[5].name).toBe("frustration_count");
       expect(columns[5].name).toBe("location");
     });
 
