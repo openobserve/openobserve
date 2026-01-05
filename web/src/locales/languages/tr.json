@@ -88,7 +88,8 @@
     "status": "Durum",
     "cancel": "İptal",
     "relative": "Göreceli",
-    "absolute": "Mutlak"
+    "absolute": "Mutlak",
+    "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

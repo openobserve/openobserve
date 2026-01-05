@@ -88,7 +88,8 @@
     "status": "Estado",
     "cancel": "Cancelar",
     "relative": "Relativo",
-    "absolute": "Absoluto"
+    "absolute": "Absoluto",
+    "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar."
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

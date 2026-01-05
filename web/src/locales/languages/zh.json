@@ -88,7 +88,8 @@
     "status": "状态",
     "cancel": "取消",
     "relative": "相对的",
-    "absolute": "绝对"
+    "absolute": "绝对",
+    "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。"
   },
   "search": {
     "selectIndex": "选择数据流",

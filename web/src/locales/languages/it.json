@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Annulla",
     "relative": "Parente",
-    "absolute": "Assoluto"
+    "absolute": "Assoluto",
+    "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare."
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

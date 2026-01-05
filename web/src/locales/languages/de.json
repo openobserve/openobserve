@@ -88,7 +88,8 @@
     "status": "Status",
     "cancel": "Stornieren",
     "relative": "Relativ",
-    "absolute": "Absolut"
+    "absolute": "Absolut",
+    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

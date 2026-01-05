@@ -88,7 +88,8 @@
     "status": "ステータス",
     "cancel": "[キャンセル]",
     "relative": "相対",
-    "absolute": "絶対"
+    "absolute": "絶対",
+    "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。"
   },
   "search": {
     "metrics": "メトリクス",
