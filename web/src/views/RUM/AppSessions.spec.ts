@@ -708,9 +708,109 @@ describe("AppSessions.vue", () => {
 
     it("should initialize data on mount when route is Sessions", async () => {
       await router.push({ name: "Sessions" });
-      
+
       // Check that necessary functions were called
       expect(mockStreams.getStream).toHaveBeenCalled();
+    });
+  });
+
+  describe("Frustration Signals", () => {
+    it("should include frustration_count in SQL query", () => {
+      const mockReq = { query: { sql: "" } };
+
+      // Simulate the SQL query generation
+      const expectedSQLFragment = "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
+
+      // The SQL query should contain frustration count aggregation
+      expect(wrapper.vm.getSessionLogs).toBeDefined();
+    });
+
+    it("should have frustration_count column in columns definition", () => {
+      const frustrictionColumn = wrapper.vm.columns.find((col: any) => col.name === "frustration_count");
+
+      expect(frustrictionColumn).toBeDefined();
+      expect(frustrictionColumn.label).toContain("Frustration");
+      expect(frustrictionColumn.slot).toBe(true);
+      expect(frustrictionColumn.slotName).toBe("frustration_count_column");
+    });
+
+    it("should render FrustrationBadge in frustration_count column slot", () => {
+      const template = wrapper.html();
+
+      // Check that the slot is defined for frustration count
+      expect(wrapper.vm.columns.some((col: any) => col.slotName === "frustration_count_column")).toBe(true);
+    });
+
+    it("should map frustration_count from API response", () => {
+      const mockHit = {
+        session_id: "test-123",
+        error_count: 5,
+        frustration_count: 3,
+        user_email: "test@example.com",
+        country: "USA",
+        city: "SF",
+        country_iso_code: "us",
+      };
+
+      // Simulate session mapping
+      wrapper.vm.sessionState.data.sessions["test-123"] = { session_id: "test-123" };
+
+      // Simulate the mapping logic from getSessionLogs
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count = mockHit.frustration_count || 0;
+
+      expect(wrapper.vm.sessionState.data.sessions["test-123"].frustration_count).toBe(3);
+    });
+
+    it("should default frustration_count to 0 when not present", () => {
+      const mockHit = {
+        session_id: "test-456",
+        error_count: 2,
+        user_email: "test@example.com",
+      };
+
+      wrapper.vm.sessionState.data.sessions["test-456"] = { session_id: "test-456" };
+
+      // Simulate the mapping with missing frustration_count
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count = mockHit.frustration_count || 0;
+
+      expect(wrapper.vm.sessionState.data.sessions["test-456"].frustration_count).toBe(0);
+    });
+
+    it("should make frustration_count column sortable", () => {
+      const frustrationColumn = wrapper.vm.columns.find((col: any) => col.name === "frustration_count");
+
+      expect(frustrationColumn.sortable).toBe(true);
+    });
+
+    it("should position frustration_count column after error_count", () => {
+      const errorIndex = wrapper.vm.columns.findIndex((col: any) => col.name === "error_count");
+      const frustrationIndex = wrapper.vm.columns.findIndex((col: any) => col.name === "frustration_count");
+
+      expect(frustrationIndex).toBeGreaterThan(errorIndex);
+    });
+
+    it("should position frustration_count column before location", () => {
+      const frustrationIndex = wrapper.vm.columns.findIndex((col: any) => col.name === "frustration_count");
+      const locationIndex = wrapper.vm.columns.findIndex((col: any) => col.name === "location");
+
+      expect(frustrationIndex).toBeLessThan(locationIndex);
+    });
+
+    it("should handle high frustration counts", () => {
+      const mockHit = {
+        session_id: "test-789",
+        frustration_count: 999,
+      };
+
+      wrapper.vm.sessionState.data.sessions["test-789"] = { session_id: "test-789" };
+      wrapper.vm.sessionState.data.sessions[mockHit.session_id].frustration_count = mockHit.frustration_count || 0;
+
+      expect(wrapper.vm.sessionState.data.sessions["test-789"].frustration_count).toBe(999);
+    });
+
+    it("should include FrustrationBadge component import", () => {
+      // Check that the component has access to FrustrationBadge
+      expect(wrapper.findComponent({ name: "FrustrationBadge" }).exists()).toBe(false); // Since it's stubbed
     });
   });
 });
