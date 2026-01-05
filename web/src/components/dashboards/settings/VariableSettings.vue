@@ -97,7 +97,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 {{ index < 9 ? `0${index + 1}` : index + 1 }}
               </div>
-              <div class="item-name">{{ variable.name }}</div>
+              <div class="item-name">
+                <span class="item-name-text">
+                  {{ variable.name }}
+                </span>
+                <q-tooltip
+                  v-if="variable.name.length > 30"
+                  style="word-wrap: break-word; white-space: normal;"
+                  class="variable-name-tooltip"
+                >
+                  {{ variable.name }}
+                </q-tooltip>
+              </div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
               </div>
@@ -513,6 +524,13 @@ export default defineComponent({
   //   padding-right: 16px;
   // }
 
+  .item-name-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .item-scope {
     .scope-info {
       display: flex;
@@ -538,6 +556,11 @@ export default defineComponent({
       }
     }
   }
+}
+
+:deep(.variable-name-tooltip) {
+  max-width: 500px !important;
+  word-break: break-all;
 }
 
 :deep(.dark-mode) {
