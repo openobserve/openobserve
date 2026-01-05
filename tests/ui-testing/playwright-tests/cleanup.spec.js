@@ -29,7 +29,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_user_delete_dest_',
         'rbac_user_update_dest_',
         'rbac_viewer_delete_dest_',
-        'rbac_viewer_update_dest_'
+        'rbac_viewer_update_dest_',
+        'incident_e2e_dest_'
       ],
       // Template prefixes to clean up
       [
@@ -45,10 +46,11 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_sql_tmpl_',
         'rbac_user_delete_tmpl_',
         'rbac_viewer_delete_tmpl_',
-        'rbac_viewer_update_tmpl_'
+        'rbac_viewer_update_tmpl_',
+        'incident_e2e_template_'
       ],
       // Folder prefixes to clean up
-      ['auto_']
+      ['auto_', 'incident_e2e_folder_']
     );
 
     // Clean up all reports owned by automation user
@@ -182,7 +184,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
-        /^auto_playwright_stream$/                     // Auto playwright stream
+        /^auto_playwright_stream$/,                    // Auto playwright stream
+        /^incident_e2e_/                               // Incident e2e test streams (incident_e2e_*)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
