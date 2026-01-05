@@ -428,10 +428,11 @@ export default defineComponent({
       },
       {
         name: "type",
-        field: "type",
+        field: (row: any) => row.urlJob ? "Url" : "File",
         label: "Type",
         align: "left",
         sortable: true,
+        sort: (a: string, b: string) => a.localeCompare(b),
         style: "width: 150px",
       },
       {
@@ -898,13 +899,15 @@ export default defineComponent({
       $q.dialog({
         title: 'Enrichment Table Job Details',
         message: `
-          <div><strong>Table Name:</strong> ${row.name}</div>
-          <div><strong>Source URL:</strong> ${row.urlJob?.url || 'N/A'}</div>
-          <div><strong>Status:</strong> Failed</div>
-          <div><strong>Retry Count:</strong> ${row.urlJob?.retry_count || 0} of 3</div>
-          <br/>
-          <div><strong>Error Details:</strong></div>
-          <div>${row.urlJob?.error_message || 'Unknown error'}</div>
+          <div style="max-width: 600px;">
+            <div><strong>Table Name:</strong> ${row.name}</div>
+            <div style="margin-top: 8px;"><strong>Source URL:</strong></div>
+            <div style="word-break: break-all; overflow-wrap: break-word; margin-top: 4px;">${row.urlJob?.url || 'N/A'}</div>
+            <div style="margin-top: 8px;"><strong>Status:</strong> Failed</div>
+            <div style="margin-top: 8px;"><strong>Retry Count:</strong> ${row.urlJob?.retry_count || 0} of 3</div>
+            <div style="margin-top: 16px;"><strong>Error Details:</strong></div>
+            <div style="word-break: break-word; overflow-wrap: break-word; margin-top: 4px;">${row.urlJob?.error_message || 'Unknown error'}</div>
+          </div>
         `,
         html: true,
         ok: {
