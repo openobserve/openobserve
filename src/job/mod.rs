@@ -85,9 +85,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     if !LOCAL_NODE.is_alert_manager() {
         return Ok(None);
     }
-    use infra::dist_lock;
-
-    use crate::common::infra::cluster::get_node_by_uuid;
+    use infra::{cluster::get_node_by_uuid, dist_lock};
 
     let db = infra::db::get_db().await;
     let node = db
