@@ -426,7 +426,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :label="t('common.searchAround')"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-              padding="sm md"
             />
           </div>
         </div>
