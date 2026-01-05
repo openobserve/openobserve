@@ -37,7 +37,7 @@ use tokio::sync::RwLock;
 
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
-const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 10;
+const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 100;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
 
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));

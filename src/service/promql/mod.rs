@@ -97,8 +97,8 @@ pub fn round_step(mut step: i64) -> i64 {
     }
     if step == 0 {
         micros(DEFAULT_STEP)
-    } else if step > (100 * second) {
-        step - (step % (10 * second))
+    } else if step > (60 * second) {
+        step - (step % (60 * second))
     } else if step > (10 * second) {
         step - (step % (5 * second))
     } else {
