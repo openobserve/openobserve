@@ -22,7 +22,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await ingestion(page);
   });
 
-  test("should load simple 1-level dependency (A -> B)", async ({ page }) => {
+  test("1-should load simple 1-level dependency (A -> B)", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep1_${Date.now()}`;
@@ -60,14 +60,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Change A and monitor B's reload
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
 
+    // Wait for variable dropdown to be visible and ready
     const varADropdown = page.getByLabel(varA, { exact: true });
+    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await varADropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(1000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -79,7 +91,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load 2-level dependency chain (A -> B -> C)", async ({ page }) => {
+  test("2-should load 2-level dependency chain (A -> B -> C)", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep2_${Date.now()}`;
@@ -103,14 +115,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Monitor 2 API calls (B and C) when A changes
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 2, timeout: 20000 });
 
+    // Wait for variable dropdown to be visible and ready
     const varADropdown = page.getByLabel(varA, { exact: true });
+    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await varADropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -122,7 +146,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load 3-level dependency chain (A -> B -> C -> D)", async ({ page }) => {
+  test("3-should load 3-level dependency chain (A -> B -> C -> D)", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep3_${Date.now()}`;
@@ -154,14 +178,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Change A and monitor cascade
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 3, timeout: 25000 });
 
+    // Wait for variable dropdown to be visible and ready
     const varADropdown = page.getByLabel(vars[0], { exact: true });
+    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await varADropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(3000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -173,7 +209,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load 5-level dependency chain", async ({ page }) => {
+  test("4-should load 5-level dependency chain", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep5_${Date.now()}`;
@@ -213,14 +249,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${vars[5]}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Change first variable and monitor cascade
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 5, timeout: 30000 });
 
+    // Wait for variable dropdown to be visible and ready
     const var0Dropdown = page.getByLabel(vars[0], { exact: true });
+    await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await var0Dropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(5000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -232,7 +280,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load 8-level dependency chain (stress test)", async ({ page }) => {
+  test("5-should load 8-level dependency chain (stress test)", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep8_${Date.now()}`;
@@ -271,19 +319,32 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
           dependsOn: i > 0 ? vars[i - 1] : null
         }
       );
-      await page.waitForTimeout(1000);
+      // Wait for UI to stabilize after adding each variable
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${vars[8]}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Change first and monitor full cascade
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 8, timeout: 40000 });
 
+    // Wait for variable dropdown to be visible and ready
     const var0Dropdown = page.getByLabel(vars[0], { exact: true });
+    await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await var0Dropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(8000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -295,7 +356,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should handle multi-dependency (C depends on both A and B)", async ({ page }) => {
+  test("6-should handle multi-dependency (C depends on both A and B)", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_MultiDep_${Date.now()}`;
@@ -330,14 +391,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Change A, monitor if C loads
     const apiMonitor1 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
 
+    // Wait for variable dropdown to be visible and ready
     const varADropdown = page.getByLabel(varA, { exact: true });
+    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await varADropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result1 = await apiMonitor1;
 
@@ -347,11 +420,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Change B, monitor if C loads again
     const apiMonitor2 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
 
+    // Wait for variable dropdown to be visible and ready
     const varBDropdown = page.getByLabel(varB, { exact: true });
+    await varBDropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Ensure network is idle before clicking
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await varBDropdown.click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown menu to open
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
     await page.locator('[role="option"]').first().click();
-    await page.waitForTimeout(2000);
+
+    // Wait for dropdown to close
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     const result2 = await apiMonitor2;
 
@@ -363,7 +445,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should detect circular dependency and show error", async ({ page }) => {
+  test("7-should detect circular dependency and show error", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Circular_${Date.now()}`;
@@ -422,7 +504,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should load independent variables in parallel", async ({ page }) => {
+  test("8-should load independent variables in parallel", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Parallel_${Date.now()}`;
@@ -446,12 +528,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     // Monitor API calls on dashboard load
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 3, timeout: 20000 });
 
     // Reload dashboard to trigger all variables to load
     await page.reload();
-    await page.waitForTimeout(5000);
+    // Wait for page to stabilize after reload
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const result = await apiMonitor;
 
@@ -463,7 +549,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await deleteDashboard(page, dashboardName);
   });
 
-  test("should show error state when variable loading fails", async ({ page }) => {
+  test("9-should show error state when variable loading fails", async ({ page }) => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Error_${Date.now()}`;
@@ -487,8 +573,11 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     );
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Check if variable shows error state
-    await page.waitForTimeout(3000);
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for UI to stabilize and error state to appear
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     const hasError = await scopedVars.hasVariableError(variableName);
 
     // Should show error indicator (red box)
