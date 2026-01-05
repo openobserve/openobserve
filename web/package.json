@@ -45,7 +45,7 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dompurify": "^3.3.1",
-    "echarts": "^5.6.0",
+    "echarts": "^6.0.0",
     "echarts-gl": "^2.0.9",
     "escodegen": "^2.1.0",
     "flag-icons": "^7.5.0",
