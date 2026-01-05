@@ -112,7 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="app-table-container tw:h-full"
                   :bordered="false"
                   @event-emitted="handleTableEvents"
+                  data-test="rum-sessions-table"
                 >
+                  <template v-slot:frustration_count_column="slotProps">
+                    <FrustrationBadge
+                      :count="slotProps.column.row.frustration_count || 0"
+                    />
+                  </template>
                   <template v-slot:session_location_column="slotProps">
                     <SessionLocationColumn :column="slotProps.column.row" />
                   </template>
@@ -182,6 +188,7 @@ import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
+import FrustrationBadge from "@/components/rum/FrustrationBadge.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 
@@ -190,6 +197,7 @@ interface Session {
   type: string;
   time_spent: number;
   error_count: string;
+  frustration_count?: number;
   initial_view_name: string;
   id: string;
 }
@@ -300,6 +308,16 @@ const columns = ref([
     label: t("rum.errorCount"),
     align: "left",
     sortable: true,
+  },
+  {
+    name: "frustration_count",
+    field: (row: any) => row["frustration_count"] || 0,
+    prop: (row: any) => row["frustration_count"] || 0,
+    label: t("rum.frustrationCount"),
+    align: "left",
+    sortable: true,
+    slot: true,
+    slotName: "frustration_count_column",
   },
   {
     name: "location",
@@ -496,7 +514,7 @@ const getSessionLogs = (req: any) => {
     whereClause = `where session_id IN (${sessionsKeys.map((item) => `'${item}'`).join(", ")})`;
   }
 
-  req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, ${userFields} ${geoFields} session_id from "_rumdata" ${whereClause} group by session_id order by zo_sql_timestamp DESC`;
+  req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, ${userFields} ${geoFields} session_id from "_rumdata" ${whereClause} group by session_id order by zo_sql_timestamp DESC`;
 
   isLoading.value.push(true);
   searchService
@@ -514,6 +532,8 @@ const getSessionLogs = (req: any) => {
         if (sessionState.data.sessions[hit.session_id]) {
           sessionState.data.sessions[hit.session_id].error_count =
             hit.error_count;
+          sessionState.data.sessions[hit.session_id].frustration_count =
+            hit.frustration_count || 0;
           sessionState.data.sessions[hit.session_id].user_email =
             hit.user_email;
           sessionState.data.sessions[hit.session_id].country = hit.country;

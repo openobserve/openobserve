@@ -358,6 +358,7 @@
     "sessionType": "Session Type",
     "timeSpent": "Time Spent",
     "errorCount": "Error Count",
+    "frustrationCount": "Frustrations",
     "initialViewName": "Initial View Name",
     "timestamp": "Timestamp",
     "type": "Type",

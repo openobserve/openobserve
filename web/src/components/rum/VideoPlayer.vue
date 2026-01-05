@@ -72,20 +72,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
-          class="progressTime bg-secondary absolute cursor-pointer"
+          class="progressTime absolute cursor-pointer"
+          :class="getEventMarkerClass(event)"
           :style="{
-            width: '2px',
+            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
             left:
               (event.relativeTime / playerState.totalTime) * playerState.width +
               'px',
             bottom: '-0.3125rem',
-            height: '0.9375rem',
+            height: event.frustration_types && event.frustration_types.length > 0 ? '1.125rem' : '0.9375rem',
           }"
-          :title="
-            event.name.length > 100
-              ? event.name.slice(0, 100) + '...'
-              : event.name
-          "
+          :title="getEventTooltip(event)"
         />
       </div>
       <div class="controls flex justify-between items-center">
@@ -435,6 +432,31 @@ const setupSession = async () => {
   player.value.triggerResize();
 };
 
+const getEventMarkerClass = (event: any) => {
+  if (event.frustration_types && event.frustration_types.length > 0) {
+    return 'bg-frustration-marker';
+  }
+  if (event.type === 'error') {
+    return 'bg-red-5';
+  }
+  return 'bg-secondary';
+};
+
+const getEventTooltip = (event: any) => {
+  const eventName = event.name.length > 100
+    ? event.name.slice(0, 100) + '...'
+    : event.name;
+
+  if (event.frustration_types && event.frustration_types.length > 0) {
+    const frustrationLabels = event.frustration_types.map((type: string) => {
+      return type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+    }).join(', ');
+    return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
+  }
+
+  return eventName;
+};
+
 function formatTimeDifference(milliSeconds: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
@@ -573,6 +595,11 @@ defineExpose({
   width: 100%;
   height: 0.3125rem;
   background-color: #ebebeb;
+}
+
+.bg-frustration-marker {
+  background-color: #fb923c !important;
+  box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
 }
 </style>
 
