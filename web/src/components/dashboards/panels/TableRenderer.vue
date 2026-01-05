@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
         <!-- Copy button on left for numeric/right-aligned columns -->
         <q-btn
-          v-if="props.col.align === 'right' && props.value != null && props.value !== undefined && props.value !== ''"
+          v-if="props.col.align === 'right' && shouldShowCopyButton(props.value)"
           :icon="
             isCellCopied(props.rowIndex, props.col.name)
               ? 'check'
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Otherwise show normal value -->
           <template v-else>
               {{
-                props.value == "undefined" || props.value === null
+                props.value === "undefined" || props.value === null
                   ? ""
                   : props.col.format
                     ? props.col.format(props.value, props.row)
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         <!-- Copy button on right for non-numeric columns -->
           <q-btn
-            v-if="props.col.align !== 'right' && props.value != null && props.value !== undefined && props.value !== ''"
+            v-if="props.col.align !== 'right' && shouldShowCopyButton(props.value)"
             :icon="
               isCellCopied(props.rowIndex, props.col.name)
                 ? 'check'
@@ -283,6 +283,13 @@ export default defineComponent({
       return copiedCells.value.has(`${rowIndex}_${colName}`);
     };
 
+    const shouldShowCopyButton = (value: any) => {
+      if (value === null || value === undefined) return false;
+      if (value === "undefined") return false;
+      const stringValue = String(value).trim();
+      return stringValue !== "";
+    };
+
     const copyCellContent = (value: any, rowIndex: number, colName: string) => {
       if (value === null || value === undefined) return;
 
@@ -324,6 +331,7 @@ export default defineComponent({
       store,
       copyCellContent,
       isCellCopied,
+      shouldShowCopyButton,
     };
   },
 });
