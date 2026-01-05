@@ -21,19 +21,46 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(OrgUsers::Table)
-                    .add_column(
-                        ColumnDef::new(OrgUsers::AllowStaticToken)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await
+        // Use add_column_if_not_exists for non-MySQL databases
+        // For MySQL, catch and ignore "Duplicate column" errors for idempotency
+        if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
+            let result = manager
+                .alter_table(
+                    Table::alter()
+                        .table(OrgUsers::Table)
+                        .add_column(
+                            ColumnDef::new(OrgUsers::AllowStaticToken)
+                                .boolean()
+                                .not_null()
+                                .default(true),
+                        )
+                        .to_owned(),
+                )
+                .await;
+
+            // Ignore "Duplicate column" error for idempotency (test retries)
+            if let Err(e) = result {
+                let err_msg = e.to_string();
+                if !err_msg.contains("Duplicate column") {
+                    return Err(e);
+                }
+            }
+            Ok(())
+        } else {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(OrgUsers::Table)
+                        .add_column_if_not_exists(
+                            ColumnDef::new(OrgUsers::AllowStaticToken)
+                                .boolean()
+                                .not_null()
+                                .default(true),
+                        )
+                        .to_owned(),
+                )
+                .await
+        }
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
