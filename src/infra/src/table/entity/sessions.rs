@@ -26,11 +26,7 @@ pub struct Model {
     pub access_token: String,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Expiration timestamp in seconds since epoch
-    /// - NULL/None: Session never expires (default for JWT/Dex sessions)
-    /// - Some(timestamp): Session expires at this timestamp (for assumed role sessions)
-    #[sea_orm(nullable)]
-    pub expires_at: Option<i64>,
+    pub expires_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
