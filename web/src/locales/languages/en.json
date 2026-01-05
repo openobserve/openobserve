@@ -510,13 +510,7 @@
     "confirmRefreshMsg": "Are you sure you want to refresh this service account token?",
     "confirmRefreshHead": "Refresh Service Token",
     "downloadToken": "Download Token",
-    "token": "Token",
-    "viewAllTokens": "View All Tokens",
-    "viewAndCopyTokens": "View & Copy Tokens",
-    "copyAllTokens": "Copy All Tokens",
-    "downloadAllTokens": "Download All Tokens",
-    "serviceAccountToken": "Service Account Token",
-    "serviceAccountTokensAllOrgs": "Service Account Tokens (All Organizations)"
+    "token":"Token"
   },
   "iam": {
     "users": "Users",

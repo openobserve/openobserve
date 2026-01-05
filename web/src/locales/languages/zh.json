@@ -2012,14 +2012,8 @@
     "confirmDeleteHead": "删除服务帐号",
     "confirmRefreshMsg": "您确定要刷新此服务帐号令牌吗？",
     "confirmRefreshHead": "刷新服务令牌",
-    "downloadToken": "下载代币",
-    "token": "代币",
-    "viewAllTokens": "查看所有代币",
-    "viewAndCopyTokens": "查看和复制代币",
-    "copyAllTokens": "复制所有代币",
-    "downloadAllTokens": "下载所有代币",
-    "serviceAccountToken": "服务账户代币",
-    "serviceAccountTokensAllOrgs": "服务账户令牌（所有组织）"
+    "downloadToken": "下载令牌",
+    "token": "令牌"
   },
   "pipeline_destinations": {
     "header": "管道目的地",

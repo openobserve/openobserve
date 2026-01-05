@@ -2017,13 +2017,7 @@
     "confirmRefreshMsg": "Möchten Sie dieses Dienstkonto-Token wirklich aktualisieren?",
     "confirmRefreshHead": "Service-Token aktualisieren",
     "downloadToken": "Token herunterladen",
-    "token": "Wertmarke",
-    "viewAllTokens": "Alle Tokens anzeigen",
-    "viewAndCopyTokens": "Tokens anzeigen und kopieren",
-    "copyAllTokens": "Alle Tokens kopieren",
-    "downloadAllTokens": "Alle Tokens herunterladen",
-    "serviceAccountToken": "Dienstkonto-Token",
-    "serviceAccountTokensAllOrgs": "Dienstkonto-Token (alle Organisationen)"
+    "token": "Wertmarke"
   },
   "pipeline_destinations": {
     "header": "Pipeline-Ziele",

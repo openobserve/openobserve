@@ -492,13 +492,7 @@
     "confirmRefreshMsg": "このサービスアカウントのトークンをリフレッシュしてもよろしいですか？",
     "confirmRefreshHead": "サービス用トークンのリフレッシュ",
     "downloadToken": "トークンをダウンロード",
-    "token": "トークン",
-    "viewAllTokens": "すべてのトークンを表示",
-    "viewAndCopyTokens": "トークンの表示とコピー",
-    "copyAllTokens": "すべてのトークンをコピー",
-    "downloadAllTokens": "すべてのトークンをダウンロード",
-    "serviceAccountToken": "サービスアカウントトークン",
-    "serviceAccountTokensAllOrgs": "サービスアカウントトークン (すべての組織)"
+    "token": "トークン"
   },
   "ticket": {
     "header": "サポートチケット",
