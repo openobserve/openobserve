@@ -370,7 +370,8 @@
     "sizekb": "Boyut (kb)",
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
-    "location": "Yer"
+    "location": "Yer",
+    "frustrationCount": "Hayal kırıklıkları"
   },
   "about": {
     "name": "Açık Gözlem",
