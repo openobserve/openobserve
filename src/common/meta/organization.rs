@@ -61,26 +61,6 @@ pub struct OrganizationCreationResponse {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
-pub struct ServiceAccountTokenInfo {
-    pub email: String,
-    /// Token is no longer returned directly for security reasons
-    /// Use the assume_service_account API to obtain temporary session tokens
-    #[serde(skip_serializing)]
-    pub token: String,
-    pub role: String,
-    /// Instructions for obtaining a temporary session token
-    pub message: String,
-}
-
-#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
-pub struct OrganizationCreationResponse {
-    #[serde(flatten)]
-    pub organization: Organization,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub service_account: Option<ServiceAccountTokenInfo>,
-}
-
-#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrgRenameBody {
     pub new_name: String,
 }

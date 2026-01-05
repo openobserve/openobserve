@@ -147,11 +147,6 @@ pub async fn set_with_expiry(
     // Cache the expiry time
     USER_SESSIONS_EXPIRY.insert(session_id.to_string(), expires_at);
 
-    // Cache the expiry time if provided
-    if let Some(exp) = expires_at {
-        USER_SESSIONS_EXPIRY.insert(session_id.to_string(), exp);
-    }
-
     Ok(())
 }
 

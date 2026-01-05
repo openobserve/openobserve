@@ -41,7 +41,7 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
 pub async fn set_with_expiry(
     session_id: &str,
     access_token: &str,
-    expires_at: Option<i64>,
+    expires_at: i64,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
