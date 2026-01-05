@@ -338,6 +338,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
     // Switch to Tab1 and add panel
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').waitFor({ state: "visible", timeout: 10000 });
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
@@ -604,6 +607,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
     // Verify variable is visible in all tabs
     const tabMapping = { tab1: "Tab1", tab2: "Tab2", tab3: "Tab3" };
     for (const tabId of ["tab1", "tab2", "tab3"]) {
@@ -611,6 +617,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       await tabLocator.click();
       // Wait for tab to be active by checking for active state or waiting for tab content to load
       await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+      // Wait for variable to appear on the dashboard after tab switch
+      await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
       await scopedVars.verifyVariableVisibility(variableName, true);
     }
 
@@ -706,10 +716,17 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
     // Switch to Tab1 and verify variable exists
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
     // Wait for tab content to load
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     await scopedVars.verifyVariableVisibility(tabVar, true);
 
     // Cleanup
@@ -751,6 +768,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     });
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Switch to Tab1
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
@@ -818,6 +838,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     });
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Go to Tab1 and add panel
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();

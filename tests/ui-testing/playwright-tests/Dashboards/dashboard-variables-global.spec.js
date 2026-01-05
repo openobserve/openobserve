@@ -325,9 +325,6 @@ test.describe("Dashboard Variables - Global Level", () => {
     await pm.dashboardSetting.enableMultiSelect();
     await pm.dashboardSetting.saveVariable();
     // Wait for save dialog to close
-    await page.locator('.q-dialog').filter({ hasText: 'Add Variable' }).waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    // Wait for variable to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 15000 });
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for variable to appear on dashboard and be fully initialized
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });

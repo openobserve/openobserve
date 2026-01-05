@@ -456,9 +456,36 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    await this.page
-      .locator('[data-test="dashboard-settings-close-btn"]')
-      .click();
+    // Use multiple selectors to detect if settings dialog is open
+    const settingsDialog = this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog'));
+    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+
+    // First, check if the dialog exists and is visible
+    const dialogExists = await settingsDialog.isVisible().catch(() => false);
+
+    if (!dialogExists) {
+      // Dialog already closed, nothing to do
+      return;
+    }
+
+    // Dialog is open, try to close it
+    try {
+      // Wait for close button with a short timeout
+      await closeBtn.waitFor({ state: "visible", timeout: 2000 });
+      await closeBtn.click({ timeout: 2000 });
+
+      // Wait for dialog to actually disappear
+      await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });
+    } catch (error) {
+      // If clicking fails, the dialog might have already closed
+      // Verify if dialog is actually closed
+      const stillVisible = await settingsDialog.isVisible().catch(() => false);
+      if (stillVisible) {
+        // Dialog is still open but we couldn't close it - this is a real error
+        throw error;
+      }
+      // Dialog closed on its own - this is fine
+    }
   }
 
   // Update tab name in edit tab options//

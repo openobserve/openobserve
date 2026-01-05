@@ -236,7 +236,19 @@ export default class DashboardVariablesScoped {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click();
-    await this.page.waitForTimeout(2000);
+
+    // Wait for save operation to complete by checking if either:
+    // 1. The add variable button becomes visible (stayed in settings)
+    // 2. The settings dialog closes (auto-redirect to dashboard)
+    // 3. We're back on the dashboard page
+    await Promise.race([
+      // Option 1: Variable list appears (dialog stayed open)
+      this.page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 5000 }),
+      // Option 2: Dialog closes (use multiple selectors for robustness)
+      this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog')).waitFor({ state: "hidden", timeout: 5000 }).catch(() => {}),
+      // Option 3: Dashboard elements become visible (fallback)
+      this.page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 5000 }).catch(() => {})
+    ]);
   }
 
   /**
