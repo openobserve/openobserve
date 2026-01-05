@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "zincsearchautomationtest",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
