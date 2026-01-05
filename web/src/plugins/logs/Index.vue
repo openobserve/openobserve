@@ -319,11 +319,12 @@ size="md" />
             ></VisualizeLogsQuery>
           </div>
           <div
-            v-show="searchObj.meta.logsVisualizeToggle == 'build'"
+            v-if="searchObj.meta.logsVisualizeToggle == 'build'"
             class="build-container"
             :style="{ '--splitter-height': `${splitterModel}vh` }"
           >
             <BuildQueryTab
+              ref="buildQueryTabRef"
               :errorData="buildErrorData"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               @query-changed="handleBuildQueryChanged"
@@ -680,6 +681,8 @@ export default defineComponent({
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+    const buildQueryTabRef = ref(null);
+    const buildQueryTabRunQueryFn = ref(null); // Store the runQuery function from BuildQueryTab
     const showSearchHistory = ref(false);
     const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
@@ -695,6 +698,16 @@ export default defineComponent({
       useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
+
+    // Provide a function for BuildQueryTab to register its runQuery method
+    const registerBuildQueryTabRunQuery = (fn: Function) => {
+      buildQueryTabRunQueryFn.value = fn;
+    };
+    provide("registerBuildQueryTabRunQuery", registerBuildQueryTabRunQuery);
+
+    // Provide searchObj for BuildQueryTab to access logs page datetime
+    provide("logsPageSearchObj", searchObj);
+
     const visualizeChartData = ref({});
     const {
       dashboardPanelData,
@@ -1950,6 +1963,15 @@ export default defineComponent({
     );
 
     const handleRunQueryFn = async (clear_cache = false) => {
+      // Handle Build tab
+      if (searchObj.meta.logsVisualizeToggle == "build") {
+        // Call the registered runQuery function
+        if (buildQueryTabRunQueryFn.value && typeof buildQueryTabRunQueryFn.value === 'function') {
+          buildQueryTabRunQueryFn.value(clear_cache);
+        }
+        return;
+      }
+
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
         shouldRefreshWithoutCache.value = clear_cache;
@@ -2061,8 +2083,7 @@ export default defineComponent({
     };
 
     const handleBuildError = (error: any) => {
-      // Handle errors from Build tab
-      console.error("Build tab error:", error);
+      // Handle errors from Build tab - already logged in BuildQueryTab
     };
 
     // [START] cancel running queries

@@ -3880,7 +3880,7 @@ export default defineComponent({
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
-      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns") {
+      if (searchObj.meta.logsVisualizeToggle == "visualize" || searchObj.meta.logsVisualizeToggle == "patterns" || searchObj.meta.logsVisualizeToggle == "build") {
         emit("handleRunQueryFn", typeof clear_cache === 'boolean' ? clear_cache : false);
       } else {
         handleRunQuery(typeof clear_cache === 'boolean' ? clear_cache : false);

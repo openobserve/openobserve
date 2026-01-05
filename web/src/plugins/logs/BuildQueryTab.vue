@@ -111,21 +111,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               class="row card-container"
-              :style="{
-                height: '100%',
-                width: dashboardPanelData.layout.showFieldList
-                  ? '100%'
-                  : 'calc(100% - 58px)',
-              }"
+              style="height: 100%; width: 100%"
             >
-              <div class="col" style="height: 100%">
-                <div class="layout-panel-container col" style="height: 100%">
+              <div class="col" style="height: 100%; overflow: hidden">
+                <div class="layout-panel-container column" style="height: 100%; display: flex; flex-direction: column">
                   <!-- Query Builder (drag-and-drop fields) -->
-                  <DashboardQueryBuilder :dashboardData="{}" />
+                  <div class="col-auto">
+                    <DashboardQueryBuilder :dashboardData="{}" />
+                  </div>
                   <q-separator />
 
                   <div
                     v-if="isOutDated"
+                    class="col-auto"
                     :style="{
                       borderColor: '#c3920d',
                       borderWidth: '1px',
@@ -149,15 +147,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     class="col"
-                    style="position: relative; height: 100%; width: 100%"
+                    style="position: relative; min-height: 0; flex: 1; display: flex; flex-direction: column"
                   >
                     <div
                       style="
                         flex: 1;
-                        min-height: calc(100% - 36px);
-                        height: calc(100% - 36px);
+                        min-height: 0;
                         width: 100%;
                         margin-top: 36px;
+                        overflow: auto;
                       "
                     >
                       <PanelSchemaRenderer
@@ -177,7 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :width="6"
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
-                        :is_ui_histogram="is_ui_histogram"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
                         :allowAlertCreation="false"
                         @series-data-update="seriesDataUpdate"
@@ -289,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, provide } from "vue";
+import { defineComponent, ref, onMounted, watch, provide, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -305,6 +302,10 @@ import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQue
 
 // Import composable
 import useDashboardPanelData from "@/composables/useDashboardPanel";
+
+// Import utilities
+import { getConsumableRelativeTime } from "@/utils/date";
+import { cloneDeep } from "lodash-es";
 
 // Import icons
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
@@ -331,11 +332,17 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["query-changed", "visualization-saved", "error"],
+  emits: ["query-changed", "visualization-saved", "error", "run-query"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+
+    // Inject the registration function from parent (Index.vue)
+    const registerBuildQueryTabRunQuery = inject("registerBuildQueryTabRunQuery", null);
+
+    // Inject searchObj from logs page (Index.vue) to access current datetime
+    const logsPageSearchObj: any = inject("logsPageSearchObj", null);
 
     // Provide the page key for child components (FieldList, ConfigPanel, etc.)
     const dashboardPanelDataPageKey = "build-logs";
@@ -360,7 +367,6 @@ export default defineComponent({
     const seriesData = ref(null);
     const panelSchemaRendererRef = ref(null);
     const searchResponse = ref(null);
-    const is_ui_histogram = ref(false);
 
     // Create local chartData ref (matching VisualizeLogsQuery pattern)
     // This creates a reactive copy that re-renders the chart when updated
@@ -368,8 +374,6 @@ export default defineComponent({
 
     // Initialize from logs context
     const initializeFromLogsContext = () => {
-      const searchObj = store.state.searchObj;
-
       // IMPORTANT: Build tab only supports auto SQL (visual query builder)
       // Not custom SQL, not PromQL - only auto-generated SQL
       dashboardPanelData.data.queries[0].customQuery = false;
@@ -377,29 +381,20 @@ export default defineComponent({
       // Set query type to SQL
       dashboardPanelData.data.queryType = "sql";
 
-      // // Set stream from logs page
-      // if (searchObj?.data?.stream?.selectedStream?.[0]?.value) {
-      //   dashboardPanelData.data.queries[0].fields.stream =
-      //     searchObj.data.stream.selectedStream[0].value;
-      //   dashboardPanelData.data.queries[0].fields.stream_type = "logs";
-      // }
+      // Set initial time range from searchObj
+      if (logsPageSearchObj?.data?.datetime) {
+        const dateTime =
+          logsPageSearchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                logsPageSearchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(logsPageSearchObj.data.datetime);
 
-      // // Set time range from logs page
-      // if (searchObj?.meta?.dateTime) {
-      //   dashboardPanelData.meta.dateTime = {
-      //     start_time: searchObj.meta.dateTime.startTime,
-      //     end_time: searchObj.meta.dateTime.endTime,
-      //     type: searchObj.meta.dateTime.type,
-      //   };
-      // }
-
-      // // Set default chart type
-      // dashboardPanelData.data.type = "line";
-
-      // // Set panel ID (required by PanelSchemaRenderer)
-      // if (!dashboardPanelData.data.id) {
-      //   dashboardPanelData.data.id = `panel_${Date.now()}`;
-      // }
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(dateTime.startTime),
+          end_time: new Date(dateTime.endTime),
+        };
+      }
 
       // Generate initial SQL (auto SQL mode)
       makeAutoSQLQuery();
@@ -462,6 +457,33 @@ export default defineComponent({
       seriesData.value = data;
     };
 
+    // Run query function (same logic as AddPanel)
+    const runQuery = (withoutCache = false) => {
+      try {
+        // Update the datetime from logs page searchObj (CURRENT datetime when Run Query is clicked)
+        // Same pattern as Index.vue handleRunQueryFn (lines 2046-2056)
+        if (logsPageSearchObj?.data?.datetime) {
+          const dateTime =
+            logsPageSearchObj.data.datetime.type === "relative"
+              ? getConsumableRelativeTime(
+                  logsPageSearchObj.data.datetime.relativeTimePeriod,
+                )
+              : cloneDeep(logsPageSearchObj.data.datetime);
+
+          dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
+
+        // Copy the data object excluding reactivity (triggers chart re-render and API call)
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      } catch (err) {
+        console.error("[BuildQueryTab] Error running query:", err);
+        emit("error", err);
+      }
+    };
+
     // // Watch for query changes and update chartData
     // watch(
     //   () => dashboardPanelData.data.queries[0],
@@ -499,13 +521,19 @@ export default defineComponent({
           makeAutoSQLQuery();
         }
 
+
         // Update chartData to trigger chart re-render
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       },
       { deep: true }
     );
 
     onMounted(() => {
+      // Register the runQuery function with parent (Index.vue)
+      if (registerBuildQueryTabRunQuery && typeof registerBuildQueryTabRunQuery === 'function') {
+        registerBuildQueryTabRunQuery(runQuery);
+      }
+
       initializeFromLogsContext();
       // Initial chartData sync after initialization
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -526,6 +554,7 @@ export default defineComponent({
       handleLimitNumberOfSeriesWarningMessage,
       handleChartApiError,
       seriesDataUpdate,
+      runQuery,
       chartData,
       isOutDated,
       errorMessage,
@@ -535,7 +564,6 @@ export default defineComponent({
       seriesData,
       panelSchemaRendererRef,
       searchResponse,
-      is_ui_histogram,
       outlinedWarning,
       symOutlinedDataInfoAlert,
       errorData: props.errorData,
