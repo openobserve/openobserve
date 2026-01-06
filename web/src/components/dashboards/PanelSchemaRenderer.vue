@@ -368,6 +368,7 @@ import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import { throttle } from "lodash-es";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -955,6 +956,9 @@ export default defineComponent({
         validatePanelData?.value?.length === 0
       ) {
         try {
+          const convertStart = performance.now();
+          console.log(`[Chart Render] Starting chart conversion (loading: ${loading.value})`);
+
           panelData.value = await convertPanelData(
             panelSchema.value,
             filteredData.value,
@@ -967,6 +971,9 @@ export default defineComponent({
             annotations,
             loading.value,
           );
+
+          const convertTime = performance.now() - convertStart;
+          console.log(`[Chart Render] Chart conversion complete in ${convertTime.toFixed(1)}ms`);
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
@@ -999,6 +1006,14 @@ export default defineComponent({
         }
       }
     };
+
+    // Create a throttled version for streaming updates (1000ms throttle)
+    // This prevents excessive re-renders during PromQL data streaming
+    // With large datasets, chunks arrive ~1-2 seconds apart, so 1s throttle is optimal
+    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 1000, {
+      leading: true,  // Call immediately on first invocation
+      trailing: true  // Ensure final call after throttle period
+    });
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -1038,8 +1053,15 @@ export default defineComponent({
     );
 
     watch(
-      [data, store?.state, annotations],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        annotations
+      ],
       async () => {
+        console.log(`[Chart Render] Data watcher triggered (loading: ${loading.value})`);
+
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
@@ -1069,8 +1091,19 @@ export default defineComponent({
             code: "",
           };
 
-        // Use the common function to convert panel data
-        await convertPanelDataCommon();
+        // Use throttled version during loading (streaming), immediate version when complete
+        // This prevents excessive re-renders during PromQL data streaming
+        if (loading.value) {
+          // During loading: throttle to reduce re-render frequency
+          console.log(`[Chart Render] Using throttled render (1000ms)`);
+          await convertPanelDataThrottled();
+        } else {
+          // Loading complete: immediate final render with full data
+          // Cancel any pending throttled calls and render immediately
+          console.log(`[Chart Render] Loading complete - final immediate render`);
+          convertPanelDataThrottled.cancel();
+          await convertPanelDataCommon();
+        }
       },
       { deep: true },
     );

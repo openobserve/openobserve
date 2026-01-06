@@ -983,6 +983,22 @@ export const usePanelDataLoader = (
                 return;
               }
 
+              // Create a Map for fast metric lookup using a hash of metric labels
+              const metricIndexMap = new Map<string, number>();
+              let chunkCount = 0;
+              const startTime = performance.now();
+
+              const getMetricSignature = (metric: any): string => {
+                if (!metric) return "";
+                // Create a deterministic signature from metric labels
+                const keys = Object.keys(metric).sort();
+                return keys.map(k => `${k}=${metric[k]}`).join(',');
+              };
+
+              // Get series limit from config
+              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+              console.log(`[PromQL Perf] Series limit applied at data loader: ${maxSeries}`);
+
               const handlePromQLResponse = (data: any, res: any) => {
                 if (res.type === "event_progress") {
                   state.loadingProgressPercentage = res?.content?.percent ?? 0;
@@ -990,17 +1006,45 @@ export const usePanelDataLoader = (
                   saveCurrentStateToCache();
                 }
                 if (res?.type === "promql_response") {
+                  const chunkStartTime = performance.now();
+                  chunkCount++;
+                  console.log(`[PromQL Perf] Chunk ${chunkCount} received at ${(chunkStartTime - startTime).toFixed(0)}ms`);
+
                   // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
                   // result is the actual PromQL data (vector/matrix with values)
                   // We need to extract and accumulate the result.result part
 
                   const newData = res?.content?.results; // This is { result_type/resultType, result }
+                  const metricsCount = newData?.result?.length || 0;
+                  console.log(`[PromQL Perf] Chunk ${chunkCount}: ${metricsCount} metrics`);
 
                   if (!queryResults[queryIndex]) {
-                    // First chunk - initialize with the structure
-                    queryResults[queryIndex] = newData;
+                    // First chunk - initialize with the structure and build index
+                    const indexBuildStart = performance.now();
+
+                    // Limit the first chunk to maxSeries
+                    const limitedResult = newData?.result ? newData.result.slice(0, maxSeries) : [];
+                    queryResults[queryIndex] = {
+                      ...newData,
+                      result: limitedResult
+                    };
+
+                    // Build initial metric index map
+                    if (limitedResult && Array.isArray(limitedResult)) {
+                      limitedResult.forEach((metric: any, index: number) => {
+                        const signature = getMetricSignature(metric.metric);
+                        metricIndexMap.set(signature, index);
+                      });
+                    }
+
+                    const actualStored = limitedResult.length;
+                    if (metricsCount > maxSeries) {
+                      console.log(`[PromQL Perf] ⚠️ First chunk limited from ${metricsCount} to ${actualStored} metrics`);
+                    }
+                    console.log(`[PromQL Perf] Built index for ${actualStored} metrics in ${(performance.now() - indexBuildStart).toFixed(1)}ms`);
                   } else {
                     // Subsequent chunks - merge the result arrays
+                    const mergeStart = performance.now();
                     const currentResult = queryResults[queryIndex];
 
                     // If both have result arrays, merge them
@@ -1012,37 +1056,33 @@ export const usePanelDataLoader = (
                     ) {
                       // Merge the result arrays (time series data)
                       // For matrix type, we need to merge values arrays for matching metrics
-                      const mergedResult = [...currentResult.result];
+                      const mergedResult = currentResult.result;
+                      let newMetricsAdded = 0;
+                      let valuesAppended = 0;
 
                       newData.result.forEach((newMetric: any) => {
-                        // Find if this metric already exists in current results
-                        const existingIndex = mergedResult.findIndex(
-                          (existingMetric: any) => {
-                            // Compare metric labels to find matching time series
-                            return (
-                              JSON.stringify(existingMetric.metric) ===
-                              JSON.stringify(newMetric.metric)
-                            );
-                          },
-                        );
+                        // Use metric signature for fast lookup
+                        const signature = getMetricSignature(newMetric.metric);
+                        const existingIndex = metricIndexMap.get(signature);
 
-                        if (existingIndex >= 0) {
+                        if (existingIndex !== undefined && existingIndex < mergedResult.length) {
                           // Metric exists - merge the values arrays
                           if (
                             Array.isArray(mergedResult[existingIndex].values) &&
                             Array.isArray(newMetric.values)
                           ) {
-                            mergedResult[existingIndex] = {
-                              ...mergedResult[existingIndex],
-                              values: [
-                                ...mergedResult[existingIndex].values,
-                                ...newMetric.values,
-                              ],
-                            };
+                            // Append new values to existing values array
+                            mergedResult[existingIndex].values.push(...newMetric.values);
+                            valuesAppended += newMetric.values.length;
                           }
-                        } else {
-                          // New metric - add it to results
+                        } else if (mergedResult.length < maxSeries) {
+                          // New metric - add it only if we haven't reached the limit
+                          const newIndex = mergedResult.length;
                           mergedResult.push(newMetric);
+                          metricIndexMap.set(signature, newIndex);
+                          newMetricsAdded++;
+                        } else {
+                          // Skip - we've reached the series limit
                         }
                       });
 
@@ -1050,6 +1090,7 @@ export const usePanelDataLoader = (
                         ...newData,
                         result: mergedResult,
                       };
+                      console.log(`[PromQL Perf] Merged chunk in ${(performance.now() - mergeStart).toFixed(1)}ms (${newMetricsAdded} new metrics, ${valuesAppended} values appended)`);
                     } else if (newData) {
                       // Replace with new data if structure is different
                       queryResults[queryIndex] = newData;
@@ -1057,6 +1098,7 @@ export const usePanelDataLoader = (
                   }
 
                   // Update state with accumulated results
+                  const stateUpdateStart = performance.now();
                   state.data = [...queryResults];
                   state.metadata = {
                     queries: queryMetadata,
@@ -1067,6 +1109,8 @@ export const usePanelDataLoader = (
                     message: "",
                     code: "",
                   };
+                  console.log(`[PromQL Perf] State update took ${(performance.now() - stateUpdateStart).toFixed(1)}ms`);
+                  console.log(`[PromQL Perf] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`);
                 }
               };
 
@@ -1100,6 +1144,7 @@ export const usePanelDataLoader = (
               const handlePromQLComplete = (data: any, _: any) => {
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
+                console.log(`[PromQL Perf] Query ${queryIndex} completed. ${completedQueries.size}/${panelSchema.value.queries.length} queries done`);
 
                 // Final update with complete results
                 state.data = [...queryResults];
@@ -1113,6 +1158,10 @@ export const usePanelDataLoader = (
                 if (
                   completedQueries.size === panelSchema.value.queries.length
                 ) {
+                  const totalTime = performance.now() - startTime;
+                  const finalMetricsCount = queryResults[queryIndex]?.result?.length || 0;
+                  console.log(`[PromQL Perf] ✅ All queries complete! Total time: ${totalTime.toFixed(0)}ms (${chunkCount} chunks)`);
+                  console.log(`[PromQL Perf] Final metrics stored in state: ${finalMetricsCount} (limited to ${maxSeries})`);
                   state.loading = false;
                   state.isOperationCancelled = false;
                   state.isPartialData = false;
