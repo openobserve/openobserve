@@ -504,30 +504,22 @@ test.describe("Share Link Test Cases", () => {
 
     testLogger.info('Logs page loaded with mocked config');
 
-    // Get the share button
-    const shareButton = page.locator(pm.logsPage.shareLinkButton);
-
     // PRIMARY ASSERTION: Share button should exist
-    await expect(shareButton).toBeVisible({ timeout: 10000 });
+    await pm.logsPage.expectShareLinkButtonVisible();
     testLogger.info('✓ Share button is visible');
 
     // SECONDARY ASSERTION: Share button should be disabled when ZO_WEB_URL not configured
-    await expect(shareButton).toBeDisabled();
+    await pm.logsPage.expectShareLinkButtonDisabled();
     testLogger.info('✓ PRIMARY CHECK PASSED: Share button is disabled (ZO_WEB_URL not configured)');
 
     // TERTIARY ASSERTION: Check for tooltip explaining why it's disabled
-    await shareButton.hover();
-    await page.waitForTimeout(500); // Wait for tooltip to appear
+    await pm.logsPage.hoverShareLinkButton();
 
-    // Look for tooltip with configuration message
-    const tooltip = page.locator('[role="tooltip"], .q-tooltip').filter({
-      hasText: /disabled|ZO_WEB_URL|configuration|web.*url/i
-    }).first();
+    // Verify tooltip is visible with configuration-related message
+    await pm.logsPage.expectShareLinkTooltipVisible(/disabled|ZO_WEB_URL|configuration|web.*url/i);
 
-    await expect(tooltip).toBeVisible({ timeout: 2000 });
-    const tooltipText = await tooltip.textContent();
-    testLogger.info(`✓ Tooltip displayed: "${tooltipText}"`);
-
+    // Get and validate tooltip text
+    const tooltipText = await pm.logsPage.getShareLinkTooltipText(/disabled|ZO_WEB_URL|configuration|web.*url/i);
     expect(tooltipText.toLowerCase()).toMatch(/disabled|configuration|web.*url/i);
     testLogger.info('✓ TERTIARY CHECK PASSED: Informative tooltip present');
 
