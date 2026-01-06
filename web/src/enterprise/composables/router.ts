@@ -17,8 +17,35 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
+
 const useEnvRoutes = () => {
-  const parentRoutes: any = [];
+  const parentRoutes: any = [
+    {
+      // Entry point from AWS Marketplace - saves token and redirects to login
+      path: "/marketplace/aws/register",
+      name: "awsMarketplaceRegister",
+      beforeEnter: (to: any, from: any, next: any) => {
+        const token = to.query.token;
+        if (token) {
+          // Save token for after login - Login.vue will check this
+          sessionStorage.setItem("aws_marketplace_token", token);
+        }
+        // Redirect to login page (normal flow, Login.vue handles token check)
+        next("/login");
+      },
+    },
+    {
+      // Post-login setup page for org selection/creation
+      path: "/marketplace/aws/setup",
+      name: "awsMarketplaceSetup",
+      component: AwsMarketplaceSetup,
+      meta: {
+        title: "AWS Marketplace Setup",
+        requiresAuth: true,
+      },
+    },
+  ];
 
   const homeChildRoutes = [
     {
