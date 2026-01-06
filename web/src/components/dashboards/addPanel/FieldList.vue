@@ -794,8 +794,8 @@ export default defineComponent({
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.stream;
 
-              if (metricName && metricName !== streamName) {
-                // Set the extracted metric name as the stream
+              if (!metricName || metricName !== streamName) {
+                // Set the query to the new stream name with curly braces
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].query = streamName + "{}";
