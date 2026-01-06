@@ -553,6 +553,7 @@ import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import usePromlqSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "FieldList",
@@ -623,6 +624,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
+    const { parsePromQlQuery } = usePromlqSuggestions();
 
     const metricsIconMapping: any = {
       Summary: "description",
@@ -777,13 +779,27 @@ export default defineComponent({
             // To prevent this, we added the dashboardPanelDataPageKey condition.
             // IMPORTANT: Only set default query if stream or stream_type actually changed
             if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
-              // set the query
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].query =
+              // Check if the user has changed the query and query contains a metric name
+              // If metric name is different from stream name, set the query to the stream name with curly braces
+              // If metric name is the same as stream name, do not set the query
+              const parsedQuery = parsePromQlQuery(
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream?.toString() + "{}";
+                ].query,
+              );
+
+              const metricName = parsedQuery?.metricName;
+              const streamName =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream;
+
+              if (metricName && metricName !== streamName) {
+                // Set the extracted metric name as the stream
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].query = streamName + "{}";
+              }
 
               fetchPromQLLabels(
                 dashboardPanelData.data.queries[
