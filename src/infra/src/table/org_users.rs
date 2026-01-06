@@ -48,6 +48,7 @@ pub struct OrgUserRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
+    pub allow_static_token: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -74,6 +75,7 @@ impl OrgUserRecord {
             token: token.to_string(),
             rum_token,
             created_at: chrono::Utc::now().timestamp_micros(),
+            allow_static_token: true, // Default to true for backward compatibility
         }
     }
 }
@@ -87,6 +89,7 @@ impl From<Model> for OrgUserRecord {
             token: model.token,
             rum_token: model.rum_token,
             created_at: model.created_at,
+            allow_static_token: model.allow_static_token,
         }
     }
 }
@@ -101,6 +104,7 @@ pub struct UserOrgExpandedRecord {
     pub created_at: i64,
     pub org_name: String,
     pub org_type: OrganizationType,
+    pub allow_static_token: bool,
 }
 
 impl FromQueryResult for UserOrgExpandedRecord {
@@ -113,6 +117,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
         let created_at = result.try_get(pre, "created_at")?;
         let org_name = result.try_get(pre, "org_name")?;
         let org_type: i16 = result.try_get(pre, "org_type")?;
+        let allow_static_token: bool = result.try_get(pre, "allow_static_token").unwrap_or(true);
 
         Ok(Self {
             email,
@@ -123,6 +128,7 @@ impl FromQueryResult for UserOrgExpandedRecord {
             created_at,
             org_name,
             org_type: org_type.into(),
+            allow_static_token,
         })
     }
 }
@@ -200,6 +206,28 @@ pub async fn add(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
+    add_with_flags(org_id, user_email, role, token, rum_token, true).await
+}
+
+pub async fn add_with_flag(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+) -> Result<(), errors::Error> {
+    add_with_flags(org_id, user_email, role, token, rum_token, true).await
+}
+
+pub async fn add_with_flags(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+
+    allow_static_token: bool,
+) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let role: i16 = role.into();
     let record = ActiveModel {
@@ -211,6 +239,8 @@ pub async fn add(
         created_at: Set(now),
         updated_at: Set(now),
         id: Set(ider::uuid()),
+
+        allow_static_token: Set(allow_static_token),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -372,6 +402,7 @@ pub async fn get_expanded_user_org(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
+        .column(Column::AllowStaticToken)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -407,6 +438,7 @@ pub async fn get_user_by_rum_token(
         .column(Column::Token)
         .column(Column::RumToken)
         .column(Column::CreatedAt)
+        .column(Column::AllowStaticToken)
         .into_model::<OrgUserExpandedRecord>()
         .one(client)
         .await
@@ -448,6 +480,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
         .column(Column::CreatedAt)
         .column(organizations::Column::OrgName)
         .column(organizations::Column::OrgType)
+        .column(Column::AllowStaticToken)
         .into_model::<UserOrgExpandedRecord>()
         .all(client)
         .await
