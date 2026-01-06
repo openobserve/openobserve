@@ -78,36 +78,11 @@ class BuildVersionChecker {
   }
 
   /**
-   * Smart detection: Check if chunk load error is due to stale build
-   * This distinguishes between stale build (404) and network errors
+   * Shared helper: Check if current build is stale
+   * Returns false if version check fails (network/backend error)
    */
-  async isStaleChunkError(error: Error | ErrorEvent): Promise<boolean> {
-    const errorMessage = error instanceof Error ? error.message : (error as any).message || '';
-
-    // Check if it's a chunk load error
-    const isChunkError = /Loading chunk|Failed to fetch dynamically imported module/i.test(errorMessage);
-
-    if (!isChunkError) {
-      return false;
-    }
-
+  private async checkIfVersionIsStale(): Promise<boolean> {
     try {
-      // Fetch config API to check if commit hash changed
-      return await this.checkForNewVersion();
-    } catch (fetchError) {
-      // Config API failed - this is a true network/backend error
-      return false;
-    }
-  }
-
-  /**
-   * Check if resource load error (script/link tag) is due to stale build
-   */
-  async isStaleResourceError(
-    target: HTMLScriptElement | HTMLLinkElement
-  ): Promise<boolean> {
-    try {
-      // Fetch config API to check if commit hash changed
       return await this.checkForNewVersion();
     } catch (error) {
       // Config API failed - this is a true network/backend error
@@ -116,13 +91,41 @@ class BuildVersionChecker {
   }
 
   /**
-   * Get current build information
+   * Helper: Extract error message from Error or ErrorEvent
+   * Uses type guards to safely extract message without unsafe type assertions
    */
-  getCurrentBuildInfo() {
-    return {
-      version: this.currentVersion,
-      buildTime: __BUILD_TIME__,
-    };
+  private getErrorMessage(error: Error | ErrorEvent): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if ('message' in error && typeof error.message === 'string') {
+      return error.message;
+    }
+    return '';
+  }
+
+  /**
+   * Smart detection: Check if chunk load error is due to stale build
+   * This distinguishes between stale build (404) and network errors
+   */
+  async isStaleChunkError(error: Error | ErrorEvent): Promise<boolean> {
+    const errorMessage = this.getErrorMessage(error);
+
+    // Check if it's a chunk load error
+    const isChunkError = /Loading chunk|Failed to fetch dynamically imported module/i.test(errorMessage);
+
+    if (!isChunkError) {
+      return false;
+    }
+
+    return this.checkIfVersionIsStale();
+  }
+
+  /**
+   * Check if resource load error (script/link tag) is due to stale build
+   */
+  async isStaleResourceError(): Promise<boolean> {
+    return this.checkIfVersionIsStale();
   }
 }
 

@@ -164,13 +164,21 @@ window.addEventListener("error", async (event) => {
 
     // Only check for OpenObserve's own chunks (relative URLs or same origin)
     // Ignore external CDN resources (absolute URLs with different origins)
-    const isOpenObserveResource = url.startsWith('/') ||
-                                   url.startsWith('./') ||
-                                   url.includes(window.location.origin);
+    const isOpenObserveResource = (() => {
+      try {
+        // Resolve relative URLs against current origin
+        const resourceUrl = new URL(url, window.location.origin);
+        // Only check resources from same origin
+        return resourceUrl.origin === window.location.origin;
+      } catch (e) {
+        // Invalid URL - assume it's a relative path (OpenObserve resource)
+        return true;
+      }
+    })();
 
     if (isOpenObserveResource) {
       // Smart detection: Check if it's stale build
-      const isStale = await buildVersionChecker.isStaleResourceError(target);
+      const isStale = await buildVersionChecker.isStaleResourceError();
 
       if (isStale) {
         showNewVersionNotification();
