@@ -60,7 +60,6 @@
       />
       <q-btn
         class="q-ml-sm o2-primary-button tw:h-[36px]"
-        padding="sm lg"
         no-caps
         :label="t('common.save')"
         :loading="saveJsonLoading"
