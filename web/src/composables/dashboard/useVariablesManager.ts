@@ -607,36 +607,62 @@ export const useVariablesManager = () => {
     // Mark as partially loaded
     variable.isVariablePartialLoaded = true;
 
+    // Check if parent has null value (no data found)
+    const parentHasNullValue =
+      variable.value === null ||
+      variable.value === undefined ||
+      (Array.isArray(variable.value) && variable.value.length === 0);
+
     // Trigger children - ensure they're reset and ready to load with new parent value
     const children = dependencyGraph.value[variableKey]?.children || [];
 
     children.forEach((childKey) => {
       const childVar = findVariableByKey(childKey, allVars);
       if (childVar) {
-        // Check if child can load (has all parents ready and is visible)
-        // Do this check BEFORE resetting to avoid triggering watchers prematurely
-        if (canVariableLoad(childVar)) {
-          // Reset child state to ensure it reloads with the new parent value
-          // This is critical for scoped variables that need fresh data
-          if (childVar.type === "query_values") {
-            // Only reset if not already loading/pending
-            if (!childVar.isLoading && !childVar.isVariableLoadingPending) {
-              childVar.isVariablePartialLoaded = false;
-              childVar.isLoading = false;
-              // Reset value and options to force fresh load
-              if (childVar.multiSelect) {
-                childVar.value = [];
-              } else {
-                childVar.value = null;
-              }
-              childVar.options = [];
-              // Mark as pending to trigger load
-              childVar.isVariableLoadingPending = true;
-            }
+        // If parent has null value, child should also be set to null WITHOUT firing API
+        if (parentHasNullValue) {
+          console.log(`[onVariablePartiallyLoaded] Parent ${variableKey} has null value, setting child ${childKey} to null without API call`);
+
+          // Set child to null/empty without triggering API
+          if (childVar.multiSelect) {
+            childVar.value = [];
           } else {
-            // Non-query types are immediate
-            childVar.isVariablePartialLoaded = true;
-            onVariablePartiallyLoaded(childKey);
+            childVar.value = null;
+          }
+          childVar.options = [];
+          childVar.isLoading = false;
+          childVar.isVariableLoadingPending = false;
+          childVar.isVariablePartialLoaded = true;
+
+          // Recursively mark grandchildren as partially loaded with null values
+          onVariablePartiallyLoaded(childKey);
+        } else {
+          // Parent has valid value, child can load normally
+          // Check if child can load (has all parents ready and is visible)
+          // Do this check BEFORE resetting to avoid triggering watchers prematurely
+          if (canVariableLoad(childVar)) {
+            // Reset child state to ensure it reloads with the new parent value
+            // This is critical for scoped variables that need fresh data
+            if (childVar.type === "query_values") {
+              // Only reset if not already loading/pending
+              if (!childVar.isLoading && !childVar.isVariableLoadingPending) {
+                childVar.isVariablePartialLoaded = false;
+                childVar.isLoading = false;
+                // Reset value and options to force fresh load
+                if (childVar.multiSelect) {
+                  childVar.value = [];
+                } else {
+                  childVar.value = null;
+                }
+                childVar.options = [];
+                // Mark as pending to trigger load
+                childVar.isVariableLoadingPending = true;
+              }
+            } else {
+              // Non-query types are immediate
+              childVar.isVariablePartialLoaded = true;
+              onVariablePartiallyLoaded(childKey);
+            }
           }
         }
       }

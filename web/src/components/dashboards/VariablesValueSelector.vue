@@ -386,6 +386,34 @@ export default defineComponent({
           response.content.percent === 100) ||
         response.type === "end"
       ) {
+        // Mark as partially loaded
+        variableObject.isVariablePartialLoaded = true;
+
+        // Only notify manager and trigger children if the value actually changed
+        // Check if value changed by comparing with oldVariablesData
+        const previousValue = oldVariablesData[variableObject.name];
+        const currentValue = variableObject.value;
+        const valueChanged =
+          Array.isArray(previousValue) && Array.isArray(currentValue)
+            ? JSON.stringify(previousValue) !== JSON.stringify(currentValue)
+            : previousValue !== currentValue;
+
+        if (valueChanged) {
+          // Update oldVariablesData
+          oldVariablesData[variableObject.name] = currentValue;
+
+          // Notify manager if using manager mode - this ensures children get updated even with no data
+          if (useManager && manager) {
+            const variableKey = getVariableKey(
+              variableObject.name,
+              variableObject.scope || "global",
+              variableObject.tabId,
+              variableObject.panelId,
+            );
+            manager.onVariablePartiallyLoaded(variableKey);
+          }
+        }
+
         finalizeVariableLoading(variableObject, true);
         emitVariablesData();
         return;
@@ -564,16 +592,15 @@ export default defineComponent({
               // Mark as partially loaded
               variableObject.isVariablePartialLoaded = true;
 
-              // Update oldVariablesData to track the new value
-              // This prevents duplicate child loads when value hasn't actually changed
-              oldVariablesData[variableObject.name] = variableObject.value;
+              // Notify manager and trigger children if value changed
+              // This includes both valid values AND null values (no data found)
+              // Children need to be notified even when parent gets null so they can be set to null too
+              if (hasValueChanged) {
+                // Update oldVariablesData ONLY when value changes
+                // This prevents duplicate child loads when value hasn't actually changed
+                oldVariablesData[variableObject.name] = variableObject.value;
 
-              // Only notify manager and trigger children if:
-              // 1. Value actually changed AND
-              // 2. Variable now has a valid value (not null/undefined/empty)
-              // This prevents child variables from firing multiple times before parent value is set
-              if (hasValueChanged && hasValidValue) {
-                // Notify manager if using manager mode (only when value changed and is valid)
+                // Notify manager if using manager mode
                 if (useManager && manager) {
                   const variableKey = getVariableKey(
                     variableObject.name,
