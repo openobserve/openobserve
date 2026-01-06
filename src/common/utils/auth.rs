@@ -26,7 +26,10 @@ use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::{infra::config::USER_SESSIONS, meta::ingestion::INGESTION_EP},
+        common::{
+            infra::config::{USER_SESSIONS, USER_SESSIONS_EXPIRY},
+            meta::ingestion::INGESTION_EP,
+        },
         service::users::get_user,
     },
     jsonwebtoken::TokenData,
@@ -211,7 +214,7 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
     pub method: String,
@@ -357,7 +360,14 @@ impl FromRequest for AuthExtractor {
                 // for organization api changes we need perms on _all_{org}
                 let entity = match (key, path_columns[1]) {
                     ("organizations", "extend_trial_period") => "_all__meta".to_string(),
-                    ("organizations", "organizations") => path_columns[0].to_string(),
+                    ("organizations", "organizations") => {
+                        // Special case: assume_service_account endpoint should check org:_all__meta
+                        if url_len == 3 && path_columns[2] == "assume_service_account" {
+                            format!("_all_{}", path_columns[0])
+                        } else {
+                            path_columns[0].to_string()
+                        }
+                    }
                     ("organizations", _) => format!("_all_{}", path_columns[0]),
                     _ => path_columns[0].to_string(),
                 };
@@ -725,6 +735,27 @@ impl FromRequest for AuthExtractor {
 
             let auth_str = extract_auth_str(&req).await;
 
+            // Log auth metadata without exposing sensitive tokens
+            let auth_type = if auth_str.starts_with("Basic ") {
+                "Basic"
+            } else if auth_str.starts_with("Bearer ") {
+                "Bearer"
+            } else if auth_str.starts_with("Session::") {
+                "Session"
+            } else if auth_str.is_empty() {
+                "None"
+            } else {
+                "Other"
+            };
+
+            log::debug!(
+                "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
+                local_path,
+                auth_str.is_empty(),
+                auth_type,
+                auth_str.len()
+            );
+
             // if let Some(auth_header) = req.headers().get("Authorization") {
             if !auth_str.is_empty() {
                 let path_is_bulk_operation = method.eq("DELETE")
@@ -939,9 +970,21 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
             let session_key = access_token.strip_prefix("session ").unwrap().to_string();
             match crate::service::db::session::get(&session_key).await {
                 Ok(token) => {
-                    format!("Bearer {token}")
+                    log::debug!("Session '{}' resolved to token", session_key);
+                    // Check if token already has auth prefix
+                    if token.starts_with("Basic ") || token.starts_with("Bearer ") {
+                        // Add session marker prefix to bypass allow_static_token check
+                        // Format: "Session::<session_id>::<actual_token>"
+                        format!("Session::{}::{}", session_key, token)
+                    } else {
+                        // Plain JWT token from Dex/OAuth, needs Bearer prefix
+                        format!("Bearer {}", token)
+                    }
                 }
-                Err(_) => access_token,
+                Err(e) => {
+                    log::error!("Failed to resolve session '{}': {}", session_key, e);
+                    access_token
+                }
             }
         } else {
             format!("Bearer {access_token}")
@@ -951,7 +994,49 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
         std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
-            auth_str.to_owned()
+            // Log auth type without exposing sensitive tokens
+            let auth_type = if auth_str.starts_with("Basic ") {
+                "Basic"
+            } else if auth_str.starts_with("Bearer ") {
+                "Bearer"
+            } else if auth_str.starts_with("session ") {
+                "session"
+            } else {
+                "Other"
+            };
+            log::debug!(
+                "Authorization header (extract_auth_str): type='{}', len={}",
+                auth_type,
+                auth_str.len()
+            );
+            // Handle session tokens from Authorization header
+            if auth_str.starts_with("session ") {
+                let session_key = auth_str.strip_prefix("session ").unwrap().to_string();
+                match crate::service::db::session::get(&session_key).await {
+                    Ok(token) => {
+                        log::debug!("Session '{}' resolved to token from header", session_key);
+                        // Check if token already has auth prefix
+                        if token.starts_with("Basic ") || token.starts_with("Bearer ") {
+                            // Add session marker prefix to bypass allow_static_token check
+                            // Format: "Session::<session_id>::<actual_token>"
+                            format!("Session::{}::{}", session_key, token)
+                        } else {
+                            // Plain JWT token from Dex/OAuth, needs Bearer prefix
+                            format!("Bearer {}", token)
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Failed to resolve session '{}' from header: {}",
+                            session_key,
+                            e
+                        );
+                        auth_str.to_owned()
+                    }
+                }
+            } else {
+                auth_str.to_owned()
+            }
         } else {
             "".to_string()
         }
@@ -984,11 +1069,47 @@ pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
             access_token
         } else if access_token.starts_with("session") {
             let session_key = access_token.strip_prefix("session ").unwrap().to_string();
+            // For sync context (rate limiting), only check cache with expiry validation
             match USER_SESSIONS.get(&session_key) {
                 Some(token) => {
-                    format!("Bearer {}", *token)
+                    let token_value = token.to_string();
+                    drop(token); // Drop reference before checking expiry
+
+                    // Check expiry from cache
+                    if let Some(expires_at_ref) = USER_SESSIONS_EXPIRY.get(&session_key) {
+                        let expires_at = *expires_at_ref;
+                        drop(expires_at_ref);
+
+                        let now = chrono::Utc::now().timestamp();
+                        if now > expires_at {
+                            log::warn!("Session '{}' expired in sync context", session_key);
+                            // Return the session key as-is, will fail auth
+                            access_token
+                        } else {
+                            // Check if token already has auth prefix (Basic/Bearer)
+                            if token_value.starts_with("Basic ")
+                                || token_value.starts_with("Bearer ")
+                            {
+                                // Already has prefix (e.g., assume_service_account sessions)
+                                token_value
+                            } else {
+                                // Plain JWT token, needs Bearer prefix
+                                format!("Bearer {}", token_value)
+                            }
+                        }
+                    } else {
+                        // No expiry info, check format and add Bearer if needed
+                        if token_value.starts_with("Basic ") || token_value.starts_with("Bearer ") {
+                            token_value
+                        } else {
+                            format!("Bearer {}", token_value)
+                        }
+                    }
                 }
-                None => access_token,
+                None => {
+                    log::warn!("Session '{}' not found in USER_SESSIONS cache", session_key);
+                    access_token
+                }
             }
         } else {
             format!("Bearer {access_token}")
@@ -998,7 +1119,63 @@ pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
         std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
-            auth_str.to_owned()
+            // Handle session tokens from Authorization header (same as cookie path)
+            if auth_str.starts_with("session ") {
+                let session_key = auth_str.strip_prefix("session ").unwrap().to_string();
+                // For sync context (rate limiting), only check cache with expiry validation
+                match USER_SESSIONS.get(&session_key) {
+                    Some(token) => {
+                        let token_value = token.to_string();
+                        drop(token); // Drop reference before checking expiry
+
+                        // Check expiry from cache
+                        if let Some(expires_at_ref) = USER_SESSIONS_EXPIRY.get(&session_key) {
+                            let expires_at = *expires_at_ref;
+                            drop(expires_at_ref);
+
+                            let now = chrono::Utc::now().timestamp();
+                            if now > expires_at {
+                                log::warn!(
+                                    "Session '{}' expired in sync context (header)",
+                                    session_key
+                                );
+                                // Return empty string, will fail auth
+                                "".to_string()
+                            } else {
+                                // Check if token already has auth prefix (Basic/Bearer)
+                                if token_value.starts_with("Basic ")
+                                    || token_value.starts_with("Bearer ")
+                                {
+                                    // Already has prefix (e.g., assume_service_account sessions)
+                                    token_value
+                                } else {
+                                    // Plain JWT token, needs Bearer prefix
+                                    format!("Bearer {}", token_value)
+                                }
+                            }
+                        } else {
+                            // No expiry info, check format and add Bearer if needed
+                            if token_value.starts_with("Basic ")
+                                || token_value.starts_with("Bearer ")
+                            {
+                                token_value
+                            } else {
+                                format!("Bearer {}", token_value)
+                            }
+                        }
+                    }
+                    None => {
+                        log::warn!(
+                            "Session '{}' not found in USER_SESSIONS cache (header)",
+                            session_key
+                        );
+                        "".to_string()
+                    }
+                }
+            } else {
+                // Not a session token, return as-is
+                auth_str.to_owned()
+            }
         } else {
             "".to_string()
         }

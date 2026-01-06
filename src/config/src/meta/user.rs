@@ -40,6 +40,8 @@ pub struct DBUser {
 pub struct UserOrg {
     pub name: String,
     #[serde(default)]
+    pub org_name: String,
+    #[serde(default)]
     pub token: String,
     #[serde(default)]
     pub rum_token: Option<String>,
