@@ -472,20 +472,19 @@ test.describe("Share Link Test Cases", () => {
 
   test("@bug-9788 @P1: Share button should be disabled when ZO_WEB_URL is not configured", {
     tag: ['@bug-9788', '@shareLink', '@P1']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    // Skip beforeEach by handling setup here with mock FIRST
+    testLogger.testStart(testInfo.title, testInfo.file);
     testLogger.info('Test: Share button disabled state with mocked config (Bug #9788)');
 
-    // Mock the /config endpoint to simulate ZO_WEB_URL not being configured
-    await page.route('**/api/*/config', async (route) => {
-      // Get the original response
+    // Set up mock BEFORE any navigation to ensure config is mocked from the start
+    await page.route('**/config', async (route) => {
       const response = await route.fetch();
       const json = await response.json();
 
       // Delete web_url property to simulate it not being configured
       const modifiedConfig = { ...json };
       delete modifiedConfig.web_url;
-
-      testLogger.info('Mocked /config endpoint with web_url property deleted');
 
       await route.fulfill({
         status: 200,
@@ -494,9 +493,15 @@ test.describe("Share Link Test Cases", () => {
       });
     });
 
-    // Reload the page to pick up the mocked config
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    // Now navigate for the first time with mock already active
+    await navigateToBase(page);
+    pm = new PageManager(page);
+
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    testLogger.navigation('Navigating to logs page with mocked config', { url: logsUrl });
+    await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Select a stream and run query to load results
     await pm.logsPage.selectStream(TEST_STREAM);
