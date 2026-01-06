@@ -214,6 +214,13 @@ export default defineComponent({
      * @param redirectURI
      */
     const redirectUser = () => {
+      // Check for AWS Marketplace token - redirect to setup if present
+      const awsMarketplaceToken = window.sessionStorage.getItem("aws_marketplace_token");
+      if (awsMarketplaceToken) {
+        router.push({ path: "/marketplace/aws/setup" });
+        return;
+      }
+
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
       if (redirectURI != null && redirectURI != "") {
