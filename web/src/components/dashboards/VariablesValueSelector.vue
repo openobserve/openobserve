@@ -813,6 +813,21 @@ export default defineComponent({
           variableData.value = item.multiSelect
             ? [SELECT_ALL_VALUE]
             : SELECT_ALL_VALUE;
+        } else if (item.type === "custom") {
+          // For custom type variables, set first option as default if no initial value
+          if (initialValue !== null && initialValue !== undefined &&
+              (Array.isArray(initialValue) ? initialValue.length > 0 : true)) {
+            // Use initial value if it exists
+            variableData.value = initialValue;
+          } else if (variableData.options && variableData.options.length > 0) {
+            // Set first option as default value
+            variableData.value = item.multiSelect
+              ? [variableData.options[0].value]
+              : variableData.options[0].value;
+          } else {
+            // No options available, set to null/empty array
+            variableData.value = item.multiSelect ? [] : null;
+          }
         } else if (item.type != "constant") {
           // for textbox type variable, if initial value is not exist, use the default value
           if (item.type == "textbox") {

@@ -106,6 +106,16 @@ const expandVariablesForScopes = (
       }
     }
 
+    // For custom type variables, select first option as default
+    if (variable.type === "custom") {
+      const options = (variable as any).options;
+      if (options && options.length > 0) {
+        return variable.multiSelect
+          ? [options[0].value]
+          : options[0].value;
+      }
+    }
+
     // Default: empty array for multiSelect, null otherwise
     return variable.multiSelect ? [] : null;
   };
