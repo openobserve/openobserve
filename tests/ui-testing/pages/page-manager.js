@@ -59,6 +59,9 @@ import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 
+// ===== FUNCTIONS PAGE OBJECTS =====
+const FunctionsPage = require("./functionsPages/functionsPage.js");
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -130,6 +133,9 @@ class PageManager {
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
+
+    // ===== FUNCTIONS PAGE OBJECTS =====
+    this.functionsPage = new FunctionsPage(page);
   }
 }
 

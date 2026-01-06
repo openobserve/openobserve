@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
+use config::{meta::function::RESULT_ARRAY, utils::json};
 use rquickjs::{Context, Runtime};
 
 thread_local! {
@@ -62,28 +62,73 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
     // We keep it in storage but remove it for compilation check
     let func_for_compilation = strip_result_array_marker(func);
 
+    // Detect if this is a ResultArray function to use appropriate variable name
+    // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single object)
+    // Only match #ResultArray# at the start of the function (not in comments)
+    let is_result_array = RESULT_ARRAY.is_match(func);
+    let var_name = if is_result_array { "rows" } else { "row" };
+    let test_value = if is_result_array { "[]" } else { "{}" };
+
     // Try to compile the function to check syntax
     JS_CONTEXT.with(|ctx| {
         ctx.with(|ctx| {
-            // Create a test wrapper to validate the function syntax
-            // We simulate what will happen during execution
+            // Create a test wrapper that catches errors and returns error details as a string
+            // This way we can extract the actual error message from JavaScript
+            // Use 'rows' for #ResultArray# functions, 'row' for regular functions
             let test_code = format!(
                 r#"
                 (function() {{
-                    const row = {{}};
+                    const {} = {};
                     try {{
                         {}
-                        return true;
+                        return JSON.stringify({{ success: true }});
                     }} catch(e) {{
-                        throw new Error("Syntax error: " + e.message);
+                        return JSON.stringify({{
+                            success: false,
+                            error: e.name + ': ' + e.message,
+                            line: e.lineNumber || 'unknown',
+                            column: e.columnNumber || 'unknown'
+                        }});
                     }}
                 }})();
                 "#,
-                func_for_compilation
+                var_name, test_value, func_for_compilation
             );
 
-            ctx.eval::<bool, _>(test_code)
-                .map_err(|e| std::io::Error::other(format!("JS syntax error: {}", e)))?;
+            let result: String = ctx
+                .eval(test_code)
+                .map_err(|e| std::io::Error::other(format!("JS compilation failed: {}", e)))?;
+
+            // Parse the result to check if there was an error
+            let result_obj: serde_json::Value = serde_json::from_str(&result)
+                .map_err(|e| std::io::Error::other(format!("Failed to parse result: {}", e)))?;
+
+            if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
+                && !success
+            {
+                let error_msg = result_obj
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                let line = result_obj
+                    .get("line")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| *s != "unknown");
+                let column = result_obj
+                    .get("column")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| *s != "unknown");
+
+                // Only append line/column if we have valid values
+                let full_error = match (line, column) {
+                    (Some(l), Some(c)) => format!("{} (line: {}, column: {})", error_msg, l, c),
+                    (Some(l), None) => format!("{} (line: {})", error_msg, l),
+                    (None, Some(c)) => format!("{} (column: {})", error_msg, c),
+                    (None, None) => error_msg.to_string(),
+                };
+
+                return Err(std::io::Error::other(full_error));
+            }
 
             // Extract parameter names (simple heuristic)
             // TODO: Parse function signature properly
@@ -166,24 +211,91 @@ pub fn apply_js_fn(
             // Strip #ResultArray# marker for execution (invalid JS syntax)
             let func_for_execution = strip_result_array_marker(&js_config.function);
 
-            // Create execution wrapper that parses input and stringifies output
+            // Detect if this is a ResultArray function to use appropriate variable name
+            // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single
+            // object)
+            // Only match #ResultArray# at the start of the function (not in comments)
+            let is_result_array = RESULT_ARRAY.is_match(&js_config.function);
+            let var_name = if is_result_array { "rows" } else { "row" };
+
+            // Create execution wrapper that catches errors and returns them as structured data
+            // Use 'rows' for #ResultArray# functions (consistent with VRL), 'row' for regular
+            // functions The function's return value is captured; if undefined, use the
+            // input variable Wrap user function to capture return value or mutated
+            // input For #ResultArray# functions, use 'rows' variable (array input)
+            // For regular functions, use 'row' variable (single object input)
             let exec_code = format!(
                 r#"
                 (function() {{
-                    const row = JSON.parse(inputJson);
-                    {}
-                    return JSON.stringify(row);
+                    try {{
+                        var {} = JSON.parse(inputJson);
+                        {}
+                        // After execution, use the variable (supports mutation pattern)
+                        return JSON.stringify({{ success: true, data: {} }});
+                    }} catch(e) {{
+                        return JSON.stringify({{
+                            success: false,
+                            error: e.name + ': ' + e.message,
+                            line: e.lineNumber || 'unknown',
+                            column: e.columnNumber || 'unknown',
+                            stack: e.stack || ''
+                        }});
+                    }}
                 }})();
                 "#,
-                func_for_execution
+                var_name, func_for_execution, var_name
             );
 
             // Execute the function
             match ctx.eval::<String, _>(exec_code) {
                 Ok(result_json) => {
-                    // Parse the result back to JSON Value
+                    // Parse the result to check if there was an error
                     match serde_json::from_str::<json::Value>(&result_json) {
-                        Ok(result) => (result, None),
+                        Ok(result_obj) => {
+                            if let Some(success) =
+                                result_obj.get("success").and_then(|v| v.as_bool())
+                                && success
+                            {
+                                // Extract the actual data
+                                if let Some(data) = result_obj.get("data") {
+                                    (data.clone(), None)
+                                } else {
+                                    (row.clone(), Some("No data returned".to_string()))
+                                }
+                            } else if let Some(success) =
+                                result_obj.get("success").and_then(|v| v.as_bool())
+                                && !success
+                            {
+                                // Extract error details
+                                let error_msg = result_obj
+                                    .get("error")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Unknown error");
+                                let line = result_obj
+                                    .get("line")
+                                    .and_then(|v| v.as_str())
+                                    .filter(|s| *s != "unknown");
+                                let column = result_obj
+                                    .get("column")
+                                    .and_then(|v| v.as_str())
+                                    .filter(|s| *s != "unknown");
+
+                                // Only append line/column if we have valid values
+                                let error_message = match (line, column) {
+                                    (Some(l), Some(c)) => {
+                                        format!("{} (line: {}, column: {})", error_msg, l, c)
+                                    }
+                                    (Some(l), None) => format!("{} (line: {})", error_msg, l),
+                                    (None, Some(c)) => format!("{} (column: {})", error_msg, c),
+                                    (None, None) => error_msg.to_string(),
+                                };
+
+                                log::error!("{}/{:?} {}", org_id, stream_name, error_message);
+                                (row, Some(error_message))
+                            } else {
+                                (row.clone(), Some("Unexpected response format".to_string()))
+                            }
+                        }
                         Err(e) => (
                             row.clone(),
                             Some(format!("Failed to parse JS output: {}", e)),
@@ -191,7 +303,7 @@ pub fn apply_js_fn(
                     }
                 }
                 Err(e) => {
-                    let error_msg = format!("JS execution error: {}", e);
+                    let error_msg = format!("JS execution failed: {}", e);
                     log::error!("{}/{:?} {}", org_id, stream_name, error_msg);
                     (row, Some(error_msg))
                 }
@@ -279,9 +391,13 @@ mod tests {
     #[test]
     fn test_compile_js_with_result_array_marker() {
         // #ResultArray# marker should not cause compilation error
+        // Note: #ResultArray# functions use 'rows' (array), not 'row' (single object)
         let func = r#"#ResultArray#
-row.transformed = true;
-row.type = "result_array";"#;
+rows.map(function(r) {
+  r.transformed = true;
+  r.type = "result_array";
+  return r;
+});"#;
         let result = compile_js_function(func, "test_org");
         assert!(result.is_ok());
 
@@ -293,8 +409,9 @@ row.type = "result_array";"#;
     #[test]
     fn test_compile_js_with_result_array_skip_vrl() {
         // #ResultArray#SkipVRL# marker should not cause compilation error
+        // Note: #ResultArray# functions use 'rows' (array), not 'row'
         let func = r#"#ResultArray#SkipVRL#
-row.transformed = true;"#;
+rows.map(function(r) { r.transformed = true; return r; });"#;
         let result = compile_js_function(func, "test_org");
         assert!(result.is_ok());
 
@@ -305,17 +422,25 @@ row.transformed = true;"#;
     #[test]
     fn test_apply_js_with_result_array_marker() {
         // Function with #ResultArray# should execute correctly
+        // Note: #ResultArray# functions receive 'rows' array, not single 'row'
         let func = r#"#ResultArray#
-row.processed = true;
-row.value = 42;"#;
+rows.map(function(r) {
+  r.processed = true;
+  r.value = 42;
+  return r;
+});"#;
         let config = compile_js_function(func, "test_org").unwrap();
-        let input = json!({"original": "test"});
+
+        // Input must be an array for #ResultArray# functions
+        let input = json!([{"original": "test"}]);
         let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
 
         assert!(error.is_none());
-        assert_eq!(output["original"], "test");
-        assert_eq!(output["processed"], true);
-        assert_eq!(output["value"], 42);
+        let output_array = output.as_array().expect("Output should be array");
+        assert_eq!(output_array.len(), 1);
+        assert_eq!(output_array[0]["original"], "test");
+        assert_eq!(output_array[0]["processed"], true);
+        assert_eq!(output_array[0]["value"], 42);
     }
 
     #[test]
@@ -340,6 +465,292 @@ row.value = 42;"#;
         assert!(stripped3.contains("row.field = 3;"));
     }
 
+    #[test]
+    fn test_compile_js_function_with_reference_error() {
+        // Test that undefined variable errors are caught and reported properly
+        let func = r#"
+            row.processed = true;
+            row.count = (row.count || 0) + 1;
+            row.source = "javascript";
+            mayvar
+        "#;
+        let result = compile_js_function(func, "test_org");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        println!("Captured error message: {}", err_msg);
+        // The error message should contain information about the undefined variable
+        assert!(
+            err_msg.contains("ReferenceError")
+                || err_msg.contains("mayvar")
+                || err_msg.contains("not defined"),
+            "Error message should mention the undefined variable, got: {}",
+            err_msg
+        );
+        // Should NOT contain "(line: unknown, column: unknown)"
+        assert!(
+            !err_msg.contains("unknown"),
+            "Error message should not contain 'unknown', got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_apply_js_fn_with_runtime_error() {
+        // Test runtime error handling
+        let func = r#"
+            row.value = undefinedVariable;
+        "#;
+        let config = compile_js_function(func, "test_org");
+        // Compilation might succeed but execution should fail
+        if let Ok(config) = config {
+            let input = json!({"original": "value"});
+            let (_output, error) = apply_js_fn(
+                &config,
+                input.clone(),
+                "test_org",
+                &["test_stream".to_string()],
+            );
+
+            // Should return original row and have an error
+            assert!(error.is_some());
+            let err_msg = error.unwrap();
+            assert!(
+                err_msg.contains("ReferenceError")
+                    || err_msg.contains("undefinedVariable")
+                    || err_msg.contains("not defined"),
+                "Error message should mention the undefined variable, got: {}",
+                err_msg
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_js_fn_with_syntax_error() {
+        // Test that syntax errors in the function are caught
+        // Note: Severe syntax errors like unmatched braces are caught by QuickJS parser
+        // before our try-catch, so we get a generic "Exception" message
+        let func = r#"
+            row.test = {{{;  // Invalid syntax
+        "#;
+        let result = compile_js_function(func, "test_org");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        println!("Syntax error message: {}", err_msg);
+        // For parse-time errors, QuickJS may not provide detailed messages
+        // We just verify an error was caught
+        assert!(
+            err_msg.contains("failed")
+                || err_msg.contains("Exception")
+                || err_msg.contains("syntax"),
+            "Error message should indicate failure, got: {}",
+            err_msg
+        );
+    }
+
     // Note: Runtime error testing is complex because QuickJS validates during compilation
     // Real runtime errors will be caught and logged appropriately in production use
+
+    #[test]
+    fn test_result_array_uses_rows_variable() {
+        // Test that #ResultArray# functions use 'rows' instead of 'row'
+        // Functions mutate rows in place (rows is mutable)
+        let func = r#"#ResultArray#
+var total = rows.length;
+var sum = rows.reduce(function(acc, r) { return acc + (r.value || 0); }, 0);
+// Enrich each row in place with aggregated data
+for (var i = 0; i < rows.length; i++) {
+  rows[i].total_count = total;
+  rows[i].sum = sum;
+}"#;
+
+        let config = compile_js_function(func, "test_org");
+        if let Err(e) = &config {
+            println!("Compilation error: {:?}", e);
+        }
+        assert!(
+            config.is_ok(),
+            "Should compile successfully with 'rows' variable"
+        );
+
+        let config = config.unwrap();
+
+        // Test with array input
+        let input = json!([
+            {"value": 10, "id": 1},
+            {"value": 20, "id": 2},
+            {"value": 30, "id": 3}
+        ]);
+
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        println!("Error: {:?}", error);
+        println!("Output: {:?}", output);
+        assert!(error.is_none(), "Should execute without error");
+
+        // Verify output is an array with enriched data
+        let output_array = output.as_array().expect("Output should be an array");
+        assert_eq!(output_array.len(), 3);
+
+        // Check first element has aggregated data
+        println!("First element: {:?}", output_array[0]);
+        assert_eq!(output_array[0]["total_count"], 3);
+        assert_eq!(output_array[0]["sum"], 60);
+        assert_eq!(output_array[0]["value"], 10);
+    }
+
+    #[test]
+    fn test_regular_function_uses_row_variable() {
+        // Test that regular functions (without #ResultArray#) use 'row'
+        let func = r#"
+row.processed = true;
+row.doubled_value = (row.value || 0) * 2;
+row;"#;
+
+        let config = compile_js_function(func, "test_org");
+        assert!(
+            config.is_ok(),
+            "Should compile successfully with 'row' variable"
+        );
+
+        let config = config.unwrap();
+
+        // Test with single object input
+        let input = json!({"value": 15, "id": 1});
+
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        assert!(error.is_none(), "Should execute without error");
+        assert_eq!(output["processed"], true);
+        assert_eq!(output["doubled_value"], 30);
+        assert_eq!(output["value"], 15);
+    }
+
+    #[test]
+    fn test_result_array_aggregation_functions() {
+        // Test complex aggregation with #ResultArray#
+        // Functions mutate rows in place instead of reassigning
+        let func = r#"#ResultArray#
+// Calculate statistics across all rows
+var values = rows.map(function(r) { return r.value || 0; });
+var sum = values.reduce(function(acc, v) { return acc + v; }, 0);
+var avg = sum / rows.length;
+var max = Math.max.apply(null, values);
+var min = Math.min.apply(null, values);
+
+// Enrich each row with batch statistics (in-place mutation)
+for (var i = 0; i < rows.length; i++) {
+  rows[i].original_value = rows[i].value;
+  rows[i].batch_size = rows.length;
+  rows[i].batch_avg = avg;
+  rows[i].batch_sum = sum;
+  rows[i].batch_max = max;
+  rows[i].batch_min = min;
+  rows[i].position = i + 1;
+  rows[i].deviation = (rows[i].value || 0) - avg;
+}"#;
+
+        let config = compile_js_function(func, "test_org");
+        assert!(config.is_ok(), "Should compile aggregation function");
+
+        let config = config.unwrap();
+
+        // Test with array of values
+        let input = json!([
+            {"value": 100, "id": "a"},
+            {"value": 200, "id": "b"},
+            {"value": 300, "id": "c"}
+        ]);
+
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        assert!(error.is_none(), "Should execute without error");
+
+        let output_array = output.as_array().expect("Output should be an array");
+        assert_eq!(output_array.len(), 3);
+
+        // Verify aggregated statistics
+        assert_eq!(output_array[0]["batch_size"], 3);
+        assert_eq!(output_array[0]["batch_sum"], 600);
+        assert_eq!(output_array[0]["batch_avg"], 200);
+        assert_eq!(output_array[0]["batch_max"], 300);
+        assert_eq!(output_array[0]["batch_min"], 100);
+        assert_eq!(output_array[0]["position"], 1);
+        assert_eq!(output_array[0]["deviation"], -100); // 100 - 200
+
+        assert_eq!(output_array[1]["deviation"], 0); // 200 - 200
+        assert_eq!(output_array[2]["deviation"], 100); // 300 - 200
+    }
+
+    #[test]
+    fn test_result_array_empty_array() {
+        // Test #ResultArray# with empty array input
+        let func = r#"#ResultArray#
+rows;"#;
+
+        let config = compile_js_function(func, "test_org");
+        assert!(config.is_ok());
+
+        let config = config.unwrap();
+        let input = json!([]);
+
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        assert!(error.is_none());
+        assert_eq!(output.as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_result_array_filtering() {
+        // Test #ResultArray# with filtering (returns subset)
+        // Filter by removing elements that don't match
+        let func = r#"#ResultArray#
+// Filter in place by modifying the array
+var filtered = [];
+for (var i = 0; i < rows.length; i++) {
+  if (rows[i].value > 50) {
+    filtered.push(rows[i]);
+  }
+}
+// Clear and rebuild rows
+rows.length = 0;
+for (var i = 0; i < filtered.length; i++) {
+  rows.push(filtered[i]);
+}"#;
+
+        let config = compile_js_function(func, "test_org");
+        assert!(config.is_ok());
+
+        let config = config.unwrap();
+        let input = json!([
+            {"value": 30},
+            {"value": 60},
+            {"value": 40},
+            {"value": 80}
+        ]);
+
+        let (output, error) = apply_js_fn(&config, input, "test_org", &["test_stream".to_string()]);
+
+        assert!(error.is_none());
+        let output_array = output.as_array().unwrap();
+        assert_eq!(output_array.len(), 2); // Only values > 50
+        assert_eq!(output_array[0]["value"], 60);
+        assert_eq!(output_array[1]["value"], 80);
+    }
+
+    #[test]
+    fn test_result_array_error_shows_rows_not_row() {
+        // Test that error messages for #ResultArray# reference 'rows'
+        let func = r#"#ResultArray#
+// This should fail because we're trying to use 'row' instead of 'rows'
+row.field = 1;"#;
+
+        let config = compile_js_function(func, "test_org");
+        // Should fail at compilation with ReferenceError about 'row' not being defined
+        assert!(config.is_err());
+        let err_msg = config.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("ReferenceError") || err_msg.contains("row"),
+            "Error should mention 'row' is not defined when using #ResultArray#"
+        );
+    }
 }

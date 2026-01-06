@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -247,6 +247,9 @@ async fn test_run_js_function(
     function: String,
     events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
+    // Check if function uses #ResultArray# marker
+    let apply_over_array = RESULT_ARRAY.is_match(&function);
+
     // Compile the JS function
     let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
         Ok(config) => config,
@@ -258,24 +261,57 @@ async fn test_run_js_function(
 
     let mut transformed_events = vec![];
 
-    // Apply the function to each event
-    for event in events {
+    if apply_over_array {
+        // #ResultArray# mode: apply function once over entire array
         let (ret_val, err) = crate::service::ingestion::apply_js_fn(
             &js_config,
-            event.clone(),
+            Value::Array(events),
             org_id,
             &[String::new()],
         );
 
         if let Some(err) = err {
-            transformed_events.push(VRLResult::new(&err, event));
+            transformed_events.push(VRLResult::new(&err, Value::Null));
+        } else if ret_val.is_array() {
+            // Result is an array - flatten each element
+            let result_array = ret_val.as_array().unwrap();
+            for item in result_array {
+                let transform = if item.is_object() {
+                    config::utils::flatten::flatten(item.clone()).unwrap_or("".into())
+                } else {
+                    item.clone()
+                };
+                transformed_events.push(VRLResult::new("", transform));
+            }
         } else {
-            let transform = if !ret_val.is_null() && ret_val.is_object() {
+            // Result is not an array - return as single result
+            let transform = if ret_val.is_object() {
                 config::utils::flatten::flatten(ret_val).unwrap_or("".into())
             } else {
-                "".into()
+                ret_val
             };
             transformed_events.push(VRLResult::new("", transform));
+        }
+    } else {
+        // Normal mode: apply function to each event
+        for event in events {
+            let (ret_val, err) = crate::service::ingestion::apply_js_fn(
+                &js_config,
+                event.clone(),
+                org_id,
+                &[String::new()],
+            );
+
+            if let Some(err) = err {
+                transformed_events.push(VRLResult::new(&err, event));
+            } else {
+                let transform = if !ret_val.is_null() && ret_val.is_object() {
+                    config::utils::flatten::flatten(ret_val).unwrap_or("".into())
+                } else {
+                    "".into()
+                };
+                transformed_events.push(VRLResult::new("", transform));
+            }
         }
     }
 

@@ -79,19 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
-                        :label="t('function.errorDetails')"
-                        labelClass="tw:text-red-600"
+                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
+                        labelClass="tw:text-red-600 tw:font-semibold"
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="q-px-sm q-pb-sm"
+                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
                         :class="
                           store.state.theme === 'dark'
                             ? 'bg-grey-10'
                             : 'bg-grey-2'
                         "
                       >
-                        <pre class="q-my-none" style="white-space: pre-wrap">{{
+                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -425,6 +425,10 @@ export default defineComponent({
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
+      // Auto-expand error section when error occurs
+      if (err) {
+        expandState.value.functionError = true;
+      }
     };
 
     const closeAddFunction = () => {
@@ -535,6 +539,10 @@ export default defineComponent({
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      // Ensure transType is a string for radio button binding
+      if (this.formData.transType !== undefined) {
+        this.formData.transType = String(this.formData.transType);
+      }
     }
   },
 });
