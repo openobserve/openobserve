@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Alert Setup -->
         <q-step
           :name="1"
-          title="Alert Setup *"
+          :title="t('alerts.steps.alertSetup') + ' *'"
           caption=""
           icon="settings"
           :done="wizardStep > 1"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Query Configuration -->
         <q-step
           :name="2"
-          title="Conditions *"
+          :title="t('alerts.steps.conditions') + ' *'"
           caption=""
           icon="search"
           :done="wizardStep > 2"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="3"
-          title="Compare with Past"
+          :title="t('alerts.steps.compareWithPast')"
           caption=""
           icon="compare_arrows"
           :done="wizardStep > 3"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 4: Alert Settings -->
         <q-step
           :name="4"
-          title="Alert Settings *"
+          :title="t('alerts.steps.alertSettings') + ' *'"
           caption=""
           icon="tune"
           :done="wizardStep > 4"
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-step
           v-if="formData.is_real_time === 'false'"
           :name="5"
-          title="Deduplication"
+          :title="t('alerts.steps.deduplication')"
           caption=""
           icon="filter_list"
           :done="wizardStep > 5"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 6: Advanced Settings -->
         <q-step
           :name="6"
-          title="Advanced"
+          :title="t('alerts.steps.advanced')"
           caption=""
           icon="settings_applications"
           :done="false"
@@ -736,12 +736,12 @@ export default defineComponent({
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
       const captions: Record<number, string> = {
-        1: 'Set the stage for your alert',
-        2: 'What should trigger the alert',
-        3: 'Compare current results with data from another time period',
-        4: 'Set your alert rules and choose how you\'d like to be notified.',
-        5: 'Avoid sending the same alert multiple times by grouping similar alerts together.',
-        6: 'Context variables, description, and row template',
+        1: t('alerts.stepCaptions.alertSetup'),
+        2: t('alerts.stepCaptions.conditions'),
+        3: t('alerts.stepCaptions.compareWithPast'),
+        4: t('alerts.stepCaptions.alertSettings'),
+        5: t('alerts.stepCaptions.deduplication'),
+        6: t('alerts.stepCaptions.advanced'),
       };
       return captions[wizardStep.value] || '';
     });

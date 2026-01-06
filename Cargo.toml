@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.40.0"
+version = "0.50.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -65,7 +65,7 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 async-walkdir.workspace = true
-awc = { version = "3.5", features = ["rustls-0_23"] }
+awc = { version = "3.8", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.9"
@@ -331,6 +331,9 @@ regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
+    "gzip",
+    "brotli",
+    "deflate",
 ] }
 roaring = "0.11.2"
 rustls-pemfile = "2"

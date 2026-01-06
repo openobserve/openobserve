@@ -61,6 +61,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="history"
                 />
                 <q-btn
+                    data-test="pipeline-list-backfill-btn"
+                    class="q-ml-sm o2-secondary-button tw-h-[36px]"
+                    :class="
+                        store.state.theme === 'dark'
+                        ? 'o2-secondary-button-dark'
+                        : 'o2-secondary-button-light'
+                    "
+                    no-caps
+                    flat
+                    :label="t('pipeline.backfill')"
+                    @click="goToBackfillJobs"
+                    icon="refresh"
+                />
+                <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
                   class="q-ml-sm o2-secondary-button tw:h-[36px]"
                   no-caps
@@ -195,6 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-tooltip position="bottom">
                         <PipelineView :pipeline="props.row" />
                       </q-tooltip>
+                    </q-btn>
+                    <!-- Backfill Button - Only for scheduled pipelines -->
+                    <q-btn
+                      v-if="props.row.source.source_type === 'scheduled'"
+                      :data-test="`pipeline-list-${props.row.name}-create-backfill`"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      icon="refresh"
+                      title="Create Backfill Job"
+                      @click.stop="openBackfillDialog(props.row)"
+                    >
                     </q-btn>
                     <!-- Error Indicator - Always render to maintain alignment -->
                     <div class="pipeline-error-slot">
@@ -390,6 +418,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:shouldStartfromNow="shouldStartfromNow = $event"
   />
 
+  <!-- Backfill Job Dialog -->
+  <create-backfill-job-dialog
+    v-model="backfillDialog.show"
+    :pipeline-id="backfillDialog.pipelineId"
+    :pipeline-name="backfillDialog.pipelineName"
+    :schedule-frequency="backfillDialog.scheduleFrequency"
+    @success="onBackfillSuccess"
+  />
+
   <!-- Pipeline Error Dialog -->
   <q-dialog v-model="errorDialog.show" @hide="closeErrorDialog">
     <q-card
@@ -498,6 +535,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
+import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
 
 import { filter, update } from "lodash-es";
 
@@ -595,6 +633,13 @@ const selectedPipelines = ref<any[]>([]);
 const errorDialog = ref({
   show: false,
   data: null as any,
+});
+
+const backfillDialog = ref({
+  show: false,
+  pipelineId: "",
+  pipelineName: "",
+  scheduleFrequency: 60,
 });
 
 const currentRouteName = computed(() => {
@@ -1092,6 +1137,15 @@ const goToPipelineHistory = () => {
   });
 };
 
+const goToBackfillJobs = () => {
+  router.push({
+    name: "pipelineBackfill",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
     const dismiss = q.notify({
       spinner: true,
@@ -1242,6 +1296,25 @@ const bulkDeletePipelines = async () => {
   }
 
   resetConfirmDialog();
+};
+
+const openBackfillDialog = (pipeline: any) => {
+  // Extract schedule frequency from pipeline source (for scheduled pipelines)
+  // The frequency is stored in trigger_condition.frequency (in minutes for derived streams)
+  const scheduleFrequency =
+    pipeline.source?.trigger_condition?.frequency || 60;
+
+  backfillDialog.value = {
+    show: true,
+    pipelineId: pipeline.pipeline_id,
+    pipelineName: pipeline.name,
+    scheduleFrequency: scheduleFrequency,
+  };
+};
+
+const onBackfillSuccess = (jobId: string) => {
+  // Navigate to backfill jobs page after successful creation
+  goToBackfillJobs();
 };
 </script>
 <style lang="scss" scoped>

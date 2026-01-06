@@ -52,7 +52,8 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a role"}))
     )
 )]
 #[post("/{org_id}/roles")]
@@ -137,7 +138,8 @@ pub async fn create_role(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a role"}))
     )
 )]
 #[delete("/{org_id}/roles/{role_id}")]
@@ -171,7 +173,8 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/roles/bulk")]
@@ -240,7 +243,8 @@ pub async fn delete_role_bulk(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/roles/bulk")]
@@ -299,7 +303,8 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all roles"}))
     )
 )]
 #[get("/{org_id}/roles")]
@@ -395,7 +400,8 @@ pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a role"}))
     )
 )]
 #[put("/{org_id}/roles/{role_id}")]
@@ -1062,6 +1068,9 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/groups/bulk")]
@@ -1130,6 +1139,9 @@ pub async fn delete_group_bulk(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/groups/bulk")]

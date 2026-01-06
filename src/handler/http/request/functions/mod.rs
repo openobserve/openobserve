@@ -51,7 +51,8 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Create a VRL function"}))
     )
 )]
 #[post("/{org_id}/functions")]
@@ -87,7 +88,8 @@ pub async fn save_function(
         (status = 200, description = "Success", content_type = "application/json", body = inline(FunctionList)),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List all functions"}))
     )
 )]
 #[get("/{org_id}/functions")]
@@ -146,7 +148,8 @@ async fn list_functions(
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete a function"}))
     )
 )]
 #[delete("/{org_id}/functions/{name}")]
@@ -195,7 +198,8 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[delete("/{org_id}/functions/bulk")]
@@ -264,7 +268,8 @@ async fn delete_function_bulk(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Update a VRL function"}))
     )
 )]
 #[put("/{org_id}/functions/{name}")]
@@ -304,7 +309,8 @@ pub async fn update_function(
         (status = 500, description = "Internal server error", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Check function dependencies"}))
     )
 )]
 #[get("/{org_id}/functions/{name}")]
@@ -335,6 +341,8 @@ pub async fn list_pipeline_dependencies(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
     )
 )]
 #[post("/{org_id}/functions/test")]

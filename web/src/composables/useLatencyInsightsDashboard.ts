@@ -367,6 +367,8 @@ export function useLatencyInsightsDashboard() {
           label_option: {
             rotate: 45,
           },
+          axis_label_rotate: 30,
+          axis_label_truncate_width: 80,
           color: isComparisonMode ? {
             mode: "palette-classic-by-series",
             fixedColor: ["#ffc107", "#1976d2"],

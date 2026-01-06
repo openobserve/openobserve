@@ -44,6 +44,7 @@ use infra::{
     cache::file_data,
     cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
+    runtime::DATAFUSION_RUNTIME,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_created_at,
@@ -62,10 +63,7 @@ use super::worker::{MergeBatch, MergeSender};
 use crate::service::{
     db, file_list,
     schema::generate_schema_for_defined_schema_fields,
-    search::{
-        DATAFUSION_RUNTIME,
-        datafusion::exec::{self, MergeParquetResult, TableBuilder},
-    },
+    search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
     tantivy::create_tantivy_index,
 };
 

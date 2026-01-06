@@ -182,7 +182,8 @@ impl TraceInfo {
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/ai/chat_stream")]

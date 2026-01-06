@@ -770,4 +770,179 @@ mod tests {
         };
         assert_eq!(query_desc.sort_order, Some("desc".to_string()));
     }
+
+    #[test]
+    fn test_escape_like_basic() {
+        // Test with normal string (no SQL special characters except underscore)
+        assert_eq!(escape_like("normalstring"), "normalstring");
+        assert_eq!(escape_like("alert123"), "alert123");
+        assert_eq!(escape_like(""), "");
+        assert_eq!(escape_like("simple-text"), "simple-text");
+    }
+
+    #[test]
+    fn test_escape_like_backslash() {
+        // Test escaping backslash
+        assert_eq!(escape_like("path\\to\\file"), r"path\\to\\file");
+        assert_eq!(escape_like("\\"), r"\\");
+        assert_eq!(escape_like("\\\\"), r"\\\\");
+    }
+
+    #[test]
+    fn test_escape_like_percent() {
+        // Test escaping percent sign (SQL wildcard)
+        assert_eq!(escape_like("50%"), r"50\%");
+        assert_eq!(escape_like("%wildcard%"), r"\%wildcard\%");
+        assert_eq!(escape_like("100% success"), r"100\% success");
+    }
+
+    #[test]
+    fn test_escape_like_underscore() {
+        // Test escaping underscore (SQL wildcard)
+        assert_eq!(escape_like("alert_name"), r"alert\_name");
+        assert_eq!(escape_like("_prefix"), r"\_prefix");
+        assert_eq!(escape_like("suffix_"), r"suffix\_");
+    }
+
+    #[test]
+    fn test_escape_like_single_quote() {
+        // Test escaping single quote (SQL string delimiter)
+        assert_eq!(escape_like("it's"), "it''s");
+        assert_eq!(escape_like("'quoted'"), "''quoted''");
+        assert_eq!(escape_like("O'Brien"), "O''Brien");
+    }
+
+    #[test]
+    fn test_escape_like_multiple_special_chars() {
+        // Test multiple special characters in one string
+        assert_eq!(escape_like("100%_test"), r"100\%\_test");
+        assert_eq!(escape_like("path\\with_50%"), r"path\\with\_50\%");
+        assert_eq!(escape_like("It's 100%!"), r"It''s 100\%!");
+    }
+
+    #[test]
+    fn test_escape_like_all_special_chars() {
+        // Test all special characters together
+        assert_eq!(escape_like(r"\%_'combined"), r"\\\%\_''combined");
+    }
+
+    #[test]
+    fn test_escape_like_unicode() {
+        // Test with unicode characters (should pass through unchanged)
+        assert_eq!(escape_like("alert_テスト"), r"alert\_テスト");
+        assert_eq!(escape_like("🔔_notification"), r"🔔\_notification");
+        assert_eq!(escape_like("алерт_name"), r"алерт\_name");
+    }
+
+    #[test]
+    fn test_escape_like_sql_injection_patterns() {
+        // Test common SQL injection patterns
+        assert_eq!(escape_like("' OR '1'='1"), "'' OR ''1''=''1");
+        assert_eq!(escape_like("admin'--"), "admin''--");
+        assert_eq!(escape_like("'; DROP TABLE--"), "''; DROP TABLE--");
+    }
+
+    #[test]
+    fn test_escape_like_consecutive_special_chars() {
+        // Test consecutive special characters
+        assert_eq!(escape_like("%%"), r"\%\%");
+        assert_eq!(escape_like("__"), r"\_\_");
+        assert_eq!(escape_like("''"), "''''");
+        assert_eq!(escape_like(r"\\"), r"\\\\");
+    }
+
+    #[test]
+    fn test_escape_like_whitespace() {
+        // Test that whitespace is preserved
+        assert_eq!(escape_like("alert name"), "alert name");
+        assert_eq!(escape_like("  spaces  "), "  spaces  ");
+        assert_eq!(escape_like("new\nline"), "new\nline");
+        assert_eq!(escape_like("tab\there"), "tab\there");
+    }
+
+    #[test]
+    fn test_escape_like_real_world_alert_names() {
+        // Test with realistic alert name patterns
+        assert_eq!(escape_like("cpu_usage_>_80%"), r"cpu\_usage\_>\_80\%");
+        assert_eq!(escape_like("disk_full_/var/log"), r"disk\_full\_/var/log");
+        assert_eq!(escape_like("error_rate_'high'"), r"error\_rate\_''high''");
+    }
+
+    #[test]
+    fn test_alert_history_entry_serialization() {
+        let entry = AlertHistoryEntry {
+            timestamp: 1640995200000000,
+            alert_name: "test_alert".to_string(),
+            org: "test_org".to_string(),
+            status: "success".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 0,
+            error: None,
+            success_response: Some("OK".to_string()),
+            is_partial: Some(false),
+            delay_in_secs: Some(10),
+            evaluation_took_in_secs: Some(1.5),
+            source_node: Some("node1".to_string()),
+            query_took: Some(500),
+            dedup_enabled: Some(true),
+            dedup_suppressed: Some(false),
+            dedup_count: Some(1),
+            grouped: Some(false),
+            group_size: None,
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: AlertHistoryEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.timestamp, entry.timestamp);
+        assert_eq!(deserialized.alert_name, entry.alert_name);
+        assert_eq!(deserialized.org, entry.org);
+        assert_eq!(deserialized.status, entry.status);
+        assert_eq!(deserialized.dedup_enabled, entry.dedup_enabled);
+    }
+
+    #[test]
+    fn test_alert_history_response_serialization() {
+        let entry = AlertHistoryEntry {
+            timestamp: 1640995200000000,
+            alert_name: "test_alert".to_string(),
+            org: "test_org".to_string(),
+            status: "success".to_string(),
+            is_realtime: true,
+            is_silenced: false,
+            start_time: 1640995100000000,
+            end_time: 1640995200000000,
+            retries: 0,
+            error: None,
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: None,
+            query_took: None,
+            dedup_enabled: None,
+            dedup_suppressed: None,
+            dedup_count: None,
+            grouped: None,
+            group_size: None,
+        };
+
+        let response = AlertHistoryResponse {
+            total: 1,
+            from: 0,
+            size: 10,
+            hits: vec![entry],
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let deserialized: AlertHistoryResponse = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.total, 1);
+        assert_eq!(deserialized.from, 0);
+        assert_eq!(deserialized.size, 10);
+        assert_eq!(deserialized.hits.len(), 1);
+    }
 }

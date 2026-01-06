@@ -80,14 +80,11 @@ pub async fn handle_request(
 
     let index_all_max_value_length = cfg.limit.index_all_max_value_length;
 
-    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+    let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &StreamType::Logs,
-    )
-    .await;
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
     let mut timestamps = Vec::new();

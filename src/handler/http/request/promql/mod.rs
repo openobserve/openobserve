@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[post("/{org_id}/prometheus/api/v1/write")]
@@ -128,7 +131,8 @@ pub async fn remote_write(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL instant query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -316,7 +320,8 @@ async fn query(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Execute PromQL range query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -664,7 +669,8 @@ async fn query_range(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus metadata"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -732,7 +738,8 @@ pub async fn metadata(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -904,7 +911,8 @@ async fn series(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label names"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -994,7 +1002,8 @@ async fn labels(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label values"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -1115,7 +1124,8 @@ fn validate_metadata_params(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Format PromQL query"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]
@@ -1242,10 +1252,13 @@ async fn search_streaming(
         .super_cluster
         .enabled;
 
-    let partitions = generate_search_partition(&req.query, req.start, req.end, req.step);
+    // adjust start and end time
+    let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
+    // generate partitions
+    let partitions = generate_search_partition(&req.query, start, end, req.step);
     log::info!(
-        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions for streaming search",
-        partitions.len()
+        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions with time range [{start},{end}]",
+        partitions.len(),
     );
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(
         partitions.len(),
@@ -1400,6 +1413,9 @@ async fn search_streaming(
 /// Generate search partitions based on the query's lookback window and step
 /// The mini partition should be at least twice the size of the lookback window to avoid redundant
 /// computations on the same data.
+/// Partitions are aligned to natural time boundaries (e.g., hour boundaries for 1h step,
+/// 30-minute boundaries for 30m step). The first and last partitions may not be fully aligned
+/// to accommodate the query's actual start/end times.
 fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Vec<(i64, i64)> {
     if start >= end {
         return vec![(start, end)];
@@ -1414,23 +1430,53 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     if partition_step < mini_step {
         partition_step = mini_step;
     }
+    partition_step -= partition_step % step;
 
     if end - start <= partition_step {
         return vec![(start, end)];
     }
 
     let mut groups: Vec<(i64, i64)> = Vec::new();
-    let mut group_start = start;
-    while group_start <= end {
-        let group_end = std::cmp::min(group_start + partition_step, end);
+
+    // Calculate the offset from the aligned boundary
+    // For example, if partition_step is 1 hour and start is 10:23, offset is 23 minutes
+    let offset = start % partition_step;
+
+    // Determine where aligned partitions start
+    let mut group_start = if offset == 0 {
+        // Start is already aligned, begin from start
+        start
+    } else {
+        // First partition: from start to next aligned boundary
+        // we need to subtract the step to avoid the overlap of the next partition
+        let next_aligned_boundary = start - offset + partition_step - step;
+        if next_aligned_boundary <= end {
+            groups.push((start, next_aligned_boundary));
+        }
+        next_aligned_boundary + step
+    };
+    while group_start < end {
+        let mut group_end = std::cmp::min(group_start + partition_step, end);
+
+        // If this would be the last partition and it's too small, merge with previous
         if group_end == end && !groups.is_empty() && (group_end - group_start < step * 5) {
             groups.last_mut().unwrap().1 = group_end;
             break;
         }
+        // we need to subtract the step to avoid the overlap of the next partition
+        if group_end < end {
+            group_end -= step;
+        }
         groups.push((group_start, group_end));
+
         // because of each partition will return data point with start and end timestamp,
         // so the next partition should start from next data point after current end
         group_start = group_end + step;
+    }
+
+    // Handle case where entire range is within one partition
+    if groups.is_empty() {
+        groups.push((start, end));
     }
 
     groups

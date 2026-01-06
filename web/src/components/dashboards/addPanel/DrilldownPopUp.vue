@@ -26,10 +26,10 @@
     >
       <div class="flex items-center q-table__title q-mr-md">
         <span data-test="dashboard-drilldown-title" v-if="isEditMode"
-          >Edit Drilldown
+          >{{ t("dashboard.editDrilldown") }}
         </span>
         <span data-test="dashboard-drilldown-title" v-else
-          >Create Drilldown</span
+          >{{ t("dashboard.createDrilldown") }}</span
         >
       </div>
       <div class="flex q-gutter-sm items-center">
@@ -52,7 +52,7 @@
     <div
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
-      Go to :
+      {{ t("dashboard.goTo") }}
       <q-btn-group class="">
         <q-btn
           :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
@@ -63,7 +63,7 @@
             class="q-mr-xs"
             :name="outlinedDashboard"
             style="cursor: pointer; height: 25px"
-          />Dashboard</q-btn
+          />{{ t("menu.dashboard") }}</q-btn
         >
         <q-btn
           :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
@@ -74,7 +74,7 @@
             class="q-mr-xs"
             name="link"
             style="cursor: pointer; height: 25px; display: flex !important"
-          />URL</q-btn
+          />{{ t("common.url") }}</q-btn
         >
         <q-btn
           :class="drilldownData.type === 'logs' ? 'selected' : ''"
@@ -85,33 +85,33 @@
             class="q-mr-xs"
             name="search"
             style="cursor: pointer; height: 25px; display: flex !important"
-          />Logs</q-btn
+          />{{ t("common.logs") }}</q-btn
         >
       </q-btn-group>
     </div>
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
-        <label>Select Logs Mode:</label>
+        <label>{{ t("dashboard.selectLogsMode") }}</label>
         <q-btn-group class="q-ml-sm">
           <q-btn
             :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
             size="sm"
             @click="drilldownData.data.logsMode = 'auto'"
           >
-            Auto
+            {{ t("common.auto") }}
           </q-btn>
           <q-btn
             :class="drilldownData.data.logsMode === 'custom' ? 'selected' : ''"
             size="sm"
             @click="drilldownData.data.logsMode = 'custom'"
           >
-            Custom
+            {{ t("common.custom") }}
           </q-btn>
         </q-btn-group>
       </div>
       <div v-if="drilldownData.data.logsMode === 'custom'" style="margin-top: 10px">
-        <label>Enter Custom Query:</label>
+        <label>{{ t("dashboard.enterCustomQuery") }}</label>
         <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
@@ -126,7 +126,7 @@
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        Enter URL:
+        {{ t("dashboard.enterUrl") }}
         <textarea
           style="
             min-width: 100%;
@@ -145,7 +145,7 @@
           v-if="!isFormURLValid && drilldownData.data.url.trim()"
           data-test="dashboard-drilldown-url-error-message"
         >
-          Invalid URL
+          {{ t("dashboard.invalidUrl") }}
         </div>
       </div>
     </div>
@@ -157,7 +157,7 @@
             v-model="drilldownData.data.folder"
             :options="folderList"
             emit-value
-            label="Select Folder * :"
+            :label="t('dashboard.selectFolderDrilldown')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
@@ -173,7 +173,7 @@
             <template v-slot:no-option>
               <q-item>
                 <q-item-section class="text-italic text-grey">
-                  No folders available
+                  {{ t("dashboard.noFoldersAvailable") }}
                 </q-item-section>
               </q-item>
             </template>
@@ -184,7 +184,7 @@
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
             emit-value
-            label="Select Dashboard * :"
+            :label="t('dashboard.selectDashboardDrilldown')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
@@ -202,7 +202,7 @@
                 data-test="dashboard-drilldown-no-dashboard-available-option"
               >
                 <q-item-section class="text-italic text-grey">
-                  No dashboards available
+                  {{ t("dashboard.noDashboardsAvailable") }}
                 </q-item-section>
               </q-item>
             </template>
@@ -213,7 +213,7 @@
             v-model="drilldownData.data.tab"
             :options="tabList"
             emit-value
-            label="Select Tab * :"
+            :label="t('dashboard.selectTabDrilldown')"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
@@ -229,7 +229,7 @@
             <template v-slot:no-option>
               <q-item data-test="dashboard-drilldown-no-tab-available-option">
                 <q-item-section class="text-italic text-grey">
-                  No tab Available
+                  {{ t("dashboard.noTabAvailable") }}
                 </q-item-section>
               </q-item>
             </template>
@@ -246,7 +246,7 @@
               align-items: center;
             "
           >
-            <div>Variables :</div>
+            <div>{{ t("dashboard.variables") }}</div>
             <q-btn
               icon="add"
               color="primary"
@@ -260,7 +260,7 @@
                   })
               "
               data-test="dashboard-drilldown-add-variable"
-              >Add</q-btn
+              >{{ t("common.add") }}</q-btn
             >
           </div>
           <div
@@ -272,14 +272,14 @@
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <CommonAutoComplete
-                placeholder="Name"
+                :placeholder="t('dashboard.name')"
                 v-model="variable.name"
                 searchRegex="(.*)"
                 :items="variableNamesFn"
                 style="width: auto !important; padding-top: 3px !important"
               ></CommonAutoComplete>
               <CommonAutoComplete
-                placeholder="Value"
+                :placeholder="t('panel.value')"
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
@@ -301,7 +301,7 @@
       <!-- radio button for new tab -->
       <div style="margin-top: 10px">
         <q-toggle
-          :label="`Pass all current variables : `"
+          :label="t('dashboard.passAllCurrentVariables')"
           left-label
           v-model="drilldownData.data.passAllVariables"
           data-test="dashboard-drilldown-pass-all-variables"
@@ -315,7 +315,7 @@
     <!-- radio button for new tab -->
     <div style="margin-top: 10px">
       <q-toggle
-        :label="`Open in new tab : `"
+        :label="t('dashboard.openInNewTab')"
         left-label
         v-model="drilldownData.targetBlank"
         data-test="dashboard-drilldown-open-in-new-tab"
@@ -347,7 +347,7 @@
         style="min-width: 60px"
         data-test="confirm-button"
         :disable="isFormValid"
-        :label="isEditMode ? 'Update' : 'Add'"
+        :label="isEditMode ? t('dashboard.update') : t('common.add')"
       />
     </q-card-actions>
   </div>
