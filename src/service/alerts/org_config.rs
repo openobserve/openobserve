@@ -37,7 +37,7 @@ pub async fn get_deduplication_config(
             Ok(Some(config))
         }
         Err(infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(_))) => Ok(None),
-        Err(e) => Err(anyhow::anyhow!("Failed to get deduplication config: {}", e)),
+        Err(e) => Err(anyhow::anyhow!("Failed to get deduplication config: {e}")),
     }
 }
 
@@ -52,7 +52,21 @@ pub async fn set_deduplication_config(
 
     db.put(&key, value.into(), db::NO_NEED_WATCH, None)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to set deduplication config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to set deduplication config: {e}"))?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::semantic_groups_put(
+            org_id,
+            config.clone(),
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish semantic_groups put: {e}");
+    }
 
     Ok(())
 }
@@ -64,7 +78,18 @@ pub async fn delete_deduplication_config(org_id: &str) -> Result<(), anyhow::Err
 
     db.delete_if_exists(&key, false, db::NO_NEED_WATCH)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to delete deduplication config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to delete deduplication config: {e}"))?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::semantic_groups_delete(org_id).await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish semantic_groups delete: {e}");
+    }
 
     Ok(())
 }
@@ -100,11 +125,7 @@ pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>
 
             // Try to save, but don't fail if it doesn't work
             if let Err(e) = set_deduplication_config(org_id, &config).await {
-                log::warn!(
-                    "Failed to auto-initialize semantic groups for org {}: {}",
-                    org_id,
-                    e
-                );
+                log::warn!("Failed to auto-initialize semantic groups for org {org_id}: {e}");
             }
 
             Ok(defaults)
@@ -123,7 +144,7 @@ pub async fn get_semantic_groups(org_id: &str) -> Result<Vec<SemanticFieldGroup>
 pub async fn initialize_semantic_groups(org_id: &str) -> Result<(), anyhow::Error> {
     // Check if already initialized
     if get_deduplication_config(org_id).await?.is_some() {
-        log::debug!("Semantic groups already initialized for org {}", org_id);
+        log::debug!("Semantic groups already initialized for org {org_id}");
         return Ok(());
     }
 
@@ -142,7 +163,7 @@ pub async fn initialize_semantic_groups(org_id: &str) -> Result<(), anyhow::Erro
     };
 
     set_deduplication_config(org_id, &config).await?;
-    log::info!("Initialized semantic groups for org {}", org_id);
+    log::info!("Initialized semantic groups for org {org_id}");
     Ok(())
 }
 
