@@ -1926,36 +1926,6 @@ pub struct NatsVisibility {
         help = "Monitor KV buckets (can be high cardinality)"
     )]
     pub monitor_kv: bool,
-    #[env_config(
-        name = "ZO_NATS_VISIBILITY_LAG_THRESHOLD",
-        default = 1000,
-        help = "Consumer lag threshold for anomaly detection"
-    )]
-    pub lag_threshold: i64,
-    #[env_config(
-        name = "ZO_NATS_VISIBILITY_LATENCY_THRESHOLD",
-        default = 5000,
-        help = "Processing latency threshold in milliseconds"
-    )]
-    pub latency_threshold_ms: u64,
-    #[env_config(
-        name = "ZO_NATS_VISIBILITY_REPLICA_LAG_THRESHOLD",
-        default = 5.0,
-        help = "Replica lag threshold in seconds"
-    )]
-    pub replica_lag_threshold_secs: f64,
-    #[env_config(
-        name = "ZO_NATS_VISIBILITY_CAPACITY_THRESHOLD",
-        default = 90.0,
-        help = "Stream capacity threshold percentage"
-    )]
-    pub capacity_threshold_percent: f64,
-    #[env_config(
-        name = "ZO_NATS_VISIBILITY_INACTIVE_THRESHOLD",
-        default = 300,
-        help = "Consumer inactive threshold in seconds"
-    )]
-    pub inactive_threshold_secs: u64,
 }
 
 #[derive(Serialize, Debug, Default, EnvConfig)]

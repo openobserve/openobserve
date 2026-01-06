@@ -155,9 +155,6 @@ impl NatsVisibilityCollector {
                 EventData::Stream(stream_data.clone()),
             );
             self.batch.push(event);
-
-            // Check for basic anomalies
-            self.check_stream_anomalies(&stream_data);
         }
 
         log::info!("[NATS Visibility] Collected {} stream events", stream_count);
@@ -300,9 +297,6 @@ impl NatsVisibilityCollector {
                     EventData::Consumer(consumer_data.clone()),
                 );
                 self.batch.push(event);
-
-                // Check for anomalies
-                self.check_consumer_anomalies(&consumer_data);
             }
         }
 
@@ -311,152 +305,6 @@ impl NatsVisibilityCollector {
             consumer_count
         );
         Ok(())
-    }
-
-    fn check_stream_anomalies(&mut self, stream_data: &StreamEventData) {
-        let cfg = get_config();
-
-        // Anomaly: Zero consumers with messages
-        if stream_data.consumer_count == 0 && stream_data.messages_total > 0 {
-            let anomaly = self.create_anomaly(
-                &stream_data.stream_name,
-                anomaly_types::ZERO_CONSUMERS_WITH_MESSAGES,
-                "availability",
-                "critical",
-                stream_data.consumer_count as f64,
-                Some(1.0),
-                "Stream has messages but no consumers",
-                &format!(
-                    "Stream {} has {} messages but 0 consumers",
-                    stream_data.stream_name, stream_data.messages_total
-                ),
-                "Check if consumer crashed or was deleted. Create consumer or restart O2 pods.",
-                "Messages are piling up and not being processed",
-                stream_data.messages_total,
-                stream_data.bytes_total,
-                0,
-                stream_data.consumer_count,
-                vec![],
-            );
-            self.batch.push(anomaly);
-        }
-
-        // Anomaly: Stream near capacity
-        if stream_data.capacity_used_percent > cfg.nats_visibility.capacity_threshold_percent {
-            let anomaly = self.create_anomaly(
-                &stream_data.stream_name,
-                anomaly_types::STREAM_NEAR_CAPACITY,
-                "capacity",
-                "warning",
-                stream_data.capacity_used_percent,
-                Some(cfg.nats_visibility.capacity_threshold_percent),
-                "Stream approaching capacity limit",
-                &format!(
-                    "Stream {} is at {:.1}% capacity ({} bytes / {} bytes)",
-                    stream_data.stream_name,
-                    stream_data.capacity_used_percent,
-                    stream_data.bytes_total,
-                    stream_data.max_bytes_configured
-                ),
-                "Consider increasing max_bytes for stream or processing messages faster",
-                "Stream may start rejecting new messages when full",
-                stream_data.messages_total,
-                stream_data.bytes_total,
-                0,
-                stream_data.consumer_count,
-                vec![],
-            );
-            self.batch.push(anomaly);
-        }
-
-        // Anomaly: High replica lag
-        for replica in &stream_data.replicas {
-            if replica.lag_seconds > cfg.nats_visibility.replica_lag_threshold_secs {
-                let anomaly = self.create_anomaly(
-                    &stream_data.stream_name,
-                    anomaly_types::HIGH_REPLICA_LAG,
-                    "replication",
-                    "warning",
-                    replica.lag_seconds,
-                    Some(cfg.nats_visibility.replica_lag_threshold_secs),
-                    "Replica lagging behind leader",
-                    &format!(
-                        "Replica {} on stream {} is lagging by {:.2}s",
-                        replica.replica_name, stream_data.stream_name, replica.lag_seconds
-                    ),
-                    "Check network connectivity and replica node health",
-                    "Data may not be fully replicated, risking data loss",
-                    stream_data.messages_total,
-                    stream_data.bytes_total,
-                    0,
-                    stream_data.consumer_count,
-                    vec![replica.replica_name.clone()],
-                );
-                self.batch.push(anomaly);
-            }
-        }
-    }
-
-    fn check_consumer_anomalies(&mut self, consumer_data: &ConsumerEventData) {
-        let cfg = get_config();
-
-        // Anomaly: High consumer lag
-        if consumer_data.lag_count > cfg.nats_visibility.lag_threshold {
-            let anomaly = self.create_anomaly(
-                &consumer_data.stream_name,
-                anomaly_types::HIGH_CONSUMER_LAG,
-                "lag",
-                "warning",
-                consumer_data.lag_count as f64,
-                Some(cfg.nats_visibility.lag_threshold as f64),
-                "Consumer falling behind",
-                &format!(
-                    "Consumer {} on stream {} has {} pending messages",
-                    consumer_data.consumer_name, consumer_data.stream_name, consumer_data.lag_count
-                ),
-                "Scale up consumer pods or optimize processing logic",
-                "Messages are accumulating, increasing processing delay",
-                consumer_data.num_pending,
-                0,
-                0,
-                1,
-                vec![consumer_data.consumer_name.clone()],
-            );
-            self.batch.push(anomaly);
-        }
-
-        // Anomaly: Consumer stuck/inactive
-        if consumer_data.status == "inactive" || consumer_data.status == "stalled" {
-            let severity = if consumer_data.status == "inactive" {
-                "critical"
-            } else {
-                "warning"
-            };
-            let anomaly = self.create_anomaly(
-                &consumer_data.stream_name,
-                anomaly_types::CONSUMER_STUCK,
-                "availability",
-                severity,
-                0.0,
-                Some(1.0),
-                &format!("Consumer is {}", consumer_data.status),
-                &format!(
-                    "Consumer {} on stream {} has been {} (last active: {:?})",
-                    consumer_data.consumer_name,
-                    consumer_data.stream_name,
-                    consumer_data.status,
-                    consumer_data.last_activity_timestamp
-                ),
-                "Check consumer logs for errors. Restart consumer pod if stuck.",
-                "Messages are not being processed",
-                consumer_data.num_pending,
-                0,
-                0,
-                1,
-                vec![consumer_data.consumer_name.clone()],
-            );
-            self.batch.push(anomaly);
-        }
     }
 
     fn create_base_event(
@@ -487,68 +335,6 @@ impl NatsVisibilityCollector {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn create_anomaly(
-        &self,
-        stream_name: &str,
-        anomaly_type: &str,
-        category: &str,
-        severity: &str,
-        current_value: f64,
-        threshold: Option<f64>,
-        short_message: &str,
-        detailed_message: &str,
-        recommended_action: &str,
-        impact: &str,
-        messages_total: u64,
-        bytes_total: u64,
-        oldest_message_age_seconds: i64,
-        consumer_count: usize,
-        affected_entities: Vec<String>,
-    ) -> NatsVisibilityEvent {
-        let anomaly_data = StreamHealthAnomalyEventData {
-            stream_name: stream_name.to_string(),
-            anomaly_type: anomaly_type.to_string(),
-            anomaly_category: category.to_string(),
-            severity: severity.to_string(),
-            current_value,
-            expected_value: None,
-            threshold_value: threshold,
-            deviation_percent: None,
-            title: short_message.to_string(),
-            description: detailed_message.to_string(),
-            recommendation: recommended_action.to_string(),
-            impact: impact.to_string(),
-            stream_messages: messages_total,
-            stream_bytes: bytes_total,
-            stream_age_seconds: oldest_message_age_seconds,
-            consumer_count,
-            affected_consumers: affected_entities.clone(),
-            affected_nodes: vec![],
-        };
-
-        let node = &cluster::LOCAL_NODE;
-        let node_role = node
-            .role
-            .iter()
-            .map(|r| format!("{:?}", r))
-            .collect::<Vec<_>>()
-            .join(",");
-
-        NatsVisibilityEvent {
-            timestamp: now_micros(),
-            cluster_name: get_config().common.cluster_name.clone(),
-            node_id: node.id,
-            node_uuid: node.uuid.clone(),
-            node_role,
-            event_type: NatsEventType::Anomaly,
-            event_category: category.to_string(),
-            data: EventData::Anomaly(anomaly_data),
-            severity: Some(severity.to_string()),
-            error_message: Some(detailed_message.to_string()),
-        }
-    }
-
     /// Buffer collected events to global in-memory buffer
     async fn buffer_events(&mut self) {
         if self.batch.is_empty() {
@@ -566,44 +352,13 @@ impl NatsVisibilityCollector {
             .iter()
             .filter(|e| matches!(e.event_type, NatsEventType::Consumer))
             .count();
-        let anomaly_count = self
-            .batch
-            .iter()
-            .filter(|e| matches!(e.event_type, NatsEventType::Anomaly))
-            .count();
 
         log::info!(
-            "[NATS Visibility] Collected {} events: {} streams, {} consumers, {} anomalies",
+            "[NATS Visibility] Collected {} events: {} streams, {} consumers",
             self.batch.len(),
             stream_count,
-            consumer_count,
-            anomaly_count
+            consumer_count
         );
-
-        // Log anomalies at appropriate level
-        for event in &self.batch {
-            if let NatsEventType::Anomaly = event.event_type {
-                if let EventData::Anomaly(anomaly) = &event.data {
-                    match anomaly.severity.as_str() {
-                        "critical" => log::error!(
-                            "[NATS Visibility] CRITICAL: {} - {}",
-                            anomaly.title,
-                            anomaly.description
-                        ),
-                        "warning" => log::warn!(
-                            "[NATS Visibility] WARNING: {} - {}",
-                            anomaly.title,
-                            anomaly.description
-                        ),
-                        _ => log::info!(
-                            "[NATS Visibility] INFO: {} - {}",
-                            anomaly.title,
-                            anomaly.description
-                        ),
-                    }
-                }
-            }
-        }
 
         // Add to global buffer
         crate::nats_visibility::buffer_events(self.batch.clone()).await;

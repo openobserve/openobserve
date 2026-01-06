@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -58,7 +58,6 @@ pub enum NatsEventType {
     ConsumerGroup,
     NodeActivity,
     Account,
-    Anomaly,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,7 +70,6 @@ pub enum EventData {
     ConsumerGroup(ConsumerGroupEventData),
     NodeActivity(NodeActivityEventData),
     Account(AccountHealthEventData),
-    Anomaly(StreamHealthAnomalyEventData),
 }
 
 // ============================================================================
@@ -401,58 +399,4 @@ pub struct AccountHealthEventData {
 
     // Reserved vs actual
     pub storage_reserved_gb: Option<f64>,
-}
-
-// ============================================================================
-// 8. Stream Health Anomaly Event Data
-// ============================================================================
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamHealthAnomalyEventData {
-    pub stream_name: String,
-    pub anomaly_type: String,
-    pub anomaly_category: String, // "availability", "performance", "capacity", "consistency"
-    pub severity: String,         // "critical", "warning", "info"
-
-    // Metrics
-    pub current_value: f64,
-    pub expected_value: Option<f64>,
-    pub threshold_value: Option<f64>,
-    pub deviation_percent: Option<f64>,
-
-    // Description
-    pub title: String,
-    pub description: String,
-    pub recommendation: String,
-    pub impact: String,
-
-    // Context
-    pub stream_messages: u64,
-    pub stream_bytes: u64,
-    pub stream_age_seconds: i64,
-    pub consumer_count: usize,
-
-    // Related entities
-    pub affected_consumers: Vec<String>,
-    pub affected_nodes: Vec<String>,
-}
-
-// ============================================================================
-// Anomaly Type Constants
-// ============================================================================
-
-pub mod anomaly_types {
-    pub const NO_CONSUMERS: &str = "no_consumers";
-    pub const ZERO_CONSUMERS_WITH_MESSAGES: &str = "zero_consumers_with_messages";
-    pub const HIGH_CONSUMER_LAG: &str = "high_consumer_lag";
-    pub const HIGH_REPLICA_LAG: &str = "high_replica_lag";
-    pub const CONSUMER_STUCK: &str = "consumer_stuck";
-    pub const HIGH_REDELIVERY_RATE: &str = "high_redelivery_rate";
-    pub const STREAM_NEAR_CAPACITY: &str = "stream_near_capacity";
-    pub const CONSUMER_PAUSED: &str = "consumer_paused";
-    pub const REPLICA_OFFLINE: &str = "replica_offline";
-    pub const RAFT_LEADER_CHANGED: &str = "raft_leader_changed";
-    pub const MESSAGE_AGE_EXCEEDED: &str = "message_age_exceeded";
-    pub const PUBLISH_FAILURE_SPIKE: &str = "publish_failure_spike";
-    pub const PROCESSING_LATENCY_SPIKE: &str = "processing_latency_spike";
 }
