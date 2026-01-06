@@ -340,8 +340,8 @@ describe("useMetricsCorrelationDashboard", () => {
 
       expect(dashboard).toBeDefined();
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
-      // Should have no WHERE clause
-      expect(query).toBe('SELECT * FROM "default"  ORDER BY _timestamp DESC');
+      // Should have no WHERE clause but should have LIMIT 100
+      expect(query).toBe('SELECT * FROM "default"  ORDER BY _timestamp DESC LIMIT 100');
     });
 
     it("should handle streams with empty filters", () => {

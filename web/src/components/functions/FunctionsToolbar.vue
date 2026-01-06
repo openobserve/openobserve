@@ -62,7 +62,7 @@
         </div>
       </q-form>
     </div>
-    <div class="add-function-actions flex justify-center">
+    <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             :ripple="false"

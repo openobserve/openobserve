@@ -62,6 +62,77 @@ pub async fn add(
     Ok(())
 }
 
+pub async fn add_with_flag(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+) -> Result<(), anyhow::Error> {
+    let user_email = user_email.to_lowercase();
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+    org_users::add_with_flag(org_id, &user_email, role.clone(), token, rum_token.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add user to org: {e}"))?;
+
+    log::debug!("Put into db_coordinator: {user_email}");
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_add(
+        &key,
+        &OrgUserPut {
+            org_id: org_id.to_string(),
+            email: user_email.to_string(),
+            role,
+            token: token.to_string(),
+            rum_token,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn add_with_flags(
+    org_id: &str,
+    user_email: &str,
+    role: UserRole,
+    token: &str,
+    rum_token: Option<String>,
+
+    allow_static_token: bool,
+) -> Result<(), anyhow::Error> {
+    let user_email = user_email.to_lowercase();
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+    org_users::add_with_flags(
+        org_id,
+        &user_email,
+        role.clone(),
+        token,
+        rum_token.clone(),
+        allow_static_token,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to add user to org: {e}"))?;
+
+    log::debug!("Put into db_coordinator: {user_email}");
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_add(
+        &key,
+        &OrgUserPut {
+            org_id: org_id.to_string(),
+            email: user_email.to_string(),
+            role,
+            token: token.to_string(),
+            rum_token,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn update(
     org_id: &str,
     user_email: &str,
@@ -309,6 +380,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 token: item.token.clone(),
                                 rum_token: item.rum_token.clone(),
                                 created_at: item.created_at,
+                                allow_static_token: item.allow_static_token,
                             },
                         );
                         if let Some(rum_token) = &item.rum_token {
@@ -321,6 +393,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                     token: item.token,
                                     rum_token: item.rum_token,
                                     created_at: item.created_at,
+                                    allow_static_token: item.allow_static_token,
                                 },
                             );
                         }
@@ -492,5 +565,46 @@ mod super_cluster {
             .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_org_users_key_prefix() {
+        assert_eq!(ORG_USERS_KEY_PREFIX, "/org_users/");
+    }
+
+    #[test]
+    fn test_org_users_key_format_single() {
+        let org_id = "test_org";
+        let user_email = "test@example.com";
+        let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+        assert_eq!(key, "/org_users/single/test_org/test@example.com");
+        assert!(key.starts_with(ORG_USERS_KEY_PREFIX));
+        assert!(key.contains("single"));
+    }
+
+    #[test]
+    fn test_org_users_key_format_many() {
+        let email = "user@example.com";
+        let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
+        assert_eq!(key, "/org_users/many/user/user@example.com");
+        assert!(key.starts_with(ORG_USERS_KEY_PREFIX));
+        assert!(key.contains("many/user"));
+    }
+
+    #[test]
+    fn test_email_lowercasing_in_key() {
+        // Verify email is consistently lowercased in key construction
+        let org_id = "TestOrg";
+        let user_email_upper = "TEST@EXAMPLE.COM";
+        let user_email_lower = user_email_upper.to_lowercase();
+
+        let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email_lower}");
+        assert_eq!(key, "/org_users/single/TestOrg/test@example.com");
+        assert!(!key.contains("TEST@EXAMPLE.COM"));
     }
 }
