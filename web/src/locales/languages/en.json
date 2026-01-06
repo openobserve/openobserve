@@ -106,7 +106,7 @@
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
     "status": "Status",
-    "chunkLoadError": "A new version of the application is available. Please refresh the page to continue."
+    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue."
   },
   "search": {
     "resetFields": "Reset selected table fields",
