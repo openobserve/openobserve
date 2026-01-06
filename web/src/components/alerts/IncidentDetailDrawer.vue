@@ -1034,7 +1034,14 @@ export default defineComponent({
       (incidentIdFromUrl) => {
         if (incidentIdFromUrl && typeof incidentIdFromUrl === 'string') {
           // Load incident from URL query parameter
-          loadDetails(incidentIdFromUrl);
+          // Validate incident ID format (e.g., UUID validation)
+          if (incidentIdFromUrl.trim().length > 0) {
+            loadDetails(incidentIdFromUrl);
+          } else {
+            console.warn('Invalid incident ID in URL');
+            correlationData.value = null;
+            correlationError.value = null;
+          }
         } else {
           // Clear correlation data when drawer closes
           correlationData.value = null;
