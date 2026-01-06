@@ -106,7 +106,8 @@
     "darkMode": "Modo oscuro",
     "manageTheme": "Administrar tema",
     "url": "URL",
-    "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar."
+    "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
+    "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar."
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

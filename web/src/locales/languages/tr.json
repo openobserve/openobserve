@@ -106,7 +106,8 @@
     "darkMode": "Karanlık Mod",
     "manageTheme": "Tema Yönet",
     "url": "URL",
-    "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
+    "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
+    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

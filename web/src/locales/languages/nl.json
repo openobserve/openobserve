@@ -106,7 +106,8 @@
     "darkMode": "Donkere modus",
     "manageTheme": "Thema beheren",
     "url": "URL",
-    "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan."
+    "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
+    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

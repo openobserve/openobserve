@@ -106,7 +106,8 @@
     "darkMode": "黑暗模式",
     "manageTheme": "管理主题",
     "url": "网址",
-    "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。"
+    "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
+    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。"
   },
   "search": {
     "selectIndex": "选择数据流",

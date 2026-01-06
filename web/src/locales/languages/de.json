@@ -106,7 +106,8 @@
     "darkMode": "Dunkler Modus",
     "manageTheme": "Theme verwalten",
     "url": "URL",
-    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
+    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
+    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
