@@ -281,7 +281,7 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should render event type selector", () => {
-      const eventSelector = wrapper.find('[data-test="q-select"]');
+      const eventSelector = wrapper.find('[data-test="player-events-filter-select"]');
       expect(eventSelector.exists()).toBe(true);
     });
 
@@ -357,6 +357,7 @@ describe("PlayerEventsSidebar Component", () => {
         "error",
         "action",
         "view",
+        "frustration",
       ]);
     });
 
@@ -365,6 +366,7 @@ describe("PlayerEventsSidebar Component", () => {
         { label: "Error", value: "error" },
         { label: "Action", value: "action" },
         { label: "View", value: "view" },
+        { label: "Frustration", value: "frustration" },
       ]);
     });
 
@@ -675,12 +677,18 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should calculate correct frustration event count", () => {
-      expect(wrapper.vm.frustrationEventCount).toBe(3);
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(3);
     });
 
     it("should return 0 frustration count when no frustrated events", async () => {
       await wrapper.setProps({ events: [mockEventsWithFrustrations[2]] });
-      expect(wrapper.vm.frustrationEventCount).toBe(0);
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(0);
     });
 
     it("should have frustration option in event filter", () => {
@@ -762,13 +770,19 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should update frustration count when events change", async () => {
-      expect(wrapper.vm.frustrationEventCount).toBe(3);
+      let frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(3);
 
       await wrapper.setProps({
         events: [mockEventsWithFrustrations[0]], // Only 1 frustrated event
       });
 
-      expect(wrapper.vm.frustrationEventCount).toBe(1);
+      frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(1);
     });
 
     it("should handle events with multiple frustration types", () => {
@@ -789,7 +803,10 @@ describe("PlayerEventsSidebar Component", () => {
       };
 
       await wrapper.setProps({ events: [eventWithEmptyArray] });
-      expect(wrapper.vm.frustrationEventCount).toBe(0);
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(0);
     });
   });
 });

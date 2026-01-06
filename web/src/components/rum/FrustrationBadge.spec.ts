@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { Quasar } from 'quasar';
 import FrustrationBadge from './FrustrationBadge.vue';
@@ -6,12 +6,31 @@ import FrustrationBadge from './FrustrationBadge.vue';
 describe('FrustrationBadge.vue', () => {
   let wrapper: VueWrapper;
 
+  beforeEach(() => {
+    // Create #app element for Quasar tooltips to attach to
+    const app = document.createElement('div');
+    app.id = 'app';
+    document.body.appendChild(app);
+  });
+
+  afterEach(() => {
+    // Clean up wrapper and DOM
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    const app = document.getElementById('app');
+    if (app) {
+      document.body.removeChild(app);
+    }
+  });
+
   const createWrapper = (count: number) => {
     return mount(FrustrationBadge, {
       props: { count },
       global: {
         plugins: [Quasar],
       },
+      attachTo: '#app',
     });
   };
 
@@ -124,9 +143,21 @@ describe('FrustrationBadge.vue', () => {
       expect(wrapper.find('[data-test="frustration-badge-medium"]').exists()).toBe(true);
     });
 
-    it('should have tooltip data-test attribute', () => {
+    it('should have tooltip data-test attribute', async () => {
       wrapper = createWrapper(5);
-      expect(wrapper.find('[data-test="frustration-badge-tooltip"]').exists()).toBe(true);
+      const badge = wrapper.find('[data-test="frustration-badge-medium"]');
+
+      // Trigger mouseenter to show tooltip
+      await badge.trigger('mouseenter');
+
+      // Wait a bit for Quasar to render the tooltip
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Tooltip is rendered at document level by Quasar, not in wrapper
+      const tooltip = document.querySelector(
+        '[data-test="frustration-badge-tooltip"]',
+      );
+      expect(tooltip).not.toBeNull();
     });
   });
 

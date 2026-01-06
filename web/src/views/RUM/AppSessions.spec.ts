@@ -395,7 +395,7 @@ describe("AppSessions.vue", () => {
       expect(columns[3].name).toBe("time_spent");
       expect(columns[4].name).toBe("error_count");
       expect(columns[5].name).toBe("frustration_count");
-      expect(columns[5].name).toBe("location");
+      expect(columns[6].name).toBe("location");
     });
 
     it("should fetch stream fields on mount", async () => {

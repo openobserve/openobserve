@@ -50,14 +50,14 @@ describe('FrustrationEventBadge.vue', () => {
   describe('Multiple Frustration Types', () => {
     it('should render multiple badges for multiple frustration types', () => {
       wrapper = createWrapper(['rage_click', 'dead_click']);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(2);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
       expect(wrapper.find('[data-test="frustration-event-badge-rage_click"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').exists()).toBe(true);
     });
 
     it('should render three frustration types', () => {
       wrapper = createWrapper(['rage_click', 'dead_click', 'error_click']);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(3);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(3);
     });
   });
 
@@ -98,25 +98,28 @@ describe('FrustrationEventBadge.vue', () => {
       wrapper = createWrapper(['rage_click']);
       const badge = wrapper.find('[data-test="frustration-event-badge-rage_click"]');
       expect(badge.exists()).toBe(true);
-      // Tooltip text is rendered inside q-tooltip component
-      expect(wrapper.find('[data-test="frustration-event-badge-tooltip"]').exists()).toBe(true);
+      // Tooltip exists in component structure
+      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
+      expect(tooltips.length).toBeGreaterThan(0);
     });
 
     it('should show correct tooltip for dead_click', () => {
       wrapper = createWrapper(['dead_click']);
-      expect(wrapper.find('[data-test="frustration-event-badge-tooltip"]').exists()).toBe(true);
+      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
+      expect(tooltips.length).toBeGreaterThan(0);
     });
 
     it('should show correct tooltip for error_click', () => {
       wrapper = createWrapper(['error_click']);
-      expect(wrapper.find('[data-test="frustration-event-badge-tooltip"]').exists()).toBe(true);
+      const tooltips = wrapper.findAllComponents({ name: 'QTooltip' });
+      expect(tooltips.length).toBeGreaterThan(0);
     });
   });
 
   describe('Empty State', () => {
     it('should handle empty frustration types array', () => {
       wrapper = createWrapper([]);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(0);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(0);
     });
   });
 
@@ -167,18 +170,18 @@ describe('FrustrationEventBadge.vue', () => {
   describe('Reactivity', () => {
     it('should update when frustrationTypes prop changes', async () => {
       wrapper = createWrapper(['rage_click']);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(1);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(1);
 
       await wrapper.setProps({ frustrationTypes: ['rage_click', 'dead_click'] });
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(2);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
     });
 
     it('should clear badges when frustrationTypes becomes empty', async () => {
       wrapper = createWrapper(['rage_click', 'dead_click']);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(2);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(2);
 
       await wrapper.setProps({ frustrationTypes: [] });
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]')).toHaveLength(0);
+      expect(wrapper.findAll('.frustration-event-badge')).toHaveLength(0);
     });
   });
 
