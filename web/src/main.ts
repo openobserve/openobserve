@@ -156,11 +156,19 @@ window.addEventListener("error", async (event) => {
 
   // Check if the error is from loading a script or stylesheet
   if (target && (target.tagName === "SCRIPT" || target.tagName === "LINK")) {
-    const isChunkLoadError =
-      (target.tagName === "SCRIPT" && (target as HTMLScriptElement).src) ||
-      (target.tagName === "LINK" && (target as HTMLLinkElement).href);
+    const url = target.tagName === "SCRIPT"
+      ? (target as HTMLScriptElement).src
+      : (target as HTMLLinkElement).href;
 
-    if (isChunkLoadError) {
+    if (!url) return;
+
+    // Only check for OpenObserve's own chunks (relative URLs or same origin)
+    // Ignore external CDN resources (absolute URLs with different origins)
+    const isOpenObserveResource = url.startsWith('/') ||
+                                   url.startsWith('./') ||
+                                   url.includes(window.location.origin);
+
+    if (isOpenObserveResource) {
       // Smart detection: Check if it's stale build
       const isStale = await buildVersionChecker.isStaleResourceError(target);
 
