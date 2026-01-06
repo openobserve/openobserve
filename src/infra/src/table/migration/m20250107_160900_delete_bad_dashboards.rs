@@ -13,8 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Removes records from the dashboards table whose JSON data column cannot be
-//! parsed into a dashboard.
+//! Migration stub for m20250107_160900_delete_bad_dashboards.
+//!
+//! This migration was originally intended to remove dashboards with unparseable
+//! JSON data, but was found to incorrectly delete valid dashboards with certain
+//! label/legend position configurations. It has been disabled since dashboard
+//! schema migrations are handled by the UI layer. The migration remains in the
+//! sequence to maintain migration ordering consistency.
 
 use sea_orm_migration::prelude::*;
 
@@ -24,6 +29,10 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        // This migration was disabled because it incorrectly deleted valid dashboards
+        // that had label/legend position fields that didn't match the v1-v5 schema
+        // definitions. Dashboard schema migrations are now handled by the UI layer.
+        // See PR #9860 for details.
         // Do nothing
         Ok(())
     }
