@@ -32,9 +32,8 @@ use actix_web::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use infra::cluster;
 
-use crate::common::utils::http::get_search_type_from_request;
+use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
