@@ -302,17 +302,20 @@ pub async fn ingest(
             {
                 let mut values = Vec::with_capacity(local_val.len());
                 for (k, value) in local_val.iter() {
-                    if [
+                    if ![
                         TIMESTAMP_COL_NAME,
                         ID_COL_NAME,
                         ORIGINAL_DATA_COL_NAME,
                         ALL_VALUES_COL_NAME,
                     ]
                     .contains(&k.as_str())
+                        && (index_all_max_value_length == 0
+                            || value
+                                .as_str()
+                                .is_none_or(|s| s.len() <= index_all_max_value_length))
                     {
-                        continue;
+                        values.push(value.to_string());
                     }
-                    values.push(value.to_string());
                 }
                 local_val.insert(
                     ALL_VALUES_COL_NAME.to_string(),
@@ -446,17 +449,20 @@ pub async fn ingest(
                         {
                             let mut values = Vec::with_capacity(local_val.len());
                             for (k, value) in local_val.iter() {
-                                if [
+                                if ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
                                     ORIGINAL_DATA_COL_NAME,
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || value
+                                            .as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                                 {
-                                    continue;
+                                    values.push(value.to_string());
                                 }
-                                values.push(value.to_string());
                             }
                             local_val.insert(
                                 ALL_VALUES_COL_NAME.to_string(),

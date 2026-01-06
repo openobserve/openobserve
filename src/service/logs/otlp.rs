@@ -288,7 +288,7 @@ pub async fn handle_request(
                     {
                         let values = local_val
                             .iter()
-                            .filter(|(k, _)| {
+                            .filter(|(k, v)| {
                                 ![
                                     TIMESTAMP_COL_NAME,
                                     ID_COL_NAME,
@@ -296,6 +296,9 @@ pub async fn handle_request(
                                     ALL_VALUES_COL_NAME,
                                 ]
                                 .contains(&k.as_str())
+                                    && (index_all_max_value_length == 0
+                                        || v.as_str()
+                                            .is_none_or(|s| s.len() <= index_all_max_value_length))
                             })
                             .map(|(_, v)| v)
                             .join(" ");
@@ -399,7 +402,7 @@ pub async fn handle_request(
                         {
                             let values = local_val
                                 .iter()
-                                .filter(|(k, _)| {
+                                .filter(|(k, v)| {
                                     ![
                                         TIMESTAMP_COL_NAME,
                                         ID_COL_NAME,
@@ -407,6 +410,10 @@ pub async fn handle_request(
                                         ALL_VALUES_COL_NAME,
                                     ]
                                     .contains(&k.as_str())
+                                        && (index_all_max_value_length == 0
+                                            || v.as_str().is_none_or(|s| {
+                                                s.len() <= index_all_max_value_length
+                                            }))
                                 })
                                 .map(|(_, v)| v)
                                 .join(" ");
