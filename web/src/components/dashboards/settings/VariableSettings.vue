@@ -433,9 +433,13 @@ export default defineComponent({
       }
     };
     const handleSaveVariable = async () => {
-      isAddVariable.value = false;
-      await getDashboardData();
-      emit("save");
+      try {
+        await getDashboardData();
+        emit("save");
+      } finally {
+        // Always go back to listing page after save, regardless of success or failure
+        isAddVariable.value = false;
+      }
     };
     const goBackToDashboardList = () => {
       isAddVariable.value = false;
