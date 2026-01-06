@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Append Data Toggle (only when updating existing tables) -->
             <div v-if="isUpdating" class="col-12">
               <q-toggle
-                class="q-py-md text-grey-8 text-bold"
+                class="q-py-md text-grey-8 text-bold lookup-table-append-toggle"
                 v-model="formData.append"
                 :label="t('function.appendData')"
               />
@@ -371,6 +371,17 @@ export default defineComponent({
 .lookup-table-file-uploader {
   .q-field__label {
     left: -30px;
+  }
+}
+
+.lookup-table-append-toggle {
+  .q-toggle__inner {
+    padding: 0.325em !important;
+    font-size: 40px !important;
+  }
+
+  .q-toggle__thumb:before {
+    background: transparent !important;
   }
 }
 </style>

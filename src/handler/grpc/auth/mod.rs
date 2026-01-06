@@ -177,6 +177,7 @@ mod tests {
                 org_id: "default".to_string(),
                 email: "root@example.com".to_string(),
                 created_at: 0,
+                allow_static_token: true,
             },
         );
 

@@ -401,6 +401,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::decline_invitation)
         .service(users::list_roles)
         .service(organization::org::organizations)
+        .service(organization::assume_service_account::assume_service_account)
         .service(organization::settings::get)
         .service(organization::settings::create)
         .service(organization::settings::upload_logo)

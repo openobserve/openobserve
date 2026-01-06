@@ -118,6 +118,7 @@ pub async fn process_token(
             source_orgs.push(UserOrg {
                 role,
                 name: dex_cfg.default_org.clone(),
+                org_name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
@@ -132,7 +133,8 @@ pub async fn process_token(
                 } else {
                     source_orgs.push(UserOrg {
                         role: role_org.role,
-                        name: role_org.org,
+                        name: role_org.org.clone(),
+                        org_name: role_org.org,
                         token: Default::default(),
                         rum_token: Default::default(),
                     });
@@ -576,6 +578,7 @@ async fn map_group_to_custom_role(
                 organizations.push(UserOrg {
                     role: role.clone(),
                     name: org_name.clone(),
+                    org_name: org_name.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 });
@@ -585,6 +588,7 @@ async fn map_group_to_custom_role(
             organizations.push(UserOrg {
                 role: role.clone(),
                 name: dex_cfg.default_org.clone(),
+                org_name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
@@ -664,6 +668,7 @@ async fn map_group_to_custom_role(
                 let new_org = UserOrg {
                     role: role.clone(),
                     name: org_name.clone(),
+                    org_name: org_name.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 };
@@ -833,6 +838,7 @@ pub async fn check_and_add_to_org(
                 identifier: ider::uuid(),
                 name: DEFAULT_ORG.to_string(),
                 org_type: USER_DEFAULT.to_owned(),
+                service_account: None,
             };
             match db::organization::save_org(&org).await {
                 Ok(_) => {
@@ -1090,6 +1096,7 @@ async fn process_custom_claim_parsing(
                 source_orgs.push(UserOrg {
                     role: UserRole::from_str(&dex_cfg.default_role).unwrap(),
                     name: assignment.org.clone(),
+                    org_name: assignment.org.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 });
