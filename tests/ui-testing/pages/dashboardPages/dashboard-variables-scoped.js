@@ -645,11 +645,25 @@ export default class DashboardVariablesScoped {
 
   /**
    * Verify deleted tab/panel shows "(deleted)" in variable assignment
-   * @param {string} scopeType - 'tabs' or 'panels'
-   * @param {string} scopeId - Tab/Panel ID
+   * This method verifies the deleted scope label by hovering over the scope chip
+   * and checking if the tooltip contains "Deleted Tab" or "Deleted Panel"
+   * @param {string} scopeType - 'tab' or 'panel' (also accepts 'tabs' or 'panels')
    */
-  async verifyDeletedScopeLabel(scopeType, scopeId) {
-    const deletedLabel = this.page.locator(`[data-test="dashboard-variable-${scopeType}-${scopeId}-deleted"]`);
-    await expect(deletedLabel).toContainText("(deleted)", { timeout: 5000 });
+  async verifyDeletedScopeLabel(scopeType) {
+    // Normalize scope type
+    const normalizedType = scopeType === 'tabs' ? 'tab' : (scopeType === 'panels' ? 'panel' : scopeType);
+
+    // Find the variable row in the variables list
+    const variableRow = this.page.locator(`[data-test="dashboard-variable-settings-draggable-row"]`);
+    await variableRow.waitFor({ state: "visible", timeout: 5000 });
+
+    // Hover over the scope chip to see the tooltip showing "Deleted Tab" or "Deleted Panel"
+    const scopeChip = variableRow.locator('.q-chip, [class*="scope"]').first();
+    await scopeChip.hover();
+
+    // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
+    const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
+    const tooltip = this.page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: new RegExp(expectedText, 'i') });
+    await expect(tooltip).toBeVisible({ timeout: 5000 });
   }
 }

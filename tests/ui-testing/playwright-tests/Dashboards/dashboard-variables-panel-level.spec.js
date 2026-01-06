@@ -476,17 +476,8 @@ test.describe("Dashboard Variables - Panel Level", () => {
     // Wait for variables tab to be active
     await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    // Find the variable row in the variables list
-    const variableRow = page.locator(`[data-test="dashboard-variable-settings-draggable-row"]`);
-    await variableRow.waitFor({ state: "visible", timeout: 5000 });
-
-    // Hover over the scope chip to see the tooltip showing "Deleted Panel"
-    const scopeChip = variableRow.locator('.q-chip, [class*="scope"]').first();
-    await scopeChip.hover();
-
-    // Wait for tooltip to appear and verify it contains "Deleted Panel"
-    const tooltip = page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: /Deleted Panel/i });
-    await expect(tooltip).toBeVisible({ timeout: 5000 });
+    // Verify deleted panel label using common function
+    await scopedVars.verifyDeletedScopeLabel("panel");
 
     await pm.dashboardSetting.closeSettingWindow();
 

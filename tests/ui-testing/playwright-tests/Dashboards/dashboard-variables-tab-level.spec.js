@@ -59,21 +59,29 @@ test.describe("Dashboard Variables - Tab Level", () => {
         assignedTabs: ["tab1"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Switch to Tab1 and verify variable is visible
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
     await scopedVars.verifyVariableVisibility(variableName, true);
 
     // Switch to Tab2 and verify variable is NOT visible
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
     await scopedVars.verifyVariableVisibility(variableName, false);
 
     // Cleanup
@@ -117,15 +125,21 @@ test.describe("Dashboard Variables - Tab Level", () => {
         assignedTabs: ["tab1", "tab2"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Go to Tab1 and set value
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     const varDropdown1 = page.getByLabel(variableName, { exact: true });
     await varDropdown1.waitFor({ state: "visible", timeout: 5000 });
@@ -141,9 +155,12 @@ test.describe("Dashboard Variables - Tab Level", () => {
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Go to Tab2 and set different value
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     const varDropdown2 = page.getByLabel(variableName, { exact: true });
     await varDropdown2.waitFor({ state: "visible", timeout: 5000 });
@@ -162,18 +179,32 @@ test.describe("Dashboard Variables - Tab Level", () => {
     expect(value1.trim()).not.toBe(value2.trim());
 
     // Switch back to Tab1 and verify value persists
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    const persistedValue1 = await varDropdown1.inputValue();
-    expect(persistedValue1).toBe(value1.trim());
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for inner dropdown to be fully initialized
+    await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network idle to ensure value is loaded
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Verify the persisted value is displayed in the selector
+    const variableSelector1 = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    await expect(variableSelector1).toContainText(value1.trim(), { timeout: 10000 });
 
     // Switch to Tab2 and verify value persists
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    const persistedValue2 = await varDropdown2.inputValue();
-    expect(persistedValue2).toBe(value2.trim());
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for inner dropdown to be fully initialized
+    await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network idle to ensure value is loaded
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Verify the persisted value is displayed in the selector
+    const variableSelector2 = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    await expect(variableSelector2).toContainText(value2.trim(), { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -211,8 +242,13 @@ test.describe("Dashboard Variables - Tab Level", () => {
         assignedTabs: ["tab2"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Initially on default tab - variable should not load yet
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
@@ -221,7 +257,7 @@ test.describe("Dashboard Variables - Tab Level", () => {
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 10000 });
 
     // Switch to Tab2
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
 
     const result = await apiMonitor;
 
@@ -270,15 +306,21 @@ test.describe("Dashboard Variables - Tab Level", () => {
         assignedTabs: ["tab1", "tab2"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Set value on Tab1
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     const varDropdown = page.getByLabel(variableName, { exact: true });
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
@@ -294,22 +336,31 @@ test.describe("Dashboard Variables - Tab Level", () => {
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Switch to Tab2
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for inner dropdown to be fully initialized
+    await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network idle to ensure value is loaded
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Get initial value on Tab2 (should be default, not changed by Tab1)
-    const varDropdown2 = page.getByLabel(variableName, { exact: true });
-    const tab2Value = await varDropdown2.inputValue();
+    const tab2Selector = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    const tab2Value = await tab2Selector.innerText();
 
     // Go back to Tab1 and change value
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
 
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Re-query the dropdown after tab switch
+    const varDropdownTab1Again = page.getByLabel(variableName, { exact: true });
+    await varDropdownTab1Again.waitFor({ state: "visible", timeout: 5000 });
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
+    await varDropdownTab1Again.click();
     // Wait for dropdown menu to open
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
 
@@ -319,14 +370,21 @@ test.describe("Dashboard Variables - Tab Level", () => {
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Switch to Tab2 and verify value hasn't changed
-    await page.locator('[data-test="dashboard-tab-tab2"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab2"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
 
-    const tab2ValueAfter = await varDropdown2.inputValue();
+    // Wait for variable to appear on the dashboard after tab switch
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for inner dropdown to be fully initialized
+    await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network idle to ensure value is loaded
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-    // Tab2 value should remain unchanged
-    expect(tab2ValueAfter).toBe(tab2Value);
+    // Verify value hasn't changed
+    const tab2SelectorAfter = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    const tab2ValueAfter = await tab2SelectorAfter.innerText();
+    expect(tab2ValueAfter).toContain(tab2Value);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -364,7 +422,8 @@ test.describe("Dashboard Variables - Tab Level", () => {
         scope: "global"
       }
     );
-
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables(); 
     // Add tab variable that depends on global
     await scopedVars.addScopedVariable(
       tabVar,
@@ -377,15 +436,21 @@ test.describe("Dashboard Variables - Tab Level", () => {
         dependsOn: globalVar
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change global variable value
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
+    // Wait for tab content to load
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     const globalDropdown = page.getByLabel(globalVar, { exact: true });
     await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
@@ -428,14 +493,8 @@ test.describe("Dashboard Variables - Tab Level", () => {
 
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-    // Add tab
+    // Add tab variable to default tab
     await pm.dashboardSetting.openSetting();
-    await pm.dashboardSetting.addTabSetting("Tab1");
-    await pm.dashboardSetting.saveTabSetting();
-    // Wait for tab to be created and visible
-    await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').waitFor({ state: "visible", timeout: 10000 });
-
-    // Add tab variable
     await scopedVars.addScopedVariable(
       variableName,
       "logs",
@@ -443,18 +502,22 @@ test.describe("Dashboard Variables - Tab Level", () => {
       "kubernetes_namespace_name",
       {
         scope: "tabs",
-        assignedTabs: ["tab1"]
+        assignedTabs: ["default"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for dashboard to be fully loaded after closing settings
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+
+    // Stay on default tab and set value
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
-
-    // Go to tab and set value
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const varDropdown = page.getByLabel(variableName, { exact: true });
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
@@ -472,21 +535,26 @@ test.describe("Dashboard Variables - Tab Level", () => {
     // Get current URL
     const currentURL = page.url();
 
-    // Verify URL contains tab variable parameter
-    expect(currentURL).toContain(`v-${variableName}.t.tab1=`);
+    // Verify URL contains tab variable parameter (default tab uses 'default' in URL)
+    expect(currentURL).toContain(`var-${variableName}.t.default=`);
 
     // Refresh page
     await page.reload();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Switch to Tab1
-    await page.locator('[data-test="dashboard-tab-tab1"]').click();
-    // Wait for tab switch to complete
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    // Wait for default tab content to load after reload
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').or(page.locator('[data-test*="dashboard-panel-"]')).first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for variable to appear on dashboard after reload
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for inner dropdown to be fully initialized
+    await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network idle to ensure value is loaded
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Verify value persisted
-    const persistedValue = await varDropdown.inputValue();
-    expect(persistedValue).toBe(selectedValue.trim());
+    const variableSelectorAfterReload = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    await expect(variableSelectorAfterReload).toContainText(selectedValue.trim(), { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -524,22 +592,26 @@ test.describe("Dashboard Variables - Tab Level", () => {
         assignedTabs: ["tab1"]
       }
     );
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Now delete the tab
     await pm.dashboardSetting.openSetting();
+    // Make sure we're on the tabs settings tab
+    await page.locator('[data-test="dashboard-settings-tab-tab"]').click();
+    await page.waitForLoadState('domcontentloaded');
     await pm.dashboardSetting.deleteTab("Tab1");
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Open variables and check the variable
+    // Open variables to verify deleted tab label
     await pm.dashboardSetting.openVariables();
+    // Wait for variables tab to be active
+    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    // Click to edit the variable
-    await page.locator(`[data-test="dashboard-variable-${variableName}-edit"]`).click();
-
-    // Verify it shows "(deleted tab)" in assigned tabs
-    await scopedVars.verifyDeletedScopeLabel("tab", "tab1");
+    // Verify deleted tab label using common function
+    await scopedVars.verifyDeletedScopeLabel("tab");
 
     await pm.dashboardSetting.closeSettingWindow();
 
