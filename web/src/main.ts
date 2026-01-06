@@ -130,7 +130,7 @@ function showNewVersionNotification() {
   staleNotificationShown = true;
   Notify.create({
     type: "negative",
-    message: "A new version is available. Please refresh to get the latest updates.",
+    message: i18n.global.t("common.chunkLoadError"),
     html: true,
     timeout: 0, // Don't auto-dismiss
     actions: [

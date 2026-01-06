@@ -53,9 +53,9 @@ if (process.env.BUILD_COMMIT_HASH) {
   commitHash = process.env.BUILD_COMMIT_HASH;
 }
 // Uncomment for testing stale build detection on local:
-// else if (process.env.TEST_COMMIT_HASH) {
-//   commitHash = process.env.TEST_COMMIT_HASH;
-// }
+else if (process.env.TEST_COMMIT_HASH) {
+  commitHash = process.env.TEST_COMMIT_HASH;
+}
 else {
   // Fallback to git command if env variable is not set
   try {
@@ -120,7 +120,7 @@ export default defineConfig({
     __INTLIFY_PROD_DEVTOOLS__: false,
     __INTLIFY_JIT_COMPILATION__: true,
     __COMMIT_HASH__: JSON.stringify(commitHash),
-    __BUILD_TIME__: JSON.stringify(buildTime),
+    __BUILD_TIME__: buildTime,
   },
   server: {
     port: 8081,
