@@ -40,6 +40,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     // Add global variable
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
 
+    // Wait for variable to be saved and settings to stabilize
+    await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.goToVariablesTab();
     // Add tab variable
@@ -82,7 +86,15 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     // Save the variable - using helper method to handle potential DOM updates
     await scopedVars.clickSaveButton();
 
+    // Wait for variable to be saved before closing settings
+    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -116,8 +128,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     // Wait for panel to be added to dashboard and panel editor to close
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    // Wait for panel editor dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     // Wait for settings button to be available (indicates panel editor has closed)
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 15000 });
 
     // Add tab
     await pm.dashboardSetting.openSetting();
@@ -131,6 +146,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "panel",
       assignedPanels: ["Panel1"]
     });
+
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${panelVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Try to add tab variable
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
@@ -191,6 +210,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
@@ -229,6 +252,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1"]
     });
+
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tab1Var}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Try to add variable to Tab2
     await page.locator('[data-test="dashboard-add-variable-btn"]').click();
@@ -297,6 +324,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
@@ -328,6 +359,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     // Add global and tab variables
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // open setting window
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -335,8 +370,15 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1"]
     });
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for dashboard to be fully loaded after closing settings
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
@@ -357,8 +399,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     // Wait for panel to be added to dashboard and panel editor to close
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    // Wait for panel editor dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     // Wait for settings button to be available (indicates panel editor has closed)
-    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 15000 });
     // Additional wait to ensure dashboard is stable after panel creation
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
@@ -439,6 +484,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     expect(options).toContain(tabVar);
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -562,6 +611,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
@@ -604,6 +657,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1", "tab2", "tab3"]
     });
+
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -670,6 +727,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "panel",
       assignedPanels: ["Panel1", "Panel2"]
     });
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for variable selectors to appear on panels
     await page.locator(`[data-test="variable-selector-${variableName}"]`).first().waitFor({ state: "visible", timeout: 10000 });
@@ -713,6 +774,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1"]
     });
+
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -759,6 +824,10 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
 
     // Add global and tab variables
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // open setting window
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -766,8 +835,15 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1"]
     });
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for dashboard to be fully loaded after closing settings
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
@@ -832,12 +908,23 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
       scope: "tab",
       assignedTabs: ["tab1"]
     });
+    // Wait for first variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tab1Var}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await scopedVars.addScopedVariable(tab2Var, "logs", "e2e_automate", "kubernetes_container_name", {
       scope: "tab",
       assignedTabs: ["tab2"]
     });
+    // Wait for second variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${tab2Var}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for dashboard to be fully loaded after closing settings
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });

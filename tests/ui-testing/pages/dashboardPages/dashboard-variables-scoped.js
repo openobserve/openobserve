@@ -281,9 +281,15 @@ export default class DashboardVariablesScoped {
     }
 
     // Dependencies are added through filters where the value references another variable using $variableName
+    // Wait for any pending DOM updates to complete
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForTimeout(500); // Small wait for UI to stabilize
+
     const addFilterBtn = this.page.locator('[data-test="dashboard-add-filter-btn"]');
-    await addFilterBtn.waitFor({ state: "visible", timeout: 5000 });
-    await addFilterBtn.click();
+    await addFilterBtn.waitFor({ state: "visible", timeout: 10000 });
+    // Wait for element to be stable before clicking
+    await addFilterBtn.waitFor({ state: "attached", timeout: 5000 });
+    await addFilterBtn.click({ force: false, timeout: 15000 });
 
     // Select the filter field name
     const filterNameSelector = this.page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
@@ -376,6 +382,13 @@ export default class DashboardVariablesScoped {
 
         // Try to click - Playwright will wait for stability automatically
         await saveBtn.click({ timeout: 10000 });
+
+        // Wait for the dialog to transition back to listing view
+        // The save button should disappear after successful save
+        await saveBtn.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
+
+        // Wait for network to be idle after save
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         // If click succeeded, return
         return;

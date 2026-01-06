@@ -56,7 +56,13 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -82,6 +88,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -181,6 +190,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -238,6 +250,10 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Wait for variables to appear on dashboard and settings to fully close
     await page.locator(`[data-test="variable-selector-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
     await page.waitForLoadState('domcontentloaded');
@@ -294,6 +310,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -416,8 +435,15 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -460,7 +486,13 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -481,8 +513,15 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     await pm.dashboardSetting.closeSettingWindow();
 
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -525,7 +564,13 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -554,14 +599,18 @@ test.describe("Dashboard Variables - Panel Level", () => {
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
 
     // Ensure network is idle before clicking dropdown
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    // Wait extra time for variable to fully initialize
+    await page.waitForTimeout(1000);
 
     await varDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 10000 });
+    // Wait for options to load
+    await page.waitForTimeout(1000);
 
     const option = page.locator('[role="option"]').first();
-    await option.waitFor({ state: "visible", timeout: 5000 });
+    await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
     // Wait for dropdown to close
@@ -579,6 +628,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 
@@ -632,7 +684,13 @@ test.describe("Dashboard Variables - Panel Level", () => {
     );
     // Wait for variable to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Verify variable appears in Panel1
     const panel1Container = page.locator('[data-test*="dashboard-panel-"]').filter({ hasText: "Panel1" }).first();
@@ -646,6 +704,9 @@ test.describe("Dashboard Variables - Panel Level", () => {
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
+    // Wait for dashboard list to be fully loaded
+    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     await deleteDashboard(page, dashboardName);
   });
 });

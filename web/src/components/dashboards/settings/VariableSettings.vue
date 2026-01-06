@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated, reactive } from "vue";
+import { defineComponent, ref, onMounted, onActivated, reactive, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -437,8 +437,12 @@ export default defineComponent({
         await getDashboardData();
         emit("save");
       } finally {
+        // Wait for next tick before switching views to ensure data is updated
+        await nextTick();
         // Always go back to listing page after save, regardless of success or failure
         isAddVariable.value = false;
+        // Wait for the listing view to render
+        await nextTick();
       }
     };
     const goBackToDashboardList = () => {
