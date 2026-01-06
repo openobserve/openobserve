@@ -9,5 +9,6 @@ ignore = [
   "RUSTSEC-2024-0436", # from paste, transitive dep of datafusion
   "RUSTSEC-2024-0437", # from protobuf, transitive dep of prometheus
   "RUSTSEC-2025-0020", # from poy3, transitive dep of datafusion-functions-json
+  "RUSTSEC-2026-0001", # from rkyv, dep of rust_decimal
 ]
 informational_warnings = ["unmaintained"] # warn for categories of informational advisories
