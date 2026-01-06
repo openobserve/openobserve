@@ -30,6 +30,7 @@ env:
   ZO_BASE_URL_SC_UI: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
+  ZO_WEB_URL: "http://localhost:5080"
   ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
@@ -451,7 +452,7 @@ jobs:
                         echo "DEBUG: File path: $TEST_FILE_PATH"
                         echo "DEBUG: Test name (unquoted): $TEST_NAME"
                         echo "::notice::🎯 OPTIMIZED RERUN: Running failed test from this shard"
-                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\""
+                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" -g \"$TEST_NAME\" --grep-invert \"@bug-9788\""
 
                         # Properly quote the test name to handle spaces and special chars
                         npx playwright test "$TEST_FILE_PATH" -g "$TEST_NAME"
@@ -459,7 +460,7 @@ jobs:
                         # No -g flag, just run the file
                         echo "DEBUG: File path: $TEST_FILE_PATH (no -g flag)"
                         echo "::notice::🎯 OPTIMIZED RERUN: Running failed test file from this shard"
-                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\""
+                        echo "DEBUG: Final command: npx playwright test \"$TEST_FILE_PATH\" --grep-invert \"@bug-9788\""
 
                         npx playwright test "$TEST_FILE_PATH"
                       fi

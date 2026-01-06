@@ -43,6 +43,7 @@ test.describe("Share Link Test Cases", () => {
   test("P0: Share link button visibility and success notification", {
     tag: ['@shareLink', '@smoke', '@P0']
   }, async ({ page }) => {
+
     testLogger.info('Testing share link button visibility and success notification');
 
     // Verify share link button is visible
@@ -64,6 +65,7 @@ test.describe("Share Link Test Cases", () => {
   test("P0: Share link preserves stream and time range after redirect", {
     tag: ['@shareLink', '@statePreservation', '@smoke', '@P0']
   }, async ({ page }) => {
+
     testLogger.info('Testing stream and time range preservation via share link redirect');
 
     // Step 1: Select stream
@@ -124,6 +126,7 @@ test.describe("Share Link Test Cases", () => {
   test("P1: Share link preserves SQL mode toggle state after redirect", {
     tag: ['@shareLink', '@statePreservation', '@functional', '@P1']
   }, async ({ page }) => {
+
     testLogger.info('Testing SQL mode preservation via share link redirect');
 
     // Step 1: Select stream
@@ -171,6 +174,7 @@ test.describe("Share Link Test Cases", () => {
   test("P1: Share link preserves histogram toggle state after redirect", {
     tag: ['@shareLink', '@statePreservation', '@functional', '@P1']
   }, async ({ page }) => {
+
     testLogger.info('Testing histogram toggle preservation via share link redirect');
 
     // Step 1: Select stream
@@ -213,6 +217,7 @@ test.describe("Share Link Test Cases", () => {
   test("P1: Share link preserves complete search state (stream + time + mode + histogram)", {
     tag: ['@shareLink', '@statePreservation', '@functional', '@P1']
   }, async ({ page }) => {
+
     testLogger.info('Testing complete search state preservation via share link redirect');
 
     // Step 1: Setup complete search state
@@ -273,6 +278,7 @@ test.describe("Share Link Test Cases", () => {
   test("P1: Share link button shows loading state while generating", {
     tag: ['@shareLink', '@functional', '@P1']
   }, async ({ page }) => {
+
     testLogger.info('Testing share link loading state');
 
     // Select stream and refresh
@@ -297,6 +303,7 @@ test.describe("Share Link Test Cases", () => {
   test("P2: Share link without stream selected", {
     tag: ['@shareLink', '@edge', '@P2']
   }, async ({ page }) => {
+
     testLogger.info('Testing share link without stream selected');
 
     // Don't select any stream, just wait for page to load
@@ -316,6 +323,7 @@ test.describe("Share Link Test Cases", () => {
   test("P2: Multiple share link clicks work correctly", {
     tag: ['@shareLink', '@edge', '@P2']
   }, async ({ page }) => {
+
     testLogger.info('Testing multiple share link clicks');
 
     // Select stream and refresh
@@ -339,6 +347,7 @@ test.describe("Share Link Test Cases", () => {
   test("P2: Share link with SQL query preserves query content after redirect", {
     tag: ['@shareLink', '@statePreservation', '@edge', '@P2']
   }, async ({ page }) => {
+
     testLogger.info('Testing SQL query preservation via share link redirect');
 
     // Step 1: Select stream
@@ -391,6 +400,7 @@ test.describe("Share Link Test Cases", () => {
   test("P2: Shared URL redirect, org context, and multiple access consistency", {
     tag: ['@shareLink', '@statePreservation', '@edge', '@P2']
   }, async ({ page }) => {
+
     testLogger.info('Testing shared URL redirect, org context, and multiple access consistency');
 
     // Step 1: Setup and share
@@ -453,5 +463,74 @@ test.describe("Share Link Test Cases", () => {
     expect(comparison.isMatch).toBe(true);
 
     testLogger.info('Shared URL redirect, org context, and multiple access test completed');
+  });
+
+  // =====================================================
+  // FUNCTIONALITY - Bug #9788: Share URL disabled without ZO_WEB_URL
+  // https://github.com/openobserve/openobserve/issues/9788
+  // =====================================================
+
+  test("@bug-9788 @P1: Share button should be disabled when ZO_WEB_URL is not configured", {
+    tag: ['@bug-9788', '@shareLink', '@P1']
+  }, async ({ page }) => {
+    testLogger.info('Test: Share button disabled state with mocked config (Bug #9788)');
+
+    // Mock the /config endpoint to simulate ZO_WEB_URL not being configured
+    await page.route('**/api/*/config', async (route) => {
+      // Get the original response
+      const response = await route.fetch();
+      const json = await response.json();
+
+      // Remove web_url to simulate it not being configured
+      const modifiedConfig = { ...json, web_url: "" };
+
+      testLogger.info('Mocked /config endpoint with web_url removed');
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(modifiedConfig)
+      });
+    });
+
+    // Reload the page to pick up the mocked config
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Select a stream and run query to load results
+    await pm.logsPage.selectStream(TEST_STREAM);
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle');
+
+    testLogger.info('Logs page loaded with mocked config');
+
+    // Get the share button
+    const shareButton = page.locator(pm.logsPage.shareLinkButton);
+
+    // PRIMARY ASSERTION: Share button should exist
+    await expect(shareButton).toBeVisible({ timeout: 10000 });
+    testLogger.info('✓ Share button is visible');
+
+    // SECONDARY ASSERTION: Share button should be disabled when ZO_WEB_URL not configured
+    await expect(shareButton).toBeDisabled();
+    testLogger.info('✓ PRIMARY CHECK PASSED: Share button is disabled (ZO_WEB_URL not configured)');
+
+    // TERTIARY ASSERTION: Check for tooltip explaining why it's disabled
+    await shareButton.hover();
+    await page.waitForTimeout(500); // Wait for tooltip to appear
+
+    // Look for tooltip with configuration message
+    const tooltip = page.locator('[role="tooltip"], .q-tooltip').filter({
+      hasText: /disabled|ZO_WEB_URL|configuration|web.*url/i
+    }).first();
+
+    await expect(tooltip).toBeVisible({ timeout: 2000 });
+    const tooltipText = await tooltip.textContent();
+    testLogger.info(`✓ Tooltip displayed: "${tooltipText}"`);
+
+    expect(tooltipText.toLowerCase()).toMatch(/disabled|configuration|web.*url/i);
+    testLogger.info('✓ TERTIARY CHECK PASSED: Informative tooltip present');
+
+    testLogger.info('Share button disabled state test completed for Bug #9788');
   });
 });
