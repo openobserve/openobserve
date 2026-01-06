@@ -238,7 +238,7 @@ async fn query_service_discovery_key(
                 None
             }
             Err(e) => {
-                log::debug!("[incidents] Correlation API failed: {}", e);
+                log::debug!("[incidents] Correlation API failed: {e}");
                 None
             }
         }
@@ -322,9 +322,10 @@ async fn find_or_create_incident(
         .await?;
 
         // Add alert to junction table
+        let alert_id = alert.get_unique_key();
         infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
-            &alert.get_unique_key(),
+            &alert_id,
             &alert.name,
             triggered_at,
             correlation_reason,
@@ -339,6 +340,24 @@ async fn find_or_create_incident(
             dimensions_changed
         );
 
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+            && !config::get_config().common.local_mode
+            && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
+                org_id,
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+                correlation_reason,
+            )
+            .await
+        {
+            log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
+        }
+
         // Trigger re-enrichment if dimensions changed or topology missing
         if dimensions_changed || existing.topology_context.is_none() {
             let org_id_clone = org_id.to_string();
@@ -351,9 +370,7 @@ async fn find_or_create_incident(
                         .await
                 {
                     log::debug!(
-                        "[incidents] Topology re-enrichment failed for incident {}: {}",
-                        incident_id_clone,
-                        e
+                        "[incidents] Topology re-enrichment failed for incident {incident_id_clone}: {e}"
                     );
                 }
             });
@@ -376,7 +393,7 @@ async fn find_or_create_incident(
         severity,
         serde_json::to_value(stable_dimensions)?,
         triggered_at,
-        Some(title),
+        Some(title.clone()),
     )
     .await?;
 
@@ -397,6 +414,24 @@ async fn find_or_create_incident(
         correlation_key,
         severity
     );
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_create(
+            org_id,
+            correlation_key,
+            severity,
+            serde_json::to_value(stable_dimensions)?,
+            triggered_at,
+            Some(title),
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident create: {e}");
+    }
 
     Ok(incident.id)
 }
@@ -574,10 +609,7 @@ pub async fn enrich_with_topology(
     let edges = match service_graph::query_edges_from_stream_internal(org_id, None).await {
         Ok(e) => e,
         Err(e) => {
-            log::debug!(
-                "[incidents] Service graph not available for topology enrichment: {}",
-                e
-            );
+            log::debug!("[incidents] Service graph not available for topology enrichment: {e}");
             return Ok(()); // Not an error - Service Graph may not be set up
         }
     };
@@ -653,9 +685,7 @@ pub async fn get_service_graph(
             Ok(map) => map,
             Err(e) => {
                 log::warn!(
-                    "Failed to parse stable_dimensions JSON for incident {}: {}",
-                    incident_id,
-                    e
+                    "Failed to parse stable_dimensions JSON for incident {incident_id}: {e}"
                 );
                 HashMap::new()
             }
@@ -791,6 +821,21 @@ pub async fn update_status(
     status: &str,
 ) -> Result<config::meta::alerts::incidents::Incident, anyhow::Error> {
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_update_status(
+            org_id,
+            incident_id,
+            status,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
+    }
 
     Ok(config::meta::alerts::incidents::Incident {
         id: updated.id,
