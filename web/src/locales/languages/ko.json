@@ -105,7 +105,8 @@
     "lightMode": "라이트 모드",
     "darkMode": "다크 모드",
     "manageTheme": "테마 관리",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요."
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
