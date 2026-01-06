@@ -216,12 +216,9 @@ pub async fn handle_otlp_request(
                 }
 
                 // Start get stream alerts
+                let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
                 crate::service::ingestion::get_stream_alerts(
-                    &[StreamParams {
-                        org_id: org_id.to_owned().into(),
-                        stream_name: metric_name.to_owned().into(),
-                        stream_type: StreamType::Metrics,
-                    }],
+                    std::slice::from_ref(&stream_param),
                     &mut stream_alerts_map,
                 )
                 .await;
@@ -230,23 +227,14 @@ pub async fn handle_otlp_request(
                 // get stream pipeline
                 if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipeline(
-                            org_id,
-                            &metric_name,
-                            &StreamType::Metrics,
-                        )
-                        .await;
+                        crate::service::ingestion::get_stream_executable_pipeline(&stream_param)
+                            .await;
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
 
                 // get user defined schema
-                let streams = vec![StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                    stream_name: metric_name.to_owned().into(),
-                }];
                 crate::service::ingestion::get_uds_and_original_data_streams(
-                    &streams,
+                    std::slice::from_ref(&stream_param),
                     &mut user_defined_schema_map,
                     &mut streams_need_original_map,
                     &mut streams_need_all_values_map,
@@ -356,12 +344,10 @@ pub async fn handle_otlp_request(
                         }
 
                         // Start get stream alerts
+                        let stream_param =
+                            StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
                         crate::service::ingestion::get_stream_alerts(
-                            &[StreamParams {
-                                org_id: org_id.to_owned().into(),
-                                stream_name: local_metric_name.to_owned().into(),
-                                stream_type: StreamType::Metrics,
-                            }],
+                            std::slice::from_ref(&stream_param),
                             &mut stream_alerts_map,
                         )
                         .await;
@@ -371,23 +357,15 @@ pub async fn handle_otlp_request(
                         if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
                                 crate::service::ingestion::get_stream_executable_pipeline(
-                                    org_id,
-                                    &local_metric_name,
-                                    &StreamType::Metrics,
+                                    &stream_param,
                                 )
                                 .await;
                             stream_executable_pipelines
                                 .insert(local_metric_name.clone(), pipeline_params);
                         }
 
-                        let streams = vec![StreamParams {
-                            org_id: org_id.to_owned().into(),
-                            stream_type: StreamType::Metrics,
-                            stream_name: local_metric_name.to_owned().into(),
-                        }];
-
                         crate::service::ingestion::get_uds_and_original_data_streams(
-                            &streams,
+                            std::slice::from_ref(&stream_param),
                             &mut user_defined_schema_map,
                             &mut streams_need_original_map,
                             &mut streams_need_all_values_map,

@@ -23,6 +23,7 @@ pub mod file_list;
 pub mod local_lock;
 pub mod pipeline;
 pub mod queue;
+pub mod runtime;
 pub mod scheduler;
 pub mod schema;
 pub mod storage;

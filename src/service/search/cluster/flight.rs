@@ -37,6 +37,7 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes, Result},
     file_list::FileId,
+    runtime::DATAFUSION_RUNTIME,
 };
 use itertools::Itertools;
 use parking_lot::Mutex;
@@ -51,7 +52,7 @@ use crate::{
     service::{
         db::enrichment_table,
         search::{
-            DATAFUSION_RUNTIME, SearchResult,
+            SearchResult,
             datafusion::{
                 exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{

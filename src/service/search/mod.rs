@@ -51,7 +51,6 @@ use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;
-use tokio::runtime::Runtime;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -123,16 +122,6 @@ type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
 
 // search manager
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .thread_name("datafusion_runtime")
-        .worker_threads(config::get_config().limit.cpu_num)
-        .thread_stack_size(16 * 1024 * 1024)
-        .enable_all()
-        .build()
-        .unwrap()
-});
 
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search

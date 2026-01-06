@@ -95,20 +95,18 @@ pub async fn ingest(
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
-    let mut stream_params = vec![StreamParams::new(org_id, &stream_name, stream_type)];
-    let mut derived_streams = HashSet::new();
+    let index_all_max_value_length = cfg.limit.index_all_max_value_length;
 
+    let mut derived_streams = HashSet::new();
     if is_derived {
         derived_streams.insert(stream_name.to_string());
     }
 
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
-        org_id,
-        &stream_name,
-        &stream_type,
-    )
-    .await;
+    let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
+    let executable_pipeline =
+        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
