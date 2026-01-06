@@ -53,9 +53,9 @@ if (process.env.BUILD_COMMIT_HASH) {
   commitHash = process.env.BUILD_COMMIT_HASH;
 }
 // Uncomment for testing stale build detection on local:
-else if (process.env.TEST_COMMIT_HASH) {
-  commitHash = process.env.TEST_COMMIT_HASH;
-}
+// else if (process.env.TEST_COMMIT_HASH) {
+//   commitHash = process.env.TEST_COMMIT_HASH;
+// }
 else {
   // Fallback to git command if env variable is not set
   try {
