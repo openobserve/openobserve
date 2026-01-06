@@ -22,6 +22,7 @@ import configService from "@/services/config";
  * 2. On chunk errors, fetch config API to check if commit_hash changed
  * 3. Cache config responses to avoid excessive API calls
  * 4. Only treat as stale build if commit hash actually changed
+ * 5. test message 
  */
 
 
