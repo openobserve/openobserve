@@ -62,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
                 :model-value="selected"
-                size="20px"
+                class="indexlist-stream-toggle"
+                size="20"
                 @update:model-value="toggleOption(opt.value)"
               />
             </q-item-section>
@@ -1484,6 +1485,19 @@ export default defineComponent({
     height: 16px;
     width: 16px;
     margin-right: 10px;
+  }
+}
+</style>
+
+<style lang="scss">
+.indexlist-stream-toggle {
+  .q-toggle__inner {
+    padding: 0.325em !important;
+    font-size: 20px !important;
+  }
+
+  .q-toggle__thumb:before {
+    background: transparent !important;
   }
 }
 </style>
