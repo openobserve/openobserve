@@ -881,6 +881,22 @@ export default defineComponent({
         const oldValue = oldVariablesData[v.name];
         const currentValue = v.value;
 
+        // CRITICAL FIX: If manager has reset a variable's value to null/empty array,
+        // we MUST clear oldVariablesData immediately, otherwise the old value will be
+        // restored when API response arrives
+        const managerHasResetValue =
+          (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
+          oldValue !== undefined &&
+          oldValue !== null &&
+          (!Array.isArray(oldValue) || oldValue.length > 0);
+
+        if (managerHasResetValue) {
+          // Manager reset this variable - clear oldVariablesData so it gets fresh value from API
+          oldVariablesData[v.name] = undefined;
+          console.log(`[syncManagerVariablesToLocal] Detected manager reset for ${v.name}, clearing oldVariablesData`);
+          return; // Skip further processing for this variable
+        }
+
         // Check if variable is in reset state (null or empty array)
         const isCurrentlyReset =
           currentValue === null ||
@@ -892,29 +908,39 @@ export default defineComponent({
           currentValue !== undefined &&
           (!Array.isArray(currentValue) || currentValue.length > 0);
 
-        // If currently reset AND variable is marked as pending (about to load)
-        // OR if options are empty (was reset), then clear oldVariablesData
-        // so it selects first option when data arrives
-        // UNLESS the variable has a valid value (from URL or user), in which case preserve it
-        // ALSO: Don't clear oldVariablesData if variable has custom or "all" default selection configured
+        // Check if this is a child variable
+        const isChildVariable =
+          variablesDependencyGraph[v.name]?.parentVariables?.length > 0;
+
+        // Check if variable has custom or "all" default selection configured
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" ||
           v.selectAllValueForMultiSelect === "all";
 
+        // If currently reset AND variable is marked as pending (about to load)
+        // OR if options are empty (was reset), then clear oldVariablesData
+        // so it selects first option when data arrives
+        // UNLESS the variable has a valid value (from URL or user), in which case preserve it
+        // IMPORTANT: For child variables, ALWAYS clear oldVariablesData when reset, even if custom/all is configured
+        // This ensures child variables update based on parent changes, not initial custom/all values
         if (
           isCurrentlyReset &&
-          (v.isVariableLoadingPending || v.options.length === 0) &&
-          !hasCustomOrAllDefault
+          (v.isVariableLoadingPending || v.options.length === 0)
         ) {
-          // Set to undefined so the selector properly handles first-time selection
-          oldVariablesData[v.name] = undefined;
+          // For child variables, always clear oldVariablesData on reset regardless of custom/all config
+          // For parent variables, only clear if not custom/all default
+          if (isChildVariable || !hasCustomOrAllDefault) {
+            // Set to undefined so the selector properly handles first-time selection
+            oldVariablesData[v.name] = undefined;
+          }
         } else if (hasValidValue && oldVariablesData[v.name] === undefined) {
           // If variable has a valid value (e.g., from URL) and oldVariablesData is undefined,
           // sync it so the value is preserved when API response arrives
           oldVariablesData[v.name] = currentValue;
-        } else if (hasCustomOrAllDefault && oldVariablesData[v.name] === undefined) {
+        } else if (hasCustomOrAllDefault && oldVariablesData[v.name] === undefined && !isChildVariable) {
           // If variable has custom or "all" default configured but oldVariablesData is undefined,
           // set it to the configured default value so it gets applied when API response arrives
+          // BUT only for parent variables (non-child), not for child variables
           if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
             oldVariablesData[v.name] = v.multiSelect
               ? v.customMultiSelectValue
@@ -1085,6 +1111,11 @@ export default defineComponent({
       currentVariable: any,
       oldVariableSelectedValues: any[],
     ) => {
+      // Check if this is a child variable (declare at the beginning to avoid scoping issues)
+      const isChildVariable =
+        variablesDependencyGraph[currentVariable.name]?.parentVariables
+          ?.length > 0;
+
       // For multiSelect, preserve existing values even if they're not in current options
       if (currentVariable.multiSelect) {
         // If we have existing values and they're not empty, keep them
@@ -1097,28 +1128,36 @@ export default defineComponent({
         }
 
         // Check if old values should be preserved based on selectAllValueForMultiSelect setting
-        const hasOldValues = Array.isArray(oldVariableSelectedValues) && oldVariableSelectedValues.length > 0;
+        // Filter out undefined values - when oldVariablesData is cleared, it becomes [undefined]
+        const validOldValues = Array.isArray(oldVariableSelectedValues)
+          ? oldVariableSelectedValues.filter(v => v !== undefined && v !== null)
+          : [];
+        const hasOldValues = validOldValues.length > 0;
 
         if (hasOldValues) {
-          // Check if we should preserve custom values
-          if (
-            currentVariable?.selectAllValueForMultiSelect === "custom" &&
-            currentVariable?.customMultiSelectValue?.length > 0 &&
-            JSON.stringify(oldVariableSelectedValues.sort()) === JSON.stringify(currentVariable.customMultiSelectValue.sort())
-          ) {
-            // Preserve custom values even if not in options
-            currentVariable.value = currentVariable.customMultiSelectValue;
-            return;
-          }
+          // Only preserve custom/all values for non-child variables
+          // Child variables should always update based on parent changes
+          if (!isChildVariable) {
+            // Check if we should preserve custom values
+            if (
+              currentVariable?.selectAllValueForMultiSelect === "custom" &&
+              currentVariable?.customMultiSelectValue?.length > 0 &&
+              JSON.stringify(validOldValues.sort()) === JSON.stringify(currentVariable.customMultiSelectValue.sort())
+            ) {
+              // Preserve custom values even if not in options
+              currentVariable.value = currentVariable.customMultiSelectValue;
+              return;
+            }
 
-          // Check if we should preserve "all" value
-          if (
-            currentVariable?.selectAllValueForMultiSelect === "all" &&
-            oldVariableSelectedValues.includes(SELECT_ALL_VALUE)
-          ) {
-            // Preserve "all" selection
-            currentVariable.value = [SELECT_ALL_VALUE];
-            return;
+            // Check if we should preserve "all" value
+            if (
+              currentVariable?.selectAllValueForMultiSelect === "all" &&
+              validOldValues.includes(SELECT_ALL_VALUE)
+            ) {
+              // Preserve "all" selection
+              currentVariable.value = [SELECT_ALL_VALUE];
+              return;
+            }
           }
         }
 
@@ -1152,11 +1191,6 @@ export default defineComponent({
         }
       }
 
-      // Check if this is a child variable
-      const isChildVariable =
-        variablesDependencyGraph[currentVariable.name]?.parentVariables
-          ?.length > 0;
-
       // Check for URL values first
       // const urlValue = props.initialVariableValues?.value[currentVariable.name];
       // if (urlValue) {
@@ -1175,9 +1209,12 @@ export default defineComponent({
       //   return;
       // }
 
-      // Only apply custom values if no URL value exists
+      // Only apply custom values if:
+      // 1. Not a child variable (child variables should update based on parent)
+      // 2. oldVariablesData is undefined (initial load, not parent-triggered reload)
       if (
         !isChildVariable &&
+        oldVariablesData[currentVariable.name] === undefined &&
         currentVariable?.selectAllValueForMultiSelect === "custom" &&
         currentVariable?.customMultiSelectValue?.length > 0
       ) {
@@ -1189,8 +1226,10 @@ export default defineComponent({
       }
 
       // Apply "all" value if configured (for both multiSelect and single-select)
+      // Only for parent variables on initial load
       if (
         !isChildVariable &&
+        oldVariablesData[currentVariable.name] === undefined &&
         currentVariable?.selectAllValueForMultiSelect === "all"
       ) {
         currentVariable.value = currentVariable.multiSelect
@@ -2432,6 +2471,9 @@ export default defineComponent({
         variable.value = variable.multiSelect ? [] : null;
         // Reset options array
         variable.options = [];
+        // CRITICAL: Clear oldVariablesData for child variables when parent changes
+        // This ensures they don't preserve custom/all values from initial load
+        oldVariablesData[variable.name] = undefined;
         // Emit the updated values immediately
         emitVariablesData();
       });
