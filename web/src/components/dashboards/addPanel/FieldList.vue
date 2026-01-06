@@ -553,7 +553,7 @@ import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
-import usePromlqSuggestions from "@/composables/usePromqlSuggestions";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "FieldList",
@@ -624,7 +624,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const { parsePromQlQuery } = usePromlqSuggestions();
+    const { parsePromQlQuery } = usePromqlSuggestions();
 
     const metricsIconMapping: any = {
       Summary: "description",
