@@ -47,11 +47,11 @@ let commitHash = "unknown";
 let buildTime = Date.now();
 
 // Priority order:
-// 1. VITE_COMMIT_HASH - Set by CI/CD (recommended for production builds)
+// 1. BUILD_COMMIT_HASH - Set by CI/CD (recommended for production builds)
 // 2. Git command - Fallback for local development
 
-if (process.env.VITE_COMMIT_HASH) {
-  commitHash = process.env.VITE_COMMIT_HASH;
+if (process.env.BUILD_COMMIT_HASH) {
+  commitHash = process.env.BUILD_COMMIT_HASH;
 }
 // Uncomment for testing stale build detection:
 // else if (process.env.TEST_COMMIT_HASH) {
