@@ -481,10 +481,11 @@ test.describe("Share Link Test Cases", () => {
       const response = await route.fetch();
       const json = await response.json();
 
-      // Remove web_url to simulate it not being configured
-      const modifiedConfig = { ...json, web_url: "" };
+      // Delete web_url property to simulate it not being configured
+      const modifiedConfig = { ...json };
+      delete modifiedConfig.web_url;
 
-      testLogger.info('Mocked /config endpoint with web_url removed');
+      testLogger.info('Mocked /config endpoint with web_url property deleted');
 
       await route.fulfill({
         status: 200,
@@ -499,7 +500,7 @@ test.describe("Share Link Test Cases", () => {
 
     // Select a stream and run query to load results
     await pm.logsPage.selectStream(TEST_STREAM);
-    await pm.logsPage.clickRefreshButton();
+    await pm.logsPage.clickRefresh();
     await page.waitForLoadState('networkidle');
 
     testLogger.info('Logs page loaded with mocked config');
@@ -515,12 +516,12 @@ test.describe("Share Link Test Cases", () => {
     // TERTIARY ASSERTION: Check for tooltip explaining why it's disabled
     await pm.logsPage.hoverShareLinkButton();
 
-    // Verify tooltip is visible with configuration-related message
-    await pm.logsPage.expectShareLinkTooltipVisible(/disabled|ZO_WEB_URL|configuration|web.*url/i);
+    // Verify tooltip is visible with specific message about ZO_WEB_URL configuration
+    await pm.logsPage.expectShareLinkTooltipVisible(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
 
-    // Get and validate tooltip text
-    const tooltipText = await pm.logsPage.getShareLinkTooltipText(/disabled|ZO_WEB_URL|configuration|web.*url/i);
-    expect(tooltipText.toLowerCase()).toMatch(/disabled|configuration|web.*url/i);
+    // Get and validate tooltip text matches expected structure
+    const tooltipText = await pm.logsPage.getShareLinkTooltipText(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
+    expect(tooltipText.toLowerCase()).toMatch(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
     testLogger.info('✓ TERTIARY CHECK PASSED: Informative tooltip present');
 
     testLogger.info('Share button disabled state test completed for Bug #9788');
