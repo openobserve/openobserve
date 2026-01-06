@@ -96,8 +96,6 @@ export function useMetricsCorrelationDashboard() {
     const rawUnit = metricsMeta?.unit || "";
     const metricType = (metricsMeta?.metric_type || "").toLowerCase();
 
-    console.log(`[useMetricsCorrelationDashboard] Stream: ${stream.stream_name}, Unit: ${rawUnit}, Type: ${metricType}`);
-
     // Map OpenTelemetry/Prometheus units to dashboard units
     const unitMapping: Record<string, string> = {
       "By": "bytes",
@@ -121,14 +119,13 @@ export function useMetricsCorrelationDashboard() {
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
-    console.log(`[useMetricsCorrelationDashboard] createMetricPanel - stream.filters for ${stream.stream_name}:`, stream.filters);
-
+    
     const whereConditions = Object.entries(stream.filters)
       .filter(([field, value]) => {
         const skip = value === SELECT_ALL_VALUE;
-        if (skip) {
-          console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
-        }
+        // if (skip) {
+        //   console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
+        // }
         return !skip;
       })
       .map(([field, value]) => {
@@ -294,9 +291,6 @@ ORDER BY x_axis_1`;
       // Extract only the fields that correspond to matched dimension keys
       filters = {};
 
-      console.log("[useMetricsCorrelationDashboard] availableDimensions:", config.availableDimensions);
-      console.log("[useMetricsCorrelationDashboard] matchedDimensions:", config.matchedDimensions);
-
       if (config.availableDimensions && config.matchedDimensions) {
         // Build a reverse mapping: value -> field name from availableDimensions
         const valueToFieldMap = new Map<string, string>();
@@ -305,8 +299,6 @@ ORDER BY x_axis_1`;
             valueToFieldMap.set(String(fieldValue), fieldName);
           }
         }
-
-        console.log("[useMetricsCorrelationDashboard] valueToFieldMap:", Object.fromEntries(valueToFieldMap));
 
         // For each matched dimension, find the actual field name
         for (const [semanticKey, value] of Object.entries(config.matchedDimensions)) {
@@ -336,8 +328,6 @@ ORDER BY x_axis_1`;
       } else {
         filters = config.matchedDimensions;
       }
-
-      console.log("[useMetricsCorrelationDashboard] Final filters for logs:", filters);
     } else if (streams && streams.length > 0) {
       // Use correlated log streams from API response
       const primaryStream = streams[0];
@@ -366,11 +356,7 @@ ORDER BY x_axis_1`;
 
     const whereClause = whereConditions ? `WHERE ${whereConditions}` : "";
 
-    const query = `SELECT * FROM "${streamName}" ${whereClause} ORDER BY _timestamp DESC`;
-
-    console.log("[useMetricsCorrelationDashboard] Generated logs query:", query);
-    console.log("[useMetricsCorrelationDashboard] Using stream:", streamName);
-    console.log("[useMetricsCorrelationDashboard] Using filters:", filters);
+    const query = `SELECT * FROM "${streamName}" ${whereClause} ORDER BY _timestamp DESC LIMIT 100`;
 
     const panel = {
       id: "logs_table_panel",

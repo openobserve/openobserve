@@ -361,6 +361,9 @@ pub async fn delete_backfill(
         (status = 400, description = "Bad request"),
         (status = 404, description = "Backfill job not found"),
         (status = 500, description = "Internal server error")
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 #[put("/{org_id}/pipelines/backfill/{job_id}")]

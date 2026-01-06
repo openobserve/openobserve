@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="togglePreview"
       >
-        <span class="tw:text-sm tw:font-semibold">Preview</span>
+        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
         <q-btn
           flat
           dense
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw:text-sm tw:font-semibold">Summary</span>
+        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
         <q-btn
           flat
           dense
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, reactive, watch, type PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
@@ -138,6 +139,7 @@ export default defineComponent({
   },
   setup(props, { expose }) {
     const store = useStore();
+    const { t } = useI18n();
     const previewAlertRef = ref(null);
 
     // Load saved state from localStorage or use defaults
@@ -220,6 +222,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       previewAlertRef,
       expandState,

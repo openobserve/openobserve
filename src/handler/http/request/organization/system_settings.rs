@@ -49,7 +49,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get resolved system setting"}))
     )
 )]
 #[get("/{org_id}/settings/v2/{key}")]
@@ -87,7 +88,8 @@ async fn get_setting(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List resolved system settings"}))
     )
 )]
 #[get("/{org_id}/settings/v2")]
@@ -125,7 +127,8 @@ async fn list_settings(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Set org-level system setting"}))
     )
 )]
 #[post("/{org_id}/settings/v2")]
@@ -171,7 +174,8 @@ async fn set_org_setting(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"description": "Set user-level system setting"}))
     )
 )]
 #[post("/{org_id}/settings/v2/user/{user_id}")]
@@ -222,7 +226,8 @@ async fn set_user_setting(
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete org system setting"}))
     )
 )]
 #[delete("/{org_id}/settings/v2/{key}")]
@@ -258,7 +263,8 @@ async fn delete_org_setting(path: web::Path<(String, String)>) -> Result<HttpRes
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"}))
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"description": "Delete user system setting"}))
     )
 )]
 #[delete("/{org_id}/settings/v2/user/{user_id}/{key}")]

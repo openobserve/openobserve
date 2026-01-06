@@ -182,13 +182,13 @@ color="warning" size="sm"> </q-icon>
             !searchObj.loading
           "
         >
-          <h3 class="text-center">
+          <h6 class="text-center">
             <span class="histogram-empty__message">
               <q-icon name="warning"
 color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
-          </h3>
+          </h6>
         </div>
 
         <div
@@ -197,12 +197,12 @@ color="warning" size="xs"></q-icon> No data
             searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
-          <h3 class="text-center">
+          <h5 class="text-center">
             <span class="histogram-empty__message"
 style="color: transparent"
               >.</span
             >
-          </h3>
+          </h5>
         </div>
 
         <div class="q-pb-sm histogram-loader" v-if="histogramLoader">

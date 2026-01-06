@@ -1040,7 +1040,12 @@ body {
     height: 20px;
     width: 20px;
   }
+  .q-toggle__inner {
+    width: 1em;
+    min-width: 1em;
+  }
   .q-toggle__thumb{
+    left: -2px;
     &:before {
       display: none !important;
     }
@@ -1061,6 +1066,7 @@ body {
       left: 3.8px;
     }
     .q-toggle__thumb{
+      left: 0.35em;
       &:before {
         display: none !important;
       }
@@ -1070,8 +1076,6 @@ body {
     }
   }
 }
-
-
 
 //o2 in xs size
 .o2-toggle-button-xs{
@@ -2138,4 +2142,8 @@ body {
 
 .q-field--labeled.q-field--dense .q-field__suffix {
   padding-top: 3px;
+}
+
+.q-toggle__inner {
+  padding: 0.325em 0em 0.325em 0;
 }

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-px-sm q-py-sm tw:h-full">
         <!-- Hero Section -->
         <div class="hero-section">
-          <div class="tw:flex tw:flex-col md:tw:flex-row tw:items-center tw:justify-between tw:gap-8">
+          <div class="tw:flex tw:flex-col tw:flex-row tw:items-center tw:justify-between tw:gap-8">
             <div class="tw:flex-1">
               <img
                 :src="

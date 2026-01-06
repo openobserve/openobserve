@@ -61,6 +61,8 @@ vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
     gridSpace: { left: 60, right: 160, top: 60, bottom: 90 }
   })),
   calculatePieChartRadius: vi.fn(() => 150),
+  calculateDynamicNameGap: vi.fn(() => 25),
+  calculateRotatedLabelBottomSpace: vi.fn(() => 0),
 }));
 
 vi.mock("@/utils/dashboard/calculateGridForSubPlot", () => ({

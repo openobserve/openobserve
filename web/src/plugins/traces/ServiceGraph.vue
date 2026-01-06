@@ -56,13 +56,13 @@
               <q-tooltip>Refresh Service Graph</q-tooltip>
             </q-btn>
 
-            <!-- 2. Tree/Graph view toggle buttons -->
+            <!-- 2. Graph/Tree view toggle buttons -->
             <q-btn-toggle
               v-model="visualizationType"
               toggle-color="primary"
               :options="[
-                { label: 'Tree View', value: 'tree', icon: 'account_tree' },
-                { label: 'Graph View', value: 'graph', icon: 'hub' }
+                { label: 'Graph View', value: 'graph', icon: 'hub' },
+                { label: 'Tree View', value: 'tree', icon: 'account_tree' }
               ]"
               dense
               no-caps
@@ -220,14 +220,14 @@ export default defineComponent({
     // Persist visualization type in localStorage
     const storedVisualizationType = localStorage.getItem('serviceGraph_visualizationType');
     const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "tree"
+      (storedVisualizationType as "tree" | "graph") || "graph"
     );
 
     // Initialize layout type based on visualization type
     const storedLayoutType = localStorage.getItem('serviceGraph_layoutType');
-    let defaultLayoutType = "horizontal";
-    if (visualizationType.value === "graph") {
-      defaultLayoutType = "force";
+    let defaultLayoutType = "force";
+    if (visualizationType.value === "tree") {
+      defaultLayoutType = "horizontal";
     }
     const layoutType = ref(storedLayoutType || defaultLayoutType);
     const chartRendererRef = ref<any>(null);
@@ -303,7 +303,7 @@ export default defineComponent({
       //   };
       // }
 
-      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value);
+      console.log('[ServiceGraph] Generating new chart options, chartKey:', chartKey.value, 'visualizationType:', visualizationType.value);
       const newOptions = visualizationType.value === "tree"
         ? convertServiceGraphToTree(filteredGraphData.value, layoutType.value)
         : convertServiceGraphToNetwork(

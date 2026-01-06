@@ -142,17 +142,30 @@ export class AlertsPage {
             searchAcrossFoldersToggle: '[data-test="alert-list-search-across-folders-toggle"]',
             alertDeleteOption: 'Delete',
 
-            // View Mode Tabs (Alerts / Incidents) - VERIFIED from source code
-            alertIncidentViewTabs: '[data-test="alert-incident-view-tabs"]',
+            // View Mode Buttons (Alerts / Incidents) - Uses AppTabs component with tab-{value} pattern
+            alertIncidentViewTabs: '[data-test="alert-incident-view-tabs"]',  // Container for view tabs
             alertsViewTab: '[data-test="tab-alerts"]',
             incidentsViewTab: '[data-test="tab-incidents"]',
 
             // Incidents view locators
             incidentListTable: '[data-test="incident-list-table"]',
             incidentSearchInput: '[data-test="incident-search-input"]',
+            incidentList: '[data-test="incident-list"]',
+            incidentRow: '[data-test="incident-row"]',
+            incidentAckButton: '[data-test="incident-ack-btn"]',
+            incidentResolveButton: '[data-test="incident-resolve-btn"]',
+            incidentReopenButton: '[data-test="incident-reopen-btn"]',
+            incidentDetailTitle: '[data-test="incident-detail-title"]',
+            incidentDetailCloseButton: '[data-test="incident-detail-close-btn"]',
 
             // Import button
             alertImportButton: '[data-test="alert-import"]',
+
+            // Page structure locators
+            alertListPage: '[data-test="alert-list-page"]',
+            alertListTable: '[data-test="alert-list-table"]',
+            alertListSplitter: '[data-test="alert-list-splitter"]',
+            loadingOverlay: '.fullscreen.bg-blue',
 
             // Table locators
             tableBodyRowWithIndex: 'tbody tr[data-index]',
@@ -665,13 +678,22 @@ export class AlertsPage {
     }
 
     /**
-     * Verify the view mode tabs are visible on page load
+     * Wait for view mode tabs to be ready (visible and interactive)
+     * Use this in beforeEach to ensure tabs are loaded before tests run
+     */
+    async waitForViewTabsReady() {
+        await this.page.locator(this.locators.alertsViewTab).waitFor({ state: 'visible', timeout: 30000 });
+        await this.page.locator(this.locators.incidentsViewTab).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
+     * Verify the view mode buttons are visible on page load
      */
     async expectViewModeTabsVisible() {
         testLogger.info('Verifying view mode tabs are visible');
-        await expect(this.page.locator(this.locators.alertIncidentViewTabs)).toBeVisible({ timeout: 10000 });
-        await expect(this.page.locator(this.locators.alertsViewTab)).toBeVisible();
-        await expect(this.page.locator(this.locators.incidentsViewTab)).toBeVisible();
+        // Check for view mode buttons directly (they should always be visible regardless of view)
+        await expect(this.page.locator(this.locators.alertsViewTab)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.incidentsViewTab)).toBeVisible({ timeout: 10000 });
         testLogger.info('View mode tabs verified');
     }
 
@@ -680,7 +702,7 @@ export class AlertsPage {
      */
     async expectAlertsViewElementsVisible() {
         testLogger.info('Verifying Alerts view elements');
-        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertListTable)).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator(this.locators.alertSearchInput)).toBeVisible();
         await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).toBeVisible();
         await expect(this.page.locator(this.locators.alertImportButton)).toBeVisible();
@@ -703,7 +725,7 @@ export class AlertsPage {
      */
     async expectAlertsOnlyElementsHidden() {
         testLogger.info('Verifying Alerts-only elements are hidden');
-        await expect(this.page.locator('[data-test="alert-list-table"]')).not.toBeVisible();
+        await expect(this.page.locator(this.locators.alertListTable)).not.toBeVisible();
         await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).not.toBeVisible();
         await expect(this.page.locator(this.locators.alertImportButton)).not.toBeVisible();
         await expect(this.page.locator(this.locators.addAlertButton)).not.toBeVisible();
@@ -741,6 +763,305 @@ export class AlertsPage {
         await this.page.locator(this.locators.incidentSearchInput).fill(query);
         await this.page.waitForTimeout(500); // Wait for debounce
         testLogger.info('Search applied in Incidents view');
+    }
+
+    /**
+     * Wait for loading overlay to disappear
+     */
+    async waitForLoadingOverlayToDisappear() {
+        const overlay = this.page.locator(this.locators.loadingOverlay);
+        if (await overlay.isVisible().catch(() => false)) {
+            await overlay.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+        }
+    }
+
+    /**
+     * Wait for alert list page to be ready
+     */
+    async waitForAlertListPageReady() {
+        await this.page.locator(this.locators.alertListPage).waitFor({ state: 'visible', timeout: 30000 });
+        await this.page.waitForTimeout(2000);
+    }
+
+    /**
+     * Verify alert list table is visible
+     */
+    async expectAlertListTableVisible() {
+        await expect(this.page.locator(this.locators.alertListTable)).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Verify alert list table is hidden
+     */
+    async expectAlertListTableHidden() {
+        await expect(this.page.locator(this.locators.alertListTable)).not.toBeVisible();
+    }
+
+    /**
+     * Verify alert list splitter is visible
+     */
+    async expectAlertListSplitterVisible() {
+        await expect(this.page.locator(this.locators.alertListSplitter)).toBeVisible();
+    }
+
+    /**
+     * Verify search toggle is visible
+     */
+    async expectSearchAcrossFoldersToggleVisible() {
+        await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).toBeVisible();
+    }
+
+    /**
+     * Verify search toggle is hidden
+     */
+    async expectSearchAcrossFoldersToggleHidden() {
+        await expect(this.page.locator(this.locators.searchAcrossFoldersToggle)).not.toBeVisible();
+    }
+
+    /**
+     * Verify import button is visible
+     */
+    async expectImportButtonVisible() {
+        await expect(this.page.locator(this.locators.alertImportButton)).toBeVisible();
+    }
+
+    /**
+     * Verify import button is hidden
+     */
+    async expectImportButtonHidden() {
+        await expect(this.page.locator(this.locators.alertImportButton)).not.toBeVisible();
+    }
+
+    /**
+     * Verify add alert button is visible
+     */
+    async expectAddAlertButtonVisible() {
+        await expect(this.page.locator(this.locators.addAlertButton)).toBeVisible();
+    }
+
+    /**
+     * Verify add alert button is hidden
+     */
+    async expectAddAlertButtonHidden() {
+        await expect(this.page.locator(this.locators.addAlertButton)).not.toBeVisible();
+    }
+
+    /**
+     * Type in alert search input with sequential typing
+     */
+    async typeInAlertSearchInput(query) {
+        const searchInput = this.page.locator(this.locators.alertSearchInput);
+        await searchInput.click();
+        await this.page.waitForTimeout(500);
+        await searchInput.pressSequentially(query, { delay: 100 });
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verify alert search input is focused
+     */
+    async expectAlertSearchInputFocused() {
+        await expect(this.page.locator(this.locators.alertSearchInput)).toBeFocused();
+    }
+
+    /**
+     * Verify incident search input has expected value
+     */
+    async expectIncidentSearchInputValue(expectedValue) {
+        await expect(this.page.locator(this.locators.incidentSearchInput)).toHaveValue(expectedValue);
+    }
+
+    /**
+     * Verify incident list table is visible
+     */
+    async expectIncidentListTableVisible() {
+        await expect(this.page.locator(this.locators.incidentListTable)).toBeVisible({ timeout: 10000 });
+    }
+
+    // ==================== INCIDENT LIFECYCLE ACTIONS ====================
+
+    /**
+     * Check if any incidents exist in the table
+     * @returns {Promise<boolean>} True if incidents exist
+     */
+    async hasIncidents() {
+        const rows = this.page.locator(this.locators.incidentRow);
+        const count = await rows.count();
+        testLogger.info(`Found ${count} incidents in table`);
+        return count > 0;
+    }
+
+    /**
+     * Get incident count
+     * @returns {Promise<number>} Number of incidents
+     */
+    async getIncidentCount() {
+        const rows = this.page.locator(this.locators.incidentRow);
+        return await rows.count();
+    }
+
+    /**
+     * Get the first incident row
+     * @returns {Locator} First incident row locator
+     */
+    getFirstIncidentRow() {
+        return this.page.locator(this.locators.incidentRow).first();
+    }
+
+    /**
+     * Click acknowledge button on first incident with "open" status
+     */
+    async clickAcknowledgeOnFirstOpenIncident() {
+        testLogger.info('Clicking acknowledge button on first open incident');
+        const ackButton = this.page.locator(this.locators.incidentAckButton).first();
+        await ackButton.waitFor({ state: 'visible', timeout: 10000 });
+        await ackButton.click();
+        await this.page.waitForTimeout(1000); // Wait for status update
+        testLogger.info('Clicked acknowledge button');
+    }
+
+    /**
+     * Click resolve button on first incident
+     */
+    async clickResolveOnFirstIncident() {
+        testLogger.info('Clicking resolve button on first incident');
+        const resolveButton = this.page.locator(this.locators.incidentResolveButton).first();
+        await resolveButton.waitFor({ state: 'visible', timeout: 10000 });
+        await resolveButton.click();
+        await this.page.waitForTimeout(1000); // Wait for status update
+        testLogger.info('Clicked resolve button');
+    }
+
+    /**
+     * Click reopen button on first resolved incident
+     */
+    async clickReopenOnFirstResolvedIncident() {
+        testLogger.info('Clicking reopen button on first resolved incident');
+        const reopenButton = this.page.locator(this.locators.incidentReopenButton).first();
+        await reopenButton.waitFor({ state: 'visible', timeout: 10000 });
+        await reopenButton.click();
+        await this.page.waitForTimeout(1000); // Wait for status update
+        testLogger.info('Clicked reopen button');
+    }
+
+    /**
+     * Verify acknowledge button is visible on first incident
+     */
+    async expectAcknowledgeButtonVisible() {
+        await expect(this.page.locator(this.locators.incidentAckButton).first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify acknowledge button is hidden (not visible)
+     */
+    async expectAcknowledgeButtonHidden() {
+        await expect(this.page.locator(this.locators.incidentAckButton).first()).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify resolve button is visible on first incident
+     */
+    async expectResolveButtonVisible() {
+        await expect(this.page.locator(this.locators.incidentResolveButton).first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify resolve button is hidden (not visible)
+     */
+    async expectResolveButtonHidden() {
+        await expect(this.page.locator(this.locators.incidentResolveButton).first()).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify reopen button is visible on first incident
+     */
+    async expectReopenButtonVisible() {
+        await expect(this.page.locator(this.locators.incidentReopenButton).first()).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify reopen button is hidden (not visible)
+     */
+    async expectReopenButtonHidden() {
+        await expect(this.page.locator(this.locators.incidentReopenButton).first()).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Click on first incident row to open detail drawer
+     */
+    async clickFirstIncidentRow() {
+        testLogger.info('Clicking first incident row to open drawer');
+        const firstRow = this.page.locator(this.locators.incidentRow).first();
+        await firstRow.waitFor({ state: 'visible', timeout: 10000 });
+        await firstRow.click();
+        await this.page.waitForTimeout(1000); // Wait for drawer to open
+        testLogger.info('Clicked first incident row');
+    }
+
+    /**
+     * Verify incident detail drawer is open (title visible)
+     */
+    async expectIncidentDrawerOpen() {
+        testLogger.info('Verifying incident drawer is open');
+        await expect(this.page.locator(this.locators.incidentDetailTitle)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Incident drawer is open');
+    }
+
+    /**
+     * Close incident detail drawer
+     */
+    async closeIncidentDrawer() {
+        testLogger.info('Closing incident drawer');
+        const closeButton = this.page.locator(this.locators.incidentDetailCloseButton);
+        await closeButton.waitFor({ state: 'visible', timeout: 5000 });
+        await closeButton.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Closed incident drawer');
+    }
+
+    /**
+     * Verify incident detail drawer is closed
+     */
+    async expectIncidentDrawerClosed() {
+        await expect(this.page.locator(this.locators.incidentDetailTitle)).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Verify URL contains incident_id parameter
+     */
+    async expectUrlContainsIncidentId() {
+        const url = this.page.url();
+        expect(url).toContain('incident_id=');
+        testLogger.info('URL contains incident_id parameter');
+    }
+
+    /**
+     * Verify URL does not contain incident_id parameter
+     */
+    async expectUrlNotContainsIncidentId() {
+        const url = this.page.url();
+        expect(url).not.toContain('incident_id=');
+        testLogger.info('URL does not contain incident_id parameter');
+    }
+
+    /**
+     * Wait for incident status update notification
+     */
+    async waitForStatusUpdateNotification() {
+        // The notification text varies, but we can check for the success notification
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Waited for status update');
+    }
+
+    /**
+     * Wait for incidents to load in the table
+     */
+    async waitForIncidentsToLoad() {
+        testLogger.info('Waiting for incidents to load');
+        await this.page.locator(this.locators.incidentListTable).waitFor({ state: 'visible', timeout: 30000 });
+        // Wait a bit for data to populate
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Incidents table loaded');
     }
 
     // ==================== IMPORT/EXPORT OPERATIONS ====================

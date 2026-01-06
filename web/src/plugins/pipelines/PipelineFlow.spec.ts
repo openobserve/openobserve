@@ -18,8 +18,25 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PipelineFlow from "./PipelineFlow.vue";
 import { nextTick } from "vue";
+import { createI18n } from "vue-i18n";
 
 installQuasar({});
+
+// Create i18n instance
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en',
+  messages: {
+    en: {
+      pipeline: {
+        unsavedChanges: 'You have unsaved changes',
+        emptyCanvas: 'Drag and drop nodes from the sidebar to start building your pipeline',
+        dragDropNodesHere: 'Drag and drop nodes here',
+        dropHere: 'Drop here'
+      }
+    }
+  }
+});
 
 // Mock dependencies
 vi.mock("@/utils/zincutils", () => ({
@@ -164,7 +181,7 @@ describe("PipelineFlow.vue", () => {
     mockZoomIn.mockClear();
     mockZoomOut.mockClear();
     mockSetViewport.mockClear();
-    
+
     // Reset mock pipelineObj for each test
     mockPipelineObj = {
       currentSelectedPipeline: {
@@ -181,46 +198,54 @@ describe("PipelineFlow.vue", () => {
     }
   });
 
+  const mountComponent = () => {
+    return mount(PipelineFlow, {
+      global: {
+        plugins: [i18n]
+      }
+    });
+  };
+
   // Test 1: Component mounts successfully
   it("should mount successfully", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.exists()).toBe(true);
   });
 
   // Test 2: Renders VueFlow component
   it("should render VueFlow component", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.findComponent({ name: "VueFlow" }).exists()).toBe(true);
   });
 
   // Test 3: Renders Controls component
   it("should render Controls component", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.findComponent({ name: "Controls" }).exists()).toBe(true);
   });
 
   // Test 4: Renders DropzoneBackground component
   it("should render DropzoneBackground component", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.findComponent({ name: "DropzoneBackground" }).exists()).toBe(true);
   });
 
   // Test 5: Initializes with correct data attributes
   it("should have correct data test attributes", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.find('[data-test="pipeline-flow-container"]').exists()).toBe(true);
   });
 
   // Test 6: Warning text is hidden when dirtyFlag is false
   it("should hide warning text when dirtyFlag is false", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
     expect(warningText.element.style.display).toBe('none');
   });
 
   // Test 7: Warning text is shown when dirtyFlag is true
   it("should show warning text when dirtyFlag is true", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.pipelineObj.dirtyFlag = true;
     await nextTick();
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
@@ -230,14 +255,14 @@ describe("PipelineFlow.vue", () => {
 
   // Test 8: Empty canvas text is shown when no nodes
   it("should show empty canvas text when no nodes exist", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.find('.empty-text').exists()).toBe(true);
     expect(wrapper.find('.empty-text').text()).toBe('Drag and drop nodes here');
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist
   it("should hide empty canvas text when nodes exist", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: '1' });
     await nextTick();
     expect(wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.length).toBe(1);
@@ -245,7 +270,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 10: VueFlow receives correct props
   it("should pass correct props to VueFlow", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     expect(vueFlow.props('defaultViewport')).toEqual({ zoom: 0.8 });
     expect(vueFlow.props('minZoom')).toBe(0.2);
@@ -254,7 +279,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 11: Controls component receives correct props
   it("should pass correct props to Controls", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const controls = wrapper.findComponent({ name: "Controls" });
     expect(controls.props('showInteractive')).toBe(false);
     expect(controls.props('position')).toBe('top-left');
@@ -262,27 +287,27 @@ describe("PipelineFlow.vue", () => {
 
   // Test 12: VueFlow ref is properly initialized
   it("should initialize vueFlowRef properly", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.vueFlowRef).toBeDefined();
   });
 
   // Test 13: Store is properly injected
   it("should inject store properly", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.store).toBeDefined();
     expect(wrapper.vm.store).toBe(mockStore);
   });
 
   // Test 14: pipelineObj is accessible
   it("should make pipelineObj accessible", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.pipelineObj).toBeDefined();
     expect(wrapper.vm.pipelineObj).toBe(mockPipelineObj);
   });
 
   // Test 15: drag and drop functions are accessible
   it("should expose drag and drop functions", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.onDragOver).toBeDefined();
     expect(wrapper.vm.onDrop).toBeDefined();
     expect(wrapper.vm.onDragLeave).toBeDefined();
@@ -291,7 +316,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 16: node change functions are accessible  
   it("should expose node change functions", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.onNodeChange).toBeDefined();
     expect(wrapper.vm.onNodesChange).toBeDefined();
     expect(wrapper.vm.onEdgesChange).toBeDefined();
@@ -299,33 +324,33 @@ describe("PipelineFlow.vue", () => {
 
   // Test 17: connection functions are accessible
   it("should expose connection functions", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.onConnect).toBeDefined();
     expect(wrapper.vm.validateConnection).toBeDefined();
   });
 
   // Test 18: zoom functions are accessible
   it("should expose zoom functions", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.zoomIn).toBeDefined();
     expect(wrapper.vm.zoomOut).toBeDefined();
   });
 
   // Test 19: resetTransform function is accessible
   it("should expose resetTransform function", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.resetTransform).toBeDefined();
   });
 
   // Test 20: isCanvasEmpty computed property works correctly
   it("should compute isCanvasEmpty correctly when no nodes", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.isCanvasEmpty).toBe(true);
   });
 
   // Test 21: isCanvasEmpty computed property works correctly with nodes
   it("should compute isCanvasEmpty correctly when nodes exist", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: '1' });
     await nextTick();
     expect(wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.length).toBe(1);
@@ -333,7 +358,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 22: zoomIn function calls vueFlowRef.zoomIn
   it("should call vueFlowRef.zoomIn when zoomIn is called", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.vueFlowRef = { zoomIn: mockZoomIn };
     wrapper.vm.zoomIn();
     expect(mockZoomIn).toHaveBeenCalled();
@@ -341,7 +366,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 23: zoomOut function calls vueFlowRef.zoomOut
   it("should call vueFlowRef.zoomOut when zoomOut is called", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.vueFlowRef = { zoomOut: mockZoomOut };
     wrapper.vm.zoomOut();
     expect(mockZoomOut).toHaveBeenCalled();
@@ -349,14 +374,14 @@ describe("PipelineFlow.vue", () => {
 
   // Test 24: resetTransform function calls setViewport with correct params
   it("should call setViewport with correct params when resetTransform is called", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.resetTransform();
     expect(mockSetViewport).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1 });
   });
 
   // Test 25: onMounted lifecycle hook behavior with > 4 nodes
   it("should call fitView with padding 0.1 when nodes > 4 on mount", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.pipelineObj.currentSelectedPipeline.nodes = Array(5).fill().map((_, i) => ({ id: `node${i}` }));
     
     // Mock the vueFlowRef before timeout
@@ -369,7 +394,7 @@ describe("PipelineFlow.vue", () => {
   // Test 26: onMounted lifecycle hook behavior with <= 4 nodes
   it("should call fitView with padding 1 when nodes <= 4 on mount", async () => {
     mockPipelineObj.currentSelectedPipeline.nodes = [{ id: 'node1' }];
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.vueFlowRef = { fitView: mockFitView };
     
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -379,7 +404,7 @@ describe("PipelineFlow.vue", () => {
   // Test 27: watch on pipelineObj.currentSelectedPipeline resets dirtyFlag
   it("should reset dirtyFlag when currentSelectedPipeline changes", async () => {
     mockPipelineObj.dirtyFlag = true;
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     
     // Trigger the watcher by changing the pipeline reference
     wrapper.vm.pipelineObj.currentSelectedPipeline = { nodes: [{ id: 'new' }], edges: [] };
@@ -391,7 +416,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 28: VueFlow emits are properly handled
   it("should handle VueFlow drop event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('drop');
     expect(mockOnDrop).toHaveBeenCalled();
@@ -399,7 +424,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 29: VueFlow node-change event is handled
   it("should handle VueFlow node-change event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('node-change');
     expect(mockOnNodeChange).toHaveBeenCalled();
@@ -407,7 +432,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 30: VueFlow nodes-change event is handled
   it("should handle VueFlow nodes-change event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('nodes-change');
     expect(mockOnNodesChange).toHaveBeenCalled();
@@ -415,7 +440,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 31: VueFlow edges-change event is handled
   it("should handle VueFlow edges-change event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('edges-change');
     expect(mockOnEdgesChange).toHaveBeenCalled();
@@ -423,7 +448,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 32: VueFlow connect event is handled
   it("should handle VueFlow connect event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('connect');
     expect(mockOnConnect).toHaveBeenCalled();
@@ -431,7 +456,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 33: VueFlow dragover event is handled
   it("should handle VueFlow dragover event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('dragover');
     expect(mockOnDragOver).toHaveBeenCalled();
@@ -439,7 +464,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 34: VueFlow dragleave event is handled
   it("should handle VueFlow dragleave event", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
     vueFlow.vm.$emit('dragleave');
     expect(mockOnDragLeave).toHaveBeenCalled();
@@ -447,7 +472,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 35: DropzoneBackground displays correct content when dragging
   it("should show 'Drop here' text in DropzoneBackground when dragging", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.isDragOver = { value: true };
     await nextTick();
     expect(wrapper.text()).toContain('Drop here');
@@ -455,14 +480,14 @@ describe("PipelineFlow.vue", () => {
 
   // Test 36: Component exposes setViewport function
   it("should expose setViewport function", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.vm.setViewport).toBeDefined();
     expect(typeof wrapper.vm.setViewport).toBe('function');
   });
 
   // Test 37: CustomNode components are rendered in templates
   it("should render CustomNode components in templates", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const customNodeComponent = wrapper.findComponent({ name: "CustomNode" });
     
     // Check if CustomNode component is available
@@ -471,7 +496,7 @@ describe("PipelineFlow.vue", () => {
 
   // Test 38: CustomEdge component is rendered in template
   it("should render CustomEdge component in template", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     const customEdgeComponent = wrapper.findComponent({ name: "CustomEdge" });
     
     // Check if CustomEdge component is available
@@ -480,13 +505,13 @@ describe("PipelineFlow.vue", () => {
 
   // Test 39: Container div has correct CSS class
   it("should have container div with correct class", () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     expect(wrapper.find('.container').exists()).toBe(true);
   });
 
   // Test 40: Warning text contains correct icon and message
   it("should display warning text with correct icon and message", async () => {
-    wrapper = mount(PipelineFlow);
+    wrapper = mountComponent();
     wrapper.vm.pipelineObj.dirtyFlag = true;
     await nextTick();
     
