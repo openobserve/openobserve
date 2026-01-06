@@ -1091,7 +1091,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: number | null = null;
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
