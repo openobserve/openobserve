@@ -16,12 +16,6 @@
 import configService from "@/services/config";
 
 /**
- * Build Version Checker Utility
- *
- * Industry-standard approach for detecting stale builds in Single Page Applications.
- * This utility helps distinguish between:
- * - Stale build errors (new deployment, old chunks deleted)
- * - Network errors (connectivity issues, server down)
  *
  * Approach:
  * 1. Commit hash is injected at build time via Vite's define option

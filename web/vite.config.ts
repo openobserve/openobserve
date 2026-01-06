@@ -42,23 +42,22 @@ if (process.env.NODE_ENV === "production") {
 
 const isTesting = process.env.NODE_ENV === "test";
 
-// Get commit hash - prefer environment variable (set by CI/CD), fallback to git command
 let commitHash = "unknown";
 let buildTime = Date.now();
 
 // Priority order:
-// 1. BUILD_COMMIT_HASH - Set by CI/CD (recommended for production builds)
+// 1. BUILD_COMMIT_HASH - Set by CI/CD
 // 2. Git command - Fallback for local development
 
 if (process.env.BUILD_COMMIT_HASH) {
   commitHash = process.env.BUILD_COMMIT_HASH;
 }
-// Uncomment for testing stale build detection:
+// Uncomment for testing stale build detection on local:
 // else if (process.env.TEST_COMMIT_HASH) {
 //   commitHash = process.env.TEST_COMMIT_HASH;
 // }
 else {
-  // Fallback to git command for local development
+  // Fallback to git command if env variable is not set
   try {
     commitHash = execSync("git rev-parse --short HEAD").toString().trim();
   } catch (e) {
