@@ -288,4 +288,78 @@ mod tests {
         // Should handle large values correctly
         assert_eq!(expiry, far_future_exp * 1_000_000);
     }
+
+    #[test]
+    fn test_extract_jwt_expiry_empty_token() {
+        // Empty token should return default expiry
+        let token = "";
+        let before = chrono::Utc::now().timestamp_micros();
+        let expiry = extract_jwt_expiry(token);
+        let after = chrono::Utc::now().timestamp_micros();
+
+        let expected_min = before + (23 * 60 * 60 * 1_000_000);
+        let expected_max = after + (25 * 60 * 60 * 1_000_000);
+        assert!(
+            expiry >= expected_min && expiry <= expected_max,
+            "Should return default expiry for empty token"
+        );
+    }
+
+    #[test]
+    fn test_extract_jwt_expiry_negative_expiry() {
+        // Negative expiry (before epoch) should be handled correctly
+        let negative_exp = -3600; // 1 hour before epoch
+        let token = create_jwt_token(negative_exp);
+        let expiry = extract_jwt_expiry(&token);
+
+        // Should return negative microseconds (before epoch)
+        assert_eq!(expiry, negative_exp * 1_000_000);
+    }
+
+    #[test]
+    fn test_extract_jwt_expiry_real_jwt_format() {
+        // Test with a more realistic JWT payload structure
+        let future_exp = chrono::Utc::now().timestamp() + 1800; // 30 minutes
+        let header = r#"{"alg":"RS256","typ":"JWT","kid":"abc123"}"#;
+        let payload = format!(
+            r#"{{"iss":"https://auth.example.com","sub":"user123","aud":"api","exp":{},"iat":{},"nbf":{}}}"#,
+            future_exp,
+            future_exp - 60,
+            future_exp - 60
+        );
+
+        let header_b64 = base64::engine::general_purpose::URL_SAFE.encode(header);
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE.encode(payload);
+        let token = format!("{}.{}.signature", header_b64, payload_b64);
+
+        let expiry = extract_jwt_expiry(&token);
+        let expected_micros = future_exp * 1_000_000;
+
+        assert_eq!(expiry, expected_micros);
+    }
+
+    #[test]
+    fn test_extract_jwt_expiry_float_exp_in_json() {
+        // JWT with float exp value falls back to default expiry because as_i64() doesn't parse
+        // floats
+        let future_exp_int = 1800000000; // Fixed timestamp
+        let header = r#"{"alg":"HS256","typ":"JWT"}"#;
+        let payload = format!(r#"{{"sub":"test","exp":{}.0}}"#, future_exp_int); // Float format
+
+        let header_b64 = base64::engine::general_purpose::URL_SAFE.encode(header);
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE.encode(payload);
+        let token = format!("{}.{}.signature", header_b64, payload_b64);
+
+        let before = chrono::Utc::now().timestamp_micros();
+        let expiry = extract_jwt_expiry(&token);
+        let after = chrono::Utc::now().timestamp_micros();
+
+        // Float values can't be parsed by as_i64(), so it returns default expiry (24 hours)
+        let expected_min = before + (23 * 60 * 60 * 1_000_000);
+        let expected_max = after + (25 * 60 * 60 * 1_000_000);
+        assert!(
+            expiry >= expected_min && expiry <= expected_max,
+            "Float exp should fall back to default expiry"
+        );
+    }
 }

@@ -1757,6 +1757,56 @@ mod tests {
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
     }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_with_org() {
+        let roles = vec![
+            "org1/admin".to_string(),
+            "org1/editor".to_string(),
+            "org2/viewer".to_string(),
+        ];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org1"));
+
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.contains(&"admin".to_string()));
+        assert!(filtered.contains(&"editor".to_string()));
+        assert!(!filtered.contains(&"viewer".to_string()));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_without_org() {
+        let roles = vec!["org1/admin".to_string(), "org2/viewer".to_string()];
+
+        let filtered = get_user_roles_by_org_id(roles.clone(), None);
+
+        // None org_id returns all roles
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered, roles);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_no_matching_org() {
+        let roles = vec!["org1/admin".to_string(), "org2/editor".to_string()];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org3"));
+
+        // No roles match org3
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_empty_roles() {
+        let roles = vec![];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org1"));
+
+        assert_eq!(filtered.len(), 0);
+    }
 }
 
 /// Creates a service account user record if it doesn't already exist

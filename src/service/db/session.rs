@@ -300,3 +300,41 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
 
     Ok(deleted_count)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_session_key_format() {
+        assert_eq!(USER_SESSION_KEY, "/user_sessions/");
+        let session_id = "test_session_123";
+        let key = format!("{}{}", USER_SESSION_KEY, session_id);
+        assert_eq!(key, "/user_sessions/test_session_123");
+    }
+
+    #[test]
+    fn test_user_session_key_prefix() {
+        // Verify the key format is correct for coordinator operations
+        let session_id = "abc-def-123";
+        let key = format!("{}{}", USER_SESSION_KEY, session_id);
+        assert!(key.starts_with("/user_sessions/"));
+        assert!(key.ends_with("abc-def-123"));
+    }
+
+    #[test]
+    fn test_user_session_key_multiple_formats() {
+        let test_cases = vec![
+            "simple_id",
+            "uuid-with-dashes",
+            "id_with_underscores",
+            "123456789",
+        ];
+
+        for session_id in test_cases {
+            let key = format!("{}{}", USER_SESSION_KEY, session_id);
+            assert_eq!(key, format!("/user_sessions/{}", session_id));
+            assert!(key.starts_with(USER_SESSION_KEY));
+        }
+    }
+}

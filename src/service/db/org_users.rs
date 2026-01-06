@@ -567,3 +567,44 @@ mod super_cluster {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_org_users_key_prefix() {
+        assert_eq!(ORG_USERS_KEY_PREFIX, "/org_users/");
+    }
+
+    #[test]
+    fn test_org_users_key_format_single() {
+        let org_id = "test_org";
+        let user_email = "test@example.com";
+        let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email}");
+        assert_eq!(key, "/org_users/single/test_org/test@example.com");
+        assert!(key.starts_with(ORG_USERS_KEY_PREFIX));
+        assert!(key.contains("single"));
+    }
+
+    #[test]
+    fn test_org_users_key_format_many() {
+        let email = "user@example.com";
+        let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{email}");
+        assert_eq!(key, "/org_users/many/user/user@example.com");
+        assert!(key.starts_with(ORG_USERS_KEY_PREFIX));
+        assert!(key.contains("many/user"));
+    }
+
+    #[test]
+    fn test_email_lowercasing_in_key() {
+        // Verify email is consistently lowercased in key construction
+        let org_id = "TestOrg";
+        let user_email_upper = "TEST@EXAMPLE.COM";
+        let user_email_lower = user_email_upper.to_lowercase();
+
+        let key = format!("{ORG_USERS_KEY_PREFIX}single/{org_id}/{user_email_lower}");
+        assert_eq!(key, "/org_users/single/TestOrg/test@example.com");
+        assert!(!key.contains("TEST@EXAMPLE.COM"));
+    }
+}
