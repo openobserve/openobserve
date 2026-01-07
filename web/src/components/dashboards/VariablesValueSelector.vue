@@ -1770,6 +1770,8 @@ export default defineComponent({
             return true;
           } catch (error) {
             resetVariableState(variableObject);
+            variableObject.isLoading = false;
+            variableObject.isVariableLoadingPending = false;
             return false;
           }
         }
@@ -1900,6 +1902,10 @@ export default defineComponent({
       );
 
       for (const variable of variablesToResolve) {
+        // Skip dynamic_filters as they don't participate in standard variable replacement
+        // and their value structure (array of objects) causes issues with escapeSingleQuotes
+        if (variable.type === "dynamic_filters") continue;
+
         console.log(
           `[VariablesValueSelector] Checking variable ${variable.name}: isPartialLoaded=${variable.isVariablePartialLoaded}, value=${JSON.stringify(variable.value)}`,
         );

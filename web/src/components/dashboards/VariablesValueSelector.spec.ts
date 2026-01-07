@@ -2017,12 +2017,56 @@ describe("VariablesValueSelector", () => {
         // Error handling is expected for invalid dates
       }
 
-      // Should not crash the component and variable should exist
       if (regionVariable) {
         expect(typeof regionVariable.isLoading).toBe("boolean");
       } else {
         expect(vm.variablesData.values).toBeInstanceOf(Array);
       }
+    });
+
+    it("should not fail building query context when dynamic filters are present", async () => {
+      // 1. Initialize wrapper with showDynamicFilters: true
+      wrapper = createWrapper({ showDynamicFilters: true });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+
+      // 2. Set the value of "Dynamic filters" variable to an array of objects
+      const dynamicFiltersVar = vm.variablesData.values.find(
+        (v: any) => v.name === "Dynamic filters",
+      );
+      expect(dynamicFiltersVar).toBeDefined();
+
+      dynamicFiltersVar.value = [
+        { name: "host", operator: "=", value: "localhost", streams: [] },
+      ];
+
+      // 3. Trigger loadVariableOptions for another variable ('region')
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Ensure variable is in a state that allows loading
+      regionVariable.isLoading = false;
+      regionVariable.isVariablePartialLoaded = true;
+      regionVariable.isVariableLoadingPending = false;
+
+      // Clear any previous calls
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+
+      // Mock the streaming to simulate successful call
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      // 4. Assert that fetchQueryDataWithHttpStream IS called
+      await vm.loadVariableOptions(regionVariable);
+
+      expect(
+        mockStreamingComposable.fetchQueryDataWithHttpStream,
+      ).toHaveBeenCalled();
     });
   });
 });
