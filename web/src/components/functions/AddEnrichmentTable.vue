@@ -344,9 +344,10 @@ export default defineComponent({
       if (this.formData.append == undefined) this.formData.append = false;
 
       // Detect if this is a URL-based enrichment table
-      if (this.formData.urlJob) {
+      if (this.formData.urlJobs && this.formData.urlJobs.length > 0) {
         this.formData.source = 'url';
-        this.formData.url = this.formData.urlJob.url || '';
+        // For now, just use the first URL (users can add more URLs via append)
+        this.formData.url = this.formData.urlJobs[0].url || '';
       } else {
         this.formData.source = 'file';
       }

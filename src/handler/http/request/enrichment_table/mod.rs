@@ -200,7 +200,7 @@ pub async fn save_enrichment_table_from_url(
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
 
     use crate::service::{
-        db::enrichment_table::{get_url_job, save_url_job},
+        db::enrichment_table::{delete_url_job, get_url_jobs_for_table, save_url_job},
         enrichment_table::url_processor::trigger_url_job_processing,
     };
 
@@ -289,44 +289,13 @@ pub async fn save_enrichment_table_from_url(
         }
     }
 
-    // ===== DUPLICATE JOB PREVENTION & RESUME HANDLING =====
-    // Check if there's already a job in progress for this table.
-    // This prevents:
-    // 1. Wasted resources from duplicate downloads
-    // 2. Race conditions where two jobs write to the same table
-    // 3. Confusing UI state where multiple jobs exist for same table
-    //
-    // We allow replacing completed/failed jobs to support retrying with
-    // different URLs or re-importing updated data.
-    let existing_job = match get_url_job(&org_id, &table_name).await {
-        Ok(Some(existing_job)) => {
-            // Only block if job is actively processing.
-            // This check is eventually consistent (job could complete between
-            // check and new job creation), but the race window is milliseconds
-            // and worst case is a harmless duplicate completion.
-            if existing_job.status == EnrichmentTableStatus::Processing {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "Job already in progress for table {}/{}",
-                    org_id, table_name
-                )));
-            }
-            // If status is Completed or Failed, we allow creating a new job.
-            // Store existing job for potential resume.
-            Some(existing_job)
-        }
-        Ok(None) => {
-            // No existing job found - this is the common case for first-time
-            // imports. Proceed with creating new job.
-            None
-        }
+    // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
+    // Fetch all existing jobs for this table
+    let existing_jobs = match get_url_jobs_for_table(&org_id, &table_name).await {
+        Ok(jobs) => jobs,
         Err(e) => {
-            // Database error while checking for existing job.
-            // We fail the request rather than proceeding blindly, because:
-            // 1. There might actually be a job in progress that we can't see
-            // 2. Database issues indicate broader system problems
-            // 3. Better to fail safe than risk duplicate work or data corruption
             log::error!(
-                "[ENRICHMENT::URL] Failed to check existing job for {}/{}: {}",
+                "[ENRICHMENT::URL] Failed to fetch existing jobs for {}/{}: {}",
                 org_id,
                 table_name,
                 e
@@ -337,33 +306,79 @@ pub async fn save_enrichment_table_from_url(
         }
     };
 
-    // ===== JOB CREATION OR RESUME =====
-    // If resume=true and there's an existing failed job with Range support,
-    // preserve its progress (last_byte_position, etc.) and just reset to Pending.
-    // Otherwise, create a fresh job from scratch.
-    // Validate URL matches to prevent resuming from wrong position if user changes URL.
-    let mut job = if let Some(existing) = existing_job {
-        if resume
-            && existing.status == EnrichmentTableStatus::Failed
-            && existing.supports_range
-            && existing.url == request_body.url
-        {
+    // Check job statuses
+    let has_processing = existing_jobs
+        .iter()
+        .any(|j| j.status == EnrichmentTableStatus::Processing);
+    let has_failed = existing_jobs
+        .iter()
+        .any(|j| j.status == EnrichmentTableStatus::Failed);
+
+    // RULE 1: Block ALL operations if any job is processing
+    // Reason: Cannot safely write to table while another job is writing
+    if has_processing {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "Cannot create new job: a job is currently processing for table {}/{}. Please wait for it to complete.",
+            org_id, table_name
+        )));
+    }
+
+    // RULE 2: Block APPEND if any job has failed
+    // Reason: Failed jobs indicate data integrity issues; user should resolve them first
+    if append_data && has_failed {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "Cannot append: table {}/{} has failed jobs. Please retry or delete the failed jobs, or use replace mode (append=false) to start fresh.",
+            org_id, table_name
+        )));
+    }
+
+    // ===== REPLACE MODE: Delete existing job records =====
+    // If replace mode and jobs exist, delete all job records
+    // Note: Table data deletion is handled by the URL processor based on append_data flag
+    if !append_data && !existing_jobs.is_empty() {
+        log::info!(
+            "[ENRICHMENT::URL] Replace mode: deleting all {} existing job record(s) for {}/{}",
+            existing_jobs.len(),
+            org_id,
+            table_name
+        );
+
+        if let Err(e) = delete_url_job(&org_id, &table_name).await {
+            log::error!(
+                "[ENRICHMENT::URL] Failed to delete existing jobs for {}/{}: {}",
+                org_id,
+                table_name,
+                e
+            );
+            // Continue anyway - we'll create the new job
+        }
+    }
+
+    // ===== RESUME LOGIC =====
+    // If resume=true, try to find a failed job with the same URL that supports Range
+    let mut job = if resume {
+        let resumable_job = existing_jobs.into_iter().find(|j| {
+            j.status == EnrichmentTableStatus::Failed
+                && j.supports_range
+                && j.url == request_body.url
+        });
+
+        if let Some(existing) = resumable_job {
             log::info!(
-                "[ENRICHMENT::URL] Resuming job for {}/{} from byte {}",
+                "[ENRICHMENT::URL] Resuming job {} for {}/{} from byte {}",
+                existing.id,
                 org_id,
                 table_name,
                 existing.last_byte_position
             );
             let mut job = existing;
-            // Reset status to Pending but preserve progress
             job.status = EnrichmentTableStatus::Pending;
             job.error_message = None;
             job.updated_at = chrono::Utc::now().timestamp_micros();
             job
         } else {
-            // Create a new job record with Pending status from scratch.
             log::info!(
-                "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+                "[ENRICHMENT::URL] No resumable job found, creating new job for {}/{}",
                 org_id,
                 table_name
             );
@@ -375,11 +390,9 @@ pub async fn save_enrichment_table_from_url(
             )
         }
     } else {
-        // No existing job - create a new job record with Pending status from scratch.
-        // This immediately makes the job visible to the status API, allowing
-        // the UI to start polling for updates even before processing begins.
+        // Not resuming - create a fresh job
         log::info!(
-            "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+            "[ENRICHMENT::URL] Creating new job for {}/{}",
             org_id,
             table_name
         );
@@ -514,7 +527,7 @@ pub async fn save_enrichment_table_from_url(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>),
+        (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
         (status = StatusCode::FORBIDDEN, description = "Forbidden", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
@@ -593,12 +606,17 @@ pub async fn get_all_enrichment_table_statuses(
                 jobs
             };
 
-            // Convert Vec<Job> to HashMap<table_name, Job> for easier frontend lookup
-            let job_map: HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob> =
-                filtered_jobs
-                    .into_iter()
-                    .map(|job| (job.table_name.clone(), job))
-                    .collect();
+            // Convert Vec<Job> to HashMap<table_name, Vec<Job>> for multi-URL support
+            // Group jobs by table_name
+            let mut job_map: HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>> =
+                HashMap::new();
+
+            for job in filtered_jobs {
+                job_map
+                    .entry(job.table_name.clone())
+                    .or_insert_with(Vec::new)
+                    .push(job);
+            }
 
             Ok(MetaHttpResponse::json(job_map))
         }
