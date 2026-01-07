@@ -17,9 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:w-full service-identity-config">
     <!-- Section Header -->
-    <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
-    <div class="text-body2 text-grey-7 tw:mb-4">
-      {{ t("settings.correlation.serviceIdentityDescription") }}
+    <div class="tw:flex tw:justify-between tw:items-start tw:mb-2">
+      <div>
+        <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
+        <div class="text-body2 text-grey-7 tw:mb-4">
+          {{ t("settings.correlation.serviceIdentityDescription") }}
+        </div>
+      </div>
+      <q-btn
+        flat
+        dense
+        color="primary"
+        icon="refresh"
+        :label="t('common.refresh')"
+        @click="loadConfig"
+      />
     </div>
 
     <!-- How it works explanation -->

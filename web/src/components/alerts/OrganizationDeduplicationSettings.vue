@@ -16,14 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full org-dedup-settings">
-    <div class="tw:mb-6">
-      <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
-      <div class="text-body2 text-grey-7">
-        {{ t('alerts.correlation.description') }}
+    <div class="tw:mb-6 tw:flex tw:justify-between tw:items-start">
+      <div>
+        <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
+        <div class="text-body2 text-grey-7">
+          {{ t('alerts.correlation.description') }}
+        </div>
+        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+          {{ t('alerts.correlation.semanticFieldNote') }}
+        </div>
       </div>
-      <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
-        {{ t('alerts.correlation.semanticFieldNote') }}
-      </div>
+      <q-btn
+        flat
+        dense
+        color="primary"
+        icon="refresh"
+        :label="t('common.refresh')"
+        @click="loadConfig"
+      />
     </div>
 
     <q-separator class="tw:mb-6" />

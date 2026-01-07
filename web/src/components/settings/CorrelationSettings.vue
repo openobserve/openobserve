@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-tab-panels v-model="activeTab" animated class="tw:mt-4 tw:overflow-hidden tw:bg-transparent">
+      <q-tab-panels v-model="activeTab" animated keep-alive class="tw:mt-4 tw:overflow-hidden tw:bg-transparent">
         <q-tab-panel name="identity" class="tw:p-0 tw:overflow-hidden">
           <ServiceIdentityConfig
             :org-id="store.state.selectedOrganization.identifier"
