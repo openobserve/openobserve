@@ -1044,6 +1044,8 @@ export default defineComponent({
      * Converts relative time periods to absolute times for sharing
      */
     const dashboardShareURL = computed(() => {
+      // Establish reactive dependency on route.fullPath to recompute when URL changes
+      void route.fullPath;
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
