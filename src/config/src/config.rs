@@ -2987,11 +2987,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        if cfg.common.local_mode {
-            cfg.compact.batch_size = 100;
-        } else {
-            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
-        }
+        cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
