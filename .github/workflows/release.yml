@@ -32,7 +32,7 @@ jobs:
           #   file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
           #   file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
-            os: ubicloud-standard-8-arm
+            os: ubicloud-standard-16-arm
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
@@ -73,13 +73,21 @@ jobs:
           npm run build
 
       - name: Install Protoc for linux
-        if: contains(matrix.arch, 'linux')
+        if: contains(matrix.arch, 'x86_64-unknown-linux')
         run: | # Make sure the protoc is >= 3.15
           wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
           unzip protoc-21.12-linux-x86_64.zip -d protoc
           sudo cp protoc/bin/protoc /usr/local/bin/
           sudo cp -r protoc/include/google /usr/local/include/
-  
+
+      - name: Install Protoc for linux ARM
+        if: contains(matrix.arch, 'aarch64-unknown-linux')
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
+
       - name: Install Protoc for windows
         if: contains(matrix.arch, 'windows')
         shell: bash
@@ -88,7 +96,7 @@ jobs:
           unzip protoc-21.12-win64.zip -d protoc
           cp protoc/bin/protoc.exe C:/windows/system32/protoc.exe
           cp -r protoc/include/google C:/windows/system32/
-  
+
       - name: Install Protoc for macos
         if: contains(matrix.arch, 'darwin')
         run: |
@@ -210,7 +218,7 @@ jobs:
           echo "body<<EOF" >> $GITHUB_OUTPUT
           cat release_body.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-  
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -276,4 +284,3 @@ jobs:
         env:
           STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
           STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
-  
