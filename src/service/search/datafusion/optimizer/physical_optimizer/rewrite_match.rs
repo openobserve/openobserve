@@ -118,17 +118,58 @@ impl TreeNodeRewriter for PlanRewriter {
                 .rewrite(&mut add_fst_fields_to_projection)?
                 .data;
 
-            // 3. Rewrite match_all/fuzzy_match_all
-            let mut expr_rewriter =
-                MatchAllRewriter::new(input.schema().clone(), self.fields.clone());
-            let rewritten_predicate = predicate.clone().rewrite(&mut expr_rewriter).data()?;
+            // 3. Update column indices in the predicate to match the new schema
+            let new_schema = input.schema();
+            let mut column_index_rewriter = ColumnIndexRewriter::new(new_schema.clone());
+            let predicate_with_updated_indices = predicate
+                .clone()
+                .rewrite(&mut column_index_rewriter)
+                .data()?;
 
-            // 4. Create new filter with rewritten predicate
+            // 4. Rewrite match_all/fuzzy_match_all
+            let mut expr_rewriter = MatchAllRewriter::new(new_schema.clone(), self.fields.clone());
+            let rewritten_predicate = predicate_with_updated_indices
+                .rewrite(&mut expr_rewriter)
+                .data()?;
+
+            // 5. Create new filter with rewritten predicate
             let new_filter = FilterExec::try_new(rewritten_predicate, input)?
                 .with_projection(add_fst_fields_to_projection.filter_projection.clone())?;
             return Ok(Transformed::yes(Arc::new(new_filter)));
         }
         Ok(Transformed::no(plan))
+    }
+}
+
+// Rewriter for updating column indices when schema changes
+#[derive(Debug, Clone)]
+struct ColumnIndexRewriter {
+    new_schema: SchemaRef,
+}
+
+impl ColumnIndexRewriter {
+    fn new(new_schema: SchemaRef) -> Self {
+        Self { new_schema }
+    }
+}
+
+impl TreeNodeRewriter for ColumnIndexRewriter {
+    type Node = Arc<dyn PhysicalExpr>;
+
+    fn f_up(&mut self, expr: Self::Node) -> Result<Transformed<Self::Node>> {
+        // Check if this is a Column expression
+        if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+            let field_name = column.name();
+            // Find the new index in the new schema
+            if let Ok(new_index) = self.new_schema.index_of(field_name) {
+                // Only update if the index changed
+                if new_index != column.index() {
+                    let new_column = Arc::new(Column::new(field_name, new_index));
+                    return Ok(Transformed::yes(new_column as Arc<dyn PhysicalExpr>));
+                }
+            }
+        }
+        Ok(Transformed::no(expr))
     }
 }
 
@@ -548,6 +589,136 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
         ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
+
+        for item in sqls {
+            let df = ctx.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    /// Test that column indices are correctly updated after adding FTS fields
+    /// This test ensures that when FTS fields are added to the schema, all column
+    /// references in the filter (including str_match function calls) use the correct
+    /// updated indices from the new schema.
+    #[tokio::test]
+    async fn test_column_index_update_with_match_all_and_str_match() {
+        // Test queries that combine match_all with str_match
+        // This simulates the real-world scenario where both functions reference the same column
+        let sqls = vec![
+            (
+                // Query with match_all and additional filter on message column
+                // This tests that after adding FTS fields, the column indices in str_match
+                // are correctly updated to match the new schema
+                "select * from t where match_all('test') and str_match(message, 'success')",
+                vec![
+                    "+------------+------------------+-------+------+",
+                    "| _timestamp | message          | error | msg  |",
+                    "+------------+------------------+-------+------+",
+                    "| 1          | test was success | ok    | info |",
+                    "+------------+------------------+-------+------+",
+                ],
+            ),
+            (
+                // Query with match_all and multiple column filters
+                "select * from t where match_all('critical') and str_match(error, 'critical')",
+                vec![
+                    "+------------+-----------+------------------+------+",
+                    "| _timestamp | message   | error            | msg  |",
+                    "+------------+-----------+------------------+------+",
+                    "| 3          | operation | critical failure | warn |",
+                    "+------------+-----------+------------------+------+",
+                ],
+            ),
+        ];
+
+        let schema = if get_config().common.utf8_view_enabled {
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("message", DataType::Utf8View, false),
+                Field::new("error", DataType::Utf8View, false),
+                Field::new("msg", DataType::Utf8View, false),
+            ]))
+        } else {
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("message", DataType::Utf8, false),
+                Field::new("error", DataType::Utf8, false),
+                Field::new("msg", DataType::Utf8, false),
+            ]))
+        };
+
+        let message_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                "test was success",
+                "request started",
+                "operation",
+                "completed",
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                "test was success",
+                "request started",
+                "operation",
+                "completed",
+            ]))
+        };
+
+        let error_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                "ok",
+                "ok",
+                "critical failure",
+                "ok",
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                "ok",
+                "ok",
+                "critical failure",
+                "ok",
+            ]))
+        };
+
+        let msg_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec!["info", "debug", "warn", "info"]))
+        } else {
+            Arc::new(StringArray::from(vec!["info", "debug", "warn", "info"]))
+        };
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
+                message_array,
+                error_array,
+                msg_array,
+            ],
+        )
+        .unwrap();
+
+        // FTS fields that will be added to the schema
+        let fields = vec![
+            ("message".to_string(), DataType::Utf8),
+            ("error".to_string(), DataType::Utf8),
+            ("msg".to_string(), DataType::Utf8),
+        ];
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_physical_optimizer_rules(vec![Arc::new(RewriteMatchPhysical::new(
+                fields.clone(),
+            ))])
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(
+            crate::service::search::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone(),
+        );
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();
