@@ -358,9 +358,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Without Aggregation -->
             <template v-else>
               <div ref="thresholdFieldRef">
-                <!-- ===== SECTION 1: AGGREGATION EVALUATION ===== -->
-                <!-- User reads: "Evaluate the [count] of [* (all fields)] over a period of [Past 10 Minutes]" -->
-                <div class="tw:mb-6">
+                <!-- ===== SECTION 1: QUERY EVALUATION ===== -->
+                <div class="section-container">
+                  <div class="section-header">
+                    <span class="section-number">1</span>
+                    <span class="section-title">Query Evaluation</span>
+                    <div class="section-divider"></div>
+                  </div>
+
+                  <!-- User reads: "Evaluate the [count] of [* (all fields)] over a period of [Past 10 Minutes]" -->
+                  <div class="section-content">
                   <!-- Line 1: All three labels -->
                   <div class="tw:flex tw:items-center tw:gap-4 tw:mb-2 tw:ml-1">
                     <span class="tw:text-sm tw:font-semibold"
@@ -422,11 +429,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        class="text-red-8 tw:mt-2" style="font-size: 11px; line-height: 12px">
                     Please enter a period value
                   </div>
+                  </div>
                 </div>
 
-                <!-- ===== SECTION 2: TRIGGER CONDITION ===== -->
-                <!-- User reads: "Trigger when the event count is [above or equal to] the threshold [>= 3]" -->
-                <div class="tw:mb-4">
+                <!-- ===== SECTION 2: ALERT CONDITION ===== -->
+                <div class="section-container">
+                  <div class="section-header">
+                    <span class="section-number">2</span>
+                    <span class="section-title">Trigger Condition</span>
+                    <div class="section-divider"></div>
+                  </div>
+
+                  <!-- User reads: "Trigger when the event count is [above or equal to] the threshold [>= 3]" -->
+                  <div class="section-content">
                   <!-- Line 1: Labels -->
                   <div class="tw:flex tw:items-center tw:gap-10 tw:mb-2 tw:ml-1">
                     <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap"
@@ -497,7 +512,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      class="text-red-8 tw:mt-2" style="font-size: 11px; line-height: 12px">
                   Please enter a threshold value
                 </div>
-              </div>
+                  </div>
+                </div>
             </template>
           </div>
         </div>
@@ -555,11 +571,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- ===== SECTION 3: FREQUENCY ===== -->
-        <!-- User reads: "Run the alert check [using Interval/Cron] for [10 Minutes] or [cron expression + timezone]" -->
+        <!-- ===== SECTION 3: SCHEDULE ===== -->
         <div class="alert-settings-row">
           <div class="tw:w-full">
-            <div class="tw:mb-4">
+            <div class="section-container">
+              <div class="section-header">
+                <span class="section-number">3</span>
+                <span class="section-title">Evaluation Frequency</span>
+                <div class="section-divider"></div>
+              </div>
+
+              <!-- User reads: "Run the alert check [using Interval/Cron] for [10 Minutes] or [cron expression + timezone]" -->
+              <div class="section-content">
               <!-- Line 1: Labels -->
               <div class="tw:flex tw:items-center tw:gap-20 tw:mb-2 tw:ml-1">
                 <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap"
@@ -682,16 +705,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ cronJobError || "Field is required!" }}
               </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- ===== SECTION 4: DESTINATIONS & COOLDOWN ===== -->
-        <!-- Line 1: "Send notification to" + gap + "Wait for" -->
-        <!-- Line 2: [dropdown] [refresh] [+] + gap + [cooldown picker] "before sending next alert" -->
+        <!-- ===== SECTION 4: NOTIFICATIONS ===== -->
         <div class="alert-settings-row">
           <div class="tw:w-full">
-            <div class="tw:mb-4">
+            <div class="section-container">
+              <div class="section-header">
+                <span class="section-number">4</span>
+                <span class="section-title">Notification Settings</span>
+                <div class="section-divider"></div>
+              </div>
+
+              <!-- Line 1: "Send notification to" + gap + "Wait for" -->
+              <!-- Line 2: [dropdown] [refresh] [+] + gap + [cooldown picker] "before sending next alert" -->
+              <div class="section-content">
               <!-- Line 1: Both labels -->
               <div class="tw:flex tw:items-center tw:gap-10 tw:mb-2 tw:ml-1">
                 <span class="tw:text-sm tw:font-semibold"
@@ -710,6 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <span class="tw:text-sm tw:font-semibold"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                  and
                   <span class="events-tooltip-trigger">
                     Wait for
                     <q-tooltip anchor="top middle" self="bottom middle" max-width="300px">
@@ -840,6 +872,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="font-size: 11px; line-height: 12px"
               >
                 Cooldown period is required!
+              </div>
               </div>
             </div>
           </div>
@@ -1011,11 +1044,11 @@ export default defineComponent({
 
     // Local aggregation state with defaults
     const localAggFunction = ref("count");
-    const localAggField = ref("* (all fields)");
+    const localAggField = ref("* (all rows)");
 
     // Field options for aggregation (with wildcard)
     const aggFieldOptions = computed(() => {
-      return ['* (all fields)', ...(props.columns || [])];
+      return ['* (all rows)', ...(props.columns || [])];
     });
 
     // Period picker for CustomDateTimePicker
@@ -1791,6 +1824,50 @@ export default defineComponent({
     height: 28px !important;
     padding: 0 !important;
   }
+}
+
+// Section styling - visible but compact
+.section-container {
+  margin-bottom: 32px;
+  padding: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--q-primary);
+}
+
+.section-number {
+  display: none; // Hidden per user request
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--section-title-color);
+  text-transform: none; // Normal case instead of uppercase
+  letter-spacing: 0;
+}
+
+.section-divider {
+  flex: 1;
+  height: 0;
+}
+
+// Light mode colors
+.light-mode {
+  --section-title-color: #374151;
+  --section-border: #e5e7eb;
+}
+
+// Dark mode colors
+.dark-mode {
+  --section-title-color: #d1d5db;
+  --section-border: #374151;
 }
 
 // Events tooltip trigger - subtle dotted underline
