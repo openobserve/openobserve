@@ -612,7 +612,8 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
     let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
-    if PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
+    if stream_type == StreamType::Metrics 
+        && PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
         == PartitionTimeLevel::Daily
     {
         level = PartitionTimeLevel::Daily;
