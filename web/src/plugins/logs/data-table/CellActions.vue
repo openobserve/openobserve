@@ -69,7 +69,8 @@ const props = defineProps({
   selectedStreamFields: {
     type: Array,
     required: true,
-  }
+    default: () => [],
+  },
 });
 
 const store = useStore();
@@ -95,7 +96,7 @@ const sendToAiChat = (value: any) => {
 };
 
 const isStreamField = computed(() => {
-  return props.selectedStreamFields.some((item: any) =>
+  return props.selectedStreamFields?.some((item: any) =>
     item.name === props.column.id ? item.isSchemaField : "",
   );
 });
