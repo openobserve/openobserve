@@ -790,6 +790,7 @@ export default defineComponent({
                   ].query,
                 );
               } catch (error: any) {
+                console.error("Failed to parse PromQL query:", error);
                 parsedQuery = null;
               }
 
@@ -801,6 +802,7 @@ export default defineComponent({
 
               // Add guard
               if (!streamName) {
+                console.warn("Cannot update query: stream name is undefined");
                 return;
               }
 
