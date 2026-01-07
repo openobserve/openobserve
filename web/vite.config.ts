@@ -29,6 +29,7 @@ import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import { execSync } from "child_process";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -40,6 +41,29 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const isTesting = process.env.NODE_ENV === "test";
+
+let commitHash = "unknown";
+let buildTime = Date.now();
+
+// Priority order:
+// 1. BUILD_COMMIT_HASH - Set by CI/CD
+// 2. Git command - Fallback for local development
+
+if (process.env.BUILD_COMMIT_HASH) {
+  commitHash = process.env.BUILD_COMMIT_HASH;
+}
+// Uncomment for testing stale build detection on local:
+// else if (process.env.TEST_COMMIT_HASH) {
+//   commitHash = process.env.TEST_COMMIT_HASH;
+// }
+else {
+  // Fallback to git command if env variable is not set
+  try {
+    commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+  } catch (e) {
+    console.warn("Could not determine Git commit hash:", e);
+  }
+}
 
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
@@ -95,6 +119,8 @@ export default defineConfig({
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
     __INTLIFY_JIT_COMPILATION__: true,
+    __COMMIT_HASH__: JSON.stringify(commitHash),
+    __BUILD_TIME__: buildTime,
   },
   server: {
     port: 8081,

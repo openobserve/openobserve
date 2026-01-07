@@ -105,7 +105,9 @@
     "lightMode": "Mode d'éclairage",
     "darkMode": "Mode sombre",
     "manageTheme": "Gérer le thème",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
+    "chunkLoadErrorMsg": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer."
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
