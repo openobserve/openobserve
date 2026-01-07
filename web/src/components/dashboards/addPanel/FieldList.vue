@@ -794,6 +794,7 @@ export default defineComponent({
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.stream;
 
+              // Set query if: (1) no metric name exists, OR (2) metric name differs from stream
               if (!metricName || metricName !== streamName) {
                 // Set the query to the new stream name with curly braces
                 dashboardPanelData.data.queries[
