@@ -979,7 +979,7 @@ async fn process_custom_claim_parsing(
         let function_name = function_name.to_string();
         Box::pin(async move {
             match db::functions::get("_meta", &function_name).await {
-                Ok(func) => Ok(func.function),
+                Ok(func) => Ok(func), // Return full Transform object with trans_type
                 Err(e) => Err(anyhow::anyhow!(
                     "Failed to load function '{}' from _meta org: {}",
                     function_name,
@@ -988,7 +988,11 @@ async fn process_custom_claim_parsing(
             }
         })
             as std::pin::Pin<
-                Box<dyn std::future::Future<Output = Result<String, anyhow::Error>> + Send>,
+                Box<
+                    dyn std::future::Future<
+                            Output = Result<config::meta::functions::Transform, anyhow::Error>,
+                        > + Send,
+                >,
             >
     };
 
@@ -1034,6 +1038,24 @@ async fn process_custom_claim_parsing(
         }
     };
 
+    let js_execute_fn = |function_content: &String,
+                         claims: Value|
+     -> Result<Value, anyhow::Error> {
+        // Compile the JavaScript function
+        let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
+            .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;
+
+        // Execute JavaScript with claims as input
+        let (result, error) =
+            crate::service::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
+
+        if let Some(err) = error {
+            return Err(anyhow::anyhow!("JavaScript execution failed: {}", err));
+        }
+
+        Ok(result)
+    };
+
     let error_publish_fn =
         |error: o2_enterprise::enterprise::auth::claim_parser::ClaimParserError| {
             Box::pin(async move {
@@ -1070,6 +1092,7 @@ async fn process_custom_claim_parsing(
         function_loader_fn,
         vrl_compile_fn,
         vrl_execute_fn,
+        js_execute_fn,
         error_publish_fn,
     )
     .await

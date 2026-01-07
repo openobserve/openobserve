@@ -236,10 +236,18 @@ export default defineComponent({
     let compilationErr = ref("");
 
     // Transform type options for radio buttons
-    const transformTypeOptions = computed(() => [
-      { label: t("function.vrl"), value: "0" },
-      { label: t("function.javascript"), value: "1" },
-    ]);
+    const transformTypeOptions = computed(() => {
+      const options = [
+        { label: t("function.vrl"), value: "0" },
+      ];
+
+      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
+      if (store.state.selectedOrganization.identifier === "_meta") {
+        options.push({ label: t("function.javascript"), value: "1" });
+      }
+
+      return options;
+    });
 
     const beingUpdated = computed(() => props.isUpdated);
 
