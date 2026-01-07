@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, get, post, web};
+use actix_web::{HttpResponse, cookie::{Cookie, SameSite}, get, post, web};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::aws_marketplace::{api as aws_mp_api, db as aws_mp_db};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,69 @@ use crate::{
     handler::http::extractors::Headers,
     service::{organization, users},
 };
+
+/// Form data from AWS Marketplace POST
+#[derive(Debug, Deserialize)]
+pub struct AwsMarketplaceRegistrationForm {
+    #[serde(rename = "x-amzn-marketplace-token")]
+    pub token: String,
+    #[serde(rename = "x-amzn-marketplace-agreement-id")]
+    pub agreement_id: Option<String>,
+    #[serde(rename = "x-amzn-marketplace-product-id")]
+    pub product_id: Option<String>,
+    #[serde(rename = "x-amzn-marketplace-fulfillment-url")]
+    pub fulfillment_url: Option<String>,
+}
+
+/// AwsMarketplaceRegistration - Entry point from AWS Marketplace
+///
+/// This endpoint receives the POST from AWS Marketplace when a customer subscribes.
+/// It saves the token in a cookie and redirects to the login page.
+#[post("/aws-marketplace/register")]
+pub async fn aws_marketplace_register(
+    form: web::Form<AwsMarketplaceRegistrationForm>,
+) -> HttpResponse {
+    log::info!(
+        "[AWS SAAS] Received marketplace registration: product_id={:?}, agreement_id={:?}",
+        form.product_id,
+        form.agreement_id
+    );
+
+    // Get the Dex login URL
+    let login_url = {
+        use o2_dex::service::auth::get_dex_login;
+        let login_data = get_dex_login();
+
+        // Store PKCE state
+        let state = login_data.state.clone();
+        if let Err(e) = crate::service::kv::set(
+            crate::handler::http::auth::validator::PKCE_STATE_ORG,
+            &state,
+            state.clone().into(),
+        ).await {
+            log::error!("[AWS SAAS] Failed to store PKCE state: {}", e);
+        }
+
+        login_data.url
+    };
+
+    // Create cookie with the marketplace token
+    // Use SameSite::Lax to allow the cookie to be sent on redirect from Dex
+    let cookie = Cookie::build("aws_marketplace_token", form.token.clone())
+        .path("/")
+        .http_only(false) // Allow JavaScript to read it
+        .secure(true)
+        .same_site(SameSite::Lax)
+        .max_age(actix_web::cookie::time::Duration::hours(4)) // Token expires in 4 hours
+        .finish();
+
+    log::info!("[AWS SAAS] Redirecting to login: {}", login_url);
+
+    HttpResponse::Found()
+        .cookie(cookie)
+        .append_header(("Location", login_url))
+        .finish()
+}
 
 /// Request payload for linking AWS Marketplace subscription
 #[derive(Debug, Deserialize, utoipa::ToSchema)]

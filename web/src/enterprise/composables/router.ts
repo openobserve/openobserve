@@ -20,21 +20,9 @@ import Usage from "@/enterprise/components/billings/usage.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 
 const useEnvRoutes = () => {
+  // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
+  // The backend sets a cookie and redirects to Dex login
   const parentRoutes: any = [
-    {
-      // Entry point from AWS Marketplace - saves token and redirects to login
-      path: "/marketplace/aws/register",
-      name: "awsMarketplaceRegister",
-      beforeEnter: (to: any, from: any, next: any) => {
-        const token = to.query.token;
-        if (token) {
-          // Save token for after login - Login.vue will check this
-          sessionStorage.setItem("aws_marketplace_token", token);
-        }
-        // Redirect to login page (normal flow, Login.vue handles token check)
-        next("/login");
-      },
-    },
     {
       // Post-login setup page for org selection/creation
       path: "/marketplace/aws/setup",
