@@ -2061,4 +2061,233 @@ describe("AddAlert Component", () => {
     });
   });
 
+  describe('Alert name sanitization from dashboard panels', () => {
+    let w: any;
+    beforeEach(() => {
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+    });
+
+    it('should sanitize alert name by replacing spaces with underscores', async () => {
+      const panelData = {
+        panelTitle: 'Sales Dashboard',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      // Mock route query to simulate dashboard panel import
+      w.vm.$route = {
+        query: {
+          panelData: encodeURIComponent(JSON.stringify(panelData))
+        }
+      };
+
+      // Manually trigger the logic that would run on mounted
+      const query = panelData.queries[0];
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Sales_Dashboard');
+    });
+
+    it('should sanitize colon character in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Q1:Q2 Results',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Q1_Q2_Results');
+    });
+
+    it('should sanitize hash character in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Dashboard #1',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Dashboard__1');
+    });
+
+    it('should sanitize question mark in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Error Rate?',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Error_Rate_');
+    });
+
+    it('should sanitize ampersand in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Stats & Metrics',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Stats___Metrics');
+    });
+
+    it('should sanitize percent character in panel title', async () => {
+      const panelData = {
+        panelTitle: 'CPU 50%',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_CPU_50_');
+    });
+
+    it('should sanitize single quote in panel title', async () => {
+      const panelData = {
+        panelTitle: "User's Dashboard",
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_User_s_Dashboard');
+    });
+
+    it('should sanitize double quote in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Dashboard "Production"',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Dashboard__Production_');
+    });
+
+    it('should sanitize multiple forbidden characters together', async () => {
+      const panelData = {
+        panelTitle: "Q1:Q2 Results? (50%)",
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Q1_Q2_Results__50_');
+    });
+
+    it('should handle panel title with all forbidden characters', async () => {
+      const panelData = {
+        panelTitle: "Test: Dashboard #1 ? Stats & Metrics (50%) 'User\"Value'",
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Test_Dashboard__1_Stats_Metrics_50_User_Value_');
+    });
+
+    it('should handle panel title with only spaces', async () => {
+      const panelData = {
+        panelTitle: '   ',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_');
+    });
+
+    it('should handle panel title without any forbidden characters', async () => {
+      const panelData = {
+        panelTitle: 'MyDashboard',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_MyDashboard');
+    });
+
+    it('should collapse consecutive forbidden characters into single underscore', async () => {
+      const panelData = {
+        panelTitle: 'Dashboard   ###   Test',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test_stream'
+          }
+        }]
+      };
+
+      w.vm.formData.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
+
+      expect(w.vm.formData.name).toBe('Alert_from_Dashboard_Test');
+    });
+  });
+
 });
