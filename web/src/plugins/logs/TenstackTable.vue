@@ -352,6 +352,7 @@ name="warning" class="q-mr-xs" />
                     "
                     :column="cell.column"
                     :row="cell.row.original as any"
+                    :selectedStreamFields="selectedStreamFields"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -401,8 +402,8 @@ import {
   ComputedRef,
   defineExpose,
 } from "vue";
+import type { PropType } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import HighLight from "@/components/HighLight.vue";
 import {
   FlexRender,
   type ColumnDef,
@@ -419,9 +420,13 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
-import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+
+interface StreamField {
+  name: string;
+  isSchemaField: boolean;
+}
 
 const props = defineProps({
   rows: {
@@ -475,7 +480,11 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array as PropType<string[]>,
+    type: Array as PropType<StreamField[]>,
+    default: () => [],
+  },
+  selectedStreamFields: {
+    type: Array as PropType<StreamField[]>,
     default: () => [],
   },
 });
