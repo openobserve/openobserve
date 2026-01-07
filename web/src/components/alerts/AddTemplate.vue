@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
+            class="flex justify-end q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)] tw:flex-shrink-0"
           >
             <q-btn
               v-close-popup
