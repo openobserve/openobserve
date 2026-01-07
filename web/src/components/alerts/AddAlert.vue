@@ -1673,7 +1673,41 @@ export default defineComponent({
           if (panelData.queries && panelData.queries.length > 0) {
             const query = panelData.queries[0];
 
-            formData.value.name = `Alert_from_${panelData.panelTitle?.replace(/[:#?&%'"\s]+/g, '_') || 'panel'}`;
+            // Sanitize panel title for use in alert name
+            // Remove invalid characters (: # ? & % ' " and whitespace)
+            // Collapse multiple underscores, trim leading/trailing underscores
+            // Limit length to 200 characters (reasonable limit for alert names)
+            const sanitizePanelTitle = (title: string | undefined): string => {
+              if (!title || title.trim() === '') {
+                return 'panel';
+              }
+
+              // Replace invalid characters with underscores
+              let sanitized = title.replace(/[:#?&%'"\s]+/g, '_');
+
+              // Collapse multiple consecutive underscores into single underscore
+              sanitized = sanitized.replace(/_+/g, '_');
+
+              // Remove leading/trailing underscores
+              sanitized = sanitized.replace(/^_+|_+$/g, '');
+
+              // If empty after sanitization, use default
+              if (sanitized === '') {
+                return 'panel';
+              }
+
+              // Truncate to reasonable length (leaving room for "Alert_from_" prefix)
+              const maxLength = 200;
+              if (sanitized.length > maxLength) {
+                sanitized = sanitized.substring(0, maxLength);
+                // Remove trailing underscore if truncation created one
+                sanitized = sanitized.replace(/_+$/, '');
+              }
+
+              return sanitized;
+            };
+
+            formData.value.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
 
             // Show notification that query was imported
             q.notify({
