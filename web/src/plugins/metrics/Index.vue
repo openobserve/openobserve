@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
             class="tw:text-xs tw:font-bold no-border"
             data-test="metrics-cancel"
-            padding="sm md"
+            padding="xs lg"
             color="negative"
             no-caps
             :label="t('panel.cancel')"
