@@ -207,6 +207,9 @@
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="currentVariablesDataRef"
+                  :currentVariablesData="liveVariablesData"
+                  :tabId="currentTabId"
+                  :panelId="currentPanelId"
                   :width="6"
                   :searchType="searchType"
                   :showLegendsButton="true"
@@ -611,15 +614,19 @@ export default defineComponent({
 
       // Initialize variables manager with dashboard variables
       try {
-        await variablesManager.initialize(
-          currentDashboardData.data?.variables?.list || [],
-          currentDashboardData.data,
-        );
-
-        // Mark current tab and panel as visible so their variables can load
+        // Get current tab and panel IDs for initialization
         const tabId =
           (route.query.tab as string) ??
           currentDashboardData.data?.tabs?.[0]?.tabId;
+
+        // Initialize with panel-to-tab mapping (3rd parameter is critical for panel variables!)
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+          props.panelId ? { [props.panelId]: tabId || "" } : {},
+        );
+
+        // Mark current tab and panel as visible so their variables can load
         if (tabId) {
           variablesManager.setTabVisibility(tabId, true);
         }
@@ -780,6 +787,26 @@ export default defineComponent({
       return props.panelId;
     });
 
+    // Computed property for LIVE merged variables (for HTML/Markdown panels and drilldown)
+    // This includes global + tab + panel scoped variables with proper precedence
+    const liveVariablesData = computed(() => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+        console.log("mergedVars", mergedVars);
+        
+        return {
+          isVariablesLoading: variablesManager.isLoading.value,
+          values: mergedVars,
+        };
+      } else {
+        // Fallback to variablesData
+        return variablesData;
+      }
+    });
+
     const currentPanelData = computed(() => {
       const rendererData = panelSchemaRendererRef.value?.panelData || {};
       return {
@@ -805,6 +832,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      liveVariablesData,
       dateTimePickerRef,
       refreshInterval,
       refreshData,
