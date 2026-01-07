@@ -1673,7 +1673,7 @@ export default defineComponent({
           if (panelData.queries && panelData.queries.length > 0) {
             const query = panelData.queries[0];
 
-            formData.value.name = `Alert_from_${panelData.panelTitle.replace(/\s+/g, '_')}`;
+            formData.value.name = `Alert_from_${panelData.panelTitle.replace(/[:#?&%'"\s]+/g, '_')}`;
 
             // Show notification that query was imported
             q.notify({
