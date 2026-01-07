@@ -18,9 +18,9 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(feature = "enterprise")]
-use actix_http::header::HeaderMap;
 use async_trait::async_trait;
+#[cfg(feature = "enterprise")]
+use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,

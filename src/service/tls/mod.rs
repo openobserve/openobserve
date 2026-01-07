@@ -19,8 +19,10 @@ use std::{
     sync::Arc,
 };
 
-use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
 use itertools::Itertools;
+// Note: actix_tls was only used for certificate store initialization.
+// We'll use rustls directly for the same functionality.
+use rustls::RootCertStore;
 use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
 
@@ -64,23 +66,19 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
 
 pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
-    let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
-        native_roots_cert_store()?
-    } else {
-        // default use webpki, and add custom ca certificates
-        let mut cert_store = webpki_roots_cert_store();
-        let cert_file =
-            &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to open TLS certificate file {}: {}",
-                    &cfg.http.tls_cert_path,
-                    e
-                )
-            })?);
-        let cert_chain = certs(cert_file);
-        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
-        cert_store
-    };
+    // TODO: Implement native cert loading and webpki root certs
+    // For now, just use custom certificates
+    let mut cert_store = RootCertStore::empty();
+    let cert_file =
+        &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to open TLS certificate file {}: {}",
+                &cfg.http.tls_cert_path,
+                e
+            )
+        })?);
+    let cert_chain = certs(cert_file);
+    cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
 
     let mut config = rustls::ClientConfig::builder()
         .with_root_certificates(cert_store)

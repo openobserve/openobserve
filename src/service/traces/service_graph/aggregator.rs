@@ -78,7 +78,7 @@ pub async fn write_sql_aggregated_edges(
     if !bulk_body.is_empty() {
         use crate::common::meta::ingestion::{IngestUser, SystemJobType};
 
-        let data = actix_web::web::Bytes::from(bulk_body.into_bytes());
+        let data = bytes::Bytes::from(bulk_body.into_bytes());
 
         crate::service::logs::bulk::ingest(
             0,

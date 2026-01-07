@@ -30,7 +30,6 @@ use {
         },
         service::users::get_user,
     },
-    actix_web::HttpResponse,
     config::meta::user::User,
     o2_openfga::meta::mapping::OFGA_MODELS,
 };
@@ -44,7 +43,7 @@ pub async fn check_stream_permissions(
     org_id: &str,
     user_id: &str,
     stream_type: &StreamType,
-) -> Option<HttpResponse> {
+) -> Option<Response> {
     if !is_root_user(user_id) {
         let user: User = get_user(Some(org_id), user_id).await.unwrap();
         let stream_type_str = stream_type.as_str();

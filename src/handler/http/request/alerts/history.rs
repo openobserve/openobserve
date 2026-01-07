@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, get, web};
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use chrono::{Duration, Utc};
 use config::{
     meta::{
-        search::{Query, Request as SearchRequest},
+        search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
@@ -128,6 +131,8 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
 /// This prevents header forgery attacks as the header is populated server-side after
 /// authentication.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlertHistory",
@@ -153,16 +158,12 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
-#[get("/{org_id}/alerts/history")]
 pub async fn get_alert_history(
-    path: web::Path<String>,
-    query: web::Query<AlertHistoryQuery>,
+    Path(org_id): Path<String>,
+    Query(query): Query<AlertHistoryQuery>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let query = query.into_inner();
-
+    req: axum::http::Request<axum::body::Body>,
+) -> Response {
     // Set default pagination values
     let from = query.from.unwrap_or(0).max(0);
     let size = query.size.unwrap_or(100).clamp(1, 1000);
@@ -375,7 +376,7 @@ pub async fn get_alert_history(
     let count_sql = format!("SELECT _timestamp FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause}");
 
     let count_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: count_sql,
             start_time,
             end_time,
@@ -433,7 +434,7 @@ pub async fn get_alert_history(
     );
 
     let data_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: data_sql,
             start_time,
             end_time,

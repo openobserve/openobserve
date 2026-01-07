@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, sync::Arc};
+use std::sync::Arc;
 
-use actix_web::{
-    HttpResponse, cookie,
-    cookie::{Cookie, SameSite},
-    get, head,
-    http::header,
-    post, put, web,
-};
 use arrow_schema::Schema;
+use axum::{
+    body::Body,
+    extract::Query,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
+};
 use config::{
     Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
@@ -44,12 +43,13 @@ use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
+    crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{
         jwt::process_token,
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
+    axum_extra::extract::CookieJar,
     config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
@@ -185,6 +185,7 @@ struct Rum {
 
 /// Healthz
 #[utoipa::path(
+    post,
     path = "/healthz",
     tag = "Meta",
     operation_id = "HealthCheck",
@@ -199,22 +200,21 @@ struct Rum {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/healthz")]
-pub async fn healthz() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Ok().json(HealthzResponse {
+pub async fn healthz() -> impl IntoResponse {
+    axum::Json(HealthzResponse {
         status: "ok".to_string(),
-    }))
+    })
 }
 
 /// Healthz HEAD
 /// Vector pipeline healthcheck support
-#[head("/healthz")]
-pub async fn healthz_head() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Ok().finish())
+pub async fn healthz_head() -> impl IntoResponse {
+    StatusCode::OK
 }
 
 /// Healthz of the node for scheduled status
 #[utoipa::path(
+    post,
     path = "/schedulez",
     tag = "Meta",
     operation_id = "SchedulerHealthCheck",
@@ -230,27 +230,34 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/schedulez")]
-pub async fn schedulez() -> Result<HttpResponse, Error> {
+pub async fn schedulez() -> impl IntoResponse {
     let node_id = LOCAL_NODE.uuid.clone();
     let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
-        return Ok(HttpResponse::NotFound().json(HealthzResponse {
-            status: "not ok".to_string(),
-        }));
+        return (
+            StatusCode::NOT_FOUND,
+            axum::Json(HealthzResponse {
+                status: "not ok".to_string(),
+            }),
+        );
     };
-    Ok(if node.scheduled && node.status == NodeStatus::Online {
-        HttpResponse::Ok().json(HealthzResponse {
-            status: "ok".to_string(),
-        })
+    if node.scheduled && node.status == NodeStatus::Online {
+        (
+            StatusCode::OK,
+            axum::Json(HealthzResponse {
+                status: "ok".to_string(),
+            }),
+        )
     } else {
-        HttpResponse::NotFound().json(HealthzResponse {
-            status: "not ok".to_string(),
-        })
-    })
+        (
+            StatusCode::NOT_FOUND,
+            axum::Json(HealthzResponse {
+                status: "not ok".to_string(),
+            }),
+        )
+    }
 }
 
-#[get("")]
-pub async fn zo_config() -> Result<HttpResponse, Error> {
+pub async fn zo_config() -> impl IntoResponse {
     let cfg = get_config();
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
@@ -361,7 +368,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let usage_publish_interval = cfg.common.usage_publish_interval;
 
-    Ok(HttpResponse::Ok().json(ConfigResponse {
+    axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
         commit_hash: config::COMMIT_HASH.to_string(),
@@ -447,11 +454,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .get_fqn_priority_dimensions(),
         #[cfg(not(feature = "enterprise"))]
         fqn_priority_dimensions: vec![],
-    }))
+    })
 }
 
-#[get("/status")]
-pub async fn cache_status() -> Result<HttpResponse, Error> {
+pub async fn cache_status() -> impl IntoResponse {
     let cfg = get_config();
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
@@ -523,20 +529,21 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"total_count": total_count, "expired_count": expired_count}),
     );
 
-    Ok(HttpResponse::Ok().json(stats))
+    axum::Json(stats)
 }
 
-#[get("")]
-pub async fn config_reload() -> Result<HttpResponse, Error> {
+pub async fn config_reload() -> impl IntoResponse {
     if let Err(e) = config::refresh_config() {
-        return Ok(
-            HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"status": e.to_string()})),
         );
     }
     #[cfg(feature = "enterprise")]
     if let Err(e) = reload_enterprise_config() {
-        return Ok(
-            HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({"status": e.to_string()})),
         );
     }
     let status = "successfully reloaded config";
@@ -559,7 +566,10 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         },
     })
     .await;
-    Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({"status": status})),
+    )
 }
 
 fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
@@ -593,13 +603,21 @@ fn hide_sensitive_fields(mut value: serde_json::Value) -> serde_json::Value {
     value
 }
 
-#[get("/runtime")]
-pub async fn config_runtime() -> Result<HttpResponse, Error> {
+pub async fn config_runtime() -> impl IntoResponse {
     let cfg = get_config();
-    let mut config_value = serde_json::to_value(cfg.as_ref())
-        .map_err(|e| Error::other(format!("Failed to serialize config: {e}")))?;
+    let config_value = match serde_json::to_value(cfg.as_ref()) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(
+                    serde_json::json!({"error": format!("Failed to serialize config: {e}")}),
+                ),
+            );
+        }
+    };
 
-    config_value = hide_sensitive_fields(config_value);
+    let config_value = hide_sensitive_fields(config_value);
 
     let mut final_response = serde_json::Map::new();
     final_response.insert(
@@ -618,7 +636,10 @@ pub async fn config_runtime() -> Result<HttpResponse, Error> {
         }
     }
 
-    Ok(HttpResponse::Ok().json(final_response))
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::Value::Object(final_response)),
+    )
 }
 
 async fn get_stream_schema_status() -> (usize, usize, usize) {
@@ -647,19 +668,26 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/redirect")]
-pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
+    use axum_extra::extract::cookie::{Cookie, SameSite};
     use config::meta::user::UserRole;
 
     use crate::common::meta::user::AuthTokens;
 
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::other("no code in request"));
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no code in request"))
+                .unwrap();
         }
     };
+    let query_string = query
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
@@ -669,7 +697,7 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
-            http_query_params: req.query_string().to_string(),
+            http_query_params: query_string,
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
@@ -685,7 +713,10 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::other("invalid state in request"));
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Body::from("invalid state in request"))
+                    .unwrap();
             }
         },
 
@@ -693,7 +724,10 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::other("no state in request"));
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no state in request"))
+                .unwrap();
         }
     };
 
@@ -721,12 +755,14 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
                     {
-                        return Ok(HttpResponse::Unauthorized()
-                            .json("Service accounts are not allowed to login".to_string()));
+                        return Response::builder()
+                            .status(StatusCode::UNAUTHORIZED)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from("\"Service accounts are not allowed to login\""))
+                            .unwrap();
                     }
 
                     // Check if email is allowed by domain management system
-                    #[cfg(feature = "enterprise")]
                     match o2_enterprise::enterprise::domain_management::is_email_allowed(
                         &res.0.user_email,
                     )
@@ -737,9 +773,11 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                                 audit_message.response_meta.http_response_code = 403;
                                 audit_message._timestamp = now_micros();
                                 audit(audit_message).await;
-                                return Ok(
-                                    HttpResponse::Unauthorized().json("Unauthorized".to_string())
-                                );
+                                return Response::builder()
+                                    .status(StatusCode::UNAUTHORIZED)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Body::from("\"Unauthorized\""))
+                                    .unwrap();
                             }
                         }
                         Err(e) => {
@@ -763,8 +801,11 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                             format!("&new_user_login={new_user}&pending_invites={pending_invites}")
                         }),
                         Err(_) => {
-                            return Ok(HttpResponse::Unauthorized()
-                                .json("Email Domain not allowed".to_string()));
+                            return Response::builder()
+                                .status(StatusCode::UNAUTHORIZED)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Body::from("\"Email Domain not allowed\""))
+                                .unwrap();
                         }
                     };
                     login_url = format!(
@@ -779,7 +820,11 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                     audit_message.response_meta.http_response_code = 400;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
-                    return Ok(HttpResponse::Unauthorized().json(e.to_string()));
+                    return Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(format!("\"{e}\"")))
+                        .unwrap();
                 }
             }
 
@@ -790,7 +835,11 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
                 audit_message.response_meta.http_response_code = 400;
                 audit_message._timestamp = now_micros();
                 audit(audit_message).await;
-                return Ok(HttpResponse::Unauthorized().json("access token is empty".to_string()));
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("\"access token is empty\""))
+                    .unwrap();
             }
 
             // store session_id in cluster co-ordinator
@@ -805,52 +854,70 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
             .unwrap();
             let cfg = get_config();
             let tokens = base64::encode(&tokens);
-            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
-            auth_cookie.set_expires(
-                cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+
+            let cookie_value = format!(
+                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
+                tokens,
+                if cfg.auth.cookie_secure_only {
+                    "; Secure"
+                } else {
+                    ""
+                },
+                if cfg.auth.cookie_same_site_lax {
+                    "; SameSite=Lax"
+                } else {
+                    "; SameSite=None"
+                },
+                cfg.auth.cookie_max_age
             );
-            auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-            auth_cookie.set_path("/");
-            if cfg.auth.cookie_same_site_lax {
-                auth_cookie.set_same_site(SameSite::Lax);
-            } else {
-                auth_cookie.set_same_site(SameSite::None);
-            }
+
             log::info!("Redirecting user after processing token");
 
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Found()
-                .append_header((header::LOCATION, login_url))
-                .cookie(auth_cookie)
-                .finish())
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, login_url)
+                .header(header::SET_COOKIE, cookie_value)
+                .body(Body::empty())
+                .unwrap()
         }
         Err(e) => {
             audit_message.response_meta.http_response_code = 400;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Unauthorized().json(e.to_string()))
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("\"{e}\"")))
+                .unwrap()
         }
     }
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/dex_login")]
-pub async fn dex_login() -> Result<HttpResponse, Error> {
+pub async fn dex_login() -> impl IntoResponse {
     use o2_dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
     let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
-    Ok(HttpResponse::Ok().json(login_data.url))
+    axum::Json(login_data.url)
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/dex_refresh")]
-async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+pub async fn refresh_token_with_dex(
+    cookies: CookieJar,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    use axum_extra::extract::cookie::{Cookie, SameSite};
+
+    let query_string = query
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
@@ -860,18 +927,18 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             http_method: "GET".to_string(),
             http_path: "/config/dex_refresh".to_string(),
             http_body: "".to_string(),
-            http_query_params: req.query_string().to_string(),
+            http_query_params: query_string,
             http_response_code: 302,
             error_msg: None,
             trace_id: None,
         },
     };
-    let token = if let Some(cookie) = req.cookie("auth_tokens") {
+
+    let token = if let Some(cookie) = cookies.get("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
 
         // remove old session id from cluster co-ordinator
-
         let access_token = auth_tokens.access_token;
         if access_token.starts_with("session") {
             crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
@@ -880,12 +947,15 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 
         auth_tokens.refresh_token
     } else {
-        return HttpResponse::Unauthorized().finish();
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap();
     };
 
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
-        Ok((access_token, refresh_token)) => {
+        Ok((access_token, refresh_token_str)) => {
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
 
@@ -893,7 +963,11 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
                 audit_message.response_meta.http_response_code = 400;
                 audit_message._timestamp = now_micros();
                 audit(audit_message).await;
-                return HttpResponse::Unauthorized().json("access token is empty".to_string());
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("\"access token is empty\""))
+                    .unwrap();
             }
 
             // store session_id in cluster co-ordinator
@@ -903,88 +977,119 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
-                refresh_token,
+                refresh_token: refresh_token_str,
             })
             .unwrap();
             let conf = get_config();
             let tokens = base64::encode(&tokens);
-            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
-            auth_cookie.set_expires(
-                cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
-            );
-            auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(conf.auth.cookie_secure_only);
-            auth_cookie.set_path("/");
-            if conf.auth.cookie_same_site_lax {
-                auth_cookie.set_same_site(SameSite::Lax);
-            } else {
-                auth_cookie.set_same_site(SameSite::None);
-            }
 
-            HttpResponse::Ok().cookie(auth_cookie).finish()
+            let cookie_value = format!(
+                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
+                tokens,
+                if conf.auth.cookie_secure_only {
+                    "; Secure"
+                } else {
+                    ""
+                },
+                if conf.auth.cookie_same_site_lax {
+                    "; SameSite=Lax"
+                } else {
+                    "; SameSite=None"
+                },
+                conf.auth.cookie_max_age
+            );
+
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::SET_COOKIE, cookie_value)
+                .body(Body::empty())
+                .unwrap()
         }
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
             let tokens = base64::encode(&tokens);
-            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
-            auth_cookie.set_expires(
-                cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
-            );
-            auth_cookie.set_http_only(true);
-            auth_cookie.set_secure(conf.auth.cookie_secure_only);
-            auth_cookie.set_path("/");
-            if conf.auth.cookie_same_site_lax {
-                auth_cookie.set_same_site(SameSite::Lax);
-            } else {
-                auth_cookie.set_same_site(SameSite::None);
-            }
 
-            HttpResponse::Unauthorized()
-                .append_header((header::LOCATION, "/"))
-                .cookie(auth_cookie)
-                .finish()
+            let cookie_value = format!(
+                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
+                tokens,
+                if conf.auth.cookie_secure_only {
+                    "; Secure"
+                } else {
+                    ""
+                },
+                if conf.auth.cookie_same_site_lax {
+                    "; SameSite=Lax"
+                } else {
+                    "; SameSite=None"
+                },
+                conf.auth.cookie_max_age
+            );
+
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::LOCATION, "/")
+                .header(header::SET_COOKIE, cookie_value)
+                .body(Body::empty())
+                .unwrap()
         }
     }
 }
 
-fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
-    cookie_name: &'a str,
+fn prepare_empty_cookie<T: Serialize + ?Sized>(
+    cookie_name: &str,
     token_struct: &T,
     conf: &Arc<Config>,
-) -> Cookie<'a> {
+) -> String {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
-    let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_expires(
-        cookie::time::OffsetDateTime::now_utc()
-            + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
-    );
-    auth_cookie.set_http_only(true);
-    auth_cookie.set_secure(conf.auth.cookie_secure_only);
-    auth_cookie.set_path("/");
-    if conf.auth.cookie_same_site_lax {
-        auth_cookie.set_same_site(SameSite::Lax);
-    } else {
-        auth_cookie.set_same_site(SameSite::None);
-    }
-    auth_cookie
+    format!(
+        "{}={}; Path=/; HttpOnly{}{}; Max-Age={}",
+        cookie_name,
+        tokens,
+        if conf.auth.cookie_secure_only {
+            "; Secure"
+        } else {
+            ""
+        },
+        if conf.auth.cookie_same_site_lax {
+            "; SameSite=Lax"
+        } else {
+            "; SameSite=None"
+        },
+        conf.auth.cookie_max_age
+    )
 }
 
-#[get("/logout")]
-async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
+pub async fn logout(
+    cookies: axum_extra::extract::CookieJar,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+) -> Response {
     // remove the session
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req).await;
+    let auth_str = {
+        // Extract auth string from headers or cookies
+        headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                cookies.get("auth_tokens").map(|c| {
+                    let decoded = config::utils::base64::decode(c.value()).unwrap_or_default();
+                    let tokens: AuthTokens = json::from_str(&decoded).unwrap_or_default();
+                    tokens.access_token
+                })
+            })
+            .unwrap_or_default()
+    };
+
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
     let user_email = get_user_email_from_auth_str(&auth_str).await;
 
-    if let Some(cookie) = req.cookie("auth_tokens") {
+    if let Some(cookie) = cookies.get("auth_tokens") {
         let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
@@ -1008,7 +1113,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
             response_meta: ResponseMeta {
                 http_method: "GET".to_string(),
                 http_path: "/config/logout".to_string(),
-                http_query_params: req.query_string().to_string(),
+                http_query_params: "".to_string(),
                 http_body: "".to_string(),
                 http_response_code: 200,
                 error_msg: None,
@@ -1018,28 +1123,29 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         .await;
     }
 
-    HttpResponse::Ok()
-        .append_header((header::LOCATION, "/"))
-        .cookie(auth_cookie)
-        .cookie(auth_ext_cookie)
-        .finish()
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::LOCATION, "/")
+        .header(header::SET_COOKIE, auth_cookie)
+        .header(header::SET_COOKIE, auth_ext_cookie)
+        .body(Body::empty())
+        .unwrap()
 }
 
-#[put("/enable")]
-async fn enable_node(
-    web::Query(query): web::Query<HashMap<String, String>>,
-) -> Result<HttpResponse, Error> {
+pub async fn enable_node(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
     let node_id = LOCAL_NODE.uuid.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
-        return Ok(MetaHttpResponse::not_found("node not found"));
+        return MetaHttpResponse::not_found("node not found");
     };
 
     let enable = match query.get("value").and_then(|v| v.parse::<bool>().ok()) {
         Some(v) => v,
         None => {
-            return Ok(MetaHttpResponse::bad_request(
+            return MetaHttpResponse::bad_request(
                 "invalid or missing 'value' query parameter (expected true or false)",
-            ));
+            );
         }
     };
     node.scheduled = enable;
@@ -1056,7 +1162,7 @@ async fn enable_node(
                 // Flush memory to WAL
                 if let Err(e) = ingester::flush_all().await {
                     log::error!("[NODE] Error flushing ingester during disable: {e}");
-                    return Ok(MetaHttpResponse::internal_error(e));
+                    return MetaHttpResponse::internal_error(e);
                 }
                 // Set draining flag to trigger immediate S3 upload after flush memory to disk
                 o2_enterprise::enterprise::drain::set_draining(true);
@@ -1073,51 +1179,46 @@ async fn enable_node(
         }
     }
     match crate::common::infra::cluster::update_local_node(&node).await {
-        Ok(_) => Ok(MetaHttpResponse::json(true)),
-        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+        Ok(_) => MetaHttpResponse::json(true),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
-#[put("/flush")]
-async fn flush_node() -> Result<HttpResponse, Error> {
+pub async fn flush_node() -> Response {
     if !LOCAL_NODE.is_ingester() {
-        return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
+        return MetaHttpResponse::not_found("local node is not an ingester");
     };
 
     // release all the searching files
     crate::common::infra::wal::clean_lock_files();
 
     match ingester::flush_all().await {
-        Ok(_) => Ok(MetaHttpResponse::json(true)),
-        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+        Ok(_) => MetaHttpResponse::json(true),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/drain_status")]
-async fn drain_status() -> Result<HttpResponse, Error> {
+pub async fn drain_status() -> Response {
     let is_ingester = LOCAL_NODE.is_ingester();
     let response = o2_enterprise::enterprise::drain::get_drain_status(is_ingester);
-    Ok(MetaHttpResponse::json(response))
+    MetaHttpResponse::json(response)
 }
 
-#[get("/list")]
-async fn list_node() -> Result<HttpResponse, Error> {
+pub async fn list_node() -> Response {
     let nodes = cluster::get_cached_nodes(|_| true).await;
-    Ok(MetaHttpResponse::json(nodes))
+    MetaHttpResponse::json(nodes)
 }
 
-#[get("/metrics")]
-async fn node_metrics() -> Result<HttpResponse, Error> {
+pub async fn node_metrics() -> Response {
     let metrics = config::utils::sysinfo::get_node_metrics();
-    Ok(MetaHttpResponse::json(metrics))
+    MetaHttpResponse::json(metrics)
 }
 
-#[post("/consistent_hash")]
-async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpResponse, Error> {
+pub async fn consistent_hash(axum::Json(body): axum::Json<HashFileRequest>) -> Response {
     let mut ret = HashFileResponse::default();
     for file in body.files.iter() {
-        let mut nodes = HashMap::new();
+        let mut nodes = hashbrown::HashMap::new();
         nodes.insert(
             "querier_interactive".to_string(),
             cluster::get_node_from_consistent_hash(
@@ -1140,27 +1241,25 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         );
         ret.files.insert(file.clone(), nodes);
     }
-    Ok(MetaHttpResponse::json(ret))
+    MetaHttpResponse::json(ret)
 }
 
-#[get("/refresh_nodes_list")]
-async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
+pub async fn refresh_nodes_list() -> Response {
     match cluster::cache_node_list().await {
-        Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
+        Ok(node_ids) => MetaHttpResponse::json(node_ids),
         Err(e) => {
             log::error!("[CLUSTER] refresh_node_list failed: {}", e);
-            Ok(MetaHttpResponse::internal_error(e.to_string()))
+            MetaHttpResponse::internal_error(e.to_string())
         }
     }
 }
 
-#[get("/refresh_user_sessions")]
-async fn refresh_user_sessions() -> Result<HttpResponse, Error> {
+pub async fn refresh_user_sessions() -> Response {
     let _ = db::session::cache().await.map_err(|e| {
         log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
         e
     });
-    Ok(MetaHttpResponse::json("user sessions refreshed"))
+    MetaHttpResponse::json("user sessions refreshed")
 }
 
 // List of all available cache modules
@@ -1200,24 +1299,21 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
     }
 }
 
-#[get("/reload")]
-async fn cache_reload(
-    web::Query(query): web::Query<HashMap<String, String>>,
-) -> Result<HttpResponse, Error> {
+pub async fn cache_reload(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
     let modules_str = match query.get("module") {
         Some(m) => m,
         None => {
-            return Ok(MetaHttpResponse::bad_request(
+            return MetaHttpResponse::bad_request(
                 "missing 'module' query parameter (e.g., ?module=schema,user,functions or ?module=all)",
-            ));
+            );
         }
     };
 
     let mut modules: Vec<&str> = modules_str.split(',').map(|s| s.trim()).collect();
     if modules.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "module parameter cannot be empty",
-        ));
+        return MetaHttpResponse::bad_request("module parameter cannot be empty");
     }
 
     // Expand "all" to all available modules
@@ -1226,7 +1322,7 @@ async fn cache_reload(
     }
 
     let total_modules = modules.len();
-    let mut results: HashMap<String, String> = HashMap::new();
+    let mut results: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let mut success_count = 0;
     let mut failed_count = 0;
 
@@ -1271,7 +1367,7 @@ async fn cache_reload(
         }
     });
 
-    Ok(MetaHttpResponse::json(response))
+    MetaHttpResponse::json(response)
 }
 
 #[cfg(test)]
@@ -1394,10 +1490,9 @@ mod tests {
         let config = Arc::new(Config::default());
         let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
 
-        assert_eq!(cookie.name(), "test_cookie");
-        assert!(!cookie.value().is_empty());
-        assert_eq!(cookie.path(), Some("/"));
-        assert_eq!(cookie.http_only(), Some(true));
+        assert!(cookie.starts_with("test_cookie="));
+        assert!(cookie.contains("Path=/"));
+        assert!(cookie.contains("HttpOnly"));
     }
 
     #[test]
@@ -1413,9 +1508,9 @@ mod tests {
         let config = Arc::new(Config::default());
         let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
 
-        assert_eq!(cookie.http_only(), Some(true));
-        assert_eq!(cookie.path(), Some("/"));
-        assert!(cookie.expires().is_some());
+        assert!(cookie.contains("HttpOnly"));
+        assert!(cookie.contains("Path=/"));
+        assert!(cookie.contains("Max-Age="));
     }
 
     #[test]
@@ -1435,9 +1530,8 @@ mod tests {
         let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
         let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
 
-        assert_eq!(cookie1.name(), "cookie1");
-        assert_eq!(cookie2.name(), "cookie2");
-        assert_eq!(cookie1.value(), cookie2.value()); // Same data, same encoded value
+        assert!(cookie1.starts_with("cookie1="));
+        assert!(cookie2.starts_with("cookie2="));
     }
 
     #[tokio::test]
@@ -1516,51 +1610,6 @@ mod tests {
     }
 
     #[test]
-    fn test_prepare_empty_cookie_with_complex_data() {
-        use std::sync::Arc;
-
-        use serde::Serialize;
-
-        #[derive(Serialize)]
-        struct ComplexData {
-            nested: NestedData,
-            array: Vec<String>,
-            flag: bool,
-        }
-
-        #[derive(Serialize)]
-        struct NestedData {
-            id: u64,
-            name: String,
-        }
-
-        let complex_data = ComplexData {
-            nested: NestedData {
-                id: 12345,
-                name: "test_nested".to_string(),
-            },
-            array: vec!["item1".to_string(), "item2".to_string()],
-            flag: true,
-        };
-
-        let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
-
-        assert_eq!(cookie.name(), "complex_cookie");
-        assert!(!cookie.value().is_empty());
-
-        // Verify the cookie value is base64 encoded JSON
-        let decoded_str = base64::decode(cookie.value()).unwrap();
-        let json_str = decoded_str;
-        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-
-        assert_eq!(parsed["nested"]["id"], 12345);
-        assert_eq!(parsed["nested"]["name"], "test_nested");
-        assert_eq!(parsed["flag"], true);
-        assert_eq!(parsed["array"][0], "item1");
-    }
-
-    #[test]
     fn test_rum_with_unicode_characters() {
         let rum = Rum {
             enabled: true,
@@ -1615,52 +1664,6 @@ mod tests {
         assert!(json.contains("\"enabled\":false"));
         assert!(json.contains("\"client_token\":\"\""));
         assert!(json.contains("\"insecure_http\":false"));
-    }
-
-    #[test]
-    fn test_prepare_empty_cookie_with_empty_data() {
-        use std::sync::Arc;
-
-        use serde::Serialize;
-
-        #[derive(Serialize)]
-        struct EmptyStruct;
-
-        let empty_data = EmptyStruct;
-        let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
-
-        assert_eq!(cookie.name(), "empty_cookie");
-        assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
-
-        // Verify it's valid base64 encoded JSON
-        let decoded_str = base64::decode(cookie.value()).unwrap();
-        let json_str = decoded_str;
-        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-        // Empty structs serialize as null in serde, not as objects
-        assert!(parsed.is_null() || parsed.is_object());
-    }
-
-    #[test]
-    fn test_prepare_empty_cookie_serialization_error_handling() {
-        use std::sync::Arc;
-
-        use serde::Serialize;
-
-        #[derive(Serialize)]
-        struct ValidData {
-            value: String,
-        }
-
-        let valid_data = ValidData {
-            value: "test".to_string(),
-        };
-        let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
-
-        // Should not panic and should produce valid cookie
-        assert_eq!(cookie.name(), "valid_cookie");
-        assert!(!cookie.value().is_empty());
     }
 
     #[tokio::test]

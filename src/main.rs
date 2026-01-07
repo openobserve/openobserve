@@ -18,15 +18,9 @@ use std::{
     collections::HashMap,
     net::SocketAddr,
     str::FromStr,
-    sync::{
-        Arc,
-        atomic::{AtomicU16, Ordering},
-    },
     time::{Duration, SystemTime},
 };
 
-use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
-use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{
     META_ORG_ID, get_config,
@@ -65,7 +59,6 @@ use openobserve::{
         node::NodeService,
         search::SEARCH_SERVER,
         self_reporting,
-        tls::http_tls_config,
     },
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -86,12 +79,13 @@ use proto::cluster_rpc::{
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{PprofConfig, pprof_backend};
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
     transport::{Identity, ServerTlsConfig},
 };
+use tower_http::{compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
@@ -99,9 +93,6 @@ use tracing_subscriber::Registry;
 use {
     config::Config,
     o2_enterprise::enterprise::{ai, common::config::O2Config},
-    openobserve::handler::http::{
-        auth::script_server::validator as script_server_validator, request::script_server,
-    },
     utoipa::OpenApi,
 };
 
@@ -754,7 +745,6 @@ async fn init_router_grpc_server(
 async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
-    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
@@ -766,93 +756,64 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
-    let server = HttpServer::new(move || {
-        let cfg = get_config();
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.limit.mem_table_bucket_num > 1 {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-        }
-        let scheme = if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        };
-        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
-        let mut app = App::new();
-        if config::cluster::LOCAL_NODE.is_router() {
-            let factory = web::scope(&cfg.common.base_uri);
-            #[cfg(feature = "enterprise")]
-            let factory = factory.wrap(
-                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
-                    router::ratelimit::resource_extractor::default_extractor,
-                )),
-            );
-
-            app = app.service(
-                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                factory
-                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .service(get_metrics)
-                    .service(router::http::config)
-                    .service(router::http::config_paths)
-                    .service(router::http::api)
-                    .service(router::http::aws)
-                    .service(router::http::gcp)
-                    .service(router::http::rum)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
-        } else {
-            app = app.service({
-                let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .service(get_metrics)
-                    .configure(get_config_routes)
-                    .configure(get_service_routes)
-                    .configure(get_other_service_routes)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes);
-                #[cfg(feature = "enterprise")]
-                let scope = scope.configure(get_script_server_routes);
-                scope
-            })
-        }
-        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
-            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(&get_http_access_log_format()
-            ))
-            .wrap(RequestTracing::new())
-    })
-    .keep_alive(if cfg.limit.http_keep_alive_disabled {
-        KeepAlive::Disabled
+    let scheme = if cfg.http.tls_enabled {
+        "HTTPS"
     } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
-    let server = if cfg.http.tls_enabled {
-        let sc = http_tls_config()?;
-        server.bind_rustls_0_23(haddr, sc)?
-    } else {
-        server.bind(haddr)?
+        "HTTP"
     };
+    log::info!("Starting {scheme} server at: {haddr}");
 
-    let server = server
-        .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
-        .disable_signals()
-        .run();
-    let handle = server.handle();
-    tokio::task::spawn(graceful_shutdown(handle));
-    server.await?;
+    // Build the router
+    let app = create_app_router()
+        .layer(middlewares::SlowLogLayer::new(
+            cfg.limit.http_slow_log_threshold,
+        ))
+        .layer(CompressionLayer::new())
+        .layer(TraceLayer::new_for_http())
+        .layer(TimeoutLayer::with_status_code(
+            http::StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
+        ));
+
+    if cfg.http.tls_enabled {
+        // TLS server using axum-server
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+            &cfg.http.tls_cert_path,
+            &cfg.http.tls_key_path,
+        )
+        .await?;
+
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle
+                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+            }
+        });
+
+        axum_server::bind_rustls(haddr, tls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        // Non-TLS server
+        let listener = TcpListener::bind(haddr).await?;
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
+
     Ok(())
 }
 
 async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    let thread_id = Arc::new(AtomicU16::new(0));
+
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
@@ -864,92 +825,62 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
-    let server = HttpServer::new(move || {
-        let cfg = get_config();
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.limit.mem_table_bucket_num > 1 {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-        }
-
-        let scheme = if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        };
-        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
-
-        let mut app = App::new();
-        if config::cluster::LOCAL_NODE.is_router() {
-            let factory = web::scope(&cfg.common.base_uri);
-            #[cfg(feature = "enterprise")]
-            let factory = factory.wrap(
-                o2_ratelimit::middleware::RateLimitController::new_with_extractor(Some(
-                    router::ratelimit::resource_extractor::default_extractor,
-                )),
-            );
-
-            app = app.service(
-                // if `cfg.common.base_uri` is empty, scope("") still works as expected.
-                factory
-                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .service(get_metrics)
-                    .service(router::http::config)
-                    .service(router::http::config_paths)
-                    .service(router::http::api)
-                    .service(router::http::aws)
-                    .service(router::http::gcp)
-                    .service(router::http::rum)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
-        } else {
-            app = app.service({
-                let scope = web::scope(&cfg.common.base_uri)
-                    .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .service(get_metrics)
-                    .configure(get_config_routes)
-                    .configure(get_service_routes)
-                    .configure(get_other_service_routes)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes);
-                #[cfg(feature = "enterprise")]
-                let scope = scope.configure(get_script_server_routes);
-                scope
-            })
-        }
-        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
-            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(&get_http_access_log_format()
-            ))
-    })
-    .keep_alive(if cfg.limit.http_keep_alive_disabled {
-        KeepAlive::Disabled
+    let scheme = if cfg.http.tls_enabled {
+        "HTTPS"
     } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
-    let server = if cfg.http.tls_enabled {
-        let sc = http_tls_config()?;
-        server.bind_rustls_0_23(haddr, sc)?
-    } else {
-        server.bind(haddr)?
+        "HTTP"
     };
+    log::info!("Starting {scheme} server at: {haddr}");
 
-    let server = server
-        .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
-        .disable_signals()
-        .run();
-    let handle = server.handle();
-    tokio::task::spawn(graceful_shutdown(handle));
-    server.await?;
+    // Build the router without tracing
+    let app = create_app_router()
+        .layer(middlewares::SlowLogLayer::new(
+            cfg.limit.http_slow_log_threshold,
+        ))
+        .layer(CompressionLayer::new())
+        .layer(TimeoutLayer::with_status_code(
+            http::StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
+        ));
+
+    if cfg.http.tls_enabled {
+        // TLS server using axum-server
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+            &cfg.http.tls_cert_path,
+            &cfg.http.tls_key_path,
+        )
+        .await?;
+
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle
+                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+            }
+        });
+
+        axum_server::bind_rustls(haddr, tls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        // Non-TLS server
+        let listener = TcpListener::bind(haddr).await?;
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
+
     Ok(())
 }
 
-async fn graceful_shutdown(handle: ServerHandle) {
+/// Signal handler for graceful shutdown
+async fn shutdown_signal() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
@@ -981,16 +912,12 @@ async fn graceful_shutdown(handle: ServerHandle) {
             _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
         }
     }
-    // tokio::signal::ctrl_c().await.unwrap();
-    // println!("ctrl-c received!");
 
     // offline the node
     if let Err(e) = cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
-
-    handle.stop(true).await;
 }
 
 /// Setup the tracing related components
@@ -1344,7 +1271,6 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
-    let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
@@ -1356,54 +1282,59 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
-    // following command will setup the namespace
-    #[cfg(feature = "enterprise")]
+    // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
-    let server = HttpServer::new(move || {
-        let cfg = get_config();
-        let local_id = thread_id.load(Ordering::SeqCst) as usize;
-        if cfg.limit.mem_table_bucket_num > 1 {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-        }
-        let scheme = if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        };
-        log::info!("Starting Script Server {scheme} server at: {haddr}, thread_id: {local_id}");
-        let mut app = App::new();
-        app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
-        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
-            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id))
-            .wrap(middlewares::Compress::default())
-            .wrap(middleware::Logger::new(&get_http_access_log_format()
-            ))
-            .wrap(RequestTracing::new())
-    })
-    .keep_alive(if cfg.limit.http_keep_alive_disabled {
-        KeepAlive::Disabled
+    let scheme = if cfg.http.tls_enabled {
+        "HTTPS"
     } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.http_keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
-    let server = if cfg.http.tls_enabled {
-        let sc = http_tls_config()?;
-        server.bind_rustls_0_23(haddr, sc)?
-    } else {
-        server.bind(haddr)?
+        "HTTP"
     };
+    log::info!("Starting Script Server {scheme} server at: {haddr}");
 
-    let server = server
-        .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
-        .disable_signals()
-        .run();
-    let handle = server.handle();
-    tokio::task::spawn(graceful_shutdown(handle));
-    server.await?;
+    // Build the router for script server
+    let app = create_script_server_router()
+        .layer(middlewares::SlowLogLayer::new(
+            cfg.limit.http_slow_log_threshold,
+        ))
+        .layer(CompressionLayer::new())
+        .layer(TimeoutLayer::new(Duration::from_secs(max(
+            1,
+            cfg.limit.http_request_timeout,
+        ))));
+
+    if cfg.http.tls_enabled {
+        // TLS server using axum-server
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+            &cfg.http.tls_cert_path,
+            &cfg.http.tls_key_path,
+        )
+        .await?;
+
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle
+                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+            }
+        });
+
+        axum_server::bind_rustls(haddr, tls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        // Non-TLS server
+        let listener = TcpListener::bind(haddr).await?;
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
 
     log::info!("HTTP server stopped");
 
@@ -1423,20 +1354,73 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
-    let cors = get_cors();
-    cfg.service(
-        web::scope("/api")
-            .wrap(actix_web_httpauth::middleware::HttpAuthentication::with_fn(
-                script_server_validator,
-            ))
-            .wrap(cors)
-            .service(script_server::create_job)
-            .service(script_server::delete_job)
-            .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps)
-            .service(script_server::patch_action),
-    );
+pub fn create_script_server_router() -> Router {
+    use axum::{
+        middleware,
+        routing::{delete, get, patch, post},
+    };
+    use openobserve::handler::http::{request::script_server, router::cors_layer};
+
+    let cfg = get_config();
+    let base_uri = &cfg.common.base_uri;
+
+    // Create script server routes with authentication
+    let api_routes = Router::new()
+        .route("/{org_id}/job", post(script_server::create_job))
+        .route("/{org_id}/job/{name}", delete(script_server::delete_job))
+        .route("/{org_id}/app/{name}", get(script_server::get_app_details))
+        .route("/{org_id}/apps", get(script_server::list_deployed_apps))
+        .route("/{org_id}/action/{id}", patch(script_server::patch_action))
+        .layer(middleware::from_fn(script_server_auth_middleware))
+        .layer(cors_layer());
+
+    // Nest under base URI
+    if base_uri.is_empty() || base_uri == "/" {
+        Router::new().nest("/api", api_routes)
+    } else {
+        Router::new().nest(&format!("{}/api", base_uri), api_routes)
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn script_server_auth_middleware(
+    mut request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::{http::header, response::IntoResponse};
+    use openobserve::{
+        common::utils::auth::AuthExtractor,
+        handler::http::auth::{
+            script_server::validator as script_server_validator,
+            validator::{AuthError, RequestData},
+        },
+    };
+
+    // Extract request data
+    let req_data = RequestData {
+        uri: request.uri().clone(),
+        method: request.method().clone(),
+        headers: request.headers().clone(),
+    };
+
+    // Extract auth info
+    let auth_info = match AuthExtractor::extract_from_request_sync(&request) {
+        Ok(info) => info,
+        Err(e) => return AuthError::Unauthorized(e).into_response(),
+    };
+
+    // Validate authentication
+    match script_server_validator(&req_data, &auth_info).await {
+        Ok(result) => {
+            request.headers_mut().insert(
+                header::HeaderName::from_static("user_id"),
+                header::HeaderValue::from_str(&result.user_email)
+                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
+            );
+            next.run(request).await
+        }
+        Err(e) => e.into_response(),
+    }
 }
 
 /// Initializes enterprise features.
@@ -1516,6 +1500,7 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 /// %{Content-Length}i - Size of request payload in bytes
 /// %{Referer}i - Referer header
 /// %{User-Agent}i - User-Agent header
+#[allow(dead_code)]
 fn get_http_access_log_format() -> String {
     let log_format = get_config().http.access_log_format.to_string();
     if log_format.is_empty() || log_format.to_lowercase() == "common" {

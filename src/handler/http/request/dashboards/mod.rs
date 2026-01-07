@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{
-    HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put,
-    web::{self, Query},
+use axum::{
+    extract::{Path, Query},
+    response::Response,
 };
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
@@ -42,7 +42,7 @@ use crate::{
 pub mod reports;
 pub mod timed_annotations;
 
-impl From<DashboardError> for HttpResponse {
+impl From<DashboardError> for Response {
     fn from(value: DashboardError) -> Self {
         match value {
             DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
@@ -83,6 +83,8 @@ impl From<DashboardError> for HttpResponse {
 
 /// CreateDashboard
 #[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateDashboard",
@@ -111,17 +113,15 @@ impl From<DashboardError> for HttpResponse {
         ("x-o2-mcp" = json!({"description": "Create a new dashboard"}))
     )
 )]
-#[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
-    path: web::Path<String>,
-    req_body: web::Json<DashboardRequestBody>,
-    req: HttpRequest,
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let org_id = path.into_inner();
-    let folder = get_folder(req.query_string());
+    axum::Json(req_body): axum::Json<DashboardRequestBody>,
+) -> Response {
+    let folder = crate::common::utils::http::get_folder(&query);
 
-    let mut dashboard: Dashboard = req_body.0.into();
+    let mut dashboard: Dashboard = req_body.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -135,6 +135,8 @@ pub async fn create_dashboard(
 
 /// UpdateDashboard
 #[utoipa::path(
+    put,
+    path = "/{org_id}/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "UpdateDashboard",
@@ -158,19 +160,16 @@ pub async fn create_dashboard(
         ("x-o2-mcp" = json!({"description": "Update an existing dashboard"}))
     )
 )]
-#[put("/{org_id}/dashboards/{dashboard_id}")]
-async fn update_dashboard(
-    path: web::Path<(String, String)>,
-    req_body: web::Json<DashboardRequestBody>,
-    req: HttpRequest,
+pub async fn update_dashboard(
+    Path((org_id, dashboard_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let (org_id, dashboard_id) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    axum::Json(req_body): axum::Json<DashboardRequestBody>,
+) -> Response {
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
 
-    let mut dashboard: Dashboard = req_body.0.into();
+    let mut dashboard: Dashboard = req_body.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
 
@@ -186,6 +185,8 @@ async fn update_dashboard(
 
 /// ListDashboards
 #[utoipa::path(
+    get,
+    path = "/{org_id}/dashboards",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ListDashboards",
@@ -206,14 +207,13 @@ async fn update_dashboard(
         ("x-o2-mcp" = json!({"description": "List all dashboards in organization"}))
     )
 )]
-#[get("/{org_id}/dashboards")]
-async fn list_dashboards(
-    org_id: web::Path<String>,
-    web::Query(query): web::Query<ListDashboardsQuery>,
-    req: HttpRequest,
-) -> impl Responder {
-    let params = query.into(&org_id.into_inner());
-    let Some(user_id) = get_user_id(req) else {
+pub async fn list_dashboards(
+    Path(org_id): Path<String>,
+    Query(query): Query<ListDashboardsQuery>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let params = query.into(&org_id);
+    let Some(user_id) = get_user_id(&headers) else {
         return MetaHttpResponse::unauthorized("User ID not found in request headers");
     };
     let dashboards = match dashboards::list_dashboards(&user_id, params).await {
@@ -226,6 +226,8 @@ async fn list_dashboards(
 
 /// GetDashboard
 #[utoipa::path(
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetDashboard",
@@ -247,9 +249,7 @@ async fn list_dashboards(
         ("x-o2-mcp" = json!({"description": "Get dashboard details by ID"}))
     )
 )]
-#[get("/{org_id}/dashboards/{dashboard_id}")]
-async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, dashboard_id) = path.into_inner();
+pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
     let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
@@ -260,6 +260,8 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
 
 /// ExportDashboard
 #[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ExportDashboard",
@@ -281,9 +283,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("x-o2-mcp" = json!({"description": "Export dashboard as JSON"}))
     )
 )]
-#[get("/{org_id}/dashboards/{dashboard_id}/export")]
-pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, dashboard_id) = path.into_inner();
+pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
     let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
@@ -294,6 +294,8 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
 
 /// DeleteDashboard
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboard",
@@ -316,20 +318,17 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
         ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID"}))
     )
 )]
-#[delete("/{org_id}/dashboards/{dashboard_id}")]
-async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, dashboard_id) = path.into_inner();
+pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
     match dashboards::delete_dashboard(&org_id, &dashboard_id).await {
-        Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
-            "Dashboard deleted",
-        )),
+        Ok(()) => MetaHttpResponse::ok("Dashboard deleted"),
         Err(err) => err.into(),
     }
 }
 
 /// DeleteDashboardBulk
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/dashboards",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboardBulk",
@@ -355,15 +354,12 @@ async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/dashboards/bulk")]
-async fn delete_dashboard_bulk(
-    path: web::Path<String>,
+pub async fn delete_dashboard_bulk(
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> impl Responder {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    axum::Json(req): axum::Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
     let _folder_id = crate::common::utils::http::get_folder(&query);
 
@@ -407,6 +403,8 @@ async fn delete_dashboard_bulk(
 
 /// MoveDashboard
 #[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboard",
@@ -436,13 +434,11 @@ async fn delete_dashboard_bulk(
         ("x-o2-mcp" = json!({"description": "Move dashboard to another folder"}))
     )
 )]
-#[put("/{org_id}/folders/dashboards/{dashboard_id}")]
-async fn move_dashboard(
-    path: web::Path<(String, String)>,
-    req_body: web::Json<MoveDashboardRequestBody>,
+pub async fn move_dashboard(
+    Path((org_id, dashboard_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let (org_id, dashboard_id) = path.into_inner();
+    axum::Json(req_body): axum::Json<MoveDashboardRequestBody>,
+) -> Response {
     // For this endpoint, openfga check is already done in the middleware
     match dashboards::move_dashboard(
         &org_id,
@@ -453,16 +449,15 @@ async fn move_dashboard(
     )
     .await
     {
-        Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
-            "Dashboard moved",
-        )),
+        Ok(()) => MetaHttpResponse::ok("Dashboard moved"),
         Err(err) => err.into(),
     }
 }
 
 /// MoveDashboards
 #[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboards",
@@ -474,7 +469,7 @@ async fn move_dashboard(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
@@ -485,13 +480,11 @@ async fn move_dashboard(
         ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder"}))
     )
 )]
-#[patch("/{org_id}/dashboards/move")]
-async fn move_dashboards(
-    path: web::Path<String>,
-    req_body: web::Json<MoveDashboardsRequestBody>,
+pub async fn move_dashboards(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
+    axum::Json(req_body): axum::Json<MoveDashboardsRequestBody>,
+) -> Response {
     // For this endpoint, openfga check is needed here, as we don't do openfga check in the
     // middleware for this api endpoint, because it includes a batch of dashboards
     match dashboards::move_dashboards(
@@ -516,12 +509,16 @@ async fn move_dashboards(
 }
 
 pub fn get_folder(query_str: &str) -> String {
-    let query = web::Query::<HashMap<String, String>>::from_query(query_str).unwrap();
+    let query: HashMap<String, String> = url::form_urlencoded::parse(query_str.as_bytes())
+        .into_owned()
+        .collect();
     crate::common::utils::http::get_folder(&query)
 }
 
 pub fn is_overwrite(query_str: &str) -> bool {
-    let query = web::Query::<HashMap<String, String>>::from_query(query_str).unwrap();
+    let query: HashMap<String, String> = url::form_urlencoded::parse(query_str.as_bytes())
+        .into_owned()
+        .collect();
     match query.get("overwrite") {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
@@ -529,8 +526,8 @@ pub fn is_overwrite(query_str: &str) -> bool {
 }
 
 /// Tries to get the user ID from the request headers.
-fn get_user_id(req: HttpRequest) -> Option<String> {
-    req.headers()
+fn get_user_id(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())

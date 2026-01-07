@@ -13,17 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{Error, dev::ServiceRequest};
-use actix_web_httpauth::extractors::basic::BasicAuth;
-use config::get_config;
+use super::validator::{AuthError, AuthValidationResult, RequestData};
+use crate::common::utils::auth::AuthExtractor;
 
+/// Validator for script server authentication
 pub async fn validator(
-    req: ServiceRequest,
-    credentials: BasicAuth,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let cfg = get_config();
-    if !credentials.user_id().eq(&cfg.auth.action_server_token) {
-        return Err((actix_web::error::ErrorUnauthorized("auth incorrect"), req));
-    }
-    Ok(req)
+    req_data: &RequestData,
+    auth_info: &AuthExtractor,
+) -> Result<AuthValidationResult, AuthError> {
+    // Use the standard validator for script server authentication
+    // Script server uses the same authentication mechanism as the main API
+    super::validator::oo_validator(req_data, auth_info).await
 }

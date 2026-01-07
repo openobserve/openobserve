@@ -110,16 +110,19 @@ pub enum LokiError {
     },
 }
 
-impl From<LokiError> for actix_web::HttpResponse {
-    fn from(error: LokiError) -> Self {
-        use actix_web::HttpResponse;
+impl axum::response::IntoResponse for LokiError {
+    fn into_response(self) -> axum::response::Response {
+        use axum::http::{StatusCode, header};
 
-        if let LokiError::Ingestion { .. } = &error {
-            return HttpResponse::InternalServerError()
-                .content_type("text/plain")
-                .body("internal server error during log ingestion");
+        if let LokiError::Ingestion { .. } = &self {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(header::CONTENT_TYPE, "text/plain")],
+                "internal server error during log ingestion",
+            )
+                .into_response();
         }
-        let body = match error {
+        let body = match self {
             LokiError::InvalidTimestamp { message } => format!("invalid timestamp: {message}"),
             LokiError::InvalidLabels { message } => format!("invalid labels: {message}"),
             LokiError::EmptyStream => "empty stream data".to_string(),
@@ -142,9 +145,12 @@ impl From<LokiError> for actix_web::HttpResponse {
             LokiError::Ingestion { .. } => unreachable!("Already tested above"),
         };
 
-        HttpResponse::BadRequest()
-            .content_type("text/plain")
-            .body(body)
+        (
+            StatusCode::BAD_REQUEST,
+            [(header::CONTENT_TYPE, "text/plain")],
+            body,
+        )
+            .into_response()
     }
 }
 
@@ -173,19 +179,23 @@ mod tests {
 
     #[test]
     fn test_error_to_http_response() {
+        use axum::response::IntoResponse;
+
         let error = LokiError::InvalidTimestamp {
             message: "bad timestamp".to_string(),
         };
-        let response: actix_web::HttpResponse = error.into();
-        assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
 
         let error = LokiError::EmptyStream;
-        let response: actix_web::HttpResponse = error.into();
-        assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
+        let response = error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 
     #[test]
     fn test_client_vs_server_errors() {
+        use axum::response::IntoResponse;
+
         let client_errors = vec![
             LokiError::InvalidTimestamp {
                 message: "test".to_string(),
@@ -200,28 +210,30 @@ mod tests {
         ];
 
         for error in client_errors {
-            let response: actix_web::HttpResponse = error.into();
-            assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
+            let response = error.into_response();
+            assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
         }
 
         let server_error = LokiError::Ingestion {
             source: anyhow::anyhow!("internal error"),
         };
-        let response: actix_web::HttpResponse = server_error.into();
+        let response = server_error.into_response();
         assert_eq!(
             response.status(),
-            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
         );
     }
 
     #[test]
     fn test_protobuf_decode_error() {
+        use axum::response::IntoResponse;
+
         let decode_error = prost::DecodeError::new("test decode error");
         let loki_error: LokiError = decode_error.into();
         assert!(matches!(loki_error, LokiError::ProtobufDecode { .. }));
 
-        let response: actix_web::HttpResponse = loki_error.into();
-        assert_eq!(response.status(), actix_web::http::StatusCode::BAD_REQUEST);
+        let response = loki_error.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 
     #[test]

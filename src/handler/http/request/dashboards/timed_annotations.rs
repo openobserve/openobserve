@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use axum::{
+    extract::{Path, Query},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use config::meta::timed_annotations::{
     ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
@@ -56,23 +58,19 @@ use crate::{
         ("x-o2-mcp" = json!({"description": "Create time annotations"}))
     )
 )]
-#[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn create_annotations(
-    path: web::Path<(String, String)>,
-    web::Json(req): web::Json<TimedAnnotationReq>,
-) -> Result<HttpResponse, Error> {
-    let (_org_id, dashboard_id) = path.into_inner();
+    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    axum::Json(req): axum::Json<TimedAnnotationReq>,
+) -> Response {
     if let Err(validation_err) = req.validate() {
-        return Ok(MetaHttpResponse::bad_request(validation_err));
+        return MetaHttpResponse::bad_request(validation_err);
     }
 
     match timed_annotations::create_timed_annotations(&dashboard_id, req).await {
-        Ok(res) => Ok(MetaHttpResponse::json(res)),
+        Ok(res) => MetaHttpResponse::json(res),
         Err(e) => {
             log::error!("Error creating timed annotations: {e}");
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to create timed annotations",
-            ))
+            MetaHttpResponse::internal_error("Failed to create timed annotations")
         }
     }
 }
@@ -108,20 +106,19 @@ pub async fn create_annotations(
         ("x-o2-mcp" = json!({"description": "Get annotations"}))
     )
 )]
-#[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn get_annotations(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (_org_id, dashboard_id) = path.into_inner();
-    let Ok(query) = web::Query::<ListTimedAnnotationsQuery>::from_query(req.query_string()) else {
-        return Ok(MetaHttpResponse::bad_request(
-            "Error parsing query parameters".to_string(),
-        ));
+    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    query: Result<Query<ListTimedAnnotationsQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let query = match query {
+        Ok(Query(q)) => q,
+        Err(_) => {
+            return MetaHttpResponse::bad_request("Error parsing query parameters".to_string());
+        }
     };
-    let query = query.into_inner();
+
     if let Err(validation_err) = query.validate() {
-        return Ok(MetaHttpResponse::bad_request(validation_err));
+        return MetaHttpResponse::bad_request(validation_err);
     }
 
     let (panels, start_time, end_time) = (query.get_panels(), query.start_time, query.end_time);
@@ -129,12 +126,10 @@ pub async fn get_annotations(
     match timed_annotations::get_timed_annotations(&dashboard_id, panels, start_time, end_time)
         .await
     {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => MetaHttpResponse::json(data),
         Err(e) => {
             log::error!("Error getting timed annotations: {e}");
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to get timed annotations",
-            ))
+            MetaHttpResponse::internal_error("Failed to get timed annotations")
         }
     }
 }
@@ -169,23 +164,19 @@ pub async fn get_annotations(
         ("x-o2-mcp" = json!({"description": "Delete annotations"}))
     )
 )]
-#[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
-    path: web::Path<(String, String)>,
-    web::Json(req): web::Json<TimedAnnotationDelete>,
-) -> Result<HttpResponse, Error> {
-    let (_org_id, dashboard_id) = path.into_inner();
+    Path((_org_id, dashboard_id)): Path<(String, String)>,
+    axum::Json(req): axum::Json<TimedAnnotationDelete>,
+) -> Response {
     if let Err(validation_err) = req.validate() {
-        return Ok(MetaHttpResponse::bad_request(validation_err));
+        return MetaHttpResponse::bad_request(validation_err);
     }
 
     match timed_annotations::delete_timed_annotations(&dashboard_id, req).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => (StatusCode::OK, "").into_response(),
         Err(e) => {
             log::error!("Error deleting timed annotations: {e}");
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to delete timed annotations",
-            ))
+            MetaHttpResponse::internal_error("Failed to delete timed annotations")
         }
     }
 }
@@ -220,27 +211,23 @@ pub async fn delete_annotations(
         ("x-o2-mcp" = json!({"description": "Update annotations"}))
     )
 )]
-#[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
 pub async fn update_annotations(
-    path: web::Path<(String, String, String)>,
-    web::Json(mut req): web::Json<TimedAnnotation>,
-) -> Result<HttpResponse, Error> {
-    let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
+    Path((_org_id, dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
+    axum::Json(mut req): axum::Json<TimedAnnotation>,
+) -> Response {
     // ensure the annotation id is always set for update
     req.annotation_id = Some(timed_annotation_id.clone());
     if let Err(validation_err) = req.validate() {
-        return Ok(MetaHttpResponse::bad_request(validation_err));
+        return MetaHttpResponse::bad_request(validation_err);
     }
 
     match timed_annotations::update_timed_annotations(&dashboard_id, &timed_annotation_id, &req)
         .await
     {
-        Ok(res) => Ok(MetaHttpResponse::json(res)),
+        Ok(res) => MetaHttpResponse::json(res),
         Err(e) => {
             log::error!("Error updating timed annotations: {e}");
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to update timed annotations",
-            ))
+            MetaHttpResponse::internal_error("Failed to update timed annotations")
         }
     }
 }
@@ -275,24 +262,18 @@ pub async fn update_annotations(
         ("x-o2-mcp" = json!({"description": "Remove annotation from panel"}))
     )
 )]
-#[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
 pub async fn delete_annotation_panels(
-    path: web::Path<(String, String, String)>,
-    web::Json(panels): web::Json<Vec<String>>,
-) -> Result<HttpResponse, Error> {
-    let (_org_id, _dashboard_id, timed_annotation_id) = path.into_inner();
+    Path((_org_id, _dashboard_id, timed_annotation_id)): Path<(String, String, String)>,
+    axum::Json(panels): axum::Json<Vec<String>>,
+) -> Response {
     if panels.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "panels cannot be empty".to_string(),
-        ));
+        return MetaHttpResponse::bad_request("panels cannot be empty".to_string());
     }
     match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => (StatusCode::OK, "").into_response(),
         Err(e) => {
             log::error!("Error deleting timed annotation panels: {e}");
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to delete timed annotation panels",
-            ))
+            MetaHttpResponse::internal_error("Failed to delete timed annotation panels")
         }
     }
 }

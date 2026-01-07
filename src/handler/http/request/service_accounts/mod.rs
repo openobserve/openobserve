@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
-
-use actix_web::{
-    HttpRequest, HttpResponse, delete, get,
-    http::{self},
-    post, put, web,
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
@@ -45,6 +44,8 @@ use crate::{
 /// ListServiceAccounts
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountsList",
@@ -66,13 +67,7 @@ use crate::{
         ("x-o2-mcp" = json!({"description": "List service accounts"}))
     )
 )]
-#[get("/{org_id}/service_accounts")]
-pub async fn list(
-    org_id: web::Path<String>,
-    _req: HttpRequest,
-    Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
+pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserEmail>) -> Response {
     let user_id = &user_email.user_id;
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
@@ -90,14 +85,12 @@ pub async fn list(
                 _user_list_from_rbac = user_list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
     }
-    users::list_users(
+    match users::list_users(
         user_id,
         &org_id,
         Some(UserRole::ServiceAccount),
@@ -105,11 +98,17 @@ pub async fn list(
         false,
     )
     .await
+    {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// CreateServiceAccount
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountSave",
@@ -133,15 +132,12 @@ pub async fn list(
         ("x-o2-mcp" = json!({"description": "Create service account"}))
     )
 )]
-#[post("/{org_id}/service_accounts")]
 pub async fn save(
-    org_id: web::Path<String>,
-    service_account: web::Json<ServiceAccountRequest>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
+    Json(service_account): Json<ServiceAccountRequest>,
+) -> Response {
     let initiator_id = user_email.user_id;
-    let service_account = service_account.into_inner();
     let user = UserRequest {
         email: service_account.email.trim().to_string(),
         first_name: service_account.first_name.trim().to_string(),
@@ -155,12 +151,17 @@ pub async fn save(
         token: None,
     };
 
-    users::post_user(&org_id, user, &initiator_id).await
+    match users::post_user(&org_id, user, &initiator_id).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// UpdateServiceAccount
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountUpdate",
@@ -184,33 +185,22 @@ pub async fn save(
         ("x-o2-mcp" = json!({"description": "Update service account"}))
     )
 )]
-#[put("/{org_id}/service_accounts/{email_id}")]
 pub async fn update(
-    params: web::Path<(String, String)>,
-    service_account: web::Json<UpdateServiceAccountRequest>,
+    Path((org_id, email_id)): Path<(String, String)>,
+    axum::extract::Query(query): axum::extract::Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
+    Json(service_account): Json<UpdateServiceAccountRequest>,
+) -> Response {
     let email_id = email_id.trim().to_lowercase();
-    let query = match web::Query::<HashMap<String, String>>::from_query(req.query_string()) {
-        Ok(query) => query,
-        Err(e) => {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!("Invalid query string: {e}"),
-            ));
-        }
-    };
 
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::other(
+                return MetaHttpResponse::bad_request(
                     " 'rotateToken' query param with value 'true' or 'false' allowed",
-                ));
+                );
             }
         },
         None => false,
@@ -218,15 +208,21 @@ pub async fn update(
 
     if rotate_token {
         return match crate::service::organization::update_passcode(Some(&org_id), &email_id).await {
-            Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {
-                token: passcode.passcode,
-                user: passcode.user,
-            })),
-            Err(e) => Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e))),
+            Ok(passcode) => (
+                StatusCode::OK,
+                Json(APIToken {
+                    token: passcode.passcode,
+                    user: passcode.user,
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::NOT_FOUND,
+                Json(MetaHttpResponse::error(StatusCode::NOT_FOUND, e)),
+            )
+                .into_response(),
         };
     };
-    let service_account = service_account.into_inner();
 
     let user = UpdateUser {
         change_password: false,
@@ -239,7 +235,7 @@ pub async fn update(
     };
     let initiator_id = &user_email.user_id;
 
-    users::update_user(
+    match users::update_user(
         &org_id,
         &email_id,
         UserUpdateMode::OtherUpdate,
@@ -247,11 +243,17 @@ pub async fn update(
         user,
     )
     .await
+    {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// RemoveServiceAccount
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "RemoveServiceAccount",
@@ -273,18 +275,21 @@ pub async fn update(
         ("x-o2-mcp" = json!({"description": "Delete service account"}))
     )
 )]
-#[delete("/{org_id}/service_accounts/{email_id}")]
 pub async fn delete(
-    path: web::Path<(String, String)>,
+    Path((org_id, email_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = path.into_inner();
+) -> Response {
     let initiator_id = user_email.user_id;
-    users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+    match users::remove_user_from_org(&org_id, &email_id, &initiator_id).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// RemoveServiceAccountBulk
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "RemoveServiceAccountBulk",
@@ -305,14 +310,11 @@ pub async fn delete(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/service_accounts/bulk")]
 pub async fn delete_bulk(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let initiator_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
@@ -327,7 +329,7 @@ pub async fn delete_bulk(
         )
         .await
         {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -357,16 +359,18 @@ pub async fn delete_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 /// GetAPIToken
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/service_accounts",
     context_path = "/api",
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",
@@ -392,24 +396,25 @@ pub async fn delete_bulk(
         ("x-o2-mcp" = json!({"description": "Get service account token"}))
     )
 )]
-#[get("/{org_id}/service_accounts/{email_id}")]
 pub async fn get_api_token(
-    path: web::Path<(String, String)>,
+    Path((org, user_id)): Path<(String, String)>,
     Headers(_user_email): Headers<UserEmail>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org, user_id) = path.into_inner();
-
+) -> Response {
     // Always return single token for the requested org
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
-        Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {
-            token: passcode.passcode,
-            user: passcode.user,
-        })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(passcode) => (
+            StatusCode::OK,
+            Json(APIToken {
+                token: passcode.passcode,
+                user: passcode.user,
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            Json(MetaHttpResponse::error(StatusCode::NOT_FOUND, e)),
+        )
+            .into_response(),
     }
 }

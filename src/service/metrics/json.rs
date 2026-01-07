@@ -19,8 +19,9 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{http, web};
 use anyhow::{Result, anyhow};
+use axum::http;
+use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -62,7 +63,7 @@ use crate::{
 
 pub async fn ingest(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource

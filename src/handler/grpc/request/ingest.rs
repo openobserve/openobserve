@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::http::StatusCode;
 use config::{
     meta::{otlp::OtlpRequestType, stream::StreamType},
     metrics,
     utils::json,
 };
+use http::StatusCode;
 use infra::errors::{Error, Result};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,

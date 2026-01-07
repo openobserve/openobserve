@@ -18,7 +18,7 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::web;
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME,
@@ -68,7 +68,7 @@ use crate::{
 
 pub async fn remote_write(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: IngestUser,
 ) -> std::result::Result<(), anyhow::Error> {
     let org_id = org_id.to_string();
@@ -84,7 +84,7 @@ pub async fn remote_write(
 
 async fn remote_write_inner(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource

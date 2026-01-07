@@ -15,7 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{HttpResponse, http, http::StatusCode};
+use axum::{
+    Json, http,
+    response::{IntoResponse, Response as HttpResponse},
+};
 use chrono::{TimeZone, Timelike, Utc};
 #[cfg(feature = "enterprise")]
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
@@ -247,21 +250,27 @@ pub async fn create_stream(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((ERROR_HEADER, format!("error in getting schema: {e}")))
-                .json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                [(ERROR_HEADER, format!("error in getting schema: {e}"))],
+                Json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!("error in getting schema: {e}"),
-                )));
+                )),
+            )
+                .into_response());
         }
     };
     if !schema.fields().is_empty() {
-        return Ok(HttpResponse::BadRequest()
-            .append_header((ERROR_HEADER, "stream already exists"))
-            .json(MetaHttpResponse::error(
+        return Ok((
+            http::StatusCode::BAD_REQUEST,
+            [(ERROR_HEADER, "stream already exists")],
+            Json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 "stream already exists",
-            )));
+            )),
+        )
+            .into_response());
     }
 
     // create the stream
@@ -270,12 +279,15 @@ pub async fn create_stream(
     let mut has_timestamp = false;
     for f in schema {
         let Ok(data_type) = f.r#type.parse::<DataType>() else {
-            return Ok(HttpResponse::BadRequest()
-                .append_header((ERROR_HEADER, format!("invalid data type: {}", f.r#type)))
-                .json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::BAD_REQUEST,
+                [(ERROR_HEADER, format!("invalid data type: {}", f.r#type))],
+                Json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
                     format!("invalid data type: {}", f.r#type),
-                )));
+                )),
+            )
+                .into_response());
         };
         let name = format_label_name(&f.name);
         if name == TIMESTAMP_COL_NAME {
@@ -297,23 +309,29 @@ pub async fn create_stream(
         match infra::schema::merge(org_id, stream_name, stream_type, &schema, Some(min_ts)).await {
             Ok(Some((s, _))) => s,
             Ok(None) => {
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(
                         ERROR_HEADER,
                         "error in creating stream: created schema is empty",
-                    ))
-                    .json(MetaHttpResponse::error(
+                    )],
+                    Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         "error in creating stream: created schema is empty",
-                    )));
+                    )),
+                )
+                    .into_response());
             }
             Err(e) => {
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((ERROR_HEADER, format!("error in creating stream: {e}")))
-                    .json(MetaHttpResponse::error(
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(ERROR_HEADER, format!("error in creating stream: {e}"))],
+                    Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         format!("error in creating stream: {e}"),
-                    )));
+                    )),
+                )
+                    .into_response());
             }
         };
 
@@ -340,10 +358,7 @@ pub async fn create_stream(
     // create the stream settings
     let resp = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await?;
     if resp.status() == http::StatusCode::OK {
-        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
-            "stream created",
-        )))
+        Ok(MetaHttpResponse::ok("stream created"))
     } else {
         Ok(resp)
     }
@@ -359,48 +374,48 @@ pub async fn save_stream_settings(
     let cfg = config::get_config();
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-        return Ok(HttpResponse::BadRequest()
-            .append_header((
+        return Ok((
+            http::StatusCode::BAD_REQUEST,
+            [(
                 ERROR_HEADER,
                 format!("stream [{stream_name}] is being deleted"),
-            ))
-            .json(MetaHttpResponse::error(
+            )],
+            Json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 format!("stream [{stream_name}] is being deleted"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     // only allow setting user defined schema for supported stream
     if !stream_type.support_uds() && !settings.defined_schema_fields.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream type [{stream_type}] don't support user defined schema"),
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "stream type [{stream_type}] don't support user defined schema"
         )));
     }
 
     // _all field can't setting for inverted index & index field
     for key in settings.full_text_search_keys.iter() {
         if key == &cfg.common.column_all {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("field [{key}] can't be used for full text search"),
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{key}] can't be used for full text search"
             )));
         }
     }
     for key in settings.index_fields.iter() {
         if key == &cfg.common.column_all {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("field [{key}] can't be used for secondary index"),
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{key}] can't be used for secondary index"
             )));
         }
     }
 
     for key in settings.partition_keys.iter() {
         if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) || key.field == cfg.common.column_all {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("field [{}] can't be used for partition key", key.field),
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{}] can't be used for partition key",
+                key.field
             )));
         }
     }
@@ -409,12 +424,15 @@ pub async fn save_stream_settings(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((ERROR_HEADER, format!("error in getting schema : {e}")))
-                .json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                [(ERROR_HEADER, format!("error in getting schema : {e}"))],
+                Json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!("error in getting schema : {e}"),
-                )));
+                )),
+            )
+                .into_response());
         }
     };
     let schema_fields = schema
@@ -426,15 +444,13 @@ pub async fn save_stream_settings(
     // check the full text search keys must be text field
     for key in settings.full_text_search_keys.iter() {
         let Some(field) = schema_fields.get(key) else {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("field [{key}] not found in schema"),
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{key}] not found in schema"
             )));
         };
         if field.data_type() != &DataType::Utf8 && field.data_type() != &DataType::LargeUtf8 {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("full text search field [{key}] must be text field"),
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "full text search field [{key}] must be text field"
             )));
         }
     }
@@ -452,9 +468,9 @@ pub async fn save_stream_settings(
     for v in settings.partition_keys.iter() {
         if let Some(old_field) = old_partition_keys.iter_mut().find(|k| k.field == v.field) {
             if old_field.types != v.types {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    format!("field [{}] partition types can't be changed", v.field),
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "field [{}] partition types can't be changed",
+                    v.field
                 )));
             }
             old_field.disabled = v.disabled;
@@ -466,10 +482,9 @@ pub async fn save_stream_settings(
 
     for range in settings.extended_retention_days.iter() {
         if range.start > range.end {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
+            return Ok(MetaHttpResponse::bad_request(
                 "start day should be less than end day",
-            )));
+            ));
         }
     }
 
@@ -482,7 +497,7 @@ pub async fn save_stream_settings(
         .await
         .unwrap();
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, "")))
+    Ok(MetaHttpResponse::ok(""))
 }
 
 #[tracing::instrument(skip(new_settings))]
@@ -493,24 +508,17 @@ pub async fn update_stream_settings(
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
     let Ok(mut schema) = infra::schema::get(org_id, stream_name, stream_type).await else {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND,
-            "stream not found",
-        )));
+        return Ok(MetaHttpResponse::not_found("stream not found"));
     };
     let Some(mut settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await
     else {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND,
-            "stream not found",
-        )));
+        return Ok(MetaHttpResponse::not_found("stream not found"));
     };
 
     // Validate index field uniqueness BEFORE any DB writes
     // This prevents inconsistent state if validation fails
     if let Err(err) = validate_index_field_conflicts(&settings, &new_settings) {
-        return Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err)));
+        return Ok(MetaHttpResponse::bad_request(err));
     }
 
     // process new fields first
@@ -587,19 +595,17 @@ pub async fn update_stream_settings(
 
     // index_original_data & index_all_values only can open one at a time
     if settings.index_original_data && settings.index_all_values {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "index_original_data & index_all_values cannot be true at the same time",
-        )));
+        ));
     }
 
     // check for user defined schema
     if !new_settings.defined_schema_fields.add.is_empty() {
         if !cfg.common.allow_user_defined_schemas {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST,
-                        "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
-                    )));
+            return Ok(MetaHttpResponse::bad_request(
+                "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
+            ));
         }
         settings
             .defined_schema_fields
@@ -629,12 +635,9 @@ pub async fn update_stream_settings(
         settings.defined_schema_fields = fields;
     }
     if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            format!(
-                "user defined schema fields count exceeds the limit: {}",
-                cfg.limit.user_defined_schema_max_fields
-            ),
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "user defined schema fields count exceeds the limit: {}",
+            cfg.limit.user_defined_schema_max_fields
         )));
     }
 
@@ -678,14 +681,9 @@ pub async fn update_stream_settings(
     if !new_settings.distinct_value_fields.add.is_empty() {
         for f in &new_settings.distinct_value_fields.add {
             if f == "count" || f == TIMESTAMP_COL_NAME {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST,
-                        format!(
-                            "count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"
-                        ),
-                    )),
-                );
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"
+                )));
             }
             // we ignore full text search fields
             if _fts.contains(f) || new_settings.full_text_search_keys.add.contains(f) {
@@ -700,12 +698,15 @@ pub async fn update_stream_settings(
                 f,
             );
             if let Err(e) = distinct_values::add(record).await {
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((ERROR_HEADER, format!("error in updating settings : {e}")))
-                    .json(MetaHttpResponse::error(
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(ERROR_HEADER, format!("error in updating settings : {e}"))],
+                    Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         format!("error in updating settings : {e}"),
-                    )));
+                    )),
+                )
+                    .into_response());
             }
             // we cannot allow duplicate entries here
             let temp = DistinctField {
@@ -723,32 +724,29 @@ pub async fn update_stream_settings(
             let usage = match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
                 Ok(entry) => entry,
                 Err(e) => {
-                    return Ok(HttpResponse::InternalServerError()
-                        .append_header((ERROR_HEADER, format!("error in updating settings : {e}")))
-                        .json(MetaHttpResponse::error(
+                    return Ok((
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        [(ERROR_HEADER, format!("error in updating settings : {e}"))],
+                        Json(MetaHttpResponse::error(
                             http::StatusCode::INTERNAL_SERVER_ERROR,
                             format!("error in updating settings : {e}"),
-                        )));
+                        )),
+                    )
+                        .into_response());
                 }
             };
             // if there are multiple uses, we cannot allow it to be removed
             if usage.len() > 1 {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    format!(
-                        "error in removing distinct field : field {f} if used in dashboards/reports"
-                    ),
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error in removing distinct field : field {f} if used in dashboards/reports"
                 )));
             }
             // here we can be sure that usage is at most 1 record
             if let Some(entry) = usage.first()
                 && entry.origin != OriginType::Stream
             {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    format!(
-                        "error in removing distinct field : field {f} if used in dashboards/reports"
-                    ),
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error in removing distinct field : field {f} if used in dashboards/reports"
                 )));
             }
         }
@@ -850,12 +848,9 @@ pub async fn delete_stream(
         {
             // URL job exists - delete it and return success
             if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("failed to delete URL job: {e}"),
-                    )),
-                );
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "failed to delete URL job: {e}"
+                )));
             }
 
             log::info!(
@@ -864,27 +859,26 @@ pub async fn delete_stream(
                 stream_name
             );
 
-            return Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                StatusCode::OK,
+            return Ok(MetaHttpResponse::ok(
                 "URL job deleted successfully".to_string(),
-            )));
+            ));
         }
 
         // No schema and no URL job - stream not found
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND,
-            "stream not found",
-        )));
+        return Ok(MetaHttpResponse::not_found("stream not found"));
     }
 
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream schema: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
+        return Ok((
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, format!("failed to delete stream schema: {e}"))],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("failed to delete stream schema: {e}"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     // delete associated feature resources, i.e. pipelines, alerts
@@ -893,15 +887,18 @@ pub async fn delete_stream(
             db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
             && let Err(e) = db::pipeline::delete(&pipeline.id).await
         {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
+            return Ok((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                Json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!(
                         "Error: failed to delete the associated pipeline \"{}\": {e}",
                         pipeline.name
                     ),
                 )),
-            );
+            )
+                .into_response());
         }
 
         if let Ok(alerts) =
@@ -912,15 +909,18 @@ pub async fn delete_stream(
                     db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, &alert.name)
                         .await
                 {
-                    return Ok(
-                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                            StatusCode::INTERNAL_SERVER_ERROR,
+                    return Ok((
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        [(ERROR_HEADER, format!("failed to delete alert: {e}"))],
+                        Json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
                             format!(
                                 "Error: failed to delete the associated alert \"{}\": {e}",
                                 alert.name
                             ),
                         )),
-                    );
+                    )
+                        .into_response());
                 }
             }
         }
@@ -933,22 +933,28 @@ pub async fn delete_stream(
         log::error!(
             "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
+        return Ok((
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("failed to delete stream: {e}"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     // delete related resource
     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
-            .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
+        return Ok((
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+            Json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR,
                 format!("failed to delete stream: {e}"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     // enrichment table cleanup
@@ -970,7 +976,7 @@ pub async fn delete_stream(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(StatusCode::OK, "stream deleted")))
+    Ok(MetaHttpResponse::ok("stream deleted"))
 }
 
 pub async fn stream_delete_inner(

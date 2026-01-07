@@ -117,7 +117,7 @@ pub enum DashboardError {
     /// Error that occurs when trying to get the list of dashboards that a user is permitted to
     /// get.
     #[error(transparent)]
-    ListPermittedDashboardsError(actix_web::Error),
+    ListPermittedDashboardsError(anyhow::Error),
 
     #[error("Permission denied")]
     PermissionDenied,
@@ -667,7 +667,7 @@ async fn filter_permitted_dashboards(
         "dashboard",
     )
     .await
-    .map_err(DashboardError::ListPermittedDashboardsError)?;
+    .map_err(|e| DashboardError::ListPermittedDashboardsError(anyhow::anyhow!(e)))?;
 
     let permitted_dashboards = dashboards
         .into_iter()

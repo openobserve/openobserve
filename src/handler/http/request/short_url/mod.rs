@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
+};
 use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
 use serde::Deserialize;
 
 use crate::{
-    common::utils::redirect_response::RedirectResponseBuilder,
     handler::http::request::search::error_utils::map_error_to_http_response, service::short_url,
 };
 
 /// Shorten a URL
 #[utoipa::path(
     post,
+    path = "/{short_id}",
     context_path = "/api",
     operation_id = "createShortUrl",
     summary = "Create short URL",
@@ -57,22 +60,18 @@ use crate::{
     ),
     tag = "Short Url"
 )]
-#[post("/{org_id}/short")]
-pub async fn shorten(
-    org_id: web::Path<String>,
-    web::Json(req): web::Json<ShortenUrlRequest>,
-) -> Result<HttpResponse, Error> {
+pub async fn shorten(Path(org_id): Path<String>, Json(req): Json<ShortenUrlRequest>) -> Response {
     match short_url::shorten(&org_id, &req.original_url).await {
         Ok(short_url) => {
             let response = ShortenUrlResponse {
                 short_url: short_url.clone(),
             };
 
-            Ok(HttpResponse::Ok().json(response))
+            Json(response).into_response()
         }
         Err(e) => {
             log::error!("Failed to shorten URL: {e}");
-            Ok(map_error_to_http_response(&e.into(), None))
+            map_error_to_http_response(&e.into(), None)
         }
     }
 }
@@ -86,6 +85,7 @@ pub struct RetrieveQuery {
 /// Retrieve the original URL from a short_id
 #[utoipa::path(
     get,
+    path = "/{short_id}",
     context_path = "/short",
     operation_id = "resolveShortUrl",
     summary = "Resolve short URL",
@@ -107,17 +107,15 @@ pub struct RetrieveQuery {
     ),
     tag = "Short Url"
 )]
-#[get("/{org_id}/short/{short_id}")]
 pub async fn retrieve(
-    req: HttpRequest,
-    path: web::Path<(String, String)>,
-    query: web::Query<RetrieveQuery>,
-) -> Result<HttpResponse, Error> {
+    Path((org_id, short_id)): Path<(String, String)>,
+    Query(query): Query<RetrieveQuery>,
+) -> Response {
     log::info!(
-        "short_url::retrieve handler called for path: {}",
-        req.path()
+        "short_url::retrieve handler called for org_id: {}, short_id: {}",
+        org_id,
+        short_id
     );
-    let (org_id, short_id) = path.into_inner();
     let original_url = short_url::retrieve(&short_id).await;
 
     // Check if type=ui for JSON response
@@ -125,9 +123,9 @@ pub async fn retrieve(
         && type_param == "ui"
     {
         if let Some(url) = original_url {
-            return Ok(HttpResponse::Ok().json(url));
+            return Json(url).into_response();
         } else {
-            return Ok(HttpResponse::NotFound().finish());
+            return (StatusCode::NOT_FOUND, "").into_response();
         }
     }
 
@@ -136,13 +134,48 @@ pub async fn retrieve(
     // TODO: Remove this once we are sure there is no more legacy short urls
     if original_url.is_some() {
         let redirect_url = short_url::construct_short_url(&org_id, &short_id);
-        let redirect_http = RedirectResponseBuilder::new(&redirect_url)
-            .build()
-            .redirect_http();
-        Ok(redirect_http)
+        build_redirect_response(&redirect_url)
     } else {
-        let redirect = RedirectResponseBuilder::default().build();
-        log::error!("Short URL not found, {}", &redirect);
-        Ok(redirect.redirect_http())
+        let default_redirect_url = "/web/";
+        log::error!(
+            "Short URL not found, redirecting to {}",
+            default_redirect_url
+        );
+        build_redirect_response(default_redirect_url)
+    }
+}
+
+/// Build a redirect response, handling long URLs with HTML meta refresh
+fn build_redirect_response(redirect_url: &str) -> Response {
+    let redirect_url = redirect_url.trim_matches('"');
+    if redirect_url.len() < 1024 {
+        Response::builder()
+            .status(StatusCode::FOUND)
+            .header(header::LOCATION, redirect_url)
+            .body(axum::body::Body::empty())
+            .unwrap()
+            .into_response()
+    } else {
+        // if the URL is too long, we send the original URL and let FE handle the redirect.
+        let html = format!(
+            r#"
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <meta http-equiv="refresh" content="0;url={redirect_url}">
+                <title>OpenObserve Redirecting...</title>
+            </head>
+            <body>
+                Redirecting to <a href="{redirect_url}">click here</a>
+            </body>
+            </html>"#
+        );
+        Response::builder()
+            .status(StatusCode::FOUND)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(axum::body::Body::from(html))
+            .unwrap()
+            .into_response()
     }
 }

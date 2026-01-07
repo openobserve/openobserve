@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::header::ContentType, post, web};
+use axum::{
+    body::Bytes,
+    extract::{Path, Query},
+    http::{StatusCode, header::CONTENT_TYPE},
+    response::{IntoResponse, Response},
+};
 use hashbrown::HashMap;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
@@ -23,6 +26,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 /// GetValue
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "GetKVValue",
@@ -46,22 +51,28 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
         ("x-o2-mcp" = json!({"description": "Get value by key"}))
     )
 )]
-#[get("/{org_id}/kv/{key}")]
-pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, key) = path.into_inner();
+pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
     match kv::get(&org_id, &key).await {
-        Ok(value) => Ok(HttpResponse::Ok()
-            .content_type(ContentType::plaintext())
-            .body(value)),
-        Err(_) => Ok(HttpResponse::NotFound()
-            .content_type(ContentType::plaintext())
-            .body("Not Found".to_string())),
+        Ok(value) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+            value,
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "Not Found",
+        )
+            .into_response(),
     }
 }
 
 /// SetValue
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "SetKVValue",
@@ -86,22 +97,23 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         ("x-o2-mcp" = json!({"description": "Set key-value pair"}))
     )
 )]
-#[post("/{org_id}/kv/{key}")]
-pub async fn set(
-    path: web::Path<(String, String)>,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
-    let (org_id, key) = path.into_inner();
+pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Response {
     let key = key.trim();
     match kv::set(&org_id, key, body).await {
-        Ok(_) => Ok(HttpResponse::Ok()
-            .content_type(ContentType::plaintext())
-            .body("OK")),
+        Ok(_) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "OK",
+        )
+            .into_response(),
         Err(e) => {
             log::error!("Setting KV value: {key}, error: {e}");
-            Ok(HttpResponse::InternalServerError()
-                .content_type(ContentType::plaintext())
-                .body("Error".to_string()))
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+                "Error",
+            )
+                .into_response()
         }
     }
 }
@@ -109,6 +121,8 @@ pub async fn set(
 /// RemoveValue
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "RemoveKVValue",
@@ -132,22 +146,28 @@ pub async fn set(
         ("x-o2-mcp" = json!({"description": "Delete key-value pair"}))
     )
 )]
-#[delete("/{org_id}/kv/{key}")]
-pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, key) = path.into_inner();
+pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
     match kv::delete(&org_id, &key).await {
-        Ok(_) => Ok(HttpResponse::Ok()
-            .content_type(ContentType::plaintext())
-            .body("OK")),
-        Err(_) => Ok(HttpResponse::NotFound()
-            .content_type(ContentType::plaintext())
-            .body("Not Found".to_string())),
+        Ok(_) => (
+            StatusCode::OK,
+            [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "OK",
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            [(CONTENT_TYPE, "text/plain; charset=utf-8")],
+            "Not Found",
+        )
+            .into_response(),
     }
 }
 
 /// ListKeys
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}",
     context_path = "/api",
     tag = "KV",
     operation_id = "ListKVKeys",
@@ -170,20 +190,17 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("x-o2-mcp" = json!({"description": "List all keys"}))
     )
 )]
-#[get("/{org_id}/kv")]
-pub async fn list(org_id: web::Path<String>, in_req: HttpRequest) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let prefix = match query.get("prefix") {
-        Some(prefix) => prefix,
-        None => "",
-    };
+pub async fn list(
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let prefix = query.get("prefix").map(|s| s.as_str()).unwrap_or("");
     match kv::list(&org_id, prefix).await {
-        Ok(keys) => Ok(MetaHttpResponse::json(keys)),
+        Ok(keys) => MetaHttpResponse::json(keys),
         Err(err) => {
             log::error!("list KV keys: {prefix}, error: {err}");
             let keys: Vec<String> = Vec::new();
-            Ok(MetaHttpResponse::json(keys))
+            MetaHttpResponse::json(keys)
         }
     }
 }

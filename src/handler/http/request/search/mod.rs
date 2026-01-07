@@ -15,8 +15,13 @@
 
 use std::io::Error;
 
-use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
+use axum::{
+    Extension, Json,
+    extract::{Path, Query},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
@@ -33,6 +38,7 @@ use config::{
 };
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
+use http::HeaderMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
@@ -162,6 +168,8 @@ async fn can_use_distinct_stream(
 /// SearchStreamData
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
@@ -219,33 +227,40 @@ async fn can_use_distinct_stream(
         ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field"}))
     )
 )]
-#[post("/{org_id}/_search")]
 pub async fn search(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    web::Json(mut req): web::Json<Request>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+    Extension(header_map): Extension<HeaderMap>,
+    Query(url_query): Query<HashMap<String, String>>,
+    Json(mut req): Json<Request>,
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let org_id = org_id.into_inner();
     let mut range_error = String::new();
 
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response();
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response();
             }
             _ => {}
         }
@@ -257,19 +272,18 @@ pub async fn search(
         Span::none()
     };
 
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
     let user_id = &user_email.user_id;
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let is_ui_histogram = get_is_ui_histogram_from_request(&query);
-    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
-    let validate_query = utils::get_bool_from_request(&query.0, "validate");
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let is_ui_histogram = get_is_ui_histogram_from_request(&url_query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&url_query);
+    let validate_query = utils::get_bool_from_request(&url_query, "validate");
 
-    let dashboard_info = get_dashboard_info_from_request(&query);
+    let dashboard_info = get_dashboard_info_from_request(&url_query);
 
     if let Err(e) = req.decode() {
-        return Ok(MetaHttpResponse::bad_request(e));
+        return MetaHttpResponse::bad_request(e);
     }
 
     // Sampling is not available for /_search endpoint
@@ -285,14 +299,14 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-    req.clear_cache = get_clear_cache_from_request(&query);
-    req.use_cache = get_use_cache_from_request(&query) && !req.clear_cache;
+    req.clear_cache = get_clear_cache_from_request(&url_query);
+    req.use_cache = get_use_cache_from_request(&url_query) && !req.clear_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+            return map_error_to_http_response(&(e.into()), Some(trace_id));
         }
     };
 
@@ -300,12 +314,14 @@ pub async fn search(
     for stream in stream_names.iter() {
         {
             if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
-                return Ok(
-                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(MetaHttpResponse::error(
                         StatusCode::TOO_MANY_REQUESTS,
                         e.to_string(),
                     )),
-                );
+                )
+                    .into_response();
             }
         }
     }
@@ -324,23 +340,23 @@ pub async fn search(
                 converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e), Some(trace_id)));
+                return map_error_to_http_response(&(e), Some(trace_id));
             }
         }
     }
 
     // set search event type
     if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
+        req.search_type = match get_search_type_from_request(&url_query) {
             Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         };
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
             .as_ref()
-            .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
     }
 
     // get stream settings
@@ -367,7 +383,7 @@ pub async fn search(
                 utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
                     .await
         {
-            return Ok(map_error_to_http_response(&e, Some(trace_id)));
+            return map_error_to_http_response(&e, Some(trace_id));
         }
 
         // Check permissions on stream
@@ -375,7 +391,7 @@ pub async fn search(
         if let Some(res) =
             check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
         {
-            return Ok(res);
+            return res;
         }
     }
 
@@ -385,8 +401,11 @@ pub async fn search(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::BadRequest()
-                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
+                )
+                    .into_response();
             }
         };
         if !keys_used.is_empty() {
@@ -427,7 +446,7 @@ pub async fn search(
                     )
                     .await
                     {
-                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
                     }
                     // Check permissions on key ends
                 }
@@ -462,7 +481,7 @@ pub async fn search(
                 res.is_partial = false;
             }
 
-            Ok(HttpResponse::Ok().json(res))
+            Json(res).into_response()
         }
         Err(err) => {
             let search_type = req
@@ -479,10 +498,7 @@ pub async fn search(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {err}");
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }
@@ -490,6 +506,8 @@ pub async fn search(
 /// SearchAround
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/{stream_name}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAround",
@@ -539,25 +557,25 @@ pub async fn search(
         ("x-o2-mcp" = json!({"description": "Search logs around a timestamp"}))
     )
 )]
-#[get("/{org_id}/{stream_name}/_around")]
 pub async fn around_v1(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Extension(header_map): Extension<HeaderMap>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+    Query(url_query): Query<HashMap<String, String>>,
+) -> Response {
     let start = std::time::Instant::now();
-
-    let (org_id, stream_name) = path.into_inner();
 
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
                     e.to_string(),
                 )),
-            );
+            )
+                .into_response();
         }
     }
 
@@ -570,12 +588,10 @@ pub async fn around_v1(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
 
     let ret = around::around(
         &trace_id,
@@ -583,21 +599,18 @@ pub async fn around_v1(
         &org_id,
         &stream_name,
         stream_type,
-        query,
+        Query(url_query),
         None,
         None,
         user_id,
     )
     .await;
     match ret {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(res) => Json(res).into_response(),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {err:?}");
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }
@@ -605,6 +618,8 @@ pub async fn around_v1(
 /// SearchAroundV2
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/{stream_name}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundV2",
@@ -663,26 +678,26 @@ pub async fn around_v1(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/{stream_name}/_around")]
 pub async fn around_v2(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
-    body: web::Bytes,
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Extension(header_map): Extension<HeaderMap>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+    Query(url_query): Query<HashMap<String, String>>,
+    body: axum::body::Bytes,
+) -> Response {
     let start = std::time::Instant::now();
-
-    let (org_id, stream_name) = path.into_inner();
 
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
                     e.to_string(),
                 )),
-            );
+            )
+                .into_response();
         }
     }
 
@@ -695,12 +710,10 @@ pub async fn around_v2(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
 
     let ret = around::around(
         &trace_id,
@@ -708,21 +721,18 @@ pub async fn around_v2(
         &org_id,
         &stream_name,
         stream_type,
-        query,
+        Query(url_query),
         None,
         Some(body),
         user_id,
     )
     .await;
     match ret {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(res) => Json(res).into_response(),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
             log::error!("search around error: {err:?}");
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }
@@ -730,6 +740,8 @@ pub async fn around_v2(
 /// SearchTopNValues
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/{stream_name}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchValues",
@@ -770,26 +782,25 @@ pub async fn around_v2(
         ("x-o2-mcp" = json!({"description": "Get distinct values for a field"}))
     )
 )]
-#[get("/{org_id}/{stream_name}/_values")]
 pub async fn values(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Path((org_id, stream_name)): Path<(String, String)>,
+    Extension(header_map): Extension<HeaderMap>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    Query(url_query): Query<HashMap<String, String>>,
+) -> Response {
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MetaHttpResponse::error(
                     StatusCode::TOO_MANY_REQUESTS,
                     e.to_string(),
                 )),
-            );
+            )
+                .into_response();
         }
     }
 
@@ -803,7 +814,7 @@ pub async fn values(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
 
     // originally there was v1 which would to a full stream search
     // and v2 which would do search on a distinct values stream iff
@@ -815,7 +826,7 @@ pub async fn values(
         &org_id,
         stream_type,
         &stream_name,
-        &query,
+        &url_query,
         user_id,
         trace_id,
         http_span,
@@ -1056,18 +1067,18 @@ async fn values_v1(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    query: &web::Query<HashMap<String, String>>,
+    query: &HashMap<String, String>,
     user_id: &str,
     trace_id: String,
     http_span: Span,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
-        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
+        None => return MetaHttpResponse::bad_request("fields is empty"),
     };
     let query_fn = query
         .get("query_fn")
@@ -1089,7 +1100,7 @@ async fn values_v1(
             } else {
                 let columns = v.splitn(2, '=').collect::<Vec<_>>();
                 if columns.len() < 2 {
-                    return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
+                    return MetaHttpResponse::bad_request("Invalid filter format");
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
                 format!("{default_sql} WHERE {} IN ('{vals}')", columns[0])
@@ -1126,7 +1137,7 @@ async fn values_v1(
     let where_str = match pickup_where(&query_sql) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
-            return Err(Error::other(e));
+            return MetaHttpResponse::bad_request(e.to_string());
         }
     };
 
@@ -1140,7 +1151,7 @@ async fn values_v1(
     };
 
     if start_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
+        return MetaHttpResponse::bad_request("start_time is empty");
     }
     let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
         now_micros()
@@ -1150,7 +1161,7 @@ async fn values_v1(
             .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
     };
     if end_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+        return MetaHttpResponse::bad_request("end_time is empty");
     }
     let (start_time, end_time) = if start_time == end_time {
         (start_time - 1, end_time + 1)
@@ -1298,10 +1309,7 @@ async fn values_v1(
             Err(err) => {
                 http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
                 log::error!("search values error: {err:?}");
-                return Ok(error_utils::map_error_to_http_response(
-                    &err,
-                    Some(trace_id),
-                ));
+                return error_utils::map_error_to_http_response(&err, Some(trace_id));
             }
         };
         query_results.push((field.to_string(), resp_search));
@@ -1393,12 +1401,14 @@ async fn values_v1(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(resp))
+    Json(resp).into_response()
 }
 
 /// SearchStreamPartition
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartition",
@@ -1435,13 +1445,13 @@ async fn values_v1(
         ("x-o2-mcp" = json!({"description": "Get search partitions then you can call _search api by partitions to give the result looks faster"}))
     )
 )]
-#[post("/{org_id}/_search_partition")]
 pub async fn search_partition(
-    org_id: web::Path<String>,
-    in_req: HttpRequest,
-    web::Json(mut req): web::Json<SearchPartitionRequest>,
+    Path(org_id): Path<String>,
+    Extension(header_map): Extension<HeaderMap>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+    Query(url_query): Query<HashMap<String, String>>,
+    Json(mut req): Json<SearchPartitionRequest>,
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -1450,28 +1460,34 @@ pub async fn search_partition(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
 
-    let org_id = org_id.into_inner();
     let user_id = &user_email.user_id;
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let enable_align_histogram = get_enable_align_histogram_from_request(&url_query);
 
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response();
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response();
             }
             _ => {}
         }
@@ -1482,7 +1498,7 @@ pub async fn search_partition(
     }
 
     if let Err(e) = req.decode() {
-        return Ok(MetaHttpResponse::bad_request(e));
+        return MetaHttpResponse::bad_request(e);
     }
 
     #[cfg(feature = "enterprise")]
@@ -1490,17 +1506,19 @@ pub async fn search_partition(
         let stream_names = match resolve_stream_names(&req.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+                return map_error_to_http_response(&(e.into()), Some(trace_id));
             }
         };
         for stream in stream_names.iter() {
             if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
-                return Ok(
-                    HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(MetaHttpResponse::error(
                         StatusCode::TOO_MANY_REQUESTS,
                         e.to_string(),
                     )),
-                );
+                )
+                    .into_response();
             }
         }
     }
@@ -1531,7 +1549,7 @@ pub async fn search_partition(
                 "",
                 "",
             );
-            Ok(HttpResponse::Ok().json(res))
+            Json(res).into_response()
         }
         Err(err) => {
             http_report_metrics(
@@ -1544,10 +1562,7 @@ pub async fn search_partition(
                 "",
             );
             log::error!("search error: {err:?}");
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }
@@ -1555,6 +1570,8 @@ pub async fn search_partition(
 /// Search History
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchHistory",
@@ -1622,23 +1639,21 @@ pub async fn search_partition(
         ("x-o2-mcp" = json!({"description": "Get search history"}))
     )
 )]
-#[post("/{org_id}/_search_history")]
 pub async fn search_history(
-    org_id: web::Path<String>,
-    in_req: HttpRequest,
-    web::Json(mut req): web::Json<SearchHistoryRequest>,
+    Path(org_id): Path<String>,
+    Extension(header_map): Extension<HeaderMap>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+    Json(mut req): Json<SearchHistoryRequest>,
+) -> Response {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let org_id = org_id.into_inner();
     let cfg = get_config();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_history", org_id = org_id.clone())
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&header_map, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
     // restrict history only to path org_id
@@ -1651,7 +1666,7 @@ pub async fn search_history(
     let search_query_req = match req.to_query_req(stream_name) {
         Ok(r) => r,
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
 
@@ -1680,10 +1695,7 @@ pub async fn search_history(
                 "",
             );
             log::error!("[trace_id {trace_id}] Search history error : {err:?}");
-            return Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ));
+            return error_utils::map_error_to_http_response(&err, Some(trace_id));
         }
     };
 
@@ -1749,11 +1761,13 @@ pub async fn search_history(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(search_res))
+    Json(search_res).into_response()
 }
 
 /// GetResultSchema
 #[utoipa::path(
+    post,
+    path = "/{org_id}",
     context_path = "/api",
     tag = "Search",
     operation_id = "ResultSchema",
@@ -1784,29 +1798,34 @@ pub async fn search_history(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/{org_id}/result_schema")]
 pub async fn result_schema(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    web::Query(query): web::Query<HashMap<String, String>>,
-    web::Json(mut req): web::Json<Request>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-
+    Query(url_query): Query<HashMap<String, String>>,
+    Json(mut req): Json<Request>,
+) -> Response {
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response();
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                return (
                     StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response();
             }
             _ => {}
         }
@@ -1814,10 +1833,10 @@ pub async fn result_schema(
 
     let user_id = &user_email.user_id;
 
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
 
-    let use_cache = get_use_cache_from_request(&query);
-    let is_streaming = query
+    let use_cache = get_use_cache_from_request(&url_query);
+    let is_streaming = url_query
         .get("is_streaming")
         .and_then(|v| v.to_lowercase().parse::<bool>().ok())
         .unwrap_or_default();
@@ -1828,23 +1847,23 @@ pub async fn result_schema(
 
     // set search event type
     if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
+        req.search_type = match get_search_type_from_request(&url_query) {
             Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         };
     };
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
             .as_ref()
-            .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &url_query));
     }
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), None));
+            return map_error_to_http_response(&(e.into()), None);
         }
     };
 
@@ -1868,7 +1887,7 @@ pub async fn result_schema(
         if let Some(res) =
             check_stream_permissions(&stream_name, &org_id, user_id, &stream_type).await
         {
-            return Ok(res);
+            return res;
         }
     }
 
@@ -1877,8 +1896,11 @@ pub async fn result_schema(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+                )
+                    .into_response();
             }
         };
         for key in keys_used {
@@ -1916,7 +1938,7 @@ pub async fn result_schema(
                     )
                     .await
                     {
-                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
                     }
                     // Check permissions on key ends
                 }
@@ -1932,22 +1954,29 @@ pub async fn result_schema(
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
-                return Ok(HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+                )
+                    .into_response();
             }
         };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response();
         }
     };
 
-    Ok(HttpResponse::Ok().json(ResultSchemaResponse {
+    Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         timeseries_field: res_schema.timeseries,
-    }))
+    })
+    .into_response()
 }

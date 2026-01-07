@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{
-    HttpRequest, HttpResponse, post,
-    web::{self, Query},
+use axum::{
+    body::Bytes,
+    extract::{Path, Query},
+    http::HeaderMap,
+    response::Response,
 };
 use config::{
     get_config,
@@ -74,6 +76,8 @@ use crate::{
 /// Search HTTP2 streaming endpoint
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/streams",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamHttp2",
@@ -101,15 +105,14 @@ use crate::{
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/_search_stream")]
 pub async fn search_http2_stream(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    in_req: HttpRequest,
-    body: web::Bytes,
-) -> HttpResponse {
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let cfg = get_config();
-    let org_id = org_id.into_inner();
 
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
@@ -117,7 +120,7 @@ pub async fn search_http2_stream(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     let user_id = user_email.user_id;
 
@@ -129,23 +132,6 @@ pub async fn search_http2_stream(
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
 
-    // Get query params
-    let Ok(query) = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()) else {
-        #[cfg(feature = "enterprise")]
-        {
-            report_to_audit(
-                user_id,
-                org_id,
-                trace_id,
-                400,
-                Some("Invalid query parameters".to_string()),
-                &in_req,
-                body_bytes,
-            )
-            .await;
-        }
-        return MetaHttpResponse::bad_request("Invalid query parameters");
-    };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
@@ -168,11 +154,17 @@ pub async fn search_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -192,11 +184,17 @@ pub async fn search_http2_stream(
         {
             report_to_audit(
                 user_id,
-                org_id,
+                org_id.clone(),
                 trace_id,
                 http_response.status().into(),
                 Some(error_message),
-                &in_req,
+                "POST".to_string(),
+                format!("/api/{}/streams", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
                 body_bytes,
             )
             .await;
@@ -228,11 +226,17 @@ pub async fn search_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -243,10 +247,14 @@ pub async fn search_http2_stream(
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
-            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                e.to_string(),
-            ));
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                axum::Json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            )
+                .into_response();
         }
     }
 
@@ -265,11 +273,17 @@ pub async fn search_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -319,11 +333,17 @@ pub async fn search_http2_stream(
                         {
                             report_to_audit(
                                 user_id,
-                                org_id,
+                                org_id.clone(),
                                 trace_id,
                                 http_response.status().into(),
                                 Some(error_message),
-                                &in_req,
+                                "POST".to_string(),
+                                format!("/api/{}/_search_stream", org_id),
+                                query
+                                    .iter()
+                                    .map(|(k, v)| format!("{}={}", k, v))
+                                    .collect::<Vec<_>>()
+                                    .join("&"),
                                 body_bytes,
                             )
                             .await;
@@ -359,13 +379,19 @@ pub async fn search_http2_stream(
                 // Add audit before closing
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     403,
                     Some(
                         "Unauthorized to clear cache - requires stream edit permission".to_string(),
                     ),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -393,11 +419,17 @@ pub async fn search_http2_stream(
                 {
                     report_to_audit(
                         user_id,
-                        org_id,
+                        org_id.clone(),
                         trace_id,
                         http_response.status().into(),
                         Some(error_message),
-                        &in_req,
+                        "POST".to_string(),
+                        format!("/api/{}/_search_stream", org_id),
+                        query
+                            .iter()
+                            .map(|(k, v)| format!("{}={}", k, v))
+                            .collect::<Vec<_>>()
+                            .join("&"),
                         body_bytes,
                     )
                     .await;
@@ -428,11 +460,17 @@ pub async fn search_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     res.status().into(),
                     Some("Unauthorized Access".to_string()),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -463,9 +501,13 @@ pub async fn search_http2_stream(
 
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
-        method: in_req.method().to_string(),
-        path: in_req.path().to_string(),
-        query_params: in_req.query_string().to_string(),
+        method: "POST".to_string(),
+        path: format!("/api/{}/streams", org_id),
+        query_params: query
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&"),
         body: body_bytes,
     });
     #[cfg(not(feature = "enterprise"))]
@@ -473,7 +515,7 @@ pub async fn search_http2_stream(
     let search_type = req.search_type;
 
     // Spawn the search task in a separate task
-    actix_web::rt::spawn(process_search_stream_request(
+    tokio::spawn(process_search_stream_request(
         org_id.clone(),
         user_id,
         trace_id.clone(),
@@ -550,9 +592,10 @@ pub async fn search_http2_stream(
         futures::stream::iter(chunks_iter)
     });
 
-    HttpResponse::Ok()
-        .content_type("text/event-stream")
-        .streaming(stream)
+    axum::response::Response::builder()
+        .header("content-type", "text/event-stream")
+        .body(axum::body::Body::from_stream(stream))
+        .unwrap()
 }
 
 #[cfg(feature = "enterprise")]
@@ -562,7 +605,9 @@ pub async fn report_to_audit(
     trace_id: String,
     code: u16,
     error_message: Option<String>,
-    req: &HttpRequest,
+    http_method: String,
+    http_path: String,
+    http_query_params: String,
     req_body: String,
 ) {
     let is_audit_enabled = get_o2_config().common.audit_enabled;
@@ -574,9 +619,9 @@ pub async fn report_to_audit(
             _timestamp: chrono::Utc::now().timestamp(),
             protocol: Protocol::Http,
             response_meta: ResponseMeta {
-                http_method: req.method().to_string(),
-                http_path: req.path().to_string(),
-                http_query_params: req.query_string().to_string(),
+                http_method,
+                http_path,
+                http_query_params,
                 http_body: req_body,
                 http_response_code: code,
                 error_msg: error_message,
@@ -590,6 +635,8 @@ pub async fn report_to_audit(
 /// Values  HTTP2 streaming endpoint
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/streams",
     context_path = "/api",
     tag = "Search",
     operation_id = "ValuesStreamHttp2",
@@ -615,16 +662,14 @@ pub async fn report_to_audit(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/_values_stream")]
 pub async fn values_http2_stream(
-    org_id: web::Path<String>,
-    Headers(user_email): Headers<UserEmail>,
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    in_req: HttpRequest,
-    body: web::Bytes,
-) -> HttpResponse {
+    Headers(user_email): Headers<UserEmail>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let cfg = get_config();
-    let org_id = org_id.into_inner();
 
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
@@ -632,7 +677,7 @@ pub async fn values_http2_stream(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     let user_id = user_email.user_id;
 
@@ -660,11 +705,17 @@ pub async fn values_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_values_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes,
                 )
                 .await;
@@ -689,10 +740,14 @@ pub async fn values_http2_stream(
         if let Err(e) =
             crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
         {
-            return HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::TOO_MANY_REQUESTS,
-                e.to_string(),
-            ));
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                axum::Json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            )
+                .into_response();
         }
     }
 
@@ -725,11 +780,17 @@ pub async fn values_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_values_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes.clone(),
                 )
                 .await;
@@ -744,11 +805,17 @@ pub async fn values_http2_stream(
         {
             report_to_audit(
                 user_id,
-                org_id,
+                org_id.clone(),
                 trace_id,
                 http_response.status().into(),
                 Some("No valid fields to process".to_string()),
-                &in_req,
+                "POST".to_string(),
+                format!("/api/{}/_values_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
                 body_bytes.clone(),
             )
             .await;
@@ -773,11 +840,17 @@ pub async fn values_http2_stream(
             {
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     res.status().into(),
                     Some("Unauthorized Access".to_string()),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_values_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes.clone(),
                 )
                 .await;
@@ -804,9 +877,13 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
-        method: in_req.method().to_string(),
-        path: in_req.path().to_string(),
-        query_params: in_req.query_string().to_string(),
+        method: "POST".to_string(),
+        path: format!("/api/{}/streams", org_id),
+        query_params: query
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&"),
         body: body_bytes,
     });
     #[cfg(not(feature = "enterprise"))]
@@ -816,7 +893,7 @@ pub async fn values_http2_stream(
     let extract_patterns = false;
 
     // Spawn the search task to process the request
-    actix_web::rt::spawn(process_search_stream_request(
+    tokio::spawn(process_search_stream_request(
         org_id.clone(),
         user_id,
         trace_id.clone(),
@@ -865,9 +942,10 @@ pub async fn values_http2_stream(
         futures::stream::iter(chunks_iter)
     });
 
-    HttpResponse::Ok()
-        .content_type("text/event-stream")
-        .streaming(stream)
+    axum::response::Response::builder()
+        .header("content-type", "text/event-stream")
+        .body(axum::body::Body::from_stream(stream))
+        .unwrap()
 }
 
 // Helper function to get histogram interval from sql query
