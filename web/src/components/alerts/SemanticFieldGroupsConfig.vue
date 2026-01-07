@@ -43,8 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="scope">
             <q-item v-bind="scope.itemProps">
               <q-item-section>
-                <q-item-label>{{ scope.opt.label }}</q-item-label>
-                <q-item-label caption>{{ scope.opt.count }} groups</q-item-label>
+                <q-item-label>
+                  <span class="tw:font-medium">{{ scope.opt.label }}</span>
+                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2">({{ scope.opt.count }} groups)</span>
+                </q-item-label>
               </q-item-section>
             </q-item>
           </template>

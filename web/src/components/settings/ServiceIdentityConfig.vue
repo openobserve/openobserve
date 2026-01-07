@@ -16,23 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full service-identity-config">
-    <!-- Section Header -->
-    <div class="tw:flex tw:justify-between tw:items-start tw:mb-2">
-      <div>
-        <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
-        <div class="text-body2 text-grey-7 tw:mb-4">
-          {{ t("settings.correlation.serviceIdentityDescription") }}
-        </div>
-      </div>
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="refresh"
-        :label="t('common.refresh')"
-        @click="loadConfig"
-      />
+    <!-- Loading State -->
+    <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
+      <q-spinner-dots color="primary" size="2.5rem" />
     </div>
+
+    <div v-else>
+      <!-- Section Header -->
+      <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
+      <div class="text-body2 text-grey-7 tw:mb-4">
+        {{ t("settings.correlation.serviceIdentityDescription") }}
+      </div>
 
     <!-- How it works explanation -->
     <q-expansion-item
@@ -40,39 +34,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense-toggle
       icon="help_outline"
       :label="t('settings.correlation.howItWorksTitle')"
-      class="tw:mb-4 tw:rounded-lg"
-      :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      :class="store.state.theme === 'dark' ? 'bg-grey-9 tw:border-gray-700' : 'bg-grey-2 tw:border-gray-200'"
     >
       <div class="tw:p-4 text-body2 tw:leading-relaxed">
         <div class="tw:mb-3">
-          <span class="tw:font-semibold text-primary">Service FQN</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.howItWorksDescription") }}</span>
+          <div class="tw:font-semibold text-primary tw:mb-1">Service FQN</div>
+          <div class="text-grey-7">{{ t("settings.correlation.howItWorksDescription") }}</div>
         </div>
-        <div class="tw:mb-3">
-          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.priorityOrderLabel") }}</span>
-          <span class="text-grey-7"> {{ t("settings.correlation.priorityOrderDescription") }}</span>
+        <div class="tw:mb-0">
+          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.priorityOrderLabel") }}</div>
+          <div class="text-grey-7">{{ t("settings.correlation.priorityOrderDescription") }}</div>
         </div>
-        <div class="tw:mb-3 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
-          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.exampleLabel") }} </span>
-          <i18n-t keypath="settings.correlation.exampleText" tag="span" class="text-grey-7">
-            <template #dim1>
-              <q-chip dense size="sm" color="primary" text-color="white" class="tw:mx-1">k8s-deployment=my-app</q-chip>
-            </template>
-            <template #dim2>
-              <q-chip dense size="sm" color="grey-7" text-color="white" class="tw:mx-1">service=myapp</q-chip>
-            </template>
-            <template #value>
-              <q-chip dense size="sm" color="positive" text-color="white" class="tw:mx-1">my-app</q-chip>
-            </template>
-          </i18n-t>
+        <div class="tw:mb-0 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
+          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.exampleLabel") }}</div>
+          <div class="text-grey-7">
+            <i18n-t keypath="settings.correlation.exampleText" tag="span">
+              <template #dim1>
+                <q-chip dense size="13" color="primary" text-color="white" class="tw:mx-1 tw:my-1 example-chip">k8s-deployment=my-app</q-chip>
+              </template>
+              <template #dim2>
+                <q-chip dense size="13" color="grey-7" text-color="white" class="tw:mx-1 tw:my-1 example-chip">service=myapp</q-chip>
+              </template>
+              <template #value>
+                <q-chip dense size="13" color="positive" text-color="white" class="tw:mx-1 tw:my-1 example-chip">my-app</q-chip>
+              </template>
+            </i18n-t>
+          </div>
         </div>
         <div>
-          <span class="tw:font-semibold text-primary">{{ t("settings.correlation.correlationLabel") }} </span>
-          <i18n-t keypath="settings.correlation.correlationDescription" tag="span" class="text-grey-7">
-            <template #field>
-              <span class="tw:font-mono tw:font-semibold">service</span>
-            </template>
-          </i18n-t>
+          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.correlationLabel") }}</div>
+          <div class="text-grey-7">
+            <i18n-t keypath="settings.correlation.correlationDescription" tag="span">
+              <template #field>
+                <span class="tw:font-mono tw:font-semibold tw:text-sm">service</span>
+              </template>
+            </i18n-t>
+          </div>
         </div>
       </div>
     </q-expansion-item>
@@ -185,25 +183,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="selectedAvailableDimensions.length === 0"
             size="sm"
           />
-          <q-btn
-            outline
-            dense
-            icon="arrow_forward"
-            @click="removeSelectedDimensions"
-            :disable="selectedPriorityDimensions.length === 0"
-            size="sm"
-          />
+          <q-icon
+            :name="outlinedInfo"
+            size="1rem"
+            class="cursor-pointer tw:self-center"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="21.875rem"
+              class="tooltip-text"
+            >
+              {{ t("settings.correlation.fqnPriorityTooltip") }}
+            </q-tooltip>
+          </q-icon>
         </div>
 
-        <!-- Available Semantic Groups (Right) -->
-        <div class="tw:flex-1">
-          <div class="tw:text-sm tw:font-semibold tw:mb-2">Available Dimensions</div>
-          <q-input
-            v-model="availableSearchQuery"
+        <div class="tw:flex tw:flex-wrap tw:gap-2 tw:p-3 tw:rounded-lg tw:border tw:border-solid"
+          :class="store.state.theme === 'dark' ? 'tw:border-gray-700 tw:bg-gray-900' : 'tw:border-gray-200 tw:bg-gray-50'"
+        >
+          <div
+            v-for="(dim, index) in localFqnPriority"
+            :key="dim"
+            class="dimension-chip tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:rounded-lg tw:border tw:border-solid"
+            :class="store.state.theme === 'dark' ? 'tw:border-gray-600 tw:bg-gray-800' : 'tw:border-gray-300 tw:bg-white'"
+          >
+            <q-badge
+              :color="index < 4 ? 'primary' : 'grey'"
+              text-color="white"
+              class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full tw:flex-shrink-0"
+            >
+              {{ index + 1 }}
+            </q-badge>
+            <div class="tw:flex tw:flex-col">
+              <span class="tw:font-medium tw:text-sm">{{ getDimensionDisplay(dim) }}</span>
+              <span class="tw:font-mono tw:text-xs tw:text-gray-500">{{ dim }}</span>
+            </div>
+            <div class="tw:flex tw:gap-1 tw:ml-2">
+              <q-btn
+                flat
+                dense
+                round
+                size="xs"
+                icon="arrow_upward"
+                :disable="index === 0"
+                @click="moveFqnDimensionUp(index)"
+                class="tw:w-6 tw:h-6"
+              >
+                <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                flat
+                dense
+                round
+                size="xs"
+                icon="arrow_downward"
+                :disable="index === localFqnPriority.length - 1"
+                @click="moveFqnDimensionDown(index)"
+                class="tw:w-6 tw:h-6"
+              >
+                <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
+              </q-btn>
+              <q-btn
+                flat
+                dense
+                round
+                size="xs"
+                icon="delete"
+                color="negative"
+                @click="removeFqnDimension(index)"
+                class="tw:w-6 tw:h-6"
+              >
+                <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
+              </q-btn>
+            </div>
+          </div>
+          <div v-if="localFqnPriority.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500 tw:w-full">
+            {{ t("settings.correlation.noDimensionsConfigured") }}
+          </div>
+        </div>
+
+      <!-- Add new semantic group to FQN priority -->
+      <div class="tw:mt-3">
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+          {{ t("settings.correlation.addDimensionHint") }}
+        </div>
+        <div class="tw:flex tw:gap-2 tw:items-end">
+          <q-select
+            v-model="selectedSemanticGroup"
+            :options="availableSemanticGroups"
             dense
-            outlined
-            placeholder="Search..."
-            class="tw:mb-2"
+            borderless
+            stack-label
+            :label="t('settings.correlation.selectSemanticGroup')"
+            class="tw:w-1/2 showLabelOnTop"
+            emit-value
+            map-options
+            clearable
+            :disable="availableSemanticGroups.length === 0"
+          >
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section>
+                  <q-item-label>
+                    <span class="tw:font-medium">{{ scope.opt.label }}</span>
+                    <span class="tw:text-xs tw:font-mono tw:text-gray-500 tw:ml-2">({{ scope.opt.value }})</span>
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("settings.correlation.noSemanticGroupsAvailable") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+
+          <q-btn
+            flat
+            icon="add"
+            color="primary"
+            class="text-bold o2-secondary-button tw:h-[32px] tw:w-[32px] tw:min-w-[32px]!"
+            :disable="!selectedSemanticGroup"
+            @click="addFqnDimension"
           >
             <template #prepend><q-icon name="search" /></template>
           </q-input>
@@ -278,6 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </q-expansion-item>
+    </div>
   </div>
 </template>
 
@@ -316,6 +422,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
+const loading = ref(true);
 const savingFqn = ref(false);
 const savingSemanticMappings = ref(false);
 const fqnSectionExpanded = ref(true);
@@ -539,6 +646,7 @@ const saveSemanticMappings = async () => {
 
 // Fetch config on mount
 const loadConfig = async () => {
+  loading.value = true;
   // Get backend defaults for FQN priority dimensions
   const backendDefaults = store.state.zoConfig?.fqn_priority_dimensions || [];
 
@@ -594,6 +702,8 @@ const loadConfig = async () => {
     // Error loading config, using defaults
     localFqnPriority.value = [...backendDefaults];
     localSemanticGroups.value = [];
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -627,5 +737,7 @@ loadConfig();
   .q-item__label {
     color: white !important;
   }
+:deep(.example-chip) {
+  font-size: 13px;
 }
 </style>
