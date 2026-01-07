@@ -895,18 +895,31 @@ export default defineComponent({
       showEnrichmentSchema.value = true;
     };
 
+    const escapeHTML = (str: string) => {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
     const showFailedJobDetails = (row: any) => {
+      const url = escapeHTML(row.urlJob?.url || 'N/A');
+      const errorMessage = escapeHTML(row.urlJob?.error_message || 'Unknown error');
+      const tableName = escapeHTML(row.name);
+
       $q.dialog({
         title: 'Enrichment Table Job Details',
         message: `
-          <div style="max-width: 600px;">
-            <div><strong>Table Name:</strong> ${row.name}</div>
-            <div style="margin-top: 8px;"><strong>Source URL:</strong></div>
-            <div style="word-break: break-all; overflow-wrap: break-word; margin-top: 4px;">${row.urlJob?.url || 'N/A'}</div>
-            <div style="margin-top: 8px;"><strong>Status:</strong> Failed</div>
-            <div style="margin-top: 8px;"><strong>Retry Count:</strong> ${row.urlJob?.retry_count || 0} of 3</div>
-            <div style="margin-top: 16px;"><strong>Error Details:</strong></div>
-            <div style="word-break: break-word; overflow-wrap: break-word; margin-top: 4px;">${row.urlJob?.error_message || 'Unknown error'}</div>
+          <div class="enrichment-error-dialog">
+            <div><strong>Table Name:</strong> ${tableName}</div>
+            <div class="dialog-section"><strong>Source URL:</strong></div>
+            <div class="dialog-url">${url}</div>
+            <div class="dialog-section"><strong>Status:</strong> Failed</div>
+            <div class="dialog-section"><strong>Retry Count:</strong> ${row.urlJob?.retry_count || 0} of 3</div>
+            <div class="dialog-section-error"><strong>Error Details:</strong></div>
+            <div class="dialog-error">${errorMessage}</div>
           </div>
         `,
         html: true,
@@ -1088,6 +1101,30 @@ export default defineComponent({
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+.enrichment-error-dialog {
+  max-width: 600px;
+
+  .dialog-section {
+    margin-top: 8px;
+  }
+
+  .dialog-url {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    margin-top: 4px;
+  }
+
+  .dialog-section-error {
+    margin-top: 16px;
+  }
+
+  .dialog-error {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    margin-top: 4px;
   }
 }
 </style>
