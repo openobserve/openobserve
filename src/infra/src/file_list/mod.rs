@@ -36,7 +36,7 @@ static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
 pub fn connect_default() -> Box<dyn FileList> {
-    match config::get_config().common.meta_store.as_str().into() {
+    match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
@@ -579,7 +579,7 @@ pub async fn query_dump_stats_by_date_range(
 
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
-        let cfg = config::get_config();
+        let cfg = get_config();
         if cfg.common.local_mode {
             return;
         }
