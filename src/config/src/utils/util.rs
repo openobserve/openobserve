@@ -15,7 +15,6 @@
 
 use crate::meta::stream::StreamType;
 
-
 pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
 
 pub fn zero_or<T>(v: T, def: T) -> T

@@ -26,7 +26,9 @@ use config::{
     FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
     spawn_pausable_job,
-    utils::{json, schema::infer_json_schema_from_map, time::now_micros, util::get_distinct_stream_name},
+    utils::{
+        json, schema::infer_json_schema_from_map, time::now_micros, util::get_distinct_stream_name,
+    },
 };
 use infra::{
     errors::{Error, Result},
@@ -47,7 +49,6 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 10240;
-
 
 pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
 
