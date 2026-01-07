@@ -29,7 +29,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{base64, json, time::now_micros},
+    utils::{base64, json, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
@@ -60,7 +60,6 @@ use crate::{
     handler::http::extractors::Headers,
     service::{
         db::enrichment_table,
-        metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search::{
             self as SearchService, datafusion::plan::projections::get_result_schema,
             sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
