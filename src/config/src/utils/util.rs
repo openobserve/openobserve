@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use crate::meta::stream::StreamType;
+
+pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
+
 pub fn zero_or<T>(v: T, def: T) -> T
 where
     T: PartialEq + Default,
@@ -22,6 +26,10 @@ where
 
 pub fn is_power_of_two(n: u64) -> bool {
     n == 0 || (n & (n - 1)) == 0
+}
+
+pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
+    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
 }
 
 #[cfg(test)]
