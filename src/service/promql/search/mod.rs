@@ -544,17 +544,32 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
     Ok(value)
 }
 
-/// Get the max series limit for the organization
-/// Returns org-specific limit if set, otherwise returns ENV default
+/// Get the maximum series limit for the organization.
+///
+/// Fetches the org-specific setting if available, otherwise falls back
+/// to the system-wide ENV configuration default (ZO_METRICS_MAX_SERIES_RESPONSE).
+///
+/// # Arguments
+/// * `org_id` - The organization identifier
+///
+/// # Returns
+/// Maximum number of series allowed per PromQL query
+///
+/// # Note
+/// This function is called for every PromQL query. Consider caching org settings
+/// with a TTL to reduce database load in high-throughput scenarios.
 async fn get_max_series_limit(org_id: &str) -> usize {
     match crate::service::db::organization::get_org_setting(org_id).await {
-        Ok(settings) => {
-            settings.max_series_per_query.unwrap_or_else(|| {
-                let cfg = get_config();
-                cfg.limit.metrics_max_series_response
-            })
-        }
-        Err(_) => {
+        Ok(settings) => settings.max_series_per_query.unwrap_or_else(|| {
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }),
+        Err(err) => {
+            log::warn!(
+                "Failed to fetch org settings for {}, using default limit: {:?}",
+                org_id,
+                err
+            );
             let cfg = get_config();
             cfg.limit.metrics_max_series_response
         }

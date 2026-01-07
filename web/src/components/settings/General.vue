@@ -71,7 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               data-test="general-settings-max-series-per-query"
               :rules="[
-                (val: any) => val === null || val === undefined || val === '' || (val >= 1000 && val <= 1000000) || t('settings.maxSeriesPerQueryValidation')
+                (val: any) => {
+                  // Allow empty/null (user wants default)
+                  if (val === null || val === undefined || val === '') return true;
+
+                  // Validate numeric range
+                  const numVal = Number(val);
+                  return (numVal >= 1000 && numVal <= 1000000) || t('settings.maxSeriesPerQueryValidation');
+                }
               ]"
               :lazy-rules="true"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
@@ -601,7 +608,11 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
-          max_series_per_query: maxSeriesPerQuery.value || null,
+          max_series_per_query: maxSeriesPerQuery.value === null ||
+                                maxSeriesPerQuery.value === undefined ||
+                                maxSeriesPerQuery.value === ''
+                                ? null
+                                : maxSeriesPerQuery.value,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });

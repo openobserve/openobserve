@@ -124,6 +124,17 @@ async fn create(
         data.dark_mode_theme_color = Some(dark_mode_theme_color);
     }
 
+    if let Some(max_series_per_query) = settings.max_series_per_query {
+        // Validate max_series_per_query is within acceptable range
+        if max_series_per_query < 1_000 || max_series_per_query > 1_000_000 {
+            return Ok(MetaHttpResponse::bad_request(
+                "max_series_per_query must be between 1,000 and 1,000,000",
+            ));
+        }
+        field_found = true;
+        data.max_series_per_query = Some(max_series_per_query);
+    }
+
     #[cfg(feature = "enterprise")]
     if let Some(claim_parser_function) = settings.claim_parser_function {
         field_found = true;

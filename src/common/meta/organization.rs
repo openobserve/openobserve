@@ -305,6 +305,54 @@ fn default_claim_parser_function() -> String {
     "".to_string()
 }
 
+/// Validated wrapper for max_series_per_query setting
+/// Ensures values are between 1,000 and 1,000,000
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MaxSeriesLimit(usize);
+
+impl MaxSeriesLimit {
+    const MIN: usize = 1_000;
+    const MAX: usize = 1_000_000;
+
+    /// Creates a new MaxSeriesLimit with validation
+    pub fn new(value: usize) -> Result<Self, String> {
+        if value >= Self::MIN && value <= Self::MAX {
+            Ok(Self(value))
+        } else {
+            Err(format!(
+                "max_series_per_query must be between {} and {}, got {}",
+                Self::MIN,
+                Self::MAX,
+                value
+            ))
+        }
+    }
+
+    /// Returns the inner value
+    pub fn value(&self) -> usize {
+        self.0
+    }
+}
+
+impl ToSchema<'_> for MaxSeriesLimit {
+    fn schema() -> (
+        &'static str,
+        utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+    ) {
+        (
+            "MaxSeriesLimit",
+            utoipa::openapi::ObjectBuilder::new()
+                .schema_type(utoipa::openapi::SchemaType::Integer)
+                .minimum(Some(1_000.0))
+                .maximum(Some(1_000_000.0))
+                .description(Some(
+                    "Maximum number of series per query (1,000 to 1,000,000)",
+                ))
+                .into(),
+        )
+    }
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
