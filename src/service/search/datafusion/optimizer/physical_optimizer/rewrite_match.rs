@@ -599,10 +599,6 @@ mod tests {
         }
     }
 
-    /// Test that column indices are correctly updated after adding FTS fields
-    /// This test ensures that when FTS fields are added to the schema, all column
-    /// references in the filter (including str_match function calls) use the correct
-    /// updated indices from the new schema.
     #[tokio::test]
     async fn test_column_index_update_with_match_all_and_str_match() {
         let schema = Arc::new(Schema::new(vec![
@@ -640,16 +636,7 @@ mod tests {
         let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
         // Verify that all column indices in FilterExec match the input schema
-        verify_filter_column_indices(physical_plan).unwrap();
-    }
-
-    /// Helper function to verify that all column indices in FilterExec predicates
-    /// match their corresponding positions in the input schema
-    fn verify_filter_column_indices(plan: Arc<dyn ExecutionPlan>) -> Result<()> {
-        let mut errors = Vec::new();
-
-        // Use apply to traverse the execution plan
-        let _ = plan.apply(&mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
+        let _ = physical_plan.apply(&mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
             if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
                 let input_schema = filter.input().schema();
                 let predicate = filter.predicate();
@@ -664,18 +651,10 @@ mod tests {
                         match input_schema.index_of(column_name) {
                             Ok(expected_index) => {
                                 if column_index != expected_index {
-                                    errors.push(format!(
-                                        "Column '{}' has index {} in filter predicate but should be {} according to input schema",
-                                        column_name, column_index, expected_index
-                                    ));
+                                   panic!("Column '{column_name}' has index {column_index} in filter predicate but should be {expected_index} according to input schema");
                                 }
                             }
-                            Err(_) => {
-                                errors.push(format!(
-                                    "Column '{}' with index {} not found in input schema",
-                                    column_name, column_index
-                                ));
-                            }
+                            Err(_) => panic!("Column '{column_name}' with index {column_index} not found in input schema"),
                         }
                     }
                     Ok(TreeNodeRecursion::Continue)
@@ -683,14 +662,5 @@ mod tests {
             }
             Ok(TreeNodeRecursion::Continue)
         });
-
-        if !errors.is_empty() {
-            return Err(DataFusionError::Internal(format!(
-                "Filter column index verification failed:\n{}",
-                errors.join("\n")
-            )));
-        }
-
-        Ok(())
     }
 }
