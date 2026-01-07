@@ -495,7 +495,9 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::udf::match_all_udf;
+    use crate::service::search::datafusion::{
+        table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
+    };
 
     #[tokio::test]
     async fn test_rewrite_match_physical() {
@@ -603,105 +605,17 @@ mod tests {
     /// updated indices from the new schema.
     #[tokio::test]
     async fn test_column_index_update_with_match_all_and_str_match() {
-        // Test queries that combine match_all with str_match
-        // This simulates the real-world scenario where both functions reference the same column
-        let sqls = vec![
-            (
-                // Query with match_all and additional filter on message column
-                // This tests that after adding FTS fields, the column indices in str_match
-                // are correctly updated to match the new schema
-                "select * from t where match_all('test') and str_match(message, 'success')",
-                vec![
-                    "+------------+------------------+-------+------+",
-                    "| _timestamp | message          | error | msg  |",
-                    "+------------+------------------+-------+------+",
-                    "| 1          | test was success | ok    | info |",
-                    "+------------+------------------+-------+------+",
-                ],
-            ),
-            (
-                // Query with match_all and multiple column filters
-                "select * from t where match_all('critical') and str_match(error, 'critical')",
-                vec![
-                    "+------------+-----------+------------------+------+",
-                    "| _timestamp | message   | error            | msg  |",
-                    "+------------+-----------+------------------+------+",
-                    "| 3          | operation | critical failure | warn |",
-                    "+------------+-----------+------------------+------+",
-                ],
-            ),
-        ];
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("msg", DataType::Utf8, false),
+            Field::new("error", DataType::Utf8, false),
+            Field::new("message", DataType::Utf8, false),
+        ]));
 
-        let schema = if get_config().common.utf8_view_enabled {
-            Arc::new(Schema::new(vec![
-                Field::new("_timestamp", DataType::Int64, false),
-                Field::new("message", DataType::Utf8View, false),
-                Field::new("error", DataType::Utf8View, false),
-                Field::new("msg", DataType::Utf8View, false),
-            ]))
-        } else {
-            Arc::new(Schema::new(vec![
-                Field::new("_timestamp", DataType::Int64, false),
-                Field::new("message", DataType::Utf8, false),
-                Field::new("error", DataType::Utf8, false),
-                Field::new("msg", DataType::Utf8, false),
-            ]))
-        };
-
-        let message_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
-            Arc::new(StringViewArray::from(vec![
-                "test was success",
-                "request started",
-                "operation",
-                "completed",
-            ]))
-        } else {
-            Arc::new(StringArray::from(vec![
-                "test was success",
-                "request started",
-                "operation",
-                "completed",
-            ]))
-        };
-
-        let error_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
-            Arc::new(StringViewArray::from(vec![
-                "ok",
-                "ok",
-                "critical failure",
-                "ok",
-            ]))
-        } else {
-            Arc::new(StringArray::from(vec![
-                "ok",
-                "ok",
-                "critical failure",
-                "ok",
-            ]))
-        };
-
-        let msg_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
-            Arc::new(StringViewArray::from(vec!["info", "debug", "warn", "info"]))
-        } else {
-            Arc::new(StringArray::from(vec!["info", "debug", "warn", "info"]))
-        };
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
-                message_array,
-                error_array,
-                msg_array,
-            ],
-        )
-        .unwrap();
-
-        // FTS fields that will be added to the schema
         let fields = vec![
-            ("message".to_string(), DataType::Utf8),
             ("error".to_string(), DataType::Utf8),
             ("msg".to_string(), DataType::Utf8),
+            ("message".to_string(), DataType::Utf8),
         ];
 
         let state = SessionStateBuilder::new()
@@ -713,17 +627,70 @@ mod tests {
             ))])
             .build();
         let ctx = SessionContext::new_with_state(state);
-        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        let provider = NewEmptyTable::new("t", schema).with_partitions(8);
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
         ctx.register_udf(
             crate::service::search::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone(),
         );
 
-        for item in sqls {
-            let df = ctx.sql(item.0).await.unwrap();
-            let data = df.collect().await.unwrap();
-            assert_batches_eq!(item.1, &data);
+        let sql =
+            "select count(*) from t where match_all('test') and str_match(message, 'success')";
+        let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        // Verify that all column indices in FilterExec match the input schema
+        verify_filter_column_indices(physical_plan).unwrap();
+    }
+
+    /// Helper function to verify that all column indices in FilterExec predicates
+    /// match their corresponding positions in the input schema
+    fn verify_filter_column_indices(plan: Arc<dyn ExecutionPlan>) -> Result<()> {
+        let mut errors = Vec::new();
+
+        // Use apply to traverse the execution plan
+        let _ = plan.apply(&mut |node: &Arc<dyn ExecutionPlan>| -> Result<TreeNodeRecursion> {
+            if let Some(filter) = node.as_any().downcast_ref::<FilterExec>() {
+                let input_schema = filter.input().schema();
+                let predicate = filter.predicate();
+
+                // Traverse the predicate expression tree to find all Column references
+                let _ = predicate.apply(&mut |expr: &Arc<dyn PhysicalExpr>| -> Result<TreeNodeRecursion> {
+                    if let Some(column) = expr.as_any().downcast_ref::<Column>() {
+                        let column_name = column.name();
+                        let column_index = column.index();
+
+                        // Find the expected index in the input schema
+                        match input_schema.index_of(column_name) {
+                            Ok(expected_index) => {
+                                if column_index != expected_index {
+                                    errors.push(format!(
+                                        "Column '{}' has index {} in filter predicate but should be {} according to input schema",
+                                        column_name, column_index, expected_index
+                                    ));
+                                }
+                            }
+                            Err(_) => {
+                                errors.push(format!(
+                                    "Column '{}' with index {} not found in input schema",
+                                    column_name, column_index
+                                ));
+                            }
+                        }
+                    }
+                    Ok(TreeNodeRecursion::Continue)
+                });
+            }
+            Ok(TreeNodeRecursion::Continue)
+        });
+
+        if !errors.is_empty() {
+            return Err(DataFusionError::Internal(format!(
+                "Filter column index verification failed:\n{}",
+                errors.join("\n")
+            )));
         }
+
+        Ok(())
     }
 }
