@@ -41,7 +41,8 @@ pub struct AwsMarketplaceRegistrationForm {
 ///
 /// This endpoint receives the POST from AWS Marketplace when a customer subscribes.
 /// It saves the token in a cookie and redirects to the login page.
-#[post("/aws-marketplace/register")]
+/// Full path: POST /marketplace/aws/register
+#[post("/aws/register")]
 pub async fn aws_marketplace_register(
     form: web::Form<AwsMarketplaceRegistrationForm>,
 ) -> HttpResponse {
