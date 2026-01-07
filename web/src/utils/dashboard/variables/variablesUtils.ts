@@ -306,6 +306,7 @@ export const processVariableContent = (
       processedContent = processedContent.replace(
         new RegExp(
           placeholder
+            .replace(/\\/g, "\\\\")
             .replace(/\$/g, "\\$")
             .replace(/\{/g, "\\{")
             .replace(/\}/g, "\\}"),

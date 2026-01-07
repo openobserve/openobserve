@@ -637,21 +637,6 @@ export default defineComponent({
       variableObject: any,
     ): any => {
       // Use HTTP2/streaming for all dashboard variable values
-      try {
-        console.debug(
-          `[VariableSearchDEBUG] initializeStreamingConnection for ${variableObject?.name} trace=${payload?.traceId || payload?.queryReq?.traceId || "(none)"} payloadPreview=`,
-          {
-            query: payload?.queryReq?.sql
-              ? String(payload.queryReq.sql).substring(0, 200)
-              : undefined,
-            fields: payload?.queryReq?.fields,
-          },
-        );
-      } catch (err) {
-        console.debug(
-          "[VariableSearchDEBUG] initializeStreamingConnection - unable to stringify payload",
-        );
-      }
 
       fetchQueryDataWithHttpStream(payload, {
         data: (p: any, r: any) => handleSearchResponse(p, r, variableObject),
@@ -710,23 +695,6 @@ export default defineComponent({
       };
       try {
         // Log the payload and trace id for debugging
-        try {
-          console.debug(
-            `[VariableSearchDEBUG] fetchFieldValuesWithWebsocket for ${variableObject.name} payloadPreview=`,
-            {
-              sql: queryContext
-                ? String(queryContext).substring(0, 200)
-                : undefined,
-              start_time: payload.start_time,
-              end_time: payload.end_time,
-              field: payload.fields && payload.fields[0],
-            },
-          );
-        } catch (err) {
-          console.debug(
-            "[VariableSearchDEBUG] fetchFieldValuesWithWebsocket - unable to stringify payload",
-          );
-        }
 
         // Start new streaming connection
         initializeStreamingConnection(wsPayload, variableObject);
@@ -1770,9 +1738,6 @@ export default defineComponent({
 
             // Use HTTP2/streaming for all dashboard variable values
             // We don't need to wait for the response here as it will be handled by the streaming handlers
-            console.debug(
-              `[VariableSearchDEBUG] handleVariableType will fetch values for ${variableObject.name} searchText='${String(searchText)}' queryPreview=${String(queryContext).substring(0, 200)}`,
-            );
             fetchFieldValuesWithWebsocket(variableObject, queryContext);
             return true;
           } catch (error) {
@@ -2578,9 +2543,6 @@ export default defineComponent({
               stop();
               // Re-run the search once loading has completed
               cancelAllVariableOperations(variableName);
-              console.debug(
-                `[VariableSearchDEBUG] re-running deferred search for ${variableName} with filter='${String(filterText)}'`,
-              );
               loadSingleVariableDataByName(
                 variableItem,
                 false,
@@ -2600,19 +2562,12 @@ export default defineComponent({
       ) {
         // Delegate to loadVariableOptions which contains the logic to avoid unnecessary fetches
         cancelAllVariableOperations(variableName);
-        console.debug(
-          `[VariableSearchDEBUG] open-event for ${variableName} - delegating to loadVariableOptions`,
-        );
         await loadVariableOptions(variableItem);
         return;
       }
 
       // Cancel any previous API calls for this variable immediately
       cancelAllVariableOperations(variableName);
-
-      console.debug(
-        `[VariableSearchDEBUG] executing search API for ${variableName} with filter='${String(filterText)}'`,
-      );
       await loadSingleVariableDataByName(variableItem, false, filterText);
     };
 
