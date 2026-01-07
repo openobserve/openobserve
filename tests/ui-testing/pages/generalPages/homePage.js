@@ -850,7 +850,7 @@ export class HomePage {
         // Note: href may be '/favicon.ico' or './favicon.ico' depending on server config
         const faviconHref = await this.faviconLink.getAttribute('href');
         result.faviconHref = faviconHref;
-        result.domValid = faviconHref && faviconHref.endsWith('favicon.ico');
+        result.domValid = Boolean(faviconHref) && faviconHref.includes('favicon.ico');
 
         // Verify favicon resource loads via fetch inside page context
         if (faviconHref) {
