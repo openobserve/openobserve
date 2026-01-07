@@ -15,21 +15,13 @@
 
 use config::{
     meta::stream::StreamType,
-    utils::{json, time::now_micros},
+    utils::{json, time::now_micros, util::get_distinct_stream_name},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use sea_orm_migration::prelude::*;
 
 use crate::{db, schema};
-
-// copied over from service/distinct_values because infra crate cannot use that
-const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
-
-fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
-    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
-}
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -57,8 +49,8 @@ impl MigrationTrait for Migration {
 
             let stype = StreamType::from(stream_type);
 
-            // we do not support distinct values over metadata streams
-            if stype == StreamType::Metadata {
+            // we only support distinct values on logs and traces
+            if !matches!(stype, StreamType::Logs | StreamType::Traces) {
                 continue;
             }
             if let Some(original_settings) = schema::get_settings(org_id, stream_name, stype).await

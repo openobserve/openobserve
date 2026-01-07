@@ -26,7 +26,7 @@ use config::{
     FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
     spawn_pausable_job,
-    utils::{json, schema::infer_json_schema_from_map, time::now_micros},
+    utils::{json, schema::infer_json_schema_from_map, time::now_micros, util::get_distinct_stream_name},
 };
 use infra::{
     errors::{Error, Result},
@@ -47,7 +47,7 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 10240;
-pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
+
 
 pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
 
@@ -122,10 +122,6 @@ impl DistinctValues {
             mem_table: Arc::new(RwLock::new(FxIndexMap::default())),
         }
     }
-}
-
-pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
-    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
 }
 
 fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {

@@ -32,7 +32,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
+    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
@@ -65,9 +65,7 @@ use crate::{
         },
         logs::O2IngestJsonData,
         metadata::{
-            MetadataItem, MetadataType,
-            distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
-            trace_list_index::TraceListItem,
+            MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem,
             write,
         },
         schema::{check_for_schema, stream_schema_exists},
