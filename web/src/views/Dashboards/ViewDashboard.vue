@@ -1047,7 +1047,6 @@ export default defineComponent({
 
       // Add reactive dependency on route to trigger re-evaluation when URL changes
       const currentPath = route.fullPath;
-      
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
