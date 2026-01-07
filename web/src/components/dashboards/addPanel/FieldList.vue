@@ -779,9 +779,8 @@ export default defineComponent({
             // To prevent this, we added the dashboardPanelDataPageKey condition.
             // IMPORTANT: Only set default query if stream or stream_type actually changed
             if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
-              // Check if the user has changed the query and query contains a metric name
-              // If metric name is different from stream name, set the query to the stream name with curly braces
-              // If metric name is the same as stream name, do not set the query
+              // Parse query to check if metric name differs from stream name
+              // Only override query if they differ or metric name is null
               let parsedQuery = null;
               try {
                 // Parse the query to get the metric name
