@@ -37,9 +37,20 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, _: &SchemaManager) -> Result<(), DbErr> {
         let db = db::get_db().await;
-        let res = db.list_keys("/schema/").await.unwrap();
+        let res = db.list_keys("/schema/").await.map_err(|e| {
+            log::error!("failed to fetch schema list from db : {e}");
+            DbErr::Custom(format!("error listing schemas : {e}"))
+        })?;
         for s in res {
-            let parts = s.strip_prefix("/").unwrap().split('/').collect::<Vec<_>>();
+            let parts = s
+                .strip_prefix("/")
+                .unwrap_or(&s)
+                .split('/')
+                .collect::<Vec<_>>();
+            if parts.len() != 4 {
+                log::warn!("invalid schema key {s}, skipping");
+                continue;
+            }
             let org_id = parts[1];
             let stream_type = parts[2];
             let stream_name = parts[3];
@@ -68,18 +79,26 @@ impl MigrationTrait for Migration {
                             metadata.insert("created_at".to_string(), now_micros().to_string());
                         }
 
-                        schema::update_setting(
+                        if let Err(e) = schema::update_setting(
                             org_id,
                             &distinct_stream,
                             StreamType::Metadata,
                             metadata.clone(),
                         )
                         .await
-                        .unwrap();
+                        {
+                            log::error!(
+                                "error in updating settings for {org_id}/{distinct_stream} : {e}"
+                            );
+                            return Err(DbErr::Custom(format!(
+                                "error updating settings for {org_id}/{distinct_stream} : {e}"
+                            )));
+                        }
 
                         #[cfg(feature = "enterprise")]
                         if get_o2_config().super_cluster.enabled {
-                            let key = schema::mk_key(org_id, stream_type, stream_name);
+                            let key =
+                                schema::mk_key(org_id, StreamType::Metadata, &distinct_stream);
                             if let Err(e) =
                                 o2_enterprise::enterprise::super_cluster::queue::schema_setting(
                                     &key,

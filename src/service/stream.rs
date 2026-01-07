@@ -484,22 +484,26 @@ pub async fn save_stream_settings(
 
     // skip metadata, as we should never do distinct values stream for
     // metadata streams
-    if stream_type != StreamType::Metadata
-        && let Some(original_settings) = unwrap_stream_settings(&schema)
-    {
-        let existing = original_settings.data_retention;
-        let new = settings.data_retention;
-        if existing != new {
-            let distinct_stream = super::metadata::distinct_values::get_distinct_stream_name(
-                stream_type,
-                &stream_name,
-            );
-            if get_stream(org_id, &distinct_stream, StreamType::Metadata)
-                .await
-                .is_some()
-            {
+    'retention_sync: {
+        if stream_type != StreamType::Metadata
+            && let Some(original_settings) = unwrap_stream_settings(&schema)
+        {
+            let existing = original_settings.data_retention;
+            let new = settings.data_retention;
+            if existing != new {
+                let distinct_stream = super::metadata::distinct_values::get_distinct_stream_name(
+                    stream_type,
+                    stream_name,
+                );
+
                 match infra::schema::get(org_id, &distinct_stream, StreamType::Metadata).await {
                     Ok(distinct_schema) => {
+                        if distinct_schema.fields().is_empty()
+                            && distinct_schema.metadata().is_empty()
+                        {
+                            break 'retention_sync;
+                        }
+
                         let mut distinct_settings =
                             unwrap_stream_settings(&distinct_schema).unwrap_or_default();
                         distinct_settings.data_retention = new;
