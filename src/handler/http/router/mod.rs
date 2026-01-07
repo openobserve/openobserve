@@ -249,9 +249,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
 
     // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
     // Must be publicly accessible (no auth) as users haven't logged in yet
+    // Using /marketplace path to avoid conflict with authenticated /api scope
     #[cfg(feature = "cloud")]
     svc.service(
-        web::scope("/api")
+        web::scope("/marketplace")
             .wrap(cors.clone())
             .service(cloud::aws_marketplace::aws_marketplace_register),
     );
