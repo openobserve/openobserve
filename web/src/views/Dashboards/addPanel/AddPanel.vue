@@ -1002,8 +1002,31 @@ export default defineComponent({
       lastTriggeredAt.value = data;
     };
 
-    // used to provide values to chart only when apply is clicked (same as chart data)
-    let updatedVariablesData: any = reactive({});
+    // Get merged variables for the current panel from variablesManager
+    // This holds the COMMITTED state - what the chart is currently using
+    // Only updates when user applies changes (similar to ViewDashboard's committed state)
+    const updatedVariablesData: any = reactive({
+      isVariablesLoading: false,
+      values: [],
+    });
+
+    // Helper function to update updatedVariablesData from variablesManager
+    const updateCommittedVariables = () => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+
+        updatedVariablesData.isVariablesLoading = variablesManager.isLoading.value;
+        // IMPORTANT: Deep copy to prevent reactive updates from live state
+        updatedVariablesData.values = JSON.parse(JSON.stringify(mergedVars));
+      } else {
+        // Fallback: deep copy from variablesData
+        updatedVariablesData.isVariablesLoading = variablesData.isVariablesLoading;
+        updatedVariablesData.values = JSON.parse(JSON.stringify(variablesData.values));
+      }
+    };
 
     // State for Add Variable functionality
     const isAddVariableOpen = ref(false);
@@ -1015,6 +1038,9 @@ export default defineComponent({
 
     // Track variables that use "current_panel" - these need special handling
     const variablesWithCurrentPanel = ref<string[]>([]);
+
+    // Track if initial variables need auto-apply (similar to ViewDashboard behavior)
+    let needsVariablesAutoUpdate = true;
 
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
@@ -1042,10 +1068,27 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
-    let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+
+      // Check if initial variables are loaded and auto-apply them (ONLY on first load)
+      if (needsVariablesAutoUpdate) {
+        // Check if the variables have loaded (length > 0)
+        if (checkIfVariablesAreLoaded(data)) {
+          needsVariablesAutoUpdate = false;
+          // Auto-commit initial variable state - this ensures the chart renders with initial values
+          updateCommittedVariables();
+
+          // Trigger chart update with loaded variables
+          if (editMode.value || !isInitialDashboardPanelData()) {
+            // Copy the panel data to trigger chart render with initial variables
+            chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+          }
+        }
+        // After initial load, don't return - we still need to update URL params below
+        // But we should NOT update chartData or updatedVariablesData
+      }
 
       // Use variablesManager if available for URL sync
       let variableObj: any = {};
@@ -1083,15 +1126,8 @@ export default defineComponent({
         },
       });
 
-      if (["html", "markdown"].includes(dashboardPanelData.data.type)) {
-        Object.assign(updatedVariablesData, variablesData);
-      } else if (needsVariablesAutoUpdate) {
-        // check if the length is > 0
-        if (checkIfVariablesAreLoaded(variablesData)) {
-          needsVariablesAutoUpdate = false;
-        }
-        Object.assign(updatedVariablesData, variablesData);
-      }
+      // Note: updatedVariablesData is now a computed property that reads from variablesManager
+      // No need to manually assign here - it will reactively update
     };
 
     const currentDashboardData: any = reactive({
@@ -1179,7 +1215,7 @@ export default defineComponent({
         }
 
         await nextTick();
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // Don't set chartData here - will be set after loadDashboard()
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
@@ -1197,6 +1233,15 @@ export default defineComponent({
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
       await loadDashboard();
+
+      // In edit mode: set chartData after dashboard loads
+      // Only if there are NO variables (if there are variables, variablesDataUpdated will handle it)
+      if (editMode.value) {
+        const hasVariables = currentDashboardData.data?.variables?.list?.length > 0;
+        if (!hasVariables) {
+          chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        }
+      }
 
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
@@ -1300,6 +1345,9 @@ export default defineComponent({
           // This allows variables scoped to "current_panel" to load
           variablesManager.setPanelVisibility("current_panel", true);
         }
+
+        // Initialize updatedVariablesData with current variable state
+        updateCommittedVariables();
       } catch (error) {
         console.error("Error initializing variables manager:", error);
       }
@@ -1389,7 +1437,22 @@ export default defineComponent({
         return normalized;
       };
 
-      const normalizedCurrent = normalizeVariables(variablesData);
+      // Get LIVE variables from variablesManager
+      let liveVariables: any = { values: [] };
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+        liveVariables = {
+          isVariablesLoading: variablesManager.isLoading.value,
+          values: mergedVars,
+        };
+      } else {
+        liveVariables = variablesData;
+      }
+
+      const normalizedCurrent = normalizeVariables(liveVariables);
       const normalizedRefreshed = normalizeVariables(updatedVariablesData);
       const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
@@ -1552,11 +1615,9 @@ export default defineComponent({
         // should use cache flag
         shouldRefreshWithoutCache.value = withoutCache;
 
-        // Also update variables data
-        Object.assign(
-          updatedVariablesData,
-          JSON.parse(JSON.stringify(variablesData)),
-        );
+        // Commit the current variable values to updatedVariablesData
+        // This is what the chart will use for the query
+        updateCommittedVariables();
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
