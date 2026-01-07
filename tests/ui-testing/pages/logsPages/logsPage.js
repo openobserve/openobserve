@@ -138,6 +138,7 @@ export class LogsPage {
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
+        this.shareLinkTooltip = '[role="tooltip"], .q-tooltip';
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
@@ -3633,6 +3634,55 @@ export class LogsPage {
         expect(result.appeared).toBe(true);
         testLogger.info('Share link triggered notification', { text: result.text });
         return result;
+    }
+
+    /**
+     * Verify the share link button is disabled
+     */
+    async expectShareLinkButtonDisabled() {
+        await expect(this.page.locator(this.shareLinkButton)).toBeDisabled();
+        testLogger.info('Share link button is disabled');
+    }
+
+    /**
+     * Hover over the share link button to show tooltip
+     */
+    async hoverShareLinkButton() {
+        await this.page.locator(this.shareLinkButton).hover();
+        testLogger.info('Hovered over share link button');
+    }
+
+    /**
+     * Get the share link tooltip text
+     * @param {string} hasTextFilter - Optional regex filter for tooltip text
+     * @returns {Promise<string>} The tooltip text
+     */
+    async getShareLinkTooltipText(hasTextFilter = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (hasTextFilter) {
+            tooltip = tooltip.filter({ hasText: hasTextFilter });
+        }
+
+        await tooltip.first().waitFor({ state: 'visible', timeout: 5000 });
+        const text = await tooltip.first().textContent();
+        testLogger.info(`Share link tooltip text: "${text}"`);
+        return text;
+    }
+
+    /**
+     * Verify the share link tooltip is visible with specific text
+     * @param {string|RegExp} expectedText - Expected text or regex pattern
+     */
+    async expectShareLinkTooltipVisible(expectedText = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (expectedText) {
+            tooltip = tooltip.filter({ hasText: expectedText });
+        }
+
+        await expect(tooltip.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Share link tooltip is visible');
     }
 
     /**
