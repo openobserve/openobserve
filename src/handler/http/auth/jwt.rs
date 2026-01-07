@@ -990,7 +990,7 @@ async fn process_custom_claim_parsing(
             as std::pin::Pin<
                 Box<
                     dyn std::future::Future<
-                            Output = Result<config::meta::functions::Transform, anyhow::Error>,
+                            Output = Result<config::meta::function::Transform, anyhow::Error>,
                         > + Send,
                 >,
             >
