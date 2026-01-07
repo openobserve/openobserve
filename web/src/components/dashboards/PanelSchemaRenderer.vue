@@ -1007,10 +1007,13 @@ export default defineComponent({
       }
     };
 
-    // Create a throttled version for streaming updates (1000ms throttle)
-    // This prevents excessive re-renders during PromQL data streaming
-    // With large datasets, chunks arrive ~1-2 seconds apart, so 1s throttle is optimal
-    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 1000, {
+    // Track if we've rendered the first chunk with actual data
+    let hasRenderedFirstDataChunk = ref(false);
+
+    // Create a throttled version for streaming updates (350ms throttle)
+    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
+    // This prevents excessive re-renders while showing progressive updates
+    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
       leading: true,  // Call immediately on first invocation
       trailing: true  // Ensure final call after throttle period
     });
@@ -1091,17 +1094,29 @@ export default defineComponent({
             code: "",
           };
 
+        // Check if this is the first chunk with actual data
+        const hasData = data.value?.length > 0 &&
+                       data.value[0]?.result?.length > 0;
+
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
-          // During loading: throttle to reduce re-render frequency
-          console.log(`[Chart Render] Using throttled render (1000ms)`);
-          await convertPanelDataThrottled();
+          // First chunk with actual data: render immediately!
+          if (hasData && !hasRenderedFirstDataChunk.value) {
+            console.log(`[Chart Render] 🚀 First data chunk - immediate render!`);
+            hasRenderedFirstDataChunk.value = true;
+            await convertPanelDataCommon();
+          } else {
+            // Subsequent chunks: throttle to reduce re-render frequency
+            console.log(`[Chart Render] Using throttled render (350ms)`);
+            await convertPanelDataThrottled();
+          }
         } else {
           // Loading complete: immediate final render with full data
           // Cancel any pending throttled calls and render immediately
           console.log(`[Chart Render] Loading complete - final immediate render`);
           convertPanelDataThrottled.cancel();
+          hasRenderedFirstDataChunk.value = false; // Reset for next query
           await convertPanelDataCommon();
         }
       },
