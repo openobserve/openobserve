@@ -102,6 +102,11 @@ const props = defineProps({
     default: false,
     required: false,
     type: Boolean
+  },
+  hidePastPrefix: {
+    default: false,
+    required: false,
+    type: Boolean
   }
 });
 
@@ -201,7 +206,8 @@ const getDisplayValue = () => {
 };
 
 const getTrimmedDisplayValue = () => {
-return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+  const prefix = props.hidePastPrefix ? '' : 'Past ';
+  return `${prefix}${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
 }
 
 // Check if the current selection matches the modelValue

@@ -85,7 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div style="width: 190px; height: 36px" class="flex items-center tw:font-semibold">
+          <div style="width: 190px; height: 36px" class="flex items-center tw:font-semibold"
+               :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
             <span>{{ t("alerts.destination") }} *</span>
           </div>
           <div class="tw:flex tw:flex-col">
@@ -173,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- For Scheduled Alerts -->
       <template v-else>
         <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
-        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw:font-semibold alert-settings-row">
+        <div v-if="queryType === 'custom' && false" class="flex justify-start items-center tw:font-semibold alert-settings-row">
           <div class="flex items-center" style="width: 190px; height: 36px">
             {{ t("common.aggregation") }}
             <q-icon
@@ -278,24 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold -->
-        <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.threshold") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  Defines when the alert should trigger based on the event count or aggregated value.<br />
-                  Example: If set to "> 100", the alert triggers when the count exceeds 100 events.
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div style="width: calc(100% - 190px)">
+        <div class="alert-settings-row">
+          <div class="tw:w-full">
             <!-- With Aggregation -->
             <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
               <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:gap-2">
@@ -372,73 +357,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Without Aggregation -->
             <template v-else>
-              <div ref="thresholdFieldRef" class="flex justify-start items-start">
-                <div class="tw:flex tw:flex-col">
-                  <q-select
-                    v-model="formData.trigger_condition.operator"
-                    :options="triggerOperators"
-                    class="showLabelOnTop no-case q-py-none"
-                    borderless
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    :style="{
-                      width: (formData.trigger_condition.operator === 'Contains' || formData.trigger_condition.operator === 'NotContains')
-                        ? '124px'
-                        : '88px',
-                      minWidth: '88px'
-                    }"
-                    @update:model-value="emitTriggerUpdate"
-                  />
-                  <div
-                    v-if="!formData.trigger_condition.operator"
-                    class="text-red-8 q-pt-xs"
-                    style="font-size: 11px; line-height: 12px"
-                  >
-                    Field is required!
+              <div ref="thresholdFieldRef">
+                <!-- ===== SECTION 1: AGGREGATION EVALUATION ===== -->
+                <!-- User reads: "Evaluate the [count] of [* (all fields)] over a period of [Past 10 Minutes]" -->
+                <div class="tw:mb-6">
+                  <!-- Line 1: All three labels -->
+                  <div class="tw:flex tw:items-center tw:gap-4 tw:mb-2 tw:ml-1">
+                    <span class="tw:text-sm tw:font-semibold"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+                          style="width: 100px">
+                      Evaluate the
+                    </span>
+                    <span class="tw:text-sm tw:font-semibold"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+                          style="width: 150px;">
+                      of
+                    </span>
+                    <span class="tw:text-sm tw:font-semibold"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                      over a
+                      <span class="events-tooltip-trigger">
+                        period
+                        <q-tooltip anchor="top middle" self="bottom middle" max-width="300px">
+                          <span style="font-size: 12px">
+                            Period for which the query should run.<br />
+                            e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.
+                          </span>
+                        </q-tooltip>
+                      </span>
+                      of
+                    </span>
+                  </div>
+
+                  <!-- Line 2: All three inputs -->
+                  <div class="tw:flex tw:items-center tw:gap-4">
+                    <q-select
+                      v-model="localAggFunction"
+                      :options="aggFunctions"
+                      dense
+                      borderless
+                      class="operator-select"
+                      style="width: 100px; height: 28px"
+                    />
+                    <q-select
+                      v-model="localAggField"
+                      :options="aggFieldOptions"
+                      dense
+                      borderless
+                      class="operator-select"
+                      style="width: 150px; height: 28px"
+                    />
+                    <div class="period-picker-wrapper">
+                      <CustomDateTimePicker
+                        v-model="periodPicker.offSet"
+                        :isFirstEntry="false"
+                        @update:model-value="updatePeriodPicker"
+                        :changeStyle="true"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Validation errors -->
+                  <div v-if="!Number(formData.trigger_condition.period)"
+                       class="text-red-8 tw:mt-2" style="font-size: 11px; line-height: 12px">
+                    Please enter a period value
                   </div>
                 </div>
-                <div class="flex items-start tw:flex-col" style="border-left: none">
-                  <div class="tw:flex tw:items-center">
-                    <div style="width: 89px; margin-left: 0 !important">
+
+                <!-- ===== SECTION 2: TRIGGER CONDITION ===== -->
+                <!-- User reads: "Trigger when the event count is [above or equal to] the threshold [>= 3]" -->
+                <div class="tw:mb-4">
+                  <!-- Line 1: Labels -->
+                  <div class="tw:flex tw:items-center tw:gap-10 tw:mb-2 tw:ml-1">
+                    <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+                          style="width: 200px">
+                      Trigger when the
+                      <span class="events-tooltip-trigger">
+                        event count
+                        <q-tooltip anchor="top middle" self="bottom middle" max-width="300px">
+                          <span style="font-size: 12px">
+                            Event Count represent the number of records returned by the query
+                          </span>
+                        </q-tooltip>
+                      </span>
+                      is
+                    </span>
+                    <span class="tw:text-sm tw:font-semibold"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                      the threshold
+                    </span>
+                  </div>
+
+                  <!-- Line 2: Inputs -->
+                  <div class="tw:flex tw:items-center tw:gap-10">
+                    <!-- Operator dropdown -->
+                    <q-select
+                      v-model="formData.trigger_condition.operator"
+                      :options="triggerOperatorsWithLabels"
+                      option-label="label"
+                      option-value="value"
+                      emit-value
+                      map-options
+                      dense
+                      borderless
+                      class="operator-select"
+                      style="width: 200px; height: 28px"
+                      @update:model-value="emitTriggerUpdate"
+                    />
+
+                    <!-- Container for operator symbol and threshold input -->
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <!-- Operator symbol - always visible -->
+                      <span v-if="formData.trigger_condition.operator"
+                            class="tw:text-base tw:font-bold"
+                            :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'">
+                        {{ formData.trigger_condition.operator }}
+                      </span>
+
+                      <!-- Value input -->
                       <q-input
                         v-model.number="formData.trigger_condition.threshold"
                         type="number"
                         dense
                         borderless
                         min="1"
-                        style="background: none"
+                        placeholder="Enter value"
+                        class="threshold-input"
+                        style="width: 80px; height: 28px"
                         debounce="300"
                         @update:model-value="emitTriggerUpdate"
                       />
                     </div>
-                    <div
-                      style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                      :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c;' : ''"
-                      :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-                      class="flex justify-center items-center"
-                    >
-                      {{ t("alerts.events") }}
-                    </div>
                   </div>
-                  <div
-                    v-if="!Number(formData.trigger_condition.threshold)"
-                    class="text-red-8 q-pt-xs"
-                    style="font-size: 11px; line-height: 12px"
-                  >
-                    Field is required!
-                  </div>
+                </div>
+
+                <!-- Validation error -->
+                <div v-if="!Number(formData.trigger_condition.threshold)"
+                     class="text-red-8 tw:mt-2" style="font-size: 11px; line-height: 12px">
+                  Please enter a threshold value
                 </div>
               </div>
             </template>
           </div>
         </div>
 
-        <!-- Period -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+        <!-- Period (Hidden - moved to aggregation section) -->
+        <div v-if="false" class="flex items-start q-mr-sm alert-settings-row">
+          <div class="tw:font-semibold flex items-center"
+               :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+               style="width: 190px; height: 36px">
             {{ t("alerts.period") + " *" }}
             <q-icon
               name="info"
@@ -487,311 +555,292 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Frequency (with inline interval/cron toggle) -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.frequency") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="auto">
-                <span style="font-size: 14px" v-if="formData.trigger_condition.frequency_type === 'minutes'">
-                  How often the task should be executed.<br />
-                  e.g., 2 minutes means that the task will run every 2 minutes.
+        <!-- ===== SECTION 3: FREQUENCY ===== -->
+        <!-- User reads: "Run the alert check [using Interval/Cron] for [10 Minutes] or [cron expression + timezone]" -->
+        <div class="alert-settings-row">
+          <div class="tw:w-full">
+            <div class="tw:mb-4">
+              <!-- Line 1: Labels -->
+              <div class="tw:flex tw:items-center tw:gap-20 tw:mb-2 tw:ml-1">
+                <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+                      style="width: 200px">
+                  Run the query
+                  <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
+                    <q-icon
+                      name="warning"
+                      size="14px"
+                      class="cursor-pointer q-ml-xs"
+                      :class="store.state.theme === 'dark' ? 'tw:text-orange-500' : 'tw:text-orange-500'"
+                    >
+                      <q-tooltip anchor="top middle" self="bottom middle" max-width="300px" class="tw:text-[12px]">
+                        Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.
+                      </q-tooltip>
+                    </q-icon>
+                  </template>
                 </span>
-                <span style="font-size: 14px" v-else>
-                  Pattern: * * * * * * means every second.
-                  <br />
-                  Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                  [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                <span class="tw:text-sm tw:font-semibold"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                  for every
                 </span>
-              </q-tooltip>
-            </q-icon>
-            <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
-              <q-icon
-                name="warning"
-                size="18px"
-                class="cursor-pointer tw:ml-2"
-                :class="store.state.theme === 'dark' ? 'tw:text-orange-500' : 'tw:text-orange-500'"
-              >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="auto"
-                  class="tw:text-[14px]"
-                >
-                  Warning: The displayed timezone is approximate. Verify and select the correct timezone manually.
-                </q-tooltip>
-              </q-icon>
-            </template>
-          </div>
-          <div class="tw:flex tw:flex-col" style="min-height: 78px">
-            <!-- Interval/Cron Mode Buttons -->
-            <div class="tw:flex frequency-toggle-group tw:mb-3">
-              <q-btn
-                :label="t('alerts.interval')"
-                :outline="formData.trigger_condition.frequency_type === 'cron'"
-                :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
-                :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
-                :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
-                style="min-width: 90px"
-                @click="handleFrequencyTypeChange('minutes')"
-              />
-              <q-btn
-                label="Cron Schedule"
-                :outline="formData.trigger_condition.frequency_type === 'minutes'"
-                :unelevated="formData.trigger_condition.frequency_type === 'cron'"
-                :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
-                :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
-                style="min-width: 130px"
-                @click="handleFrequencyTypeChange('cron')"
-              />
-            </div>
+              </div>
 
-            <!-- Input Fields Container (fixed height to prevent shifting) -->
-            <div class="tw:flex tw:items-start" style="min-height: 36px">
-              <!-- Interval Mode -->
-              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
-                <div style="width: 87px; margin-left: 0 !important">
-                  <q-input
-                    v-model.number="formData.trigger_condition.frequency"
-                    type="number"
-                    dense
-                    borderless
-                    min="1"
-                    style="background: none"
-                    debounce="300"
-                    @update:model-value="emitTriggerUpdate"
+              <!-- Line 2: Mode tabs and inputs -->
+              <div class="tw:flex tw:items-center tw:gap-10">
+                <!-- Interval/Cron Mode Tabs -->
+                <div class="tw:flex frequency-toggle-group" style="width: 240px">
+                  <q-btn
+                    label="Using Interval"
+                    :outline="formData.trigger_condition.frequency_type === 'cron'"
+                    :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
+                    :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
+                    no-caps
+                    size="xs"
+                    class="tw:px-3 frequency-toggle-btn frequency-toggle-left"
+                    :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
+                    style="min-width: 120px; height: 28px; font-size: 12px"
+                    @click="handleFrequencyTypeChange('minutes')"
+                  />
+                  <q-btn
+                    label="Using Cron"
+                    :outline="formData.trigger_condition.frequency_type === 'minutes'"
+                    :unelevated="formData.trigger_condition.frequency_type === 'cron'"
+                    :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
+                    no-caps
+                    size="xs"
+                    class="tw:px-3 frequency-toggle-btn frequency-toggle-right"
+                    :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
+                    style="min-width: 120px; height: 28px; font-size: 12px"
+                    @click="handleFrequencyTypeChange('cron')"
                   />
                 </div>
-                <div
-                  style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                  :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-                  :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-                  class="flex justify-center items-center"
-                >
-                  {{ t("alerts.minutes") }}
+
+                <!-- Input based on mode -->
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <!-- Interval Mode -->
+                  <template v-if="formData.trigger_condition.frequency_type === 'minutes'">
+                    <div class="period-picker-wrapper">
+                      <CustomDateTimePicker
+                        v-model="frequencyPicker.offSet"
+                        :isFirstEntry="false"
+                        @update:model-value="updateFrequencyPicker"
+                        :changeStyle="true"
+                        :hidePastPrefix="true"
+                      />
+                    </div>
+                  </template>
+
+                  <!-- Cron Mode -->
+                  <template v-else>
+                    <q-input
+                      v-model="formData.trigger_condition.cron"
+                      dense
+                      borderless
+                      placeholder="Cron Expression *"
+                      class="threshold-input"
+                      style="width: 150px; height: 28px"
+                      debounce="300"
+                      @update:model-value="emitTriggerUpdate"
+                    />
+                    <q-select
+                      v-model="formData.trigger_condition.timezone"
+                      :options="filteredTimezone"
+                      @blur="
+                        browserTimezone =
+                          browserTimezone === ''
+                            ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                            : browserTimezone
+                      "
+                      use-input
+                      @filter="timezoneFilterFn"
+                      input-debounce="0"
+                      dense
+                      borderless
+                      emit-value
+                      fill-input
+                      hide-selected
+                      :title="formData.trigger_condition.timezone"
+                      placeholder="Timezone *"
+                      :display-value="`${browserTimezone || 'Select timezone'}`"
+                      class="operator-select"
+                      style="width: 180px; height: 28px"
+                      @update:model-value="emitTriggerUpdate"
+                    />
+                  </template>
                 </div>
               </div>
 
-              <!-- Cron Mode -->
-              <div v-else class="tw:flex tw:items-center tw:gap-2">
-                <q-input
-                  v-model="formData.trigger_condition.cron"
-                  dense
-                  borderless
-                  placeholder="Cron Expression *"
-                  style="background: none; width: 180px"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
-                <q-select
-                  v-model="formData.trigger_condition.timezone"
-                  :options="filteredTimezone"
-                  @blur="
-                    browserTimezone =
-                      browserTimezone === ''
-                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                        : browserTimezone
-                  "
-                  use-input
-                  @filter="timezoneFilterFn"
-                  input-debounce="0"
-                  dense
-                  borderless
-                  emit-value
-                  fill-input
-                  hide-selected
-                  :title="formData.trigger_condition.timezone"
-                  placeholder="Timezone *"
-                  :display-value="`${browserTimezone || 'Select timezone'}`"
-                  style="width: 210px"
-                  @update:model-value="emitTriggerUpdate"
-                />
+              <!-- Validation error -->
+              <div
+                v-if="
+                  (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
+                  (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
+                  cronJobError
+                "
+                class="text-red-8 tw:mt-2"
+                style="font-size: 11px; line-height: 12px"
+              >
+                {{ cronJobError || "Field is required!" }}
               </div>
-            </div>
-
-            <!-- Error Message -->
-            <div
-              v-if="
-                (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
-                (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
-                cronJobError
-              "
-              class="text-red-8 tw:mt-1"
-              style="font-size: 11px; line-height: 12px"
-            >
-              {{ cronJobError || "Field is required!" }}
             </div>
           </div>
         </div>
 
-        <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  If the alert triggers then how long should it wait before sending another notification.<br />
-                  e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send
-                  another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user
-                  with notifications.
+        <!-- ===== SECTION 4: DESTINATIONS & COOLDOWN ===== -->
+        <!-- Line 1: "Send notification to" + gap + "Wait for" -->
+        <!-- Line 2: [dropdown] [refresh] [+] + gap + [cooldown picker] "before sending next alert" -->
+        <div class="alert-settings-row">
+          <div class="tw:w-full">
+            <div class="tw:mb-4">
+              <!-- Line 1: Both labels -->
+              <div class="tw:flex tw:items-center tw:gap-10 tw:mb-2 tw:ml-1">
+                <span class="tw:text-sm tw:font-semibold"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'"
+                      style="width: 240px">
+                  <span class="events-tooltip-trigger">
+                    Send notification to
+                    <q-tooltip anchor="top middle" self="bottom middle" max-width="300px">
+                      <span style="font-size: 12px">
+                        Select one or more destinations to send alert notifications.<br />
+                        Destinations can be Slack channels, email addresses, webhooks, or other notification endpoints.
+                      </span>
+                    </q-tooltip>
+                  </span>
                 </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
-              <div
-                style="width: 87px; margin-left: 0 !important"
-                class="silence-notification-input"
-              >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
-                  type="number"
-                  dense
-                  borderless
-                  min="0"
-                  style="background: none"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
-              </div>
-              <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  height: 36px;
-                "
-                :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-grey-10'
-                    : 'bg-grey-2'
-                "
-                class="flex justify-center items-center"
-              >
-                {{ t("alerts.minutes") }}
-              </div>
-            </div>
-            <div
-              v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
-            </div>
-          </div>
-        </div>
 
-        <!-- Destinations -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.destination") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">Select one or more destinations to send alert notifications.</span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                ref="destinationsFieldRef"
-                v-model="localDestinations"
-                :options="filteredDestinations"
-                class="no-case q-py-none destinations-select-field"
-                borderless
-                dense
-                multiple
-                use-input
-                fill-input
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterDestinations"
-                @update:model-value="emitDestinationsUpdate"
-                style="width: 180px; max-width: 300px"
-              >
-                <template v-slot:selected>
-                  <div
-                    v-if="localDestinations.length > 0"
-                    class="ellipsis"
+                <span class="tw:text-sm tw:font-semibold"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                  <span class="events-tooltip-trigger">
+                    Wait for
+                    <q-tooltip anchor="top middle" self="bottom middle" max-width="300px">
+                      <span style="font-size: 12px">
+                        If the alert triggers then how long should it wait before sending another notification.<br />
+                        e.g. if the alert triggers at 4:00 PM and the cooldown is set to 10 minutes then it will not send
+                        another notification until 4:10 PM. This prevents alert spam.
+                      </span>
+                    </q-tooltip>
+                  </span>
+                </span>
+              </div>
+
+              <!-- Line 2: Both controls -->
+              <div class="tw:flex tw:items-center tw:gap-10">
+                <!-- Destination controls -->
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <!-- Destination dropdown -->
+                  <q-select
+                    ref="destinationsFieldRef"
+                    v-model="localDestinations"
+                    :options="filteredDestinations"
+                    class="no-case q-py-none destinations-select-field"
+                    borderless
+                    dense
+                    multiple
+                    use-input
+                    fill-input
+                    :input-debounce="400"
+                    hide-bottom-space
+                    @filter="filterDestinations"
+                    @update:model-value="emitDestinationsUpdate"
+                    style="width: 150px; max-width: 300px; height: 28px"
                   >
-                    {{ localDestinations.join(", ") }}
+                    <template v-slot:selected>
+                      <div
+                        v-if="localDestinations.length > 0"
+                        class="ellipsis"
+                      >
+                        {{ localDestinations.join(", ") }}
+                      </div>
+                    </template>
+                    <template v-slot:option="option">
+                      <q-list dense>
+                        <q-item tag="label">
+                          <q-item-section avatar>
+                            <q-checkbox
+                              size="xs"
+                              dense
+                              v-model="localDestinations"
+                              :val="option.opt"
+                              @update:model-value="emitDestinationsUpdate"
+                            />
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </q-list>
+                    </template>
+                    <template v-slot:no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">No destinations available</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
+
+                  <!-- Refresh button -->
+                  <q-btn
+                    icon="refresh"
+                    class="iconHoverBtn"
+                    :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                    padding="xs"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    title="Refresh latest Destinations"
+                    @click="$emit('refresh:destinations')"
+                    style="min-width: auto; height: 28px; width: 28px"
+                  />
+
+                  <!-- Add New Destination button -->
+                  <q-btn
+                    data-test="create-destination-btn"
+                    class="text-bold o2-secondary-button add-destination-btn"
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    no-caps
+                    flat
+                    @click="routeToCreateDestination"
+                    title="Add New Destination"
+                    style="height: 28px !important; width: 32px !important; min-width: 32px !important; min-height: 28px !important; max-height: 28px !important;"
+                  >
+                    <q-icon name="add" size="xs" />
+                  </q-btn>
+                </div>
+
+                <!-- Cooldown controls -->
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <div class="period-picker-wrapper">
+                    <CustomDateTimePicker
+                      v-model="silencePicker.offSet"
+                      :isFirstEntry="false"
+                      @update:model-value="updateSilencePicker"
+                      :changeStyle="true"
+                      :hidePastPrefix="true"
+                    />
                   </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="emitDestinationsUpdate"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No destinations available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Destinations"
-                @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
-                data-test="create-destination-btn"
-                label="Add New Destination"
-                class="text-bold no-border q-ml-sm"
-                color="primary"
-                no-caps
-                @click="routeToCreateDestination"
-              />
-            </div>
-            <div
-              v-if="!localDestinations || localDestinations.length === 0"
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
+
+                  <span class="tw:text-sm tw:font-semibold"
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-50' : 'tw:text-gray-900'">
+                    before sending next alert
+                  </span>
+                </div>
+              </div>
+
+              <!-- Validation errors -->
+              <div
+                v-if="!localDestinations || localDestinations.length === 0"
+                class="text-red-8 tw:mt-2"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Destination is required!
+              </div>
+              <div
+                v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''"
+                class="text-red-8 tw:mt-2"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Cooldown period is required!
+              </div>
             </div>
           </div>
         </div>
@@ -811,9 +860,13 @@ import {
   isAboveMinRefreshInterval,
   convertMinutesToCron,
 } from "@/utils/zincutils";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
+  components: {
+    CustomDateTimePicker,
+  },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -956,8 +1009,155 @@ export default defineComponent({
     // Aggregation functions
     const aggFunctions = ["count", "min", "max", "avg", "sum", "median", "p50", "p75", "p90", "p95", "p99"];
 
+    // Local aggregation state with defaults
+    const localAggFunction = ref("count");
+    const localAggField = ref("* (all fields)");
+
+    // Field options for aggregation (with wildcard)
+    const aggFieldOptions = computed(() => {
+      return ['* (all fields)', ...(props.columns || [])];
+    });
+
+    // Period picker for CustomDateTimePicker
+    const periodPicker = ref({
+      offSet: "10m", // Default 10 minutes
+      uuid: "period-picker"
+    });
+
+    // Update period when picker changes
+    const updatePeriodPicker = (newValue: string) => {
+      periodPicker.value.offSet = newValue;
+      // Convert to minutes for formData (e.g., "10m" -> 10)
+      const match = newValue.match(/^(\d+)([smhdw])$/);
+      if (match) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        let minutes = value;
+
+        switch (unit) {
+          case 's': minutes = Math.ceil(value / 60); break;
+          case 'm': minutes = value; break;
+          case 'h': minutes = value * 60; break;
+          case 'd': minutes = value * 1440; break;
+          case 'w': minutes = value * 10080; break;
+        }
+
+        props.formData.trigger_condition.period = minutes;
+        handlePeriodChange();
+      }
+    };
+
+    // Initialize picker from formData.trigger_condition.period
+    watch(
+      () => props.formData.trigger_condition.period,
+      (newPeriod) => {
+        if (newPeriod) {
+          periodPicker.value.offSet = `${newPeriod}m`;
+        }
+      },
+      { immediate: true }
+    );
+
+    // Frequency picker for CustomDateTimePicker
+    const frequencyPicker = ref({
+      offSet: "1m", // Default 1 minute
+      uuid: "frequency-picker"
+    });
+
+    // Update frequency when picker changes
+    const updateFrequencyPicker = (newValue: string) => {
+      frequencyPicker.value.offSet = newValue;
+      // Convert to minutes for formData (e.g., "10m" -> 10)
+      const match = newValue.match(/^(\d+)([smhdw])$/);
+      if (match) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        let minutes = value;
+
+        switch (unit) {
+          case 's': minutes = Math.ceil(value / 60); break;
+          case 'm': minutes = value; break;
+          case 'h': minutes = value * 60; break;
+          case 'd': minutes = value * 1440; break;
+          case 'w': minutes = value * 10080; break;
+        }
+
+        props.formData.trigger_condition.frequency = minutes;
+        emitTriggerUpdate();
+      }
+    };
+
+    // Initialize frequency picker from formData.trigger_condition.frequency
+    watch(
+      () => props.formData.trigger_condition.frequency,
+      (newFrequency) => {
+        if (newFrequency) {
+          frequencyPicker.value.offSet = `${newFrequency}m`;
+        }
+      },
+      { immediate: true }
+    );
+
+    // Silence (cooldown) picker for CustomDateTimePicker
+    const silencePicker = ref({
+      offSet: "10m", // Default 10 minutes
+      uuid: "silence-picker"
+    });
+
+    // Update silence when picker changes
+    const updateSilencePicker = (newValue: string) => {
+      silencePicker.value.offSet = newValue;
+      // Convert to minutes for formData (e.g., "10m" -> 10)
+      const match = newValue.match(/^(\d+)([smhdw])$/);
+      if (match) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        let minutes = value;
+
+        switch (unit) {
+          case 's': minutes = Math.ceil(value / 60); break;
+          case 'm': minutes = value; break;
+          case 'h': minutes = value * 60; break;
+          case 'd': minutes = value * 1440; break;
+          case 'w': minutes = value * 10080; break;
+        }
+
+        props.formData.trigger_condition.silence = minutes;
+        emitTriggerUpdate();
+      }
+    };
+
+    // Initialize silence picker from formData.trigger_condition.silence
+    watch(
+      () => props.formData.trigger_condition.silence,
+      (newSilence) => {
+        if (newSilence !== undefined && newSilence !== null && newSilence >= 0) {
+          silencePicker.value.offSet = `${newSilence}m`;
+        }
+      },
+      { immediate: true }
+    );
+
     // Trigger operators
-    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
+    const triggerOperators = ["=", "!=", ">=", ">", "<=", "<"];
+
+    // Operator labels for natural language display (Datadog-style)
+    const operatorLabels: Record<string, string> = {
+      '=': 'equal to',
+      '!=': 'not equal to',
+      '>=': 'above or equal to',
+      '>': 'above',
+      '<=': 'below or equal to',
+      '<': 'below',
+    };
+
+    // Transform operators for dropdown with natural language labels
+    const triggerOperatorsWithLabels = computed(() => {
+      return triggerOperators.map(op => ({
+        label: operatorLabels[op] || op,
+        value: op
+      }));
+    });
 
     // Filtered fields for group by
     const filteredFields = ref([...props.columns]);
@@ -1295,7 +1495,18 @@ export default defineComponent({
       localIsAggregationEnabled,
       localDestinations,
       aggFunctions,
+      localAggFunction,
+      localAggField,
+      aggFieldOptions,
+      periodPicker,
+      updatePeriodPicker,
+      frequencyPicker,
+      updateFrequencyPicker,
+      silencePicker,
+      updateSilencePicker,
       triggerOperators,
+      triggerOperatorsWithLabels,
+      operatorLabels,
       filteredFields,
       filterFields,
       filteredNumericColumns,
@@ -1449,8 +1660,30 @@ export default defineComponent({
 
 // Fix for destinations select - keep selected items and input on same line
 .destinations-select-field {
+  min-height: 28px !important;
+  height: 28px !important;
+
+  :deep(.q-field__inner) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
   :deep(.q-field__control) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control-container) {
+    min-height: 28px !important;
+    height: 28px !important;
+
     .q-field__native {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
       display: flex !important;
       flex-direction: row !important;
       align-items: center !important;
@@ -1471,6 +1704,183 @@ export default defineComponent({
         width: 20% !important;
       }
     }
+  }
+
+  :deep(.q-field__marginal) {
+    height: 28px !important;
+  }
+
+  :deep(.q-field__append) {
+    height: 28px !important;
+  }
+}
+
+// Operator select styling for natural language threshold
+.operator-select {
+  min-height: 28px !important;
+  height: 28px !important;
+
+  :deep(.q-field__inner) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control-container) {
+    min-height: 28px !important;
+    height: 28px !important;
+
+    .q-field__native {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+    }
+  }
+
+  :deep(.q-field__marginal) {
+    height: 28px !important;
+  }
+
+  :deep(.q-field__append) {
+    height: 28px !important;
+  }
+}
+
+// Threshold input styling
+.threshold-input {
+  min-height: 28px !important;
+  height: 28px !important;
+
+  :deep(.q-field__control) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control-container) {
+    min-height: 28px !important;
+    height: 28px !important;
+
+    .q-field__native {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+    }
+  }
+}
+
+// Add destination button - force 28px height
+.add-destination-btn {
+  min-height: 28px !important;
+  max-height: 28px !important;
+  height: 28px !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  padding: 0 !important;
+
+  :deep(.q-btn__content) {
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+  }
+}
+
+// Events tooltip trigger - subtle dotted underline
+.events-tooltip-trigger {
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1;
+  padding-bottom: 2px;
+
+  &:hover {
+    border-bottom-style: solid;
+  }
+}
+
+// Period picker wrapper - fixed 28px height
+.period-picker-wrapper {
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+
+  // Target the button inside CustomDateTimePicker
+  :deep(.q-btn) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-size: 12px !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 4px !important;
+  }
+
+  :deep(.date-time-button) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+  }
+
+  :deep(.q-btn__content) {
+    min-height: 28px !important;
+    height: 28px !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  :deep(.q-icon) {
+    font-size: 16px !important;
+    margin: 0 !important;
+  }
+
+  :deep(.q-field) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__inner) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control) {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+
+  :deep(.q-field__control-container) {
+    min-height: 28px !important;
+    height: 28px !important;
+
+    .q-field__native {
+      min-height: 28px !important;
+      height: 28px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+    }
+  }
+
+  :deep(.q-field__marginal) {
+    height: 28px !important;
+  }
+
+  :deep(.q-field__append) {
+    height: 28px !important;
   }
 }
 </style>
