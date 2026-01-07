@@ -32,7 +32,7 @@ jobs:
           #   file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
           #   file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
-            os: ubicloud-standard-8-arm
+            os: ubicloud-standard-16-arm
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
@@ -73,9 +73,17 @@ jobs:
           npm run build
 
       - name: Install Protoc for linux
-        if: contains(matrix.arch, 'linux')
+        if: contains(matrix.arch, 'x86_64-unknown-linux')
         run: | # Make sure the protoc is >= 3.15
           wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          unzip protoc-21.12-linux-x86_64.zip -d protoc
+          sudo cp protoc/bin/protoc /usr/local/bin/
+          sudo cp -r protoc/include/google /usr/local/include/
+
+      - name: Install Protoc for linux ARM
+        if: contains(matrix.arch, 'aarch64-unknown-linux')
+        run: | # Make sure the protoc is >= 3.15
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip
           unzip protoc-21.12-linux-x86_64.zip -d protoc
           sudo cp protoc/bin/protoc /usr/local/bin/
           sudo cp -r protoc/include/google /usr/local/include/
