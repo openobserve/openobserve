@@ -309,7 +309,8 @@ export const processVariableContent = (
             .replace(/\\/g, "\\\\")
             .replace(/\$/g, "\\$")
             .replace(/\{/g, "\\{")
-            .replace(/\}/g, "\\}"),
+            .replace(/\}/g, "\\}")
+            .replace(/\|/g, "\\|"),
           "g",
         ),
         String(value),

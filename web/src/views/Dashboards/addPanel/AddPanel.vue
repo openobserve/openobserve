@@ -2296,17 +2296,6 @@ export default defineComponent({
         hoveredSeriesState.value.panelId = panelId ?? -1;
         hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
       },
-      setIndex: function (
-        dataIndex: number,
-        seriesIndex: number,
-        panelId: any,
-        hoveredTime?: any,
-      ) {
-        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
-        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
-        hoveredSeriesState.value.panelId = panelId ?? -1;
-        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
-      },
     });
 
     const currentPanelData = computed(() => {
@@ -2686,35 +2675,6 @@ export default defineComponent({
       handleSaveVariable,
       currentTabId,
       currentPanelId,
-      errorMessage,
-      handleLimitNumberOfSeriesWarningMessage,
-      handleResultMetadataUpdate,
-      outlinedWarning,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      isAddVariableOpen,
-      selectedVariableToEdit,
-      handleOpenAddVariable,
-      handleCloseAddVariable,
-      handleSaveVariable,
-      isAddVariableOpen,
-      selectedVariableToEdit,
-      handleOpenAddVariable,
-      handleCloseAddVariable,
-      handleSaveVariable,
-      currentTabId,
-      currentPanelId,
-      errorMessage,
-      handleLimitNumberOfSeriesWarningMessage,
-      handleResultMetadataUpdate,
-      outlinedWarning,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      isAddVariableOpen,
-      selectedVariableToEdit,
-      handleOpenAddVariable,
-      handleCloseAddVariable,
-      handleSaveVariable,
     };
   },
   methods: {
