@@ -271,12 +271,12 @@ export const processVariableContent = (
         : variable.value;
 
     const placeholders = [
-      `\${${variable.name}}`,
-      `\${${variable.name}:csv}`,
-      `\${${variable.name}:pipe}`,
-      `\${${variable.name}:doublequote}`,
-      `\${${variable.name}:singlequote}`,
-      `$${variable.name}`,
+      "${" + variable.name + "}",
+      "${" + variable.name + ":csv}",
+      "${" + variable.name + ":pipe}",
+      "${" + variable.name + ":doublequote}",
+      "${" + variable.name + ":singlequote}",
+      "$" + variable.name,
     ];
 
     placeholders.forEach((placeholder) => {
