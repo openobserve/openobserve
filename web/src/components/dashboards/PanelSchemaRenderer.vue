@@ -956,9 +956,6 @@ export default defineComponent({
         validatePanelData?.value?.length === 0
       ) {
         try {
-          const convertStart = performance.now();
-          console.log(`[Chart Render] Starting chart conversion (loading: ${loading.value})`);
-
           panelData.value = await convertPanelData(
             panelSchema.value,
             filteredData.value,
@@ -971,9 +968,6 @@ export default defineComponent({
             annotations,
             loading.value,
           );
-
-          const convertTime = performance.now() - convertStart;
-          console.log(`[Chart Render] Chart conversion complete in ${convertTime.toFixed(1)}ms`);
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
@@ -1063,8 +1057,6 @@ export default defineComponent({
         annotations
       ],
       async () => {
-        console.log(`[Chart Render] Data watcher triggered (loading: ${loading.value})`);
-
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
@@ -1103,18 +1095,15 @@ export default defineComponent({
         if (loading.value) {
           // First chunk with actual data: render immediately!
           if (hasData && !hasRenderedFirstDataChunk.value) {
-            console.log(`[Chart Render] 🚀 First data chunk - immediate render!`);
             hasRenderedFirstDataChunk.value = true;
             await convertPanelDataCommon();
           } else {
             // Subsequent chunks: throttle to reduce re-render frequency
-            console.log(`[Chart Render] Using throttled render (350ms)`);
             await convertPanelDataThrottled();
           }
         } else {
           // Loading complete: immediate final render with full data
           // Cancel any pending throttled calls and render immediately
-          console.log(`[Chart Render] Loading complete - final immediate render`);
           convertPanelDataThrottled.cancel();
           hasRenderedFirstDataChunk.value = false; // Reset for next query
           await convertPanelDataCommon();

@@ -84,18 +84,13 @@ export const convertPromQLData = async (
   annotations: any,
   metadata: any = null,
 ) => {
-  const startTime = performance.now();
-  console.log(`[Convert PromQL] Starting conversion for ${panelSchema.type} chart`);
-
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined
       ? panelSchema.config.show_gridlines
       : true;
 
-  const momentStart = performance.now();
   await importMoment();
-  console.log(`[Convert PromQL] Moment import: ${(performance.now() - momentStart).toFixed(1)}ms`);
 
   // if no data than return it
   if (
@@ -123,10 +118,7 @@ export const convertPromQLData = async (
   ];
 
   if (NEW_CHART_TYPES.includes(panelSchema.type)) {
-    console.log(`[Convert PromQL] Using NEW modular converter for ${panelSchema.type}`);
-
     try {
-      const modularStart = performance.now();
       const result = await convertPromQLChartData(searchQueryData, {
         panelSchema,
         store,
@@ -135,11 +127,9 @@ export const convertPromQLData = async (
         annotations,
         metadata,
       });
-      console.log(`[Convert PromQL] Modular converter took ${(performance.now() - modularStart).toFixed(1)}ms`);
 
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationStart = performance.now();
         const annotationResults = await getAnnotationsData(
           annotations,
           store,
@@ -148,9 +138,7 @@ export const convertPromQLData = async (
         if (annotationResults && result.options) {
           result.options.annotations = annotationResults;
         }
-        console.log(`[Convert PromQL] Annotations took ${(performance.now() - annotationStart).toFixed(1)}ms`);
       }
-      console.log(`[Convert PromQL] ✅ Total conversion: ${(performance.now() - startTime).toFixed(1)}ms`);
       return result;
     } catch (error) {
       console.error(`Error converting ${panelSchema.type} chart:`, error);
@@ -166,7 +154,6 @@ export const convertPromQLData = async (
 
   // get the limit series from the config
   const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
-  console.log(`[Convert PromQL] Max series limit: ${maxSeries}`);
 
   // get the total series
   let totalSeries = 0;
@@ -175,7 +162,6 @@ export const convertPromQLData = async (
       totalSeries += queryData.result.length || 0;
     }
   });
-  console.log(`[Convert PromQL] Total series in data: ${totalSeries}`);
 
   // For multiple queries (multi y-axis equivalent), divide the limit equally
   const numberOfQueries = searchQueryData.filter(
@@ -184,31 +170,23 @@ export const convertPromQLData = async (
   const limitPerQuery =
     numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
 
-  console.log(`[Convert PromQL] Limit per query: ${limitPerQuery} (${numberOfQueries} queries)`);
-
   // Limit number of series to limitPerQuery per query
-  const limitStart = performance.now();
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
     if (!queryData || !queryData.result) {
       return queryData;
     }
     const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
-    if (originalCount > limitPerQuery) {
-      console.log(`[Convert PromQL] ⚠️ Limiting series from ${originalCount} to ${limitPerQuery}`);
-    }
     return {
       ...queryData,
       result: remainingSeries,
     };
   });
-  console.log(`[Convert PromQL] Series limiting took ${(performance.now() - limitStart).toFixed(1)}ms`);
 
   // Add warning if total number of series exceeds limit
   if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
     extras.limitNumberOfSeriesWarningMessage =
       `Showing ${maxSeries} of ${totalSeries} series. Increase max_dashboard_series in settings to see more.`;
-    console.log(`[Convert PromQL] ${extras.limitNumberOfSeriesWarningMessage}`);
   }
 
   // flag to check if the data is time seriesc
@@ -219,8 +197,6 @@ export const convertPromQLData = async (
   );
 
   // get the x axis key which will be timestamp
-  console.log(`[Convert PromQL] Building xAxis data...`);
-  const xAxisStart = performance.now();
   let xAxisData: any = new Set();
 
   // add all series timestamp
@@ -238,8 +214,6 @@ export const convertPromQLData = async (
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
-  const timestampCount = xAxisData.length;
-  console.log(`[Convert PromQL] Collected ${timestampCount} unique timestamps`);
 
   // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
   if (metadata?.queries?.[0]?.endTime) {
@@ -251,7 +225,6 @@ export const convertPromQLData = async (
   }
 
   // convert timestamp to specified timezone time
-  const tzConvertStart = performance.now();
   xAxisData.forEach((value: number, index: number) => {
     // we need both milliseconds and date (object or string)
     xAxisData[index] = [
@@ -261,8 +234,6 @@ export const convertPromQLData = async (
         : new Date(value * 1000).toISOString().slice(0, -1),
     ];
   });
-  console.log(`[Convert PromQL] Timezone conversion (${timestampCount} timestamps): ${(performance.now() - tzConvertStart).toFixed(1)}ms`);
-  console.log(`[Convert PromQL] xAxis data complete: ${(performance.now() - xAxisStart).toFixed(1)}ms`);
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,

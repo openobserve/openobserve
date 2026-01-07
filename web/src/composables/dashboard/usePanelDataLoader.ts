@@ -986,12 +986,11 @@ export const usePanelDataLoader = (
 
               // Get series limit from config
               const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
-              console.log(`[PromQL Perf] Series limit applied at data loader: ${maxSeries}`);
 
               // Create chunk processor for efficient metric merging
               const chunkProcessor = createPromQLChunkProcessor({
                 maxSeries,
-                enableLogging: true,
+                enableLogging: false,
               });
 
               const handlePromQLResponse = (data: any, res: any) => {
@@ -1010,7 +1009,6 @@ export const usePanelDataLoader = (
                   );
 
                   // Update state with accumulated results
-                  const stateUpdateStart = performance.now();
                   state.data = [...queryResults];
                   state.metadata = {
                     queries: queryMetadata,
@@ -1021,7 +1019,6 @@ export const usePanelDataLoader = (
                     message: "",
                     code: "",
                   };
-                  console.log(`[PromQL Perf] State update took ${(performance.now() - stateUpdateStart).toFixed(1)}ms`);
                 }
               };
 
@@ -1055,7 +1052,6 @@ export const usePanelDataLoader = (
               const handlePromQLComplete = (data: any, _: any) => {
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
-                console.log(`[PromQL Perf] Query ${queryIndex} completed. ${completedQueries.size}/${panelSchema.value.queries.length} queries done`);
 
                 // Final update with complete results
                 state.data = [...queryResults];
@@ -1069,9 +1065,6 @@ export const usePanelDataLoader = (
                 if (
                   completedQueries.size === panelSchema.value.queries.length
                 ) {
-                  // Log final statistics from chunk processor
-                  chunkProcessor.logFinalStats();
-
                   state.loading = false;
                   state.isOperationCancelled = false;
                   state.isPartialData = false;
