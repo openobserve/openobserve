@@ -352,6 +352,7 @@ name="warning" class="q-mr-xs" />
                     "
                     :column="cell.column"
                     :row="cell.row.original as any"
+                    :selectedStreamFields="selectedStreamFields"
                     @copy="copyLogToClipboard"
                     @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
@@ -475,6 +476,10 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
+    type: Array as PropType<string[]>,
+    default: () => [],
+  },
+  selectedStreamFields: {
     type: Array as PropType<string[]>,
     default: () => [],
   },
