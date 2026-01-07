@@ -256,6 +256,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-actions>
     </q-card>
   </q-dialog>
+
+  <!-- Confirmation Dialog for Delete Before Backfill -->
+  <q-dialog v-model="showDeleteConfirmation" persistent>
+    <q-card style="min-width: 400px">
+      <q-card-section class="tw:pb-2">
+        <div class="text-h6">Confirm Data Deletion</div>
+      </q-card-section>
+
+      <q-card-section class="q-pt-none">
+        <p class="tw:mb-4">
+          You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
+        </p>
+        <p class="tw:font-semibold tw:text-red-600">
+          This action CANNOT be undone or cancelled once the job is created.
+        </p>
+        <p class="tw:mt-4">Are you sure you want to proceed?</p>
+      </q-card-section>
+
+      <q-card-actions align="right" class="q-px-md q-pb-md">
+        <q-btn
+          flat
+          label="Cancel"
+          class="o2-secondary-button"
+          @click="showDeleteConfirmation = false"
+          data-test="delete-confirm-cancel-btn"
+          autofocus
+        />
+        <q-btn
+          unelevated
+          label="Yes, Delete and Backfill"
+          class="o2-primary-button"
+          @click="confirmDelete"
+          data-test="delete-confirm-yes-btn"
+        />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -289,6 +326,7 @@ const show = computed({
 });
 
 const showAdvanced = ref(false);
+const showDeleteConfirmation = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
 const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
@@ -387,27 +425,15 @@ const onSubmit = async () => {
 
   // Show confirmation dialog if delete_before_backfill is enabled
   if (formData.value.deleteBeforeBackfill) {
-    $q.dialog({
-      title: "Confirm Data Deletion",
-      message:
-        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is created. Are you sure you want to proceed?",
-      cancel: {
-        label: "Cancel",
-        color: "grey-8",
-        flat: true,
-      },
-      ok: {
-        label: "Yes, Delete and Backfill",
-        color: "negative",
-      },
-      persistent: true,
-      focus: "cancel", // Focus on cancel button by default for safety
-    }).onOk(() => {
-      createBackfillJobRequest();
-    });
+    showDeleteConfirmation.value = true;
   } else {
     createBackfillJobRequest();
   }
+};
+
+const confirmDelete = () => {
+  showDeleteConfirmation.value = false;
+  createBackfillJobRequest();
 };
 
 const createBackfillJobRequest = async () => {
@@ -445,7 +471,7 @@ const createBackfillJobRequest = async () => {
   } catch (error: any) {
     console.error("Error creating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.error ||
+      error?.response?.data?.message ||
       error?.message ||
       "Failed to create backfill job";
 
