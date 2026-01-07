@@ -245,9 +245,9 @@ describe("useStreams Composable", () => {
 
     it("should reject with 'Stream Not Found' for non-existent stream", async () => {
       mockStore.state.streams.logs = { list: [] };
-      
+
       await expect(streamsInstance.getStream("non-existent", "logs", false))
-        .rejects.toBe("Stream Not Found");
+        .rejects.toThrow("Stream 'non-existent' not found for type 'logs'");
     });
 
     it("should handle getMultiStreams with valid streams", async () => {
@@ -661,9 +661,9 @@ describe("useStreams Composable", () => {
       mockStore.state.streams.streamsIndexMapping.logs["test"] = 0;
       
       vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("Schema error"));
-      
+
       await expect(streamsInstance.getStream("test", "logs", true))
-        .rejects.toBe("Error while fetching schema");
+        .rejects.toThrow("Error while fetching schema: Schema error");
     });
 
     it("should handle getPaginatedStreams service error", async () => {
