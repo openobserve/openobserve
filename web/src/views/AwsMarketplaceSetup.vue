@@ -221,9 +221,20 @@ export default defineComponent({
     const activatedOrgId = ref("");
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+    // Helper to get cookie value
+    const getCookie = (name: string): string | null => {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? decodeURIComponent(match[2]) : null;
+    };
+
+    // Helper to delete cookie
+    const deleteCookie = (name: string) => {
+      document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    };
+
     onMounted(async () => {
-      // Get token from sessionStorage (saved by /marketplace/aws/register route)
-      token.value = sessionStorage.getItem("aws_marketplace_token") || "";
+      // Get token from cookie (set by backend at /api/aws-marketplace/register)
+      token.value = getCookie("aws_marketplace_token") || "";
 
       if (!token.value) {
         state.value = "no_token";
@@ -341,8 +352,8 @@ export default defineComponent({
 
           if (status === "active") {
             if (pollInterval) clearInterval(pollInterval);
-            // Clear the token from sessionStorage
-            sessionStorage.removeItem("aws_marketplace_token");
+            // Clear the token cookie
+            deleteCookie("aws_marketplace_token");
             state.value = "success";
             isProcessing.value = false;
 
@@ -372,7 +383,7 @@ export default defineComponent({
     };
 
     const goToDashboard = () => {
-      sessionStorage.removeItem("aws_marketplace_token");
+      deleteCookie("aws_marketplace_token");
       router.push({
         path: "/",
         query: activatedOrgId.value
