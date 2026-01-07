@@ -372,6 +372,7 @@ self="top right" max-width="220px">
         :width="props.width"
         :height="props.height"
       :variablesData="props.variablesData"
+      :currentVariablesData="props.currentVariablesData"
       :forceLoad="props.forceLoad"
       :searchType="searchType"
       :dashboard-id="props.dashboardId"

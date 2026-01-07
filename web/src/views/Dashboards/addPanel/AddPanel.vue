@@ -509,7 +509,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <CustomHTMLEditor
               v-model="dashboardPanelData.data.htmlContent"
               style="flex: 1; min-height: 0"
-              :initialVariableValues="updatedVariablesData"
+              :initialVariableValues="liveVariablesData"
+              :tabId="currentTabId"
+              :panelId="currentPanelId"
             />
             <DashboardErrorsComponent
               :errors="errorData"
@@ -540,7 +542,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <CustomMarkdownEditor
               v-model="dashboardPanelData.data.markdownContent"
               style="flex: 1; min-height: 0"
-              :initialVariableValues="updatedVariablesData"
+              :initialVariableValues="liveVariablesData"
+              :tabId="currentTabId"
+              :panelId="currentPanelId"
             />
             <DashboardErrorsComponent
               :errors="errorData"
@@ -1008,6 +1012,24 @@ export default defineComponent({
     const updatedVariablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
+    });
+
+    // Computed property for LIVE merged variables (for HTML/Markdown editors)
+    // This includes global + tab + panel scoped variables with proper precedence
+    const liveVariablesData = computed(() => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+        return {
+          isVariablesLoading: variablesManager.isLoading.value,
+          values: mergedVars,
+        };
+      } else {
+        // Fallback to variablesData
+        return variablesData;
+      }
     });
 
     // Helper function to update updatedVariablesData from variablesManager
@@ -2657,6 +2679,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      liveVariablesData,
       updatedVariablesData,
       savePanelData,
       resetAggregationFunction,

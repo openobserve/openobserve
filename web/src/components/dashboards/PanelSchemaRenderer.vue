@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
           />
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
           />
@@ -435,6 +435,11 @@ export default defineComponent({
     variablesData: {
       required: true,
       type: Object,
+    },
+    currentVariablesData: {
+      required: false,
+      type: Object,
+      default: null,
     },
     forceLoad: {
       type: Boolean,

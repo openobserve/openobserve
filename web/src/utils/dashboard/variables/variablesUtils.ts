@@ -168,36 +168,56 @@ const resolveVariablesWithPrecedence = (
 
     // 1. Check panel-level first
     if (context.panelId) {
-      const panelVar = variables.find((v: any) => v.scope === "panels");
-      if (panelVar && Array.isArray(panelVar.value)) {
-        const panelValue = panelVar.value.find(
-          (pv: any) => pv.panelId === context.panelId,
-        );
-        if (
-          panelValue &&
-          panelValue.value !== null &&
-          panelValue.value !== undefined
-        ) {
-          effectiveValue = panelValue.value;
-          found = true;
+      // New format: variable has panelId property directly
+      const panelVar = variables.find(
+        (v: any) => v.scope === "panels" && v.panelId === context.panelId,
+      );
+      if (panelVar && panelVar.value !== null && panelVar.value !== undefined) {
+        effectiveValue = panelVar.value;
+        found = true;
+      } else {
+        // Old format: value is array of {panelId, value}
+        const panelVarOld = variables.find((v: any) => v.scope === "panels");
+        if (panelVarOld && Array.isArray(panelVarOld.value)) {
+          const panelValue = panelVarOld.value.find(
+            (pv: any) => pv.panelId === context.panelId,
+          );
+          if (
+            panelValue &&
+            panelValue.value !== null &&
+            panelValue.value !== undefined
+          ) {
+            effectiveValue = panelValue.value;
+            found = true;
+          }
         }
       }
     }
 
     // 2. Check tab-level next
     if (!found && context.tabId) {
-      const tabVar = variables.find((v: any) => v.scope === "tabs");
-      if (tabVar && Array.isArray(tabVar.value)) {
-        const tabValue = tabVar.value.find(
-          (tv: any) => tv.tabId === context.tabId,
-        );
-        if (
-          tabValue &&
-          tabValue.value !== null &&
-          tabValue.value !== undefined
-        ) {
-          effectiveValue = tabValue.value;
-          found = true;
+      // New format: variable has tabId property directly
+      const tabVar = variables.find(
+        (v: any) => v.scope === "tabs" && v.tabId === context.tabId,
+      );
+      if (tabVar && tabVar.value !== null && tabVar.value !== undefined) {
+        effectiveValue = tabVar.value;
+        found = true;
+      } else {
+        // Old format: value is array of {tabId, value}
+        const tabVarOld = variables.find((v: any) => v.scope === "tabs");
+        if (tabVarOld && Array.isArray(tabVarOld.value)) {
+          const tabValue = tabVarOld.value.find(
+            (tv: any) => tv.tabId === context.tabId,
+          );
+          if (
+            tabValue &&
+            tabValue.value !== null &&
+            tabValue.value !== undefined
+          ) {
+            effectiveValue = tabValue.value;
+            found = true;
+          }
         }
       }
     }
