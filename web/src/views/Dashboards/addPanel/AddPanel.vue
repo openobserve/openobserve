@@ -1324,6 +1324,7 @@ export default defineComponent({
         await variablesManager.initialize(
           currentDashboardData.data?.variables?.list || [],
           currentDashboardData.data,
+          { [currentPanelId.value]: currentTabId.value || "" },
         );
 
         // Mark current tab and panel as visible so their variables can load

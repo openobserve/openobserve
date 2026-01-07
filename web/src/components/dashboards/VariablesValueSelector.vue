@@ -915,9 +915,13 @@ export default defineComponent({
         return;
       }
 
-      // IMPORTANT: Use direct references to manager's variables, not copies
-      // This ensures changes in the component are reflected in the manager
       variablesData.values = managedVars;
+
+      // REBUILD dependency graph from updated variables
+      // This is needed for the logic below (isChildVariable) and other component functions
+      variablesDependencyGraph = buildVariablesDependencyGraph(
+        variablesData.values,
+      );
 
       // Synchronize oldVariablesData with current manager state
       // This is critical for child variables that get reset by the manager
@@ -1072,7 +1076,7 @@ export default defineComponent({
         if (!useManager) return;
 
         syncManagerVariablesToLocal();
-
+        
         // Check for pending variables that need to be loaded
         // Use nextTick to ensure DOM and state are updated
         nextTick(() => {
@@ -2427,9 +2431,9 @@ export default defineComponent({
         try {
           await manager.updateVariableValue(
             currentVariable.name,
-            props.scope,
-            props.tabId,
-            props.panelId,
+            currentVariable.scope || "global",
+            currentVariable.tabId,
+            currentVariable.panelId,
             currentVariable.value,
           );
           return; // Manager handles all downstream updates

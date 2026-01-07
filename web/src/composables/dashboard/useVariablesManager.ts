@@ -411,9 +411,16 @@ export const useVariablesManager = () => {
   };
 
   // ========== INITIALIZATION ==========
-  const initialize = async (config: VariableConfig[], dashboard: any) => {
+  const initialize = async (
+    config: VariableConfig[],
+    dashboard: any,
+    extraPanelTabMapping?: Record<string, string>,
+  ) => {
     currentDashboard.value = dashboard;
-    panelTabMapping.value = buildPanelTabMapping(dashboard);
+    panelTabMapping.value = {
+      ...buildPanelTabMapping(dashboard),
+      ...(extraPanelTabMapping || {}),
+    };
 
     // Migrate legacy variables (no scope) to global
     const migratedConfig = config.map((v) => ({
