@@ -363,6 +363,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { computed } from "vue";
 import {
   getAllDashboardsByFolderId,
@@ -405,6 +406,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const route = useRoute();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard"
@@ -415,6 +417,9 @@ export default defineComponent({
 
     // Inject variablesManager to access all dashboard variables
     const variablesManager = inject<any>("variablesManager", null);
+
+    // Get current dashboard data to access tabs
+    const currentDashboardData = inject<any>("currentDashboardData", null);
     
     const getDefaultDrilldownData = () => ({
       name: "",
@@ -672,24 +677,31 @@ export default defineComponent({
     const selectedValue = computed(() => {
       let selectedValues: any = [];
 
-      // Get all dashboard variables (global, tabs, and panels) from variablesManager
+      // Get only visible variables (global, current tab, current panel) from variablesManager
       // If manager is not available, fall back to props.variablesData
       let allVariables: any[] = [];
 
       if (variablesManager && variablesManager.variablesData) {
-        // Collect all variables from all scopes
-        const globalVars = variablesManager.variablesData.global || [];
-        const tabVars = Object.values(variablesManager.variablesData.tabs || {}).flat();
-        const panelVars = Object.values(variablesManager.variablesData.panels || {}).flat();
+        
+        // Get the current panel ID and tab ID
+        const currentPanelId = dashboardPanelData.data.id;
+        // Get current tab ID from route query or first tab in dashboard
+        const currentTabId =
+          (route.query.tab as string) ||
+          currentDashboardData?.data?.tabs?.[0]?.tabId ||
+          "";
 
-        // Combine all variables and remove duplicates by name
-        const allVarsMap = new Map();
-        [...globalVars, ...tabVars, ...panelVars].forEach((variable: any) => {
-          if (!allVarsMap.has(variable.name)) {
-            allVarsMap.set(variable.name, variable);
-          }
-        });
-        allVariables = Array.from(allVarsMap.values());
+        // Use getAllVisibleVariables to get only global + current tab + current panel variables
+        if (variablesManager.getAllVisibleVariables) {
+          allVariables = variablesManager.getAllVisibleVariables(currentTabId, currentPanelId);
+        } else {
+          // Fallback: manually merge global + current tab + current panel
+          const globalVars = variablesManager.variablesData.global || [];
+          const tabVars = (currentTabId && variablesManager.variablesData.tabs?.[currentTabId]) || [];
+          const panelVars = (currentPanelId && variablesManager.variablesData.panels?.[currentPanelId]) || [];
+
+          allVariables = [...globalVars, ...tabVars, ...panelVars];
+        }
       } else {
         // Fallback to props.variablesData
         allVariables = props?.variablesData?.values || [];
