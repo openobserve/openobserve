@@ -1400,6 +1400,8 @@ pub struct Limit {
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
+    pub metrics_max_series_response: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]

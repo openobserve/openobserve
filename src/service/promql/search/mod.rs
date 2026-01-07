@@ -200,9 +200,9 @@ async fn search_in_cluster(
     if start > end && !cached_values.is_empty() {
         log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
         let values = if query_exemplars {
-            merge_exemplars_query(&cached_values)
+            merge_exemplars_query(&cached_values, &req.org_id).await?
         } else {
-            merge_matrix_query(&cached_values)
+            merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
         return Ok(values);
@@ -349,13 +349,13 @@ async fn search_in_cluster(
 
     // merge result
     let values = if result_type == "matrix" {
-        merge_matrix_query(&series_data)
+        merge_matrix_query(&series_data, &req.org_id).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data)
+        merge_vector_query(&series_data, &req.org_id).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
-        merge_exemplars_query(&series_data)
+        merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
         return Err(server_internal_error("invalid result type"));
     };
@@ -416,7 +416,7 @@ async fn search_in_cluster(
     Ok(values)
 }
 
-fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -447,12 +447,17 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
             RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
+
+    // Check series limit
+    let max_limit = get_max_series_limit(org_id).await;
+    check_series_limit(merged_data.len(), max_limit)?;
+
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
-fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -475,9 +480,13 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
         })
         .collect::<Vec<_>>();
 
+    // Check series limit
+    let max_limit = get_max_series_limit(org_id).await;
+    check_series_limit(merged_data.len(), max_limit)?;
+
     let mut value = Value::Vector(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
@@ -492,7 +501,7 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
     Value::Sample(sample)
 }
 
-fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -524,9 +533,42 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
             exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Check series limit
+    let max_limit = get_max_series_limit(org_id).await;
+    check_series_limit(merged_data.len(), max_limit)?;
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
+}
+
+/// Get the max series limit for the organization
+/// Returns org-specific limit if set, otherwise returns ENV default
+async fn get_max_series_limit(org_id: &str) -> usize {
+    match crate::service::db::organization::get_org_setting(org_id).await {
+        Ok(settings) => {
+            settings.max_series_per_query.unwrap_or_else(|| {
+                let cfg = get_config();
+                cfg.limit.metrics_max_series_response
+            })
+        }
+        Err(_) => {
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }
+    }
+}
+
+/// Check if series count exceeds the limit
+fn check_series_limit(series_count: usize, max_limit: usize) -> Result<()> {
+    if series_count > max_limit {
+        return Err(Error::ErrorCode(ErrorCodes::TooManyRecords(format!(
+            "Query result exceeds maximum allowed series limit of {}. Current result: {} series. \
+             You can increase this limit via organization settings or ZO_METRICS_MAX_SERIES_RESPONSE environment variable.",
+            max_limit, series_count
+        ))));
+    }
+    Ok(())
 }
