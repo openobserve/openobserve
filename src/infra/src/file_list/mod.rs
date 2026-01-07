@@ -17,6 +17,7 @@ use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
 use config::{
+    get_config,
     meta::{
         meta_store::MetaStore,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
@@ -610,7 +611,13 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
 }
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
-    let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
+    let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
+    if PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
+        == PartitionTimeLevel::Daily
+    {
+        level = PartitionTimeLevel::Daily;
+    }
+    let ts = level.duration();
     if ts > 0 {
         time_end + second_micros(ts)
     } else {
