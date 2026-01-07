@@ -101,10 +101,12 @@ npm run test:unit:coverage
 
 ### Rust Tests
 
-**Code Coverage Requirements:**
+**Code Coverage Requirements (Backend):**
 - Functions: ≥66%
 - Lines: ≥66%
 - Regions: ≥65%
+
+These thresholds are enforced by the CI pipeline and can be overridden using environment variables `COVERAGE_FUNCTIONS`, `COVERAGE_LINES`, and `COVERAGE_REGIONS`.
 
 **Running Tests:**
 ```bash
@@ -124,11 +126,21 @@ npm run test:unit:coverage
 - Ignore coverage for `job` and `generated` files
 - Retry failed tests once
 
-### JavaScript Tests
+### JavaScript/TypeScript Tests
 
-Run ESLint checks:
+**Code Coverage Requirements (Frontend):**
+- Lines: ≥55%
+- Functions: ≥44%
+- Branches: ≥45%
+- Statements: ≥54%
+
+**Running Tests:**
 ```bash
 cd web
+# Run tests with coverage
+./coverage.sh check
+
+# Run ESLint checks
 ./eslint.sh
 ```
 
@@ -149,10 +161,12 @@ docker build -t openobserve:latest-amd64 -f deploy/build/Dockerfile.tag.amd64 .
 ### CI Pipeline Checks
 
 Pull requests must pass:
-1. **Rust unit tests** with ≥81% code coverage (stricter than base requirements)
-2. **ESLint checks** for JavaScript/TypeScript
-3. **Cargo deny** for license and security checks
-4. **PR title validation** (see below)
+1. **Rust unit tests** with coverage thresholds (66%/66%/65% for functions/lines/regions)
+   - Tests run against both PostgreSQL and SQLite
+2. **Frontend unit tests** with coverage thresholds (55%/44%/45%/54% for lines/functions/branches/statements)
+3. **ESLint checks** for JavaScript/TypeScript
+4. **Cargo deny** for license and security checks
+5. **PR title validation** (see below)
 
 ### Security and License Checks
 
