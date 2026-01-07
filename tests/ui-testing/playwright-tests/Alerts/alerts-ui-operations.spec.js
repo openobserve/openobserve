@@ -106,6 +106,62 @@ test.describe("Alerts UI Operations", () => {
     await pm.dashboardFolder.deleteFolder(folderName);
   });
 
+  /**
+   * Feature #9484: Manual Alert Trigger via UI
+   * https://github.com/openobserve/openobserve/issues/9484
+   * Tests the manual alert trigger functionality accessible via the kebab menu
+   * Uses validation infrastructure (self-referential destination) for reliable testing
+   */
+  test('Manual Alert Trigger via UI (Feature #9484)', {
+    tag: ['@manualTrigger', '@all', '@alerts', '@feature9484']
+  }, async ({ page }) => {
+    const streamName = 'auto_playwright_stream';
+    const uniqueSuffix = sharedRandomValue || pm.alertsPage.generateRandomString();
+
+    // Use validation infrastructure - creates a destination that posts back to OpenObserve
+    // This ensures the trigger succeeds without external dependencies
+    validationInfra = await pm.alertsPage.ensureValidationInfrastructure(pm, uniqueSuffix);
+    testLogger.info('Validation infrastructure ready for manual trigger test', validationInfra);
+
+    await pm.commonActions.navigateToAlerts();
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+
+    // Create folder for the test
+    const folderName = 'auto_trigger_' + uniqueSuffix;
+    await pm.alertsPage.createFolder(folderName, 'Manual Trigger Test Folder');
+    await pm.alertsPage.verifyFolderCreated(folderName);
+    testLogger.info('Created folder for manual trigger test', { folderName });
+
+    // Navigate to folder and create alert with validation destination
+    await pm.alertsPage.navigateToFolder(folderName);
+    const column = 'log';
+    const value = 'test';
+    const alertName = await pm.alertsPage.createAlert(streamName, column, value, validationInfra.destinationName, uniqueSuffix);
+    await pm.alertsPage.verifyAlertCreated(alertName);
+    testLogger.info('Successfully created alert for manual trigger test', { alertName });
+
+    // Trigger the alert manually via the UI
+    testLogger.info('Triggering alert manually via UI');
+    const triggerSuccess = await pm.alertsPage.triggerAlertManually(alertName);
+    expect(triggerSuccess).toBe(true);
+    testLogger.info('Manual alert trigger successful', { alertName, triggerSuccess });
+
+    // Note: Alert history verification is optional for this feature test
+    // The core Feature #9484 is about the UI button triggering the API successfully
+    // The success notification confirms the trigger was successful
+
+    // Cleanup: delete the alert and folder
+    await pm.commonActions.navigateToAlerts();
+    await pm.alertsPage.navigateToFolder(folderName);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await pm.alertsPage.deleteAlertByRow(alertName);
+    await pm.dashboardFolder.searchFolder(folderName);
+    await pm.dashboardFolder.verifyFolderVisible(folderName);
+    await pm.dashboardFolder.deleteFolder(folderName);
+
+    testLogger.info('Feature #9484 test completed: Manual Alert Trigger via UI');
+  });
+
   test('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {

@@ -1903,9 +1903,7 @@ export class LogsPage {
 
         // Check if JSON tab is selected (has 'q-tab--active' class)
         const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
-        if (!isJsonTabActive) {
-            throw new Error('JSON tab is not selected by default - Bug #9724 regression');
-        }
+        expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
 
         // Verify JSON content is visible
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
@@ -1929,7 +1927,7 @@ export class LogsPage {
     async clickLogDetailTableTab() {
         await this.page.locator(this.logDetailTableTab).click();
         // Wait for table content to be visible
-        await this.page.waitForTimeout(500);
+        await this.page.locator(this.logDetailTableContent).waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info('Clicked Table tab');
     }
 
@@ -1940,7 +1938,7 @@ export class LogsPage {
     async clickLogDetailJsonTab() {
         await this.page.locator(this.logDetailJsonTab).click();
         // Wait for JSON content to be visible
-        await this.page.waitForTimeout(500);
+        await this.page.locator(this.logDetailJsonContent).waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info('Clicked JSON tab');
     }
 
@@ -1951,9 +1949,7 @@ export class LogsPage {
     async verifyTableTabSelected() {
         const tableTab = this.page.locator(this.logDetailTableTab);
         const isTableTabActive = await tableTab.evaluate(el => el.classList.contains('q-tab--active'));
-        if (!isTableTabActive) {
-            throw new Error('Table tab is not selected');
-        }
+        expect(isTableTabActive, 'Table tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
         testLogger.info('✓ Table tab is selected and content is visible');
     }
@@ -1965,9 +1961,7 @@ export class LogsPage {
     async verifyJsonTabSelected() {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
         const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
-        if (!isJsonTabActive) {
-            throw new Error('JSON tab is not selected');
-        }
+        expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
         testLogger.info('✓ JSON tab is selected and content is visible');
     }
@@ -1978,7 +1972,8 @@ export class LogsPage {
      */
     async closeLogDetailSidebar() {
         await this.page.locator(this.logDetailCloseButton).click();
-        await this.page.waitForTimeout(500);
+        // Wait for sidebar to close
+        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'hidden', timeout: 5000 });
         testLogger.info('Log detail sidebar closed');
     }
 
