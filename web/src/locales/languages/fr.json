@@ -1829,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Le texte du logo a été correctement mis à jour.",
     "errorUpdatingImage": "Erreur lors de la mise à jour de l'image.",
     "fileFormatConstraint": "(Uniquement les formats .png, .jpg, .jpeg, .gif, .bmp et taille maximale : 150 x 30 px)",
-    "filesValidationFailed": "Le ou les fichiers {count} n'ont pas passé les contraintes de validation"
+    "filesValidationFailed": "Le ou les fichiers {count} n'ont pas passé les contraintes de validation",
+    "maxSeriesPerQueryLabel": "Nombre maximum de séries par requête",
+    "maxSeriesPerQueryDescription": "Nombre maximum de séries pouvant être renvoyées à partir d'une seule requête ProMQL. Aide à prévenir le gel de l'interface utilisateur en cas de grands ensembles de résultats. Laissez ce champ vide pour utiliser la valeur par défaut du système (40 000).",
+    "maxSeriesPerQueryTooltip": "Lorsqu'une requête ProMQL telle que « count (metric) by (label) » renvoie trop de séries, elle peut geler l'interface utilisateur. Cette limite empêche cela. Définissez la valeur par défaut du système sur null ou spécifiez une valeur comprise entre 1 000 et 1 000 000.",
+    "maxSeriesPerQueryValidation": "La valeur doit être comprise entre 1 000 et 1 000 000, ou laisser vide par défaut",
+    "systemDefault": "défaut du système"
   },
   "iam": {
     "users": "Les utilisateurs",
