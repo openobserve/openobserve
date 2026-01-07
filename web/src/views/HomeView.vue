@@ -409,7 +409,7 @@ bordered class="my-card q-py-md">
         </div>
       </div>
     </div>
-    <div v-if="isLoadingSummary" class="column q-pt-md" style="height: auto; overflow-y: auto;">
+    <div v-if="isLoadingSummary">
       <HomeViewSkeleton />
     </div>
   </q-page>

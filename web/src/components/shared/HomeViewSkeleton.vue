@@ -1,38 +1,39 @@
 <template>
-  <div>
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem]" style="display: flex; flex-direction: column;">
 
     <!-- 1st section - Streams container -->
-      <div class="streams-container q-px-lg q-py-md"
+      <div class="feature-card"
            :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'">
         <!-- Header -->
-        <div class="row justify-between items-center q-mb-md">
-          <SkeletonBox variant="title" width="80px" />
-          <SkeletonBox variant="button" width="60px" />
+        <div class="row justify-between items-center streams-header">
+          <div class="row tw:items-center tw:gap-2">
+            <SkeletonBox variant="avatar" width="40px" height="40px" />
+            <SkeletonBox variant="title" width="100px" />
+          </div>
+          <SkeletonBox variant="button" width="40px" height="40px" />
         </div>
 
-        <!-- Tiles -->
-        <div class="row wrap justify-evenly q-gutter-md">
-          <div 
-            v-for="n in 5" 
-            :key="n" 
-            class="tile" 
-            style="min-width: 240px; flex-grow: 1; max-width: 100%;"
+        <!-- Tiles using same grid as HomeView -->
+        <div class="tiles-grid">
+          <div
+            v-for="n in 5"
+            :key="n"
+            class="tile"
           >
-            <div class="tile-content q-pa-md rounded-borders column justify-between"
-                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-                 style="height: 140px; gap: 12px;">
-              <!-- Top Section -->
+            <div class="tile-content rounded-borders text-center column justify-between"
+                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
+              <!-- Top Section (60%) -->
               <div class="column justify-between">
                 <!-- Title row -->
-                <div class="row justify-between items-center">
-                  <SkeletonBox variant="text" width="100px" />
-                  <SkeletonBox variant="avatar" width="32px" height="32px" />
+                <div class="row justify-between">
+                  <SkeletonBox variant="text" width="100px" height="20px" />
+                  <SkeletonBox variant="avatar" width="40px" height="40px" />
                 </div>
               </div>
 
-              <!-- Bottom Section - Data -->
-              <div class="row items-end">
-                <SkeletonBox variant="title" width="80px" />
+              <!-- Bottom Section (40%) -->
+              <div class="data-to-display row items-end">
+                <SkeletonBox variant="title" width="80px" height="32px" />
               </div>
             </div>
           </div>
@@ -40,69 +41,66 @@
       </div>
 
       <!-- 2nd section - functions and dashboards tiles + 2 charts -->
-      <div class="charts-main-container row tw:gap-4 q-mt-md xl:tw:min-h-[330px]" style="display: flex; gap: 16px; height: calc(100% - 22px);">
-        <!-- Functions and Dashboards tiles -->
-        <div class="xl:tw:flex-col lg:tw:flex md:tw:flex-row tw:justify-evenly sm:tw:justify-start tw:gap-4 md:tw:w-full xl:tw:w-fit">
+      <div class="charts-main-container">
+        <!-- Functions and Dashboards column -->
+        <div class="functions-dashboards-column">
           <!-- Functions tile -->
-          <div class="tw:w-full lg:tw:w-[calc(50%-0.5rem)] xl:tw:w-[240px] tw:max-w-full">
-            <div class="dashboards-tile-content tw:h-[180px] q-pa-md rounded-borders column justify-between"
-                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-                 style="min-height: 150px; gap: 12px;">
+          <div class="tile-wrapper">
+            <div class="feature-card rounded-borders text-center column justify-between"
+                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
-                <div class="row justify-between items-center">
-                  <div class="skeleton-box" style="width: 100px; height: 16px; border-radius: 4px;"></div>
-                  <div class="skeleton-box" style="width: 32px; height: 32px; border-radius: 4px;"></div>
+                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                  <SkeletonBox variant="avatar" width="40px" height="40px" />
+                  <SkeletonBox variant="text" width="100px" height="20px" />
+                  <SkeletonBox variant="button" width="40px" height="40px" />
                 </div>
               </div>
-              <div class="row items-end justify-between">
-                <div class="skeleton-box" style="width: 50px; height: 24px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              <div class="data-to-display row items-end">
+                <SkeletonBox variant="title" width="60px" height="32px" />
               </div>
             </div>
           </div>
 
           <!-- Dashboards tile -->
-          <div class="tw:w-full lg:tw:w-[calc(50%-0.5rem)] xl:tw:w-[240px] tw:max-w-full">
-            <div class="functions-tile-content tw:h-[180px] q-pa-md rounded-borders column justify-between"
-                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-                 style="min-height: 150px; gap: 12px;">
+          <div class="tile-wrapper">
+            <div class="feature-card rounded-borders text-center column justify-between"
+                 :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'">
               <div class="column justify-between">
-                <div class="row justify-between items-center">
-                  <div class="skeleton-box" style="width: 100px; height: 16px; border-radius: 4px;"></div>
-                  <div class="skeleton-box" style="width: 32px; height: 32px; border-radius: 4px;"></div>
+                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
+                  <SkeletonBox variant="avatar" width="40px" height="40px" />
+                  <SkeletonBox variant="text" width="100px" height="20px" />
+                  <SkeletonBox variant="button" width="40px" height="40px" />
                 </div>
               </div>
-              <div class="row items-end justify-between">
-                <div class="skeleton-box" style="width: 50px; height: 24px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              <div class="data-to-display row items-end">
+                <SkeletonBox variant="title" width="60px" height="32px" />
               </div>
             </div>
           </div>
         </div>
 
         <!-- Alerts Chart -->
-        <div class="first-chart-container rounded-borders tw:w-full tw:max-w-full xl:tw:w-[31%] tw:p-4"
-             style="display: flex; flex-direction: column;"
+        <div class="feature-card first-chart-container rounded-borders tw:p-4"
              :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'">
-          <div class="details-container" style="margin-bottom: 16px;">
+          <div class="details-container">
             <!-- Header -->
             <div class="row justify-between items-center">
-              <div class="row items-center" style="gap: 8px;">
-                <div class="skeleton-box" style="width: 33px; height: 33px; border-radius: 9px;"></div>
-                <div class="skeleton-box" style="width: 120px; height: 18px; border-radius: 4px;"></div>
-              </div>
-              <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              <span class="text-title tw:flex tw:items-center tw:gap-2">
+                <SkeletonBox variant="avatar" width="40px" height="40px" />
+                <SkeletonBox variant="text" width="120px" height="20px" />
+              </span>
+              <SkeletonBox variant="button" width="40px" height="40px" />
             </div>
             <!-- Stats row -->
             <div class="row q-pt-sm" style="gap: 16px;">
               <div class="column">
-                <div class="skeleton-box q-mb-xs" style="width: 100px; height: 14px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 40px; height: 20px; border-radius: 4px;"></div>
+                <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
+                <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
-              <div class="skeleton-box" style="width: 1px; height: 40px;"></div>
+              <q-separator vertical />
               <div class="column">
-                <div class="skeleton-box q-mb-xs" style="width: 80px; height: 14px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 40px; height: 20px; border-radius: 4px;"></div>
+                <SkeletonBox variant="text" width="80px" height="14px" class="q-mb-xs" />
+                <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
             </div>
           </div>
@@ -113,28 +111,27 @@
         </div>
 
         <!-- Pipelines Chart -->
-        <div class="second-chart-container rounded-borders tw:w-full tw:max-w-full xl:tw:w-[calc(49%+5px)] tw:p-4"
-             style="display: flex; flex-direction: column;"
+        <div class="feature-card second-chart-container rounded-borders tw:p-4"
              :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'">
-          <div class="details-container" style="margin-bottom: 16px;">
+          <div class="details-container">
             <!-- Header -->
             <div class="row justify-between items-center">
-              <div class="row items-center" style="gap: 8px;">
-                <div class="skeleton-box" style="width: 33px; height: 33px; border-radius: 9px;"></div>
-                <div class="skeleton-box" style="width: 140px; height: 18px; border-radius: 4px;"></div>
-              </div>
-              <div class="skeleton-box" style="width: 60px; height: 32px; border-radius: 4px;"></div>
+              <span class="text-title tw:flex tw:items-center tw:gap-2">
+                <SkeletonBox variant="avatar" width="40px" height="40px" />
+                <SkeletonBox variant="text" width="140px" height="20px" />
+              </span>
+              <SkeletonBox variant="button" width="40px" height="40px" />
             </div>
             <!-- Stats row -->
             <div class="row q-pt-sm" style="gap: 16px;">
               <div class="column">
-                <div class="skeleton-box q-mb-xs" style="width: 120px; height: 14px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 40px; height: 20px; border-radius: 4px;"></div>
+                <SkeletonBox variant="text" width="120px" height="14px" class="q-mb-xs" />
+                <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
-              <div class="skeleton-box" style="width: 1px; height: 40px;"></div>
+              <q-separator vertical />
               <div class="column">
-                <div class="skeleton-box q-mb-xs" style="width: 100px; height: 14px; border-radius: 4px;"></div>
-                <div class="skeleton-box" style="width: 40px; height: 20px; border-radius: 4px;"></div>
+                <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
+                <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
             </div>
           </div>
@@ -155,61 +152,132 @@ const store = useStore();
 </script>
 
 <style scoped lang="scss">
-.streams-container {
-  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
-  border-radius: 8px;
-  box-sizing: border-box;
+// Import the same structure as HomeView.vue
+.feature-card {
+  background: var(--tile-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+  border-radius: 0.5rem;
+  padding: 1rem;
 }
 
-.dark-stream-container {
-  background: #222526;
-  border: 1px solid #444444;
-}
-
+.dark-stream-container,
 .light-stream-container {
-  background: linear-gradient(to bottom, #fdfdfe, #f3f3f9);
-  border: 1px solid #E7EAEE;
+  background: var(--tile-bg);
+  border: 0.0625rem solid var(--o2-border-color);
+}
+
+.streams-header {
+  margin-bottom: 16px;
+}
+
+// Modern CSS Grid for responsive tiles - matching HomeView
+.tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
 }
 
 .tile {
-  flex: 1 1 240px;
-  max-width: 100%;
+  border-radius: 0.325rem;
+  border: 0.0625rem solid var(--o2-border-color);
 }
 
 .tile-content {
-  height: 140px !important;
-  padding: 16px;
-  border-radius: 8px;
+  height: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  gap: 0.5rem;
+}
+
+.dark-tile-content,
+.light-tile-content {
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  color: var(--text-primary);
 }
 
 .dark-tile-content {
-  background: #2B2C2D;
-  border: 1px solid #444444;
-  color: #D2D2D2;
+  --tile-bg: #2B2C2D;
+  --tile-border: #444444;
+  --text-primary: #CCCFD1;
 }
 
 .light-tile-content {
-  background: #ffffff;
-  border: 1px solid #E7EAEE;
-  color: #2D2D2D;
+  --tile-bg: #ffffff;
+  --tile-border: #E7EAEE;
+  --text-primary: #2E3133;
+}
+
+.data-to-display {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+// Layout for charts section - matching HomeView
+.charts-main-container {
+  display: grid;
+  grid-template-columns: minmax(min-content, max-content) 1fr 2fr;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: stretch;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+}
+
+.functions-dashboards-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+
+  @media (max-width: 1280px) {
+    flex-direction: row;
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+.tile-wrapper {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  width: 100%;
+
+  .feature-card {
+    width: 100%;
+  }
 }
 
 .chart-container-light {
-  border: 1px solid #E7EAEE;
-  background: #ffffff;
+  border: 1px solid var(--tile-border);
+  background: var(--tile-bg);
+  --tile-bg: #ffffff;
+  --tile-border: #E7EAEE;
 }
 
 .chart-container-dark {
-  border: 1px solid #444444;
-  background: #2B2C2D;
+  border: 1px solid var(--tile-border);
+  background: var(--tile-bg);
+  --tile-bg: #2B2C2D;
+  --tile-border: #444444;
 }
 
-.charts-main-container {
+.text-title {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0%;
+}
+
+.details-container {
   gap: 12px;
-}
-
-.ai-enabled-home-view {
-  height: calc(100vh - 120px);
+  margin-bottom: 16px;
 }
 
 /* Skeleton Animation */
