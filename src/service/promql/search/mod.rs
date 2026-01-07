@@ -587,3 +587,50 @@ fn check_series_limit(series_count: usize, max_limit: usize) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_series_limit_within_limit() {
+        // Test series count within limit
+        let result = check_series_limit(1000, 10000);
+        assert!(result.is_ok());
+
+        // Test series count exactly at limit
+        let result = check_series_limit(10000, 10000);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_check_series_limit_exceeds_limit() {
+        // Test series count exceeds limit
+        let result = check_series_limit(10001, 10000);
+        assert!(result.is_err());
+
+        // Verify error message contains expected information
+        let err = result.unwrap_err();
+        let err_msg = format!("{:?}", err);
+        assert!(err_msg.contains("exceeds maximum allowed series limit"));
+        assert!(err_msg.contains("10000"));
+        assert!(err_msg.contains("10001"));
+    }
+
+    #[test]
+    fn test_check_series_limit_edge_cases() {
+        // Test zero series (should always pass)
+        let result = check_series_limit(0, 1000);
+        assert!(result.is_ok());
+
+        // Test with limit of 1
+        let result = check_series_limit(0, 1);
+        assert!(result.is_ok());
+
+        let result = check_series_limit(1, 1);
+        assert!(result.is_ok());
+
+        let result = check_series_limit(2, 1);
+        assert!(result.is_err());
+    }
+}

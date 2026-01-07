@@ -311,12 +311,12 @@ fn default_claim_parser_function() -> String {
 pub struct MaxSeriesLimit(usize);
 
 impl MaxSeriesLimit {
-    const MIN: usize = 1_000;
-    const MAX: usize = 1_000_000;
+    pub const MIN: usize = 1_000;
+    pub const MAX: usize = 1_000_000;
 
     /// Creates a new MaxSeriesLimit with validation
     pub fn new(value: usize) -> Result<Self, String> {
-        if value >= Self::MIN && value <= Self::MAX {
+        if (Self::MIN..=Self::MAX).contains(&value) {
             Ok(Self(value))
         } else {
             Err(format!(
@@ -331,25 +331,6 @@ impl MaxSeriesLimit {
     /// Returns the inner value
     pub fn value(&self) -> usize {
         self.0
-    }
-}
-
-impl ToSchema<'_> for MaxSeriesLimit {
-    fn schema() -> (
-        &'static str,
-        utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
-    ) {
-        (
-            "MaxSeriesLimit",
-            utoipa::openapi::ObjectBuilder::new()
-                .schema_type(utoipa::openapi::SchemaType::Integer)
-                .minimum(Some(1_000.0))
-                .maximum(Some(1_000_000.0))
-                .description(Some(
-                    "Maximum number of series per query (1,000 to 1,000,000)",
-                ))
-                .into(),
-        )
     }
 }
 
@@ -561,6 +542,69 @@ mod tests {
         assert_eq!(setting.span_id_field_name, "span_id");
         assert!(!setting.toggle_ingestion_logs);
         assert!(!setting.enable_streaming_search);
+    }
+
+    #[test]
+    fn test_max_series_limit_valid_values() {
+        // Test minimum valid value
+        let limit = MaxSeriesLimit::new(1_000);
+        assert!(limit.is_ok());
+        assert_eq!(limit.unwrap().value(), 1_000);
+
+        // Test maximum valid value
+        let limit = MaxSeriesLimit::new(1_000_000);
+        assert!(limit.is_ok());
+        assert_eq!(limit.unwrap().value(), 1_000_000);
+
+        // Test mid-range value
+        let limit = MaxSeriesLimit::new(40_000);
+        assert!(limit.is_ok());
+        assert_eq!(limit.unwrap().value(), 40_000);
+    }
+
+    #[test]
+    fn test_max_series_limit_invalid_values() {
+        // Test below minimum
+        let limit = MaxSeriesLimit::new(999);
+        assert!(limit.is_err());
+        assert!(limit.unwrap_err().contains("must be between"));
+
+        // Test above maximum
+        let limit = MaxSeriesLimit::new(1_000_001);
+        assert!(limit.is_err());
+        assert!(limit.unwrap_err().contains("must be between"));
+
+        // Test zero
+        let limit = MaxSeriesLimit::new(0);
+        assert!(limit.is_err());
+
+        // Test very large value
+        let limit = MaxSeriesLimit::new(10_000_000);
+        assert!(limit.is_err());
+    }
+
+    #[test]
+    fn test_max_series_limit_serialization() {
+        let limit = MaxSeriesLimit::new(50_000).unwrap();
+
+        // Test serialization
+        let json = serde_json::to_string(&limit).unwrap();
+        assert_eq!(json, "50000");
+
+        // Test deserialization with valid value
+        let deserialized: MaxSeriesLimit = serde_json::from_str("50000").unwrap();
+        assert_eq!(deserialized.value(), 50_000);
+    }
+
+    #[test]
+    fn test_max_series_limit_deserialization_invalid() {
+        // Test deserialization with invalid value (too low)
+        let result: Result<MaxSeriesLimit, _> = serde_json::from_str("500");
+        assert!(result.is_err());
+
+        // Test deserialization with invalid value (too high)
+        let result: Result<MaxSeriesLimit, _> = serde_json::from_str("2000000");
+        assert!(result.is_err());
     }
 
     #[test]
