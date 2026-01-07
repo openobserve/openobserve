@@ -782,17 +782,28 @@ export default defineComponent({
               // Check if the user has changed the query and query contains a metric name
               // If metric name is different from stream name, set the query to the stream name with curly braces
               // If metric name is the same as stream name, do not set the query
-              const parsedQuery = parsePromQlQuery(
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].query,
-              );
+              let parsedQuery = null;
+              try {
+                // Parse the query to get the metric name
+                parsedQuery = parsePromQlQuery(
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].query,
+                );
+              } catch (error: any) {
+                parsedQuery = null;
+              }
 
               const metricName = parsedQuery?.metricName;
               const streamName =
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields.stream;
+
+              // Add guard
+              if (!streamName) {
+                return;
+              }
 
               // Set query if: (1) no metric name exists, OR (2) metric name differs from stream
               if (!metricName || metricName !== streamName) {
