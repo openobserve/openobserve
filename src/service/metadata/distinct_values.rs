@@ -124,6 +124,10 @@ impl DistinctValues {
     }
 }
 
+pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
+    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
+}
+
 fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
     let (tx, mut rx) = mpsc::channel::<DvEvent>(CHANNEL_SIZE);
     tokio::task::spawn(async move {
@@ -208,12 +212,8 @@ impl Metadata for DistinctValues {
                 continue;
             }
 
-            let distinct_stream_name = format!(
-                "{}_{}_{}",
-                DISTINCT_STREAM_PREFIX,
-                stream_type.as_str(),
-                stream_name
-            );
+            let distinct_stream_name = get_distinct_stream_name(stream_type, &stream_name);
+
             // check for schema
             let mut db_schema =
                 infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
@@ -238,6 +238,35 @@ impl Metadata for DistinctValues {
                         return Err(Error::Message(e.to_string()));
                     }
                 };
+
+                if let Some(ret) =
+                    super::super::stream::get_stream_retention(&org_id, stream_type, &stream_name)
+                        .await
+                {
+                    let mut new_settings = infra::schema::get_settings(
+                        &org_id,
+                        &distinct_stream_name,
+                        StreamType::Metadata,
+                    )
+                    .await
+                    .unwrap_or_default();
+                    new_settings.data_retention = ret;
+                    if let Err(e) = super::super::stream::save_stream_settings(
+                        &org_id,
+                        &distinct_stream_name,
+                        StreamType::Metadata,
+                        new_settings,
+                    )
+                    .await
+                    {
+                        // in worse case the original and distinct stream will have different
+                        // retention, but no point in failing the whole
+                        // ingest operation of distinct values for that
+                        log::warn!(
+                            "error updating stream settings for retention for distinct values stream {org_id}/{distinct_stream_name} : {e}"
+                        );
+                    }
+                }
             }
 
             let inferred_schema =
