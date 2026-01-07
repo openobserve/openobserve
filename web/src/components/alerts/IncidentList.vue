@@ -177,7 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :maximized="true"
     >
       <IncidentDetailDrawer
-        :incident="selectedIncident"
         @close="closeDrawer"
         @status-updated="onStatusUpdated"
       />

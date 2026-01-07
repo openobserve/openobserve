@@ -192,9 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-toggle
             v-model="localIsAggregationEnabled"
-            size="md"
-            color="primary"
-            class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
+            size="30px"
+            class="text-bold o2-toggle-button-xs"
             @update:model-value="toggleAggregation"
           />
         </div>
