@@ -89,164 +89,168 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       default-opened
     >
       <div class="tw:p-4">
-        <div class="tw:flex tw:gap-2 tw:mb-3">
-          <q-btn
-            flat
+        <div class="tw:flex tw:gap-4">
+        <!-- Priority Order (Left) -->
+        <div class="tw:flex-1">
+          <div class="tw:text-sm tw:font-semibold tw:mb-2">Priority Order</div>
+          <q-input
+            v-model="prioritySearchQuery"
             dense
+            outlined
+            placeholder="Search..."
+            class="tw:mb-2"
+          >
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+          <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
+            <q-item
+              v-for="(dim, index) in filteredPriorityDimensions"
+              :key="dim"
+              clickable
+              @click="togglePrioritySelection(dim)"
+              :active="selectedPriorityDimensions.includes(dim)"
+              dense
+              class="tw:py-2 tw:cursor-move"
+              draggable="true"
+              @dragstart="handleDragStart(index, $event)"
+              @dragover.prevent
+              @drop="handleDrop(index, $event)"
+            >
+              <q-item-section avatar class="tw:min-w-0 tw:mr-1">
+                <q-icon name="drag_indicator" size="sm" class="tw:text-gray-400" />
+              </q-item-section>
+              <q-item-section avatar class="tw:min-w-0 tw:mr-3">
+                <q-badge
+                  :color="index < 4 ? 'primary' : 'grey'"
+                  text-color="white"
+                  class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
+                >
+                  {{ localFqnPriority.indexOf(dim) + 1 }}
+                </q-badge>
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="tw:font-medium">{{ getDimensionDisplay(dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ dim }})</span></q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <div class="tw:flex tw:gap-1">
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="sm"
+                    icon="arrow_upward"
+                    :disable="localFqnPriority.indexOf(dim) === 0"
+                    @click="moveFqnDimensionUp(localFqnPriority.indexOf(dim))"
+                  >
+                    <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="sm"
+                    icon="arrow_downward"
+                    :disable="localFqnPriority.indexOf(dim) === localFqnPriority.length - 1"
+                    @click="moveFqnDimensionDown(localFqnPriority.indexOf(dim))"
+                  >
+                    <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    size="sm"
+                    icon="delete"
+                    color="negative"
+                    @click="removeFqnDimension(localFqnPriority.indexOf(dim))"
+                  >
+                    <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
+                  </q-btn>
+                </div>
+              </q-item-section>
+            </q-item>
+            <q-item v-if="filteredPriorityDimensions.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
+              {{ prioritySearchQuery ? "No matching dimensions" : t("settings.correlation.noDimensionsConfigured") }}
+            </q-item>
+          </q-list>
+        </div>
+
+        <!-- Center Buttons -->
+        <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
+          <q-btn
+            outline
+            dense
+            icon="arrow_back"
+            @click="addSelectedDimensions"
+            :disable="selectedAvailableDimensions.length === 0"
             size="sm"
-            icon="restart_alt"
-            :label="t('settings.correlation.resetToDefaults')"
-            @click="resetFqnPriority"
           />
-          <q-icon
-            :name="outlinedInfo"
-            size="1rem"
-            class="cursor-pointer tw:self-center"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="21.875rem"
-              class="tooltip-text"
-            >
-              {{ t("settings.correlation.fqnPriorityTooltip") }}
-            </q-tooltip>
-          </q-icon>
-        </div>
-
-        <q-list bordered class="tw:rounded-lg">
-        <q-item
-          v-for="(dim, index) in localFqnPriority"
-          :key="dim"
-          dense
-          class="tw:py-2"
-        >
-          <q-item-section avatar class="tw:min-w-0">
-            <q-badge
-              :color="index < 4 ? 'primary' : 'grey'"
-              text-color="white"
-              class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
-            >
-              {{ index + 1 }}
-            </q-badge>
-          </q-item-section>
-          <q-item-section>
-            <q-item-label class="tw:font-medium">{{ getDimensionDisplay(dim) }}</q-item-label>
-            <q-item-label caption class="tw:font-mono tw:text-xs">{{ dim }}</q-item-label>
-          </q-item-section>
-          <q-item-section side>
-            <div class="tw:flex tw:gap-1">
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveFqnDimensionUp(index)"
-              >
-                <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_downward"
-                :disable="index === localFqnPriority.length - 1"
-                @click="moveFqnDimensionDown(index)"
-              >
-                <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="delete"
-                color="negative"
-                @click="removeFqnDimension(index)"
-              >
-                <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
-              </q-btn>
-            </div>
-          </q-item-section>
-        </q-item>
-        <q-item v-if="localFqnPriority.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
-          {{ t("settings.correlation.noDimensionsConfigured") }}
-        </q-item>
-      </q-list>
-
-      <!-- Add new semantic group to FQN priority -->
-      <div class="tw:mt-3">
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t("settings.correlation.addDimensionHint") }}
-        </div>
-        <div class="tw:flex tw:gap-2 tw:items-end">
-          <q-select
-            v-model="selectedSemanticGroup"
-            :options="availableSemanticGroups"
-            dense
-            borderless
-            stack-label
-            :label="t('settings.correlation.selectSemanticGroup')"
-            class="tw:flex-1 showLabelOnTop"
-            emit-value
-            map-options
-            clearable
-            :disable="availableSemanticGroups.length === 0"
-          >
-            <template v-slot:option="scope">
-              <q-item v-bind="scope.itemProps">
-                <q-item-section>
-                  <q-item-label>{{ scope.opt.label }}</q-item-label>
-                  <q-item-label caption class="tw:text-xs tw:font-mono">
-                    {{ scope.opt.value }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.correlation.noSemanticGroupsAvailable") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-
           <q-btn
-            flat
+            outline
             dense
-            icon="add"
-            color="primary"
-            :disable="!selectedSemanticGroup"
-            @click="addFqnDimension"
+            icon="arrow_forward"
+            @click="removeSelectedDimensions"
+            :disable="selectedPriorityDimensions.length === 0"
+            size="sm"
+          />
+        </div>
+
+        <!-- Available Semantic Groups (Right) -->
+        <div class="tw:flex-1">
+          <div class="tw:text-sm tw:font-semibold tw:mb-2">Available Dimensions</div>
+          <q-input
+            v-model="availableSearchQuery"
+            dense
+            outlined
+            placeholder="Search..."
+            class="tw:mb-2"
           >
-            <q-tooltip>{{ t("settings.correlation.addDimensionLabel") }}</q-tooltip>
-          </q-btn>
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
+          <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
+            <q-item
+              v-for="group in filteredAvailableGroups"
+              :key="group.value"
+              clickable
+              @click="toggleAvailableSelection(group.value)"
+              :active="selectedAvailableDimensions.includes(group.value)"
+              dense
+            >
+              <q-item-section>
+                <q-item-label>{{ group.label }} <span class="tw:font-normal tw:text-xs">({{ group.value }})</span></q-item-label>
+              </q-item-section>
+            </q-item>
+            <q-item v-if="filteredAvailableGroups.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
+              {{ availableSearchQuery ? t("settings.correlation.noMatchingGroups") : t("settings.correlation.noSemanticGroupsAvailable") }}
+            </q-item>
+          </q-list>
         </div>
       </div>
+
+      <!-- Reset and Save Buttons -->
+      <div class="tw:flex tw:justify-end tw:gap-2 tw:mt-4">
+        <q-btn
+          flat
+          :label="t('settings.correlation.resetToDefaults')"
+          icon="restart_alt"
+          @click="resetFqnPriority"
+        />
+        <q-btn
+          :label="t('common.save')"
+          color="primary"
+          @click="saveFqnPriority"
+          :loading="savingFqn"
+        />
+      </div>
+
       <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw:mt-2 tw:text-sm tw:text-amber-600 dark:tw:text-amber-400">
         {{ t("settings.correlation.noSemanticGroupsConfigured") }}
       </div>
+    </div>
+  </q-expansion-item>
 
-        <!-- Save FQN Priority Button -->
-        <div class="tw:flex tw:justify-end tw:mt-4">
-          <q-btn
-            :label="t('common.save')"
-            color="primary"
-            @click="saveFqnPriority"
-            :loading="savingFqn"
-            class="tw:px-4"
-          />
-        </div>
-      </div>
-    </q-expansion-item>
-
-    <!-- Semantic Field Groups - Collapsible Section -->
-    <q-expansion-item
+  <!-- Semantic Field Groups - Collapsible Section -->
+  <q-expansion-item
       v-model="semanticSectionExpanded"
       icon="category"
       :label="t('settings.correlation.semanticFieldTitle')"
@@ -320,6 +324,13 @@ const localFqnPriority = ref<string[]>([]);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 const selectedSemanticGroup = ref<string | null>(null);
 
+// Dual-list selector state
+const prioritySearchQuery = ref('');
+const availableSearchQuery = ref('');
+const selectedAvailableDimensions = ref<string[]>([]);
+const selectedPriorityDimensions = ref<string[]>([]);
+const draggedIndex = ref<number | null>(null);
+
 // Reserved IDs that should not be used as semantic groups
 // service-fqn is the OUTPUT of correlation, not an input dimension
 const RESERVED_GROUP_IDS = ['service-fqn', 'servicefqn', 'fqn'];
@@ -340,6 +351,81 @@ const availableSemanticGroups = computed(() => {
       value: group.id
     }));
 });
+
+// Filtered priority dimensions based on search
+const filteredPriorityDimensions = computed(() => {
+  if (!prioritySearchQuery.value) return localFqnPriority.value;
+  const query = prioritySearchQuery.value.toLowerCase();
+  return localFqnPriority.value.filter(dim => {
+    const display = getDimensionDisplay(dim).toLowerCase();
+    return display.includes(query) || dim.toLowerCase().includes(query);
+  });
+});
+
+// Filtered available groups based on search
+const filteredAvailableGroups = computed(() => {
+  const available = availableSemanticGroups.value;
+  if (!availableSearchQuery.value) return available;
+  const query = availableSearchQuery.value.toLowerCase();
+  return available.filter(g =>
+    g.label.toLowerCase().includes(query) || g.value.toLowerCase().includes(query)
+  );
+});
+
+// Toggle selection in priority list
+const togglePrioritySelection = (value: string) => {
+  const index = selectedPriorityDimensions.value.indexOf(value);
+  if (index > -1) {
+    selectedPriorityDimensions.value.splice(index, 1);
+  } else {
+    selectedPriorityDimensions.value.push(value);
+  }
+};
+
+// Toggle selection in available list
+const toggleAvailableSelection = (value: string) => {
+  const index = selectedAvailableDimensions.value.indexOf(value);
+  if (index > -1) {
+    selectedAvailableDimensions.value.splice(index, 1);
+  } else {
+    selectedAvailableDimensions.value.push(value);
+  }
+};
+
+// Drag and drop handlers
+const handleDragStart = (index: number, event: DragEvent) => {
+  draggedIndex.value = index;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+  }
+};
+
+const handleDrop = (targetIndex: number, event: DragEvent) => {
+  event.preventDefault();
+  if (draggedIndex.value === null || draggedIndex.value === targetIndex) return;
+
+  const newList = [...localFqnPriority.value];
+  const draggedItem = newList[draggedIndex.value];
+  newList.splice(draggedIndex.value, 1);
+  newList.splice(targetIndex, 0, draggedItem);
+
+  localFqnPriority.value = newList;
+  draggedIndex.value = null;
+};
+
+// Add selected dimensions from right to left
+const addSelectedDimensions = () => {
+  localFqnPriority.value.push(...selectedAvailableDimensions.value);
+  selectedAvailableDimensions.value = [];
+};
+
+// Remove selected dimensions from left
+const removeSelectedDimensions = () => {
+  localFqnPriority.value = localFqnPriority.value.filter(
+    d => !selectedPriorityDimensions.value.includes(d)
+  );
+  selectedPriorityDimensions.value = [];
+};
 
 // Get display name for a dimension - check semantic groups first, then format the ID
 const getDimensionDisplay = (dimId: string): string => {
@@ -379,11 +465,6 @@ const removeFqnDimension = (index: number) => {
   localFqnPriority.value.splice(index, 1);
 };
 
-const addFqnDimension = () => {
-  if (!selectedSemanticGroup.value) return;
-  localFqnPriority.value.push(selectedSemanticGroup.value);
-  selectedSemanticGroup.value = null;
-};
 
 const resetFqnPriority = () => {
   // Reset to backend defaults from O2_FQN_PRIORITY_DIMENSIONS
@@ -535,5 +616,15 @@ loadConfig();
 
 :deep(.tooltip-text) {
   font-size: 0.75rem;
+}
+
+// Custom highlight for selected items in dual-list
+:deep(.q-item.q-item--active) {
+  background-color: var(--q-primary) !important;
+  color: white !important;
+
+  .q-item__label {
+    color: white !important;
+  }
 }
 </style>
