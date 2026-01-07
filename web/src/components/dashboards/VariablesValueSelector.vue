@@ -420,7 +420,7 @@ export default defineComponent({
       }
       try {
         if (
-          response.content?.results?.hits?.length &&
+          response.content?.results?.hits &&
           (response.type === "search_response" ||
             response.type === "search_response_hits")
         ) {
@@ -442,9 +442,7 @@ export default defineComponent({
               variableObject.options = [];
             }
 
-            const isFirstResponse =
-              fieldHit.values.length > 0 &&
-              variableObject.isVariablePartialLoaded === false;
+            const isFirstResponse = variableObject.isVariablePartialLoaded === false;
 
             variableLog(
               variableObject.name,
@@ -614,6 +612,12 @@ export default defineComponent({
                   finalizePartialVariableLoading(variableObject, true);
                 }
               }
+            }
+          } else {
+            // No field hit found. If this is the first response, reset the variable.
+            if (variableObject.isVariablePartialLoaded === false) {
+              resetVariableState(variableObject);
+              variableObject.isVariablePartialLoaded = true;
             }
           }
         }

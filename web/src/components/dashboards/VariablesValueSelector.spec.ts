@@ -2068,5 +2068,49 @@ describe("VariablesValueSelector", () => {
         mockStreamingComposable.fetchQueryDataWithHttpStream,
       ).toHaveBeenCalled();
     });
+
+    it("should clear options when API returns empty hits", async () => {
+      wrapper = createWrapper();
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const regionVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "region",
+      );
+
+      // Pre-set options and value to simulate stale state
+      regionVariable.options = [{ label: "stale_value", value: "stale_value" }];
+      regionVariable.value = "stale_value";
+      regionVariable.isVariablePartialLoaded = false; // Reset to ensure it processes the response
+
+      // Mock streaming with empty hits
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          // Simulate empty response
+          const mockResponse = {
+            type: "search_response",
+            content: {
+              results: {
+                hits: [], // Empty hits
+              },
+            },
+          };
+
+          // Call the data handler
+          handlers.data(payload, mockResponse);
+
+          // Call the complete handler
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      await vm.loadVariableOptions(regionVariable);
+      await nextTick();
+
+      // Options should be cleared
+      expect(regionVariable.options).toEqual([]);
+      // Value should be reset (null for single select)
+      expect(regionVariable.value).toBeNull();
+    });
   });
 });
