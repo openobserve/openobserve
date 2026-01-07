@@ -17,6 +17,7 @@ use std::collections::HashMap as stdHashMap;
 
 use async_trait::async_trait;
 use config::{
+    get_config,
     meta::{
         meta_store::MetaStore,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
@@ -35,7 +36,7 @@ static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
 pub fn connect_default() -> Box<dyn FileList> {
-    match config::get_config().common.meta_store.as_str().into() {
+    match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
@@ -578,7 +579,7 @@ pub async fn query_dump_stats_by_date_range(
 
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
-        let cfg = config::get_config();
+        let cfg = get_config();
         if cfg.common.local_mode {
             return;
         }
@@ -610,7 +611,14 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
 }
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
-    let ts = super::schema::unwrap_partition_time_level(None, stream_type).duration();
+    let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
+    if stream_type == StreamType::Metrics
+        && PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
+            == PartitionTimeLevel::Daily
+    {
+        level = PartitionTimeLevel::Daily;
+    }
+    let ts = level.duration();
     if ts > 0 {
         time_end + second_micros(ts)
     } else {
