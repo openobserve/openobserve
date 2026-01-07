@@ -943,7 +943,6 @@ export default defineComponent({
         if (managerHasResetValue) {
           // Manager reset this variable - clear oldVariablesData so it gets fresh value from API
           oldVariablesData[v.name] = undefined;
-          console.log(`[syncManagerVariablesToLocal] Detected manager reset for ${v.name}, clearing oldVariablesData`);
           return; // Skip further processing for this variable
         }
 
@@ -1898,25 +1897,13 @@ export default defineComponent({
         variablesToResolve =
           manager.getAllVisibleVariables(props.tabId, props.panelId) ||
           variablesData.values;
-        console.log(
-          "[VariablesValueSelector] Resolving with variables:",
-          variablesToResolve.map((v: any) => `${v.name}@${v.scope}`).join(", "),
-        );
       }
-
-      console.log(
-        `[VariablesValueSelector] Query BEFORE variable replacement:`,
-        queryContext,
-      );
 
       for (const variable of variablesToResolve) {
         // Skip dynamic_filters as they don't participate in standard variable replacement
         // and their value structure (array of objects) causes issues with escapeSingleQuotes
         if (variable.type === "dynamic_filters") continue;
 
-        console.log(
-          `[VariablesValueSelector] Checking variable ${variable.name}: isPartialLoaded=${variable.isVariablePartialLoaded}, value=${JSON.stringify(variable.value)}`,
-        );
         if (variable.isVariablePartialLoaded) {
           // Escape special regex characters in variable name
           const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1943,9 +1930,6 @@ export default defineComponent({
               quotedPattern,
               arrayValues,
             );
-            console.log(
-              `[VariablesValueSelector] Replaced array '$${variable.name}' with ${arrayValues}`,
-            );
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values with regex to replace all occurrences
             const replacedValue = escapeSingleQuotes(variable.value);
@@ -1954,21 +1938,9 @@ export default defineComponent({
               pattern,
               replacedValue,
             );
-            console.log(
-              `[VariablesValueSelector] Replaced single $${variable.name} with ${replacedValue}`,
-            );
           }
-        } else {
-          console.log(
-            `[VariablesValueSelector] Skipping variable ${variable.name} - not partially loaded`,
-          );
         }
       }
-
-      console.log(
-        `[VariablesValueSelector] Query AFTER variable replacement:`,
-        queryContext,
-      );
 
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);
@@ -2242,8 +2214,6 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      console.log("variableObject", variableObject);
-
       // Check if there's already a loading request in progress
       if (variableObject.isLoading) {
         return;
@@ -2594,19 +2564,7 @@ export default defineComponent({
         (v: any) => v.isLoading === true || v.isVariablePartialLoaded === false,
       );
 
-      console.debug(
-        `[VariableSearchDEBUG] onVariableSearch: name=${variableName} filterText='${String(filterText)}' managerLoading=${managerLoading} localLoading=${localLoading}`,
-      );
-
-      // Also emit a high level log for telemetry in case Playwright steps miss console.debug output
-      console.log(
-        `[VariablesValueSelector] onVariableSearch called for ${variableName} (filter='${String(filterText)}')`,
-      );
-
       if (managerLoading || localLoading) {
-        console.log(
-          `[VariablesValueSelector] Variables still loading, deferring search for ${variableName}`,
-        );
         const stop = watch(
           () =>
             useManager && manager && (manager as any).isLoading

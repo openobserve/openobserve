@@ -1649,7 +1649,7 @@ export default defineComponent({
         updateDateTime(selectedDate.value);
         // console.timeEnd("runQuery");
       } catch (err) {
-        console.log(err);
+        // Error during query execution
       }
     };
 
@@ -2508,18 +2508,12 @@ export default defineComponent({
      * Handles saving a variable - reloads dashboard to reflect the saved variable
      */
     const handleSaveVariable = async (payload: any) => {
-      console.log(
-        `[handleSaveVariable] Saving variable: ${JSON.stringify(payload)}`
-      );
       isAddVariableOpen.value = false;
 
       const { variableData, isEdit, oldVariableName } = payload || {};
 
       // If payload is missing, return (should not happen)
       if (!variableData) {
-        console.log(
-          `[handleSaveVariable] Payload is missing, cannot save variable`
-        );
         return;
       }
 
@@ -2536,9 +2530,6 @@ export default defineComponent({
         );
         if (index !== -1) {
           variablesList[index] = variableData;
-          console.log(
-            `[handleSaveVariable] Updated variable: ${oldVariableName} to ${variableData.name}`
-          );
           // Also update tracking
           if (
             variablesCreatedInSession.value.includes(oldVariableName) &&
@@ -2547,9 +2538,6 @@ export default defineComponent({
             const trackIndex =
               variablesCreatedInSession.value.indexOf(oldVariableName);
             variablesCreatedInSession.value[trackIndex] = variableData.name;
-            console.log(
-              `[handleSaveVariable] Updated tracking for variable: ${oldVariableName} to ${variableData.name}`
-            );
           }
           if (
             variablesWithCurrentPanel.value.includes(oldVariableName) &&
@@ -2558,23 +2546,14 @@ export default defineComponent({
             const trackIndex =
               variablesWithCurrentPanel.value.indexOf(oldVariableName);
             variablesWithCurrentPanel.value[trackIndex] = variableData.name;
-            console.log(
-              `[handleSaveVariable] Updated tracking for variable: ${oldVariableName} to ${variableData.name}`
-            );
           }
         }
       } else {
         // Add new
         variablesList.push(variableData);
-        console.log(
-          `[handleSaveVariable] Added new variable: ${variableData.name}`
-        );
         // Track
         if (!variablesCreatedInSession.value.includes(variableData.name)) {
           variablesCreatedInSession.value.push(variableData.name);
-          console.log(
-            `[handleSaveVariable] Added tracking for variable: ${variableData.name}`
-          );
         }
       }
 
@@ -2584,18 +2563,12 @@ export default defineComponent({
       if (usesCurrentPanel) {
         if (!variablesWithCurrentPanel.value.includes(variableData.name)) {
           variablesWithCurrentPanel.value.push(variableData.name);
-          console.log(
-            `[handleSaveVariable] Added tracking for variable: ${variableData.name} to current_panel`
-          );
         }
       } else {
         // If it was tracked but no longer uses current_panel, remove it
         const idx = variablesWithCurrentPanel.value.indexOf(variableData.name);
         if (idx !== -1) {
           variablesWithCurrentPanel.value.splice(idx, 1);
-          console.log(
-            `[handleSaveVariable] Removed tracking for variable: ${variableData.name} from current_panel`
-          );
         }
       }
 
@@ -2606,18 +2579,12 @@ export default defineComponent({
         variablesList,
         currentDashboardData.data,
       );
-      console.log(
-        `[handleSaveVariable] Re-initialized manager with updated list: ${JSON.stringify(variablesList)}`
-      );
 
       // Restore visibility
       // 1. Tab visibility
       const tabId = currentTabId.value;
       if (tabId) {
         variablesManager.setTabVisibility(tabId, true);
-        console.log(
-          `[handleSaveVariable] Restored visibility for tab: ${tabId}`
-        );
       }
 
       // 2. Panel visibility (Edit Mode)
@@ -2626,24 +2593,15 @@ export default defineComponent({
           route.query.panelId as string,
           true,
         );
-        console.log(
-          `[handleSaveVariable] Restored visibility for panel: ${route.query.panelId}`
-        );
       } else {
         // 3. Panel visibility (Add Mode - current_panel)
         // In add mode, mark "current_panel" as visible so variables can load
         variablesManager.setPanelVisibility("current_panel", true);
-        console.log(
-          `[handleSaveVariable] Restored visibility for panel: current_panel`
-        );
       }
 
       // 4. Additionally, if any variable uses "current_panel", ensure it's visible
       if (variablesWithCurrentPanel.value.length > 0) {
         variablesManager.setPanelVisibility("current_panel", true);
-        console.log(
-          `[handleSaveVariable] Restored visibility for panel: current_panel`
-        );
       }
 
       // 5. Trigger variable data reload to ensure new variables are displayed

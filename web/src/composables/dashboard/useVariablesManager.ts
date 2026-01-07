@@ -360,38 +360,29 @@ export const useVariablesManager = () => {
     // Check 3: All parents ready?
     const parents = dependencyGraph.value[key]?.parents || [];
     const allVars = getAllVariablesFlat();
-    
-    console.log(`[canVariableLoad] Checking ${key}. Parents: ${JSON.stringify(parents)}`);
-    
+
     const allParentsReady = parents.every((parentKey) => {
       const parentVar = findVariableByKey(parentKey, allVars);
       // Parent MUST be marked as partially loaded - this is the authoritative flag
       // that indicates the variable is ready to be used in queries
       if (!parentVar) {
-        console.log(`[canVariableLoad] Parent ${parentKey} not found for ${key}`);
         return false;
       }
-      
+
       if (parentVar.isVariablePartialLoaded !== true) {
-        console.log(`[canVariableLoad] Parent ${parentKey} is NOT partially loaded for ${key}`);
         return false;
       }
-      
+
       // Additionally check that parent has a valid value
       const hasValue =
         parentVar.value !== null &&
         parentVar.value !== undefined &&
         parentVar.value !== "" &&
         (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
-      
-      if (!hasValue) {
-        console.log(`[canVariableLoad] Parent ${parentKey} has no valid value for ${key}: ${JSON.stringify(parentVar.value)}`);
-      }
-      
+
       return hasValue;
     });
 
-    console.log(`[canVariableLoad] Result for ${key}: ${allParentsReady}`);
     return allParentsReady;
   };
 
@@ -556,12 +547,6 @@ export const useVariablesManager = () => {
    * This is triggered when user clicks the Dashboard Refresh button
    */
   const commitAll = () => {
-    console.log("[commitAll] START - Committing live variables to committed state");
-    console.log("[commitAll] BEFORE commit - variablesData (live state):");
-    console.log("  Global:", variablesData.global.map(v => ({ name: v.name, value: v.value })));
-    console.log("  Tabs:", Object.entries(variablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
-    console.log("  Panels:", Object.entries(variablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
-
     // Deep clone global variables
     committedVariablesData.global = variablesData.global.map((v) => ({
       ...v,
@@ -585,12 +570,6 @@ export const useVariablesManager = () => {
         value: Array.isArray(v.value) ? [...v.value] : v.value,
       }));
     });
-
-    console.log("[commitAll] AFTER commit - committedVariablesData:");
-    console.log("  Global:", committedVariablesData.global.map(v => ({ name: v.name, value: v.value })));
-    console.log("  Tabs:", Object.entries(committedVariablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
-    console.log("  Panels:", Object.entries(committedVariablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
-    console.log("[commitAll] DONE");
   };
 
   /**
@@ -638,8 +617,6 @@ export const useVariablesManager = () => {
       if (childVar) {
         // If parent has null value, child should also be set to null WITHOUT firing API
         if (parentHasNullValue) {
-          console.log(`[onVariablePartiallyLoaded] Parent ${variableKey} has null value, setting child ${childKey} to null without API call`);
-
           // Set child to null/empty without triggering API
           if (childVar.multiSelect) {
             childVar.value = [];
@@ -700,11 +677,9 @@ export const useVariablesManager = () => {
   ) => {
     const variable = getVariable(name, scope, tabId, panelId);
     if (!variable) {
-      console.log(`[updateVariableValue] Variable not found: ${name}@${scope}`);
       return;
     }
 
-    console.log(`[updateVariableValue] Updating ${name}@${scope} from ${JSON.stringify(variable.value)} to ${JSON.stringify(newValue)}`);
     variable.value = newValue;
 
     // Recursively reset all descendants
@@ -712,13 +687,9 @@ export const useVariablesManager = () => {
       const children = dependencyGraph.value[parentKey]?.children || [];
       const allVars = getAllVariablesFlat();
 
-      console.log(`[updateVariableValue] Resetting ${children.length} children of ${parentKey}`);
-
       children.forEach((childKey) => {
         const childVar = findVariableByKey(childKey, allVars);
         if (childVar) {
-          console.log(`[updateVariableValue] Resetting descendant ${childVar.name}@${childVar.scope} from ${JSON.stringify(childVar.value)} to ${childVar.multiSelect ? '[]' : 'null'}`);
-
           // Reset child's state completely - do this regardless of visibility
           // If the child is not visible now, it needs to be reset for when it becomes visible
           childVar.isVariablePartialLoaded = false;
@@ -749,21 +720,17 @@ export const useVariablesManager = () => {
     // that are ready to load (i.e. all their parents are now ready)
     const immediateChildrenKeys = dependencyGraph.value[variableKey]?.children || [];
     const allVars = getAllVariablesFlat();
-    
+
     immediateChildrenKeys.forEach(childKey => {
       const childVar = findVariableByKey(childKey, allVars);
       if (!childVar) {
-        console.log(`[updateVariableValue] Immediate child ${childKey} not found`);
         return;
       }
-      
+
       const isVisible = isVariableVisible(childVar);
       const canLoad = canVariableLoad(childVar);
-      
-      console.log(`[updateVariableValue] Checking immediate child ${childKey}: visible=${isVisible}, canLoad=${canLoad}`);
-      
+
       if (isVisible && canLoad) {
-        console.log(`[updateVariableValue] Triggering immediate child ${childVar.name}@${childVar.scope} to load`);
         childVar.isVariableLoadingPending = true;
       }
     });
@@ -893,7 +860,6 @@ export const useVariablesManager = () => {
 
   // ========== URL SYNCHRONIZATION ==========
   const loadFromUrl = (route: any) => {
-    console.log("[loadFromUrl] START - URL query:", route.query);
     const query = route.query;
 
     Object.entries(query).forEach(([key, value]) => {
@@ -901,11 +867,8 @@ export const useVariablesManager = () => {
 
       const parsed = parseVariableUrlKey(key);
       if (!parsed) {
-        console.log(`[loadFromUrl] ✗ Failed to parse key: ${key}`);
         return;
       }
-
-      console.log(`[loadFromUrl] Parsed ${key} -> name='${parsed.name}', scope='${parsed.scope}', tabId='${parsed.tabId}', panelId='${parsed.panelId}', value=${JSON.stringify(value)}`);
 
       if (parsed.scope === "global") {
         const variable = getVariable(parsed.name, "global");
@@ -917,9 +880,6 @@ export const useVariablesManager = () => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
-          console.log(`[loadFromUrl] ✓ Set global var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
-        } else {
-          console.log(`[loadFromUrl] ✗ Global variable '${parsed.name}' not found`);
         }
 
         // ALSO apply to all tab/panel instances of same name (drilldown compatibility)
@@ -932,7 +892,6 @@ export const useVariablesManager = () => {
             tabVar.isVariablePartialLoaded = true;
             tabVar.isVariableLoadingPending = false;
             tabVar.isLoading = false;
-            console.log(`[loadFromUrl] ✓ Set tab var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
           }
         });
 
@@ -945,7 +904,6 @@ export const useVariablesManager = () => {
             panelVar.isVariablePartialLoaded = true;
             panelVar.isVariableLoadingPending = false;
             panelVar.isLoading = false;
-            console.log(`[loadFromUrl] ✓ Set panel var '${parsed.name}' = ${JSON.stringify(parsedValue)} (marked as loaded)`);
           }
         });
       } else {
@@ -963,17 +921,9 @@ export const useVariablesManager = () => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
-          console.log(`[loadFromUrl] ✓ Set ${parsed.scope} var '${parsed.name}' (${parsed.scope === 'tabs' ? 'tab=' + parsed.tabId : 'panel=' + parsed.panelId}) = ${JSON.stringify(parsedValue)} (marked as loaded)`);
-        } else {
-          console.log(`[loadFromUrl] ✗ ${parsed.scope} variable '${parsed.name}' not found`);
         }
       }
     });
-
-    console.log("[loadFromUrl] DONE - variablesData state after load:");
-    console.log("  Global:", variablesData.global.map(v => ({ name: v.name, value: v.value })));
-    console.log("  Tabs:", Object.entries(variablesData.tabs).map(([id, vars]) => ({ tabId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
-    console.log("  Panels:", Object.entries(variablesData.panels).map(([id, vars]) => ({ panelId: id, vars: vars.map(v => ({ name: v.name, value: v.value })) })));
   };
 
   interface ParsedUrlKey {

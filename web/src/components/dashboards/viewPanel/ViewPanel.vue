@@ -795,7 +795,6 @@ export default defineComponent({
           currentPanelId.value,
           currentTabId.value || "",
         );
-        console.log("mergedVars", mergedVars);
         
         return {
           isVariablesLoading: variablesManager.isLoading.value,

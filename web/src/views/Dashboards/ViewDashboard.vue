@@ -1058,11 +1058,6 @@ export default defineComponent({
           });
         }
 
-        console.log(
-          "[ViewDashboard] Watcher triggered - preserving variables:",
-          variableParams,
-        );
-
         router.replace({
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
@@ -1335,9 +1330,6 @@ export default defineComponent({
           !initialCommitDone &&
           usingScopedVariablesManager.value
         ) {
-          console.log(
-            "[ViewDashboard] Variables settled, performing initial commit",
-          );
           variablesManager.commitAll();
           initialCommitDone = true;
         }

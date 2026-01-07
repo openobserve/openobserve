@@ -1166,7 +1166,6 @@ export const usePanelDataLoader = (
           state.isPartialData = false;
         }
       } else {
-        console.log("loadData: starting SQL query execution...", variablesData.value);
         // copy of current abortController
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
@@ -1509,18 +1508,6 @@ export const usePanelDataLoader = (
                 );
 
               const query = query2;
-
-              // LOG: Check if variables were properly replaced
-              console.log(
-                "[usePanelDataLoader] " +
-                  panelSchema.value.title +
-                  " NON-TIMESHIFT QUERY AFTER applyDynamicVariables:",
-                {
-                  hasUnreplacedVars: /\$\w+/.test(query),
-                  unreplacedVars: query.match(/\$\w+/g) || "none",
-                  queryPreview: query.substring(0, 200),
-                },
-              );
 
               // Validate that timestamp column is not used as an alias for other fields
               if (!checkTimestampAlias(query)) {
