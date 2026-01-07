@@ -14,7 +14,8 @@ OpenObserve is a cloud-native observability platform built for logs, metrics, tr
 
 ### Prerequisites
 - Git
-- Rust & Cargo 1.70+
+- Rust & Cargo: nightly-2025-11-11 (specified in `rust-toolchain.toml`)
+  - Components: rustfmt, clippy, llvm-tools
 - Node.js v14+ and npm v6+
 - Protocol Buffers compiler (protoc) >= 3.15
 
