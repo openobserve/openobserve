@@ -875,6 +875,21 @@ export default defineComponent({
 
     // get organizations settings on first load and identifier change
     const getOrganizationSettings = async () => {
+      // Default settings to use if API call fails
+      const defaultSettings = {
+        scrape_interval: 15,
+        span_id_field_name: "spanId",
+        trace_id_field_name: "traceId",
+        toggle_ingestion_logs: false,
+        enable_websocket_search: false,
+        enable_streaming_search: false,
+        streaming_aggregation_enabled: false,
+        free_trial_expiry: "",
+        light_mode_theme_color: undefined,
+        dark_mode_theme_color: undefined,
+        claim_parser_function: "",
+      };
+
       try {
         //get organizations settings
         const orgSettings: any = await organizations.get_organization_settings(
@@ -884,23 +899,23 @@ export default defineComponent({
         //set settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
-          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
+          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? defaultSettings.scrape_interval,
           span_id_field_name:
-            orgSettings?.data?.data?.span_id_field_name ?? "spanId",
+            orgSettings?.data?.data?.span_id_field_name ?? defaultSettings.span_id_field_name,
           trace_id_field_name:
-            orgSettings?.data?.data?.trace_id_field_name ?? "traceId",
+            orgSettings?.data?.data?.trace_id_field_name ?? defaultSettings.trace_id_field_name,
           toggle_ingestion_logs:
-            orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
+            orgSettings?.data?.data?.toggle_ingestion_logs ?? defaultSettings.toggle_ingestion_logs,
           enable_websocket_search:
-            orgSettings?.data?.data?.enable_websocket_search ?? false,
+            orgSettings?.data?.data?.enable_websocket_search ?? defaultSettings.enable_websocket_search,
           enable_streaming_search:
-            orgSettings?.data?.data?.enable_streaming_search ?? false,
+            orgSettings?.data?.data?.enable_streaming_search ?? defaultSettings.enable_streaming_search,
           streaming_aggregation_enabled:
-            orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
-          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? defaultSettings.streaming_aggregation_enabled,
+          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? defaultSettings.free_trial_expiry,
           light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
-          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? "",
+          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
         });
 
         if (
@@ -922,8 +937,17 @@ export default defineComponent({
             });
           }
         }
-      } catch (error) {
-        console.error("Error in getOrganizationSettings:", error);
+      } catch (error: any) {
+        // Handle permission errors gracefully (403 = Forbidden)
+        if (error?.response?.status === 403) {
+          console.warn("Organization settings access denied (403). Using default settings.");
+          // Set default settings when access is denied
+          store.dispatch("setOrganizationSettings", defaultSettings);
+        } else {
+          console.error("Error in getOrganizationSettings:", error);
+          // Still set defaults for other errors to prevent undefined values
+          store.dispatch("setOrganizationSettings", defaultSettings);
+        }
       }
       return;
     };

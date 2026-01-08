@@ -45,6 +45,7 @@ use {
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
+        infra::config::ORG_USERS,
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
@@ -56,9 +57,48 @@ use crate::{
         db::{self, org_users},
         self_reporting,
         stream::get_streams,
-        users::add_admin_to_org,
     },
 };
+
+const MASKED_TOKEN: &str = "NOT_AVAILABLE";
+
+/// Checks if a service account token should be masked
+/// Returns true if:
+/// - The service account has allow_static_token set to false
+/// - This prevents exposure of tokens that should only be used via assume_service_account API
+fn should_mask_token(org_id: Option<&str>, user_email: &str) -> bool {
+    // Check if this user has allow_static_token flag set to false in the requesting org
+    if let Some(org) = org_id {
+        let key = format!("{}/{}", org, user_email);
+        if let Some(user_record) = ORG_USERS.get(&key) {
+            return !user_record.allow_static_token;
+        }
+    }
+
+    false
+}
+
+/// Masks a token if necessary based on org context
+fn mask_token_if_needed(token: String, org_id: Option<&str>, user_email: &str) -> String {
+    if should_mask_token(org_id, user_email) {
+        MASKED_TOKEN.to_string()
+    } else {
+        token
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// Wrapper function to call o2-enterprise's tenant admin role creation logic
+async fn create_and_assign_tenant_admin_role(
+    org_id: &str,
+    service_account_email: &str,
+) -> Result<(), anyhow::Error> {
+    o2_openfga::authorizer::roles::create_and_assign_tenant_admin_role(
+        org_id,
+        service_account_email,
+    )
+    .await
+}
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
@@ -151,9 +191,10 @@ pub async fn get_passcode(
             "Not allowed for external service accounts",
         ));
     }
+    let passcode = mask_token_if_needed(user.token, org_id, &user.email);
     Ok(IngestionPasscode {
         user: user.email,
-        passcode: user.token,
+        passcode,
     })
 }
 
@@ -238,13 +279,14 @@ async fn update_passcode_inner(
     // TODO : Fix for root users
     let ret = if is_rum_update {
         IngestionTokensContainer::RumToken(RumIngestionToken {
-            user: db_user.email,
+            user: db_user.email.clone(),
             rum_token: Some(rum_token),
         })
     } else {
+        let passcode = mask_token_if_needed(token, org_id, &db_user.email);
         IngestionTokensContainer::Passcode(IngestionPasscode {
             user: db_user.email,
-            passcode: token,
+            passcode,
         })
     };
     Ok(ret)
@@ -262,6 +304,7 @@ pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, an
             identifier: record.org_id.clone(),
             name: record.org_name.clone(),
             org_type: record.org_type.to_string(),
+            service_account: None,
         })
         .collect())
 }
@@ -276,7 +319,13 @@ pub async fn list_org_users_by_user(
 pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
-) -> Result<Organization, anyhow::Error> {
+) -> Result<
+    (
+        Organization,
+        Option<crate::common::meta::organization::ServiceAccountTokenInfo>,
+    ),
+    anyhow::Error,
+> {
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
@@ -325,7 +374,166 @@ pub async fn create_org(
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
-            add_admin_to_org(&org.identifier, user_email).await?;
+
+            // Determine which user to add to the org
+            // If service_account is specified, add it instead of the caller
+            if let Some(ref service_account_email) = org.service_account {
+                // Validate email format
+                if !service_account_email.contains('@') {
+                    return Err(anyhow::anyhow!("Invalid service account email format"));
+                }
+
+                log::info!(
+                    "Creating/adding service account '{}' to organization '{}' (caller: '{}')",
+                    service_account_email,
+                    org.identifier,
+                    user_email
+                );
+
+                // Create user record if it doesn't exist as ServiceAccount
+                use crate::service::users::create_service_account_if_not_exists;
+                create_service_account_if_not_exists(service_account_email).await?;
+
+                // Add service account to the org with ServiceAccount role
+                // Set allow_static_token = false to force use of assume_service_account API
+                use config::{meta::user::UserRole, utils::rand::generate_random_string};
+                let token = generate_random_string(32); // Generate random token (won't be exposed)
+                let rum_token = format!("rum{}", generate_random_string(16));
+
+                db::org_users::add_with_flags(
+                    &org.identifier,
+                    service_account_email,
+                    UserRole::ServiceAccount,
+                    &token,
+                    Some(rum_token),
+                    false,
+                )
+                .await?;
+
+                // Update OpenFGA and create tenant admin role
+                #[cfg(feature = "enterprise")]
+                {
+                    use o2_openfga::authorizer::authz::{
+                        get_add_user_to_org_tuples, update_tuples,
+                    };
+                    if get_openfga_config().enabled {
+                        let mut tuples = vec![];
+                        get_add_user_to_org_tuples(
+                            &org.identifier,
+                            service_account_email,
+                            &UserRole::ServiceAccount.to_string(),
+                            &mut tuples,
+                        );
+                        match update_tuples(tuples, vec![]).await {
+                            Ok(_) => {
+                                log::info!("Service account added to org successfully in openfga");
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Error adding service account to the org in openfga: {e}"
+                                );
+                            }
+                        }
+
+                        // Create tenant admin role and assign service account to it
+                        if let Err(e) = create_and_assign_tenant_admin_role(
+                            &org.identifier,
+                            service_account_email,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "Failed to create/assign tenant admin role for '{}' in org '{}': {}",
+                                service_account_email,
+                                org.identifier,
+                                e
+                            );
+                            // Don't fail org creation if role assignment fails
+                            // The org and service account are already created
+                        } else {
+                            log::info!(
+                                "Created and assigned tenant admin role to '{}' in org '{}'",
+                                service_account_email,
+                                org.identifier
+                            );
+                        }
+                    }
+                }
+            } else {
+                // No service_account provided: use caller's email as service account
+                log::info!(
+                    "No service_account provided, using caller '{}' as service account for organization '{}'",
+                    user_email,
+                    org.identifier
+                );
+
+                // Create user record if it doesn't exist as ServiceAccount
+                use crate::service::users::create_service_account_if_not_exists;
+                create_service_account_if_not_exists(user_email).await?;
+
+                // Add caller as service account to the org with ServiceAccount role
+                // Set allow_static_token = false to force use of assume_service_account API
+                use config::{meta::user::UserRole, utils::rand::generate_random_string};
+                let token = generate_random_string(32); // Generate random token (won't be exposed)
+                let rum_token = format!("rum{}", generate_random_string(16));
+
+                db::org_users::add_with_flags(
+                    &org.identifier,
+                    user_email,
+                    UserRole::ServiceAccount,
+                    &token,
+                    Some(rum_token),
+                    false,
+                )
+                .await?;
+
+                // Update OpenFGA and create tenant admin role
+                #[cfg(feature = "enterprise")]
+                {
+                    use o2_openfga::authorizer::authz::{
+                        get_add_user_to_org_tuples, update_tuples,
+                    };
+                    if get_openfga_config().enabled {
+                        let mut tuples = vec![];
+                        get_add_user_to_org_tuples(
+                            &org.identifier,
+                            user_email,
+                            &UserRole::ServiceAccount.to_string(),
+                            &mut tuples,
+                        );
+                        match update_tuples(tuples, vec![]).await {
+                            Ok(_) => {
+                                log::info!("Service account added to org successfully in openfga");
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Error adding service account to the org in openfga: {e}"
+                                );
+                            }
+                        }
+
+                        // Create tenant admin role and assign service account to it
+                        if let Err(e) =
+                            create_and_assign_tenant_admin_role(&org.identifier, user_email).await
+                        {
+                            log::error!(
+                                "Failed to create/assign tenant admin role for '{}' in org '{}': {}",
+                                user_email,
+                                org.identifier,
+                                e
+                            );
+                            // Don't fail org creation if role assignment fails
+                            // The org and service account are already created
+                        } else {
+                            log::info!(
+                                "Created and assigned tenant admin role to '{}' in org '{}'",
+                                user_email,
+                                org.identifier
+                            );
+                        }
+                    }
+                }
+            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -337,7 +545,60 @@ pub async fn create_org(
                 stream_name: None,
             })
             .await;
-            Ok(org.clone())
+
+            // Check if creator is a service account and return token info
+            // Use service_account email if specified, otherwise use caller's email
+            let target_email = org.service_account.as_deref().unwrap_or(user_email);
+
+            let service_account_info = if let Some(new_org_user) =
+                crate::service::users::get_user(Some(&org.identifier), target_email).await
+            {
+                // Check if they're a service account in _meta org
+                if let Some(meta_user) =
+                    crate::service::users::get_user(Some(config::META_ORG_ID), target_email).await
+                {
+                    if meta_user.role == UserRole::ServiceAccount {
+                        // Create tenant admin role and add service account to it
+                        #[cfg(feature = "enterprise")]
+                        {
+                            if let Err(e) =
+                                create_and_assign_tenant_admin_role(&org.identifier, target_email)
+                                    .await
+                            {
+                                log::error!(
+                                    "Failed to create/assign tenant admin role for '{}' in org '{}': {}",
+                                    target_email,
+                                    org.identifier,
+                                    e
+                                );
+                                // Don't fail org creation if role assignment fails
+                                // The org and service account are already created
+                            }
+                        }
+
+                        // Return service account info with instructions to use
+                        // assume_service_account API Tokens are no longer
+                        // returned directly for security reasons
+                        Some(crate::common::meta::organization::ServiceAccountTokenInfo {
+                            email: new_org_user.email.clone(),
+                            token: String::new(), // Not returned for security
+                            role: format!("{}", new_org_user.role),
+                            message: format!(
+                                "Use POST /api/_meta/assume_service_account with org_id='{}' and service_account='{}' to obtain a temporary session token",
+                                org.identifier, new_org_user.email
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            Ok((org.clone(), service_account_info))
         }
         Err(e) => {
             log::error!("Error creating org: {e}");
@@ -362,6 +623,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
         } else {
             CUSTOM.to_owned()
         },
+        service_account: None,
     };
     match db::organization::save_org(org).await {
         Ok(_) => {
@@ -402,6 +664,7 @@ pub async fn check_and_create_org_without_ofga(
         } else {
             CUSTOM.to_owned()
         },
+        service_account: None,
     };
     match db::organization::save_org(org).await {
         Ok(_) => Ok(org.clone()),

@@ -582,8 +582,19 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         }
         let token = generate_random_string(16);
         let rum_token = format!("rum{}", generate_random_string(16));
+
+        // Assign Admin role by default
+        let role = UserRole::Admin;
+
         // Add user to the organization
-        db::org_users::add(org_id, user_email, UserRole::Admin, &token, Some(rum_token)).await?;
+        crate::service::db::org_users::add(
+            org_id,
+            user_email,
+            role.clone(),
+            &token,
+            Some(rum_token),
+        )
+        .await?;
 
         // Update OFGA
         #[cfg(feature = "enterprise")]
@@ -591,12 +602,7 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
             use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
             if get_openfga_config().enabled {
                 let mut tuples = vec![];
-                get_add_user_to_org_tuples(
-                    org_id,
-                    user_email,
-                    &UserRole::Admin.to_string(),
-                    &mut tuples,
-                );
+                get_add_user_to_org_tuples(org_id, user_email, &role.to_string(), &mut tuples);
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("User added to org successfully in openfga");
@@ -769,6 +775,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
             token: user_from_db.token.clone(),
             rum_token: user_from_db.rum_token.clone(),
             created_at: 0,
+            allow_static_token: true,
         };
         if is_root_user(&user_from_db.email) {
             USERS_RUM_TOKEN
@@ -1294,6 +1301,7 @@ mod tests {
 
         let user_org = UserOrg {
             name: "org2".to_string(),
+            org_name: "Organization 2".to_string(),
             token: "token2".to_string(),
             rum_token: Some("rum2".to_string()),
             role: get_default_user_role(),
@@ -1301,6 +1309,7 @@ mod tests {
 
         let matched_org = UserOrg {
             name: target_org.clone(),
+            org_name: "Organization 1".to_string(),
             token: "token1".to_string(),
             rum_token: Some("rum1".to_string()),
             role: get_default_user_role(),
@@ -1367,6 +1376,7 @@ mod tests {
                 org_id: "dummy".to_string(),
                 email: "admin@zo.dev".to_string(),
                 created_at: 0,
+                allow_static_token: true,
             },
         );
     }
@@ -1493,6 +1503,7 @@ mod tests {
             is_external: false,
             organizations: vec![UserOrg {
                 name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
                 token: "".to_string(),
                 rum_token: None,
                 role: UserRole::User,
@@ -1516,6 +1527,7 @@ mod tests {
             is_external: false,
             organizations: vec![UserOrg {
                 name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
                 token: "existing_token".to_string(),
                 rum_token: Some("existing_rum".to_string()),
                 role: UserRole::User,
@@ -1745,4 +1757,91 @@ mod tests {
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
     }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_with_org() {
+        let roles = vec![
+            "org1/admin".to_string(),
+            "org1/editor".to_string(),
+            "org2/viewer".to_string(),
+        ];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org1"));
+
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.contains(&"admin".to_string()));
+        assert!(filtered.contains(&"editor".to_string()));
+        assert!(!filtered.contains(&"viewer".to_string()));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_without_org() {
+        let roles = vec!["org1/admin".to_string(), "org2/viewer".to_string()];
+
+        let filtered = get_user_roles_by_org_id(roles.clone(), None);
+
+        // None org_id returns all roles
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered, roles);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_no_matching_org() {
+        let roles = vec!["org1/admin".to_string(), "org2/editor".to_string()];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org3"));
+
+        // No roles match org3
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_get_user_roles_by_org_id_empty_roles() {
+        let roles = vec![];
+
+        let filtered = get_user_roles_by_org_id(roles, Some("org1"));
+
+        assert_eq!(filtered.len(), 0);
+    }
+}
+
+/// Creates a service account user record if it doesn't already exist
+/// This is used when creating organizations with a specified service account
+pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
+    // Check if user already exists
+    if db::user::get_user_record(email).await.is_ok() {
+        log::debug!("Service account '{}' already exists", email);
+        return Ok(());
+    }
+
+    log::info!("Creating new service account user record for '{}'", email);
+
+    // Create the user record in the users table
+    let random_password = generate_random_string(32);
+    let salt = ider::uuid();
+    let password_hash = get_hash(&random_password, &salt);
+    let cfg = get_config();
+    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let now = chrono::Utc::now().timestamp_micros();
+    let user_record = infra::table::users::UserRecord {
+        email: email.to_string(),
+        first_name: email.split('@').next().unwrap_or("Service").to_string(),
+        last_name: "Account".to_string(),
+        password: password_hash.clone(),
+        salt,
+        is_root: false,
+        password_ext: Some(password_ext),
+        user_type: config::meta::user::UserType::Internal,
+        created_at: now,
+        updated_at: now,
+    };
+
+    infra::table::users::add(user_record).await?;
+    log::info!("Service account user record created for '{}'", email);
+
+    Ok(())
 }

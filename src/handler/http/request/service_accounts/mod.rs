@@ -396,7 +396,11 @@ pub async fn delete_bulk(
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",
     summary = "Get service account API token",
-    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
+    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. \
+                   \
+                   **Security Note:** Service accounts with `allow_static_token=false` will return a masked token (***MASKED***) instead of the actual token. These accounts must use the `assume_service_account` API to obtain temporary session tokens. \
+                   \
+                   Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
     security(
         ("Authorization"= [])
     ),
@@ -405,7 +409,7 @@ pub async fn delete_bulk(
         ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(APIToken)),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -414,13 +418,19 @@ pub async fn delete_bulk(
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
-pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_api_token(
+    path: web::Path<(String, String)>,
+    Headers(_user_email): Headers<UserEmail>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let config = config::get_config();
     if !config.auth.service_account_enabled {
         return Ok(HttpResponse::Forbidden().json("Service Accounts Not Enabled"));
     }
 
     let (org, user_id) = path.into_inner();
+
+    // Always return single token for the requested org
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {

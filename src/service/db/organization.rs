@@ -299,6 +299,7 @@ pub async fn get_org_from_db(org_id: &str) -> Result<Organization, anyhow::Error
         identifier: org.identifier,
         name: org.org_name,
         org_type: org.org_type.to_string(),
+        service_account: None,
     })
 }
 
@@ -313,6 +314,7 @@ pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
         identifier: org.identifier,
         name: org.org_name,
         org_type: org.org_type.to_string(),
+        service_account: None,
     })
 }
 
@@ -338,6 +340,7 @@ pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow
             identifier: org.identifier,
             name: org.org_name,
             org_type: org.org_type.to_string(),
+            service_account: None,
         })
         .collect())
 }

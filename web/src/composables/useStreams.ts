@@ -289,14 +289,15 @@ const useStreams = () => {
               const streamList = deepCopy(streamsCache[streamType].value || {});
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
               updateStreamsInStore(streamType, streamList);
-            } catch (err) {
-              return reject("Error while fetching schema");
+            } catch (err: any) {
+              return reject(new Error(`Error while fetching schema: ${err?.message || 'Unknown error'}`));
             }
           }
           return resolve(
             streamsCache[streamType].value?.list[streamIndex] || {},
           );
         } else {
+          // Stream not found in cache - reject with proper Error object
           // await StreamService.schema(
           //   store.state.selectedOrganization.identifier,
           //   streamName,
@@ -307,8 +308,8 @@ const useStreams = () => {
           //     const streamIndex = streamsIndexMapping[streamType][streamName];
           //     return resolve(streams[streamType].list[streamIndex]);
           //   })
-          //   .catch(() => reject("Stream Not Found"));
-          return reject("Stream Not Found");
+          //   .catch(() => reject(new Error("Stream Not Found")));
+          return reject(new Error(`Stream '${streamName}' not found for type '${streamType}'`));
         }
       } catch (e: any) {
         reject(new Error(e.message));

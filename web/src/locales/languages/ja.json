@@ -105,7 +105,9 @@
     "lightMode": "ライトモード",
     "darkMode": "ダークモード",
     "manageTheme": "テーマを管理",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
+    "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。"
   },
   "search": {
     "metrics": "メトリクス",

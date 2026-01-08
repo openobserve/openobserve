@@ -1091,11 +1091,23 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
         resizeObserver = new ResizeObserver(() => {
-          handleWindowLayoutChanges();
+          // Debounce the resize handler to prevent "ResizeObserver loop" errors
+          // This error occurs when the callback takes longer than one animation frame
+          if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
+          }
+
+          resizeTimeout = window.setTimeout(() => {
+            // Use requestAnimationFrame to ensure DOM updates happen at the right time
+            requestAnimationFrame(() => {
+              handleWindowLayoutChanges();
+            });
+          }, 100); // 100ms debounce delay
         });
 
         resizeObserver.observe(chartPanelRef.value);
@@ -1106,6 +1118,10 @@ export default defineComponent({
       if (resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver = null;
+      }
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
       }
     });
 

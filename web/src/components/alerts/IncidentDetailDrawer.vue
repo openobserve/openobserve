@@ -878,14 +878,8 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     IncidentServiceGraph,
   },
-  props: {
-    incident: {
-      type: Object as PropType<Incident | null>,
-      default: null,
-    },
-  },
   emits: ["close", "status-updated"],
-  setup(props, { emit }) {
+  setup(_props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
@@ -1034,11 +1028,20 @@ export default defineComponent({
       }
     };
 
+    // Watch for URL query parameter
     watch(
-      () => props.incident,
-      (incident) => {
-        if (incident) {
-          loadDetails(incident.id);
+      () => router.currentRoute.value.query.incident_id,
+      (incidentIdFromUrl) => {
+        if (incidentIdFromUrl && typeof incidentIdFromUrl === 'string') {
+          // Load incident from URL query parameter
+          // Validate incident ID format (e.g., UUID validation)
+          if (incidentIdFromUrl.trim().length > 0) {
+            loadDetails(incidentIdFromUrl);
+          } else {
+            console.warn('Invalid incident ID in URL');
+            correlationData.value = null;
+            correlationError.value = null;
+          }
         } else {
           // Clear correlation data when drawer closes
           correlationData.value = null;

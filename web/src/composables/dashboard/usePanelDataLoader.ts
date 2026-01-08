@@ -973,6 +973,11 @@ export const usePanelDataLoader = (
               }
 
               const handlePromQLResponse = (data: any, res: any) => {
+                if (res.type === "event_progress") {
+                  state.loadingProgressPercentage = res?.content?.percent ?? 0;
+                  state.isPartialData = true;
+                  saveCurrentStateToCache();
+                }
                 if (res?.type === "promql_response") {
                   // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
                   // result is the actual PromQL data (vector/matrix with values)
