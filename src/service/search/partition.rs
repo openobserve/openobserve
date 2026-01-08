@@ -53,6 +53,7 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        is_aggregate: bool,
         _is_streaming_aggregate: bool,
         _streaming_interval_micros: i64,
         add_mini_partition: bool,
@@ -75,6 +76,8 @@ impl PartitionGenerator {
                 order_by,
                 add_mini_partition,
             )
+        } else if is_aggregate {
+            vec![[start_time, end_time]]
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
         }
@@ -613,7 +616,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_no_mini_partition_with_uneven_time_range_2()
      {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 300; // 5 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
@@ -684,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_partition_generator_with_histogram_alignment_mini_partition_with_uneven_time_range_2() {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 300; // 5 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
@@ -909,7 +912,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration()
      {
-        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1746161220000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 3600; // 60 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
@@ -982,7 +985,7 @@ mod tests {
     #[test]
     fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration_bug()
      {
-        let start_time = 1752568628000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let start_time = 1752568628000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30
         let end_time = 1752741428000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
         let min_step_seconds = 18000; // 300 minutes in seconds
         let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
