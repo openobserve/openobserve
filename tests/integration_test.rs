@@ -4286,13 +4286,12 @@ mod tests {
             let job_id = first_job.job_id.clone();
             let delete_result = delete_backfill_job(org_id, &job_id).await;
             // Delete may fail if job is in progress, which is acceptable
-            if delete_result.is_ok() {
-                log::info!("Successfully deleted backfill job: {}", job_id);
-            } else {
-                log::warn!(
+            match delete_result {
+                Ok(_) => log::info!("Successfully deleted backfill job: {}", job_id),
+                Err(e) => log::warn!(
                     "Could not delete backfill job (may be in progress): {}",
-                    delete_result.unwrap_err()
-                );
+                    e
+                ),
             }
         }
     }
@@ -4329,13 +4328,15 @@ mod tests {
         let org_id = "e2e";
         let jobs_result = list_backfill_jobs(org_id).await;
 
-        if let Ok(jobs) = jobs_result {
-            if let Some(first_job) = jobs.first() {
-                let job_id = first_job.job_id.clone();
+        if let Ok(jobs) = jobs_result
+            && let Some(first_job) = jobs.first()
+        {
+            let job_id = first_job.job_id.clone();
 
-                // Try to disable
-                let disable_result = enable_backfill_job(org_id, &job_id, false).await;
-                if disable_result.is_ok() {
+            // Try to disable
+            let disable_result = enable_backfill_job(org_id, &job_id, false).await;
+            match disable_result {
+                Ok(_) => {
                     log::info!("Successfully disabled backfill job: {}", job_id);
 
                     // Try to enable back
@@ -4343,12 +4344,8 @@ mod tests {
                     if enable_result.is_ok() {
                         log::info!("Successfully re-enabled backfill job: {}", job_id);
                     }
-                } else {
-                    log::warn!(
-                        "Could not modify job state: {}",
-                        disable_result.unwrap_err()
-                    );
                 }
+                Err(e) => log::warn!("Could not modify job state: {}", e),
             }
         }
     }

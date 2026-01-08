@@ -307,7 +307,7 @@ fn default_claim_parser_function() -> String {
 
 /// Validated wrapper for max_series_per_query setting
 /// Ensures values are between 1,000 and 1,000,000
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MaxSeriesLimit(usize);
 
 impl MaxSeriesLimit {
@@ -331,6 +331,25 @@ impl MaxSeriesLimit {
     /// Returns the inner value
     pub fn value(&self) -> usize {
         self.0
+    }
+}
+
+impl serde::Serialize for MaxSeriesLimit {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for MaxSeriesLimit {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = usize::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
     }
 }
 
