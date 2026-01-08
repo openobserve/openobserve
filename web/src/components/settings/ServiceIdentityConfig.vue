@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-config">
+  <div class="tw:w-full service-identity-config q-mt-sm">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
       <q-spinner-dots color="primary" size="2.5rem" />
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense-toggle
       icon="help_outline"
       :label="t('settings.correlation.howItWorksTitle')"
-      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
       :class="store.state.theme === 'dark' ? 'bg-grey-9 tw:border-gray-700' : 'bg-grey-2 tw:border-gray-200'"
     >
       <div class="tw:p-4 text-body2 tw:leading-relaxed">
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('settings.correlation.fqnPriorityTitle')"
       :caption="t('settings.correlation.fqnPriorityDescription')"
       header-class="section-header"
-      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
       :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
       default-opened
     >
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('settings.correlation.semanticFieldTitle')"
       :caption="t('settings.correlation.semanticFieldDescription')"
       header-class="section-header"
-      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
+      class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
       :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
       default-opened
     >
@@ -739,5 +739,12 @@ loadConfig();
   }
 :deep(.example-chip) {
   font-size: 13px;
+}
+</style>
+<style lang="scss">
+.expanstion-item-o2 {
+  .q-item__section--side {
+    min-width: auto;
+  }
 }
 </style>

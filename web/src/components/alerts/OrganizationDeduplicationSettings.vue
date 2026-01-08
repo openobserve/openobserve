@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full org-dedup-settings">
-    <div class="tw:mb-6 tw:flex tw:justify-between tw:items-start">
-      <div>
-        <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
-        <div class="text-body2 text-grey-7">
-          {{ t('alerts.correlation.description') }}
-        </div>
-        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
-          {{ t('alerts.correlation.semanticFieldNote') }}
-        </div>
+  <div class="tw:w-full org-dedup-settings q-mt-sm">
+    <div class="tw:mb-6">
+      <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
+      <div class="text-body2 text-grey-7">
+        {{ t('alerts.correlation.description') }}
+      </div>
+      <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+        {{ t('alerts.correlation.semanticFieldNote') }}
       </div>
       <q-btn
         flat
@@ -166,6 +164,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 
 const store = useStore();
 const $q = useQuasar();

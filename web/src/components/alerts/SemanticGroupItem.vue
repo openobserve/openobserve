@@ -42,8 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="field-names-input">
           <TagInput
             v-model="localGroup.fields"
-            placeholder=""
-            label="Field names (comma-separated) *"
+            placeholder="Field names (comma-separated) *"
             @update:model-value="emitUpdate"
           />
         </div>

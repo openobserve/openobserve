@@ -15,13 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full discovered-services">
-    <div class="tw:mb-6 tw:flex tw:justify-between tw:items-start">
-      <div>
-        <div class="text-h6 tw:mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
-        <div class="text-body2 text-grey-7">
-          {{ t("settings.correlation.discoveredServicesDescription") }}
-        </div>
+  <div class="tw:w-full discovered-services q-mt-sm">
+    <div class="tw:mb-6">
+      <GroupHeader :title="t('settings.correlation.discoveredServicesTitle')" :showIcon="false" class="tw:mb-2" />
+      <div class="text-body2 text-grey-7 tw:mb-4">
+        {{ t("settings.correlation.discoveredServicesDescription") }}
       </div>
       <q-btn
         flat
@@ -613,6 +611,7 @@ import serviceStreamsService, {
   type ServiceFqnGroup,
   type ServiceInGroup,
 } from "@/services/service_streams";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 
 const { t } = useI18n();
 
