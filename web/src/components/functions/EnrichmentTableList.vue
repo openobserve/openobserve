@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item-label>
                   <q-item-label caption v-if="job.status === 'completed'" class="q-mt-sm">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
-                    Size: {{ formatSizeFromMB((job.total_bytes_fetched / (1024 * 1024)).toString()) }}
+                    Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </q-item-label>
                   <q-item-label caption v-if="job.status === 'failed'" class="q-mt-sm text-negative">
                     Error: {{ job.error_message }}

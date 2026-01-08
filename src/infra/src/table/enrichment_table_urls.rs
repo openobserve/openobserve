@@ -17,6 +17,9 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, entity::p
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
+
+// Status constants for enrichment table URL jobs
+const STATUS_PROCESSING: i16 = 1;
 // Re-export the entity for convenience
 pub use crate::table::entity::enrichment_table_urls::{
     ActiveModel, Column, Entity, Model, Relation,
@@ -261,7 +264,7 @@ pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, er
     let count = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
-        .filter(Column::Status.eq(1)) // 1 = Processing status
+        .filter(Column::Status.eq(STATUS_PROCESSING))
         .count(client)
         .await?;
 

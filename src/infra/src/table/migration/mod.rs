@@ -41,7 +41,6 @@ mod m20241227_000300_create_org_users_table;
 mod m20241227_000400_populate_users_table;
 // mod m20241227_000500_delete_meta_users_table;
 mod m20250107_160900_delete_bad_dashboards;
-mod m20250108_000001_recreate_enrichment_table_urls_with_ksuids;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
 mod m20250121_120000_create_cipher_table;
@@ -89,6 +88,7 @@ mod m20251226_000001_add_enrichment_table_urls_is_local_region;
 mod m20251229_000001_create_backfill_jobs;
 mod m20251230_000001_add_allow_static_token_to_org_users;
 mod m20260107_000001_sync_distinct_stream_retention;
+mod m20260108_000001_recreate_enrichment_table_urls_with_ksuids;
 
 pub struct Migrator;
 
@@ -166,7 +166,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251229_000001_create_backfill_jobs::Migration),
             Box::new(m20251230_000001_add_allow_static_token_to_org_users::Migration),
             Box::new(m20260107_000001_sync_distinct_stream_retention::Migration),
-            Box::new(m20250108_000001_recreate_enrichment_table_urls_with_ksuids::Migration),
+            Box::new(m20260108_000001_recreate_enrichment_table_urls_with_ksuids::Migration),
         ]
     }
 }

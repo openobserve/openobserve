@@ -352,11 +352,14 @@ pub async fn save_enrichment_table_from_url(
     let jobs_to_save: Vec<EnrichmentTableUrlJob> = if resume {
         // ===== SCENARIO 1: RESUME =====
         // Find failed job with matching URL that supports Range requests
-        let resumable_job = existing_jobs.into_iter().find(|j| {
-            j.status == EnrichmentTableStatus::Failed
-                && j.supports_range
-                && j.url == request_body.url
-        });
+        let resumable_job = existing_jobs
+            .iter()
+            .find(|j| {
+                j.status == EnrichmentTableStatus::Failed
+                    && j.supports_range
+                    && j.url == request_body.url
+            })
+            .cloned();
 
         if let Some(existing) = resumable_job {
             log::info!(

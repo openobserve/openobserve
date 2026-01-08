@@ -171,7 +171,7 @@ mod legacy_enrichment_table_urls {
                 // to ensure uniqueness when we later support multiple URLs per table
                 let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
                 let mut am = job.into_active_model();
-                println!("enrichment_table_url job ksuid: {ksuid}");
+                log::debug!("[ENRICHMENT::URL] enrichment_table_url job ksuid: {ksuid}");
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
