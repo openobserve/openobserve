@@ -68,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is="Component"
               :date-time="currentTimeObj"
               :selected-date="selectedDate"
+              ref="activePerformanceComponent"
+              @variablesManagerReady="onVariablesManagerReady"
             />
           </div>
         </div>
@@ -112,8 +114,22 @@ export default defineComponent({
     const { t } = useI18n();
 
     const activePerformanceTab = ref("overview");
+    const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
     const { rumState } = useRum();
+
+    // Variables manager will be initialized by RenderDashboardCharts in child components
+    const variablesManager = ref(null);
+
+    // Computed ref to access RenderDashboardCharts from the active child component
+    const performanceChartsRef = computed(() => {
+      return (
+        activePerformanceComponent.value?.performanceChartsRef ||
+        activePerformanceComponent.value?.webVitalsChartsRef ||
+        activePerformanceComponent.value?.errorRenderDashboardChartsRef ||
+        activePerformanceComponent.value?.apiDashboardChartsRef
+      );
+    });
 
     const tabs = [
       {
@@ -255,36 +271,10 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values.forEach((v) => {
-        variableObj[`var-${v.name}`] = v.value;
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-        },
-      });
+    // Handler for when variables manager is ready from child component
+    const onVariablesManagerReady = (manager: any) => {
+      variablesManager.value = manager;
     };
-
-    // ======= [START] default variable values
-
-    const initialVariableValues = {};
-    Object.keys(route.query).forEach((key) => {
-      if (key.startsWith("var-")) {
-        const newKey = key.slice(4);
-        initialVariableValues[newKey] = route.query[key];
-      }
-    });
-    // ======= [END] default variable values
 
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
@@ -342,6 +332,14 @@ export default defineComponent({
     };
 
     const refreshData = () => {
+      // CRITICAL: Commit all live variable changes to committed state
+      // This is the key mechanism that prevents premature API calls
+      // Call commitAllVariables via the RenderDashboardCharts ref
+      if (performanceChartsRef.value?.commitAllVariables) {
+        performanceChartsRef.value.commitAllVariables();
+      }
+
+      // Refresh the dashboard
       dateTimePicker.value.refresh();
     };
 
@@ -401,15 +399,14 @@ export default defineComponent({
       // ----------------
       refreshData,
       onDeletePanel,
-      variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,
-      initialVariableValues,
       getQueryParamsForDuration,
       tabs,
       activePerformanceTab,
+      activePerformanceComponent,
     };
   },
 });
