@@ -765,6 +765,9 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     // Build the router
     let app = create_app_router()
+        .layer(middlewares::AccessLogLayer::new(
+            middlewares::get_http_access_log_format(),
+        ))
         .layer(middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
@@ -1446,39 +1449,6 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
     Ok(())
 }
 
-/// Get the HTTP access log format from configuration, or return the default if not set
-///
-/// %a - Remote IP address
-/// %t - Time when the request was received
-/// %r - First line of request
-/// %s - Response status code
-/// %b - Size of response in bytes, excluding HTTP headers
-/// %U - URL path requested
-/// %T - Time taken to serve the request, in seconds
-/// %D - Time taken to serve the request, in microseconds
-/// %i - Header line(s) from request
-/// %o - Header line(s) from response
-/// %{Content-Length}i - Size of request payload in bytes
-/// %{Referer}i - Referer header
-/// %{User-Agent}i - User-Agent header
-// TODO: Implement HTTP access logging for Axum using this format
-// For now, this function is preserved but not actively used
-// Axum doesn't have built-in Logger middleware like actix-web
-// We should implement a custom tower::Layer that uses this format
-#[allow(dead_code)]
-fn get_http_access_log_format() -> String {
-    // TODO: Implement HTTP access logging for Axum using this format
-    let log_format = get_config().http.access_log_format.to_string();
-    if log_format.is_empty() || log_format.to_lowercase() == "common" {
-        r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
-    } else if log_format.to_lowercase() == "json" {
-        r#"{ "remote_ip": "%a", "request": "%r", "status": %s, "response_size": %b, "request_size": "%{Content-Length}i", "referer": "%{Referer}i", "user_agent": "%{User-Agent}i", "response_time_secs": %T }"#
-            .to_string()
-    } else {
-        log_format
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use tokio::runtime::Runtime;
@@ -1490,21 +1460,6 @@ mod tests {
         let _guard = setup_logs();
 
         // Just verify that the guard is valid and the logs setup doesn't panic
-    }
-
-    #[test]
-    fn test_log_formatting_patterns() {
-        // Test the log format string used in HTTP server setup
-        let log_format = get_http_access_log_format();
-
-        assert!(log_format.contains("%a")); // Remote IP
-        assert!(log_format.contains("%r")); // Request line
-        assert!(log_format.contains("%s")); // Response status
-        assert!(log_format.contains("%b")); // Response size
-        assert!(log_format.contains("%T")); // Time taken
-        assert!(log_format.contains("Content-Length"));
-        assert!(log_format.contains("Referer"));
-        assert!(log_format.contains("User-Agent"));
     }
 
     #[test]
@@ -1570,57 +1525,6 @@ mod tests {
         assert!(addr.is_err());
     }
 
-    #[test]
-    fn test_thread_id_atomic_operations() {
-        use std::sync::{
-            Arc,
-            atomic::{AtomicU16, Ordering},
-        };
-
-        // Test the atomic operations used for thread ID management
-        let thread_id = Arc::new(AtomicU16::new(0));
-
-        assert_eq!(thread_id.load(Ordering::SeqCst), 0);
-        thread_id.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(thread_id.load(Ordering::SeqCst), 1);
-
-        // Test multiple increments
-        for i in 2..=10 {
-            thread_id.fetch_add(1, Ordering::SeqCst);
-            assert_eq!(thread_id.load(Ordering::SeqCst), i);
-        }
-    }
-
-    #[test]
-    fn test_compression_encoding_configuration() {
-        use tonic::codec::CompressionEncoding;
-
-        // Test that compression encoding constants are available
-        let _gzip = CompressionEncoding::Gzip;
-
-        // Test that we can create compression configurations
-        // This tests the pattern used in gRPC service setup
-        let max_size = 4 * 1024 * 1024; // 4MB as used in the actual code
-        assert!(max_size > 0);
-        assert_eq!(max_size, 4194304);
-    }
-
-    #[test]
-    fn test_duration_calculations() {
-        use std::{cmp::max, time::Duration};
-
-        // Test duration calculations used in server configurations
-        let keep_alive = max(1, 30); // Pattern from keep_alive configuration
-        assert_eq!(keep_alive, 30);
-
-        let timeout = max(1, 0); // Edge case: ensure minimum of 1
-        assert_eq!(timeout, 1);
-
-        // Test duration creation
-        let duration = Duration::from_secs(keep_alive);
-        assert_eq!(duration.as_secs(), 30);
-    }
-
     #[tokio::test]
     async fn test_oneshot_channel_communication() {
         use tokio::sync::oneshot;
@@ -1670,21 +1574,6 @@ mod tests {
 
         let timeout = std::cmp::max(1, 60);
         assert!(timeout >= 1);
-    }
-
-    #[test]
-    fn test_log_formatting_patterns() {
-        // Test the log format string used in HTTP server setup
-        let log_format = get_http_access_log_format();
-
-        assert!(log_format.contains("%a")); // Remote IP
-        assert!(log_format.contains("%r")); // Request line
-        assert!(log_format.contains("%s")); // Response status
-        assert!(log_format.contains("%b")); // Response size
-        assert!(log_format.contains("%T")); // Time taken
-        assert!(log_format.contains("Content-Length"));
-        assert!(log_format.contains("Referer"));
-        assert!(log_format.contains("User-Agent"));
     }
 
     #[tokio::test]

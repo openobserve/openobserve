@@ -949,7 +949,8 @@ impl AuthExtractor {
                 if !auth_tokens.access_token.is_empty() {
                     auth_tokens.access_token
                 } else if let Some(auth_ext_cookie) = cookie_map.get("auth_ext") {
-                    let val = config::utils::base64::decode_raw(auth_ext_cookie).unwrap_or_default();
+                    let val =
+                        config::utils::base64::decode_raw(auth_ext_cookie).unwrap_or_default();
                     std::str::from_utf8(&val).unwrap_or_default().to_string()
                 } else {
                     String::new()

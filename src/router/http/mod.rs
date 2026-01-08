@@ -453,9 +453,9 @@ async fn send_and_respond(
     }
 
     if is_streaming {
-        let stream = resp.bytes_stream().map(|chunk| {
-            chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-        });
+        let stream = resp
+            .bytes_stream()
+            .map(|chunk| chunk.map_err(|e| std::io::Error::other(e.to_string())));
         match builder.body(Body::from_stream(stream)) {
             Ok(r) => r,
             Err(e) => (

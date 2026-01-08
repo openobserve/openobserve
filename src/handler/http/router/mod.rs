@@ -912,7 +912,10 @@ pub fn create_app_router() -> Router {
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {
         app = app
-            .route("/", get(|| async { axum::response::Redirect::permanent("/web/") }))
+            .route(
+                "/",
+                get(|| async { axum::response::Redirect::permanent("/web/") }),
+            )
             .nest_service("/web", ui::ui_routes());
     }
 
