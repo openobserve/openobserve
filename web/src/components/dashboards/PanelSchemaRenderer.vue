@@ -747,7 +747,6 @@ export default defineComponent({
       // Prepare panel data to pass to alert creation
       const query = panelSchema.value.queries?.[0];
       if (!query) {
-        console.error("No query found in panel");
         return;
       }
 
@@ -977,7 +976,6 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          console.error("error", error);
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1518,7 +1516,6 @@ export default defineComponent({
       const streamName = queryDetails?.queries[0]?.fields?.stream;
 
       if (!originalQuery || !streamName) {
-        console.error("Missing query or stream name.");
         return null;
       }
 
@@ -1546,7 +1543,6 @@ export default defineComponent({
       try {
         return parser.astify(originalQuery);
       } catch (error) {
-        console.error("Failed to parse query:", error);
         return null;
       }
     };
@@ -1706,7 +1702,6 @@ export default defineComponent({
         const navigateToLogs = async () => {
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
-            console.error("Panel schema is undefined.");
             return;
           }
 
@@ -1904,7 +1899,6 @@ export default defineComponent({
               });
             }
           } catch (error) {
-            console.error("Failed to navigate to logs:", error);
           }
         };
 
@@ -2033,7 +2027,6 @@ export default defineComponent({
           )?.folderId;
 
           if (!folderId) {
-            console.error(`Folder "${drilldownData.data.folder}" not found`);
             return;
           }
 
@@ -2055,9 +2048,6 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
-            console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
-            );
             return;
           }
 
@@ -2304,7 +2294,6 @@ export default defineComponent({
             showErrorNotification("Browser denied file download...");
           }
         } catch (error) {
-          console.error("Error downloading CSV:", error);
           showErrorNotification("Failed to download data as CSV");
         }
       }
@@ -2364,7 +2353,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error downloading JSON:", error);
         showErrorNotification("Failed to download data as JSON");
       }
     };

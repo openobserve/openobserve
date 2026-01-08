@@ -1341,7 +1341,6 @@ export default defineComponent({
           const query = promQueryModeller.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
         } catch (error) {
-          console.error("Error generating PromQL query:", error);
         }
       },
       { deep: true }

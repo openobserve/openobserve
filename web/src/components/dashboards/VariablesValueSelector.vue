@@ -700,7 +700,6 @@ export default defineComponent({
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        console.error("Streaming connection failed:", error);
         variableObject.isLoading = false;
         variableObject.isVariableLoadingPending = false;
       }
@@ -1784,10 +1783,6 @@ export default defineComponent({
         // Don't use loadVariableOptions as it delegates back to manager (circular)
         await loadSingleVariableDataByName(variable, false);
       } catch (error) {
-        console.error(
-          `[VariablesValueSelector] Error loading variable ${variable.name}:`,
-          error,
-        );
         variable.isLoading = false;
       }
     };
@@ -2373,7 +2368,6 @@ export default defineComponent({
           );
           return; // Manager handles all downstream updates
         } catch (error) {
-          console.error("Error updating variable via manager:", error);
           // Fall through to legacy behavior on error
         }
       }

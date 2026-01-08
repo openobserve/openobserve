@@ -1153,7 +1153,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error loading dashboard:", error);
         showErrorNotification("Failed to load dashboard data");
       }
     });

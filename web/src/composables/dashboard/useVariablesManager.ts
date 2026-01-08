@@ -462,7 +462,6 @@ export const useVariablesManager = () => {
         panelTabMapping.value,
       );
     } catch (error: any) {
-      console.error("Error building dependency graph:", error);
       throw error;
     }
 

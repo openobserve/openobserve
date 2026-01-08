@@ -383,7 +383,6 @@ export default defineComponent({
 
         return;
       } catch (error) {
-        console.error("Error updating variables data:", error);
       }
 
       // resize the chart when variables data is updated
@@ -636,7 +635,6 @@ export default defineComponent({
           variablesManager.setPanelVisibility(props.panelId, true);
         }
       } catch (error) {
-        console.error("Error initializing variables manager:", error);
       }
 
       // if variables data is null, set it to empty list

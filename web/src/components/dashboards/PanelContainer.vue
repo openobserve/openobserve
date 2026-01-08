@@ -626,7 +626,6 @@ export default defineComponent({
       const streamName = queryDetails?.queries[0]?.fields?.stream;
 
       if (!originalQuery || !streamName) {
-        console.error("Missing query or stream name.");
         return null;
       }
 
@@ -685,7 +684,6 @@ export default defineComponent({
       );
       const queryDetails = props.data;
       if (!queryDetails) {
-        console.error("Data is undefined.");
         return;
       }
 
