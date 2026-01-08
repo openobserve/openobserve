@@ -553,7 +553,6 @@ const loadConfig = async () => {
       }
     } catch (settingError: any) {
       // Error loading setting, use defaults
-      console.log("ServiceIdentityConfig: Error loading FQN settings v2, using defaults:", settingError);
     }
 
     // Load semantic field groups from settings v2 API
@@ -566,7 +565,6 @@ const loadConfig = async () => {
       }
     } catch (settingError: any) {
       // Error loading setting, will use defaults
-      console.log("ServiceIdentityConfig: Error loading semantic groups settings v2:", settingError);
     }
 
     // Use settings v2 FQN priority if available, otherwise use backend defaults
@@ -593,7 +591,7 @@ const loadConfig = async () => {
     localFqnPriority.value = fqnPriority;
     localSemanticGroups.value = filteredSemanticGroups;
   } catch (error) {
-    console.log("ServiceIdentityConfig: Error loading config, using defaults", error);
+    // Error loading config, using defaults
     localFqnPriority.value = [...backendDefaults];
     localSemanticGroups.value = [];
   }

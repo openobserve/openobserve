@@ -285,7 +285,6 @@ const loadConfig = async () => {
       // Try to get existing config
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
       const config = response.data;
-      console.log("Loaded dedup config:", config);
       localConfig.value = {
         enabled: config.enabled ?? true,
         alert_dedup_enabled: config.alert_dedup_enabled ?? true,
@@ -296,13 +295,10 @@ const loadConfig = async () => {
       };
       localSemanticGroups.value = config.semantic_field_groups ?? [];
     } catch (error) {
-      console.log("No existing config, loading default semantic groups from backend", error);
-
       // Load default semantic groups from backend
       try {
         const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
         const defaultGroups = semanticGroupsResponse.data;
-        console.log(`Loaded ${defaultGroups.length} default semantic groups from backend`);
 
         localConfig.value = {
           enabled: true,
@@ -319,8 +315,6 @@ const loadConfig = async () => {
         localSemanticGroups.value = [];
       }
     }
-  } else {
-    console.log("Using config from props:", props.config);
   }
 };
 
@@ -332,7 +326,6 @@ watch(
   () => props.config,
   (newVal) => {
     if (newVal) {
-      console.log("Config changed from props:", newVal);
       localConfig.value = {
         enabled: newVal.enabled ?? true,
         alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
@@ -342,8 +335,6 @@ watch(
         fqn_priority_dimensions: newVal.fqn_priority_dimensions,
       };
       localSemanticGroups.value = newVal.semantic_field_groups ?? [];
-      console.log("Updated localConfig:", localConfig.value);
-      console.log("Updated localSemanticGroups:", localSemanticGroups.value);
     }
   },
   { deep: true, immediate: true },

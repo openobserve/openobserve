@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Priority Order (Left) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
-      <q-input v-model="searchLeft" dense outlined :placeholder="'Search...'" class="tw:mb-3">
+      <q-input v-model="searchLeft" dense outlined placeholder="Search..." class="tw:mb-3">
         <template #prepend><q-icon name="search" /></template>
       </q-input>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
@@ -177,14 +177,19 @@ const searchRight = ref('');
 const leftSelected = ref<string[]>([]);
 const rightSelected = ref<string[]>([]);
 
+// Create a map for O(1) lookups instead of O(n) find operations
+const itemsMap = computed(() =>
+  new Map(props.allItems.map(item => [item.value, item]))
+);
+
 const availableItems = computed(() => {
   return props.allItems.filter(item => !props.modelValue.includes(item.value));
 });
 
 const selectedItems = computed(() => {
   return props.modelValue
-    .map(value => props.allItems.find(item => item.value === value))
-    .filter(Boolean) as Item[];
+    .map(value => itemsMap.value.get(value))
+    .filter((item): item is Item => item !== undefined);
 });
 
 const filteredSelected = computed(() => {
