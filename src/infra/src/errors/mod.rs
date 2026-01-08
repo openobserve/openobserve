@@ -199,7 +199,6 @@ pub enum ErrorCodes {
     InvalidParams(String),
     RatelimitExceeded(String),
     SearchHistogramNotAvailable(String),
-    TooManyRecords(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -255,7 +254,6 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(_) => 20011,
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
-            ErrorCodes::TooManyRecords(_) => 20014,
         }
     }
 
@@ -285,7 +283,6 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(_) => {
                 "Search histogram not available".to_string()
             }
-            ErrorCodes::TooManyRecords(_) => "Too many records".to_string(),
         }
     }
 
@@ -305,7 +302,6 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
-            ErrorCodes::TooManyRecords(msg) => msg.to_owned(),
         }
     }
 
@@ -325,7 +321,6 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
-            ErrorCodes::TooManyRecords(msg) => msg.to_owned(),
         }
     }
 
