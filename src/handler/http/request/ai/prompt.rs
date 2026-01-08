@@ -65,7 +65,7 @@ pub async fn list_prompts(Path(org_id): Path<String>) -> Response {
 /// GetPrompt
 #[utoipa::path(
     get,
-    path = "/{org_id}/ai/prompts/{id}",
+    path = "/{org_id}/ai/prompts/{prompt_type}",
     context_path = "/api",
     tag = "Ai",
     operation_id = "GetPrompt",
@@ -179,7 +179,7 @@ pub async fn update_prompt(
 }
 
 #[utoipa::path(
-    post,
+    delete,
     path = "/{org_id}/ai/prompts",
     context_path = "/api",
     tag = "Ai",

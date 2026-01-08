@@ -61,7 +61,7 @@ pub struct ListIncidentsResponse {
 /// ListIncidents
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/incidents",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "ListIncidents",
@@ -103,7 +103,7 @@ pub async fn list_incidents(
 /// GetIncident
 #[utoipa::path(
     get,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncident",
@@ -133,8 +133,8 @@ pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -
 #[cfg(feature = "enterprise")]
 /// UpdateIncidentStatus
 #[utoipa::path(
-    put,
-    path = "/{org_id}/{incident_id}",
+    patch,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/status",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "UpdateIncidentStatus",
@@ -184,7 +184,7 @@ pub async fn update_incident_status(
 /// GetIncidentStats
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/incidents/stats",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentStats",
@@ -241,7 +241,7 @@ pub struct TriggerRcaQuery {
 /// TriggerIncidentRca
 #[utoipa::path(
     post,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
@@ -365,7 +365,7 @@ pub async fn trigger_incident_rca(
 /// GetIncidentServiceGraph
 #[utoipa::path(
     get,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/service_graph",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentServiceGraph",
@@ -408,7 +408,7 @@ pub async fn get_incident_service_graph(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/service_graph",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentServiceGraph",
@@ -434,7 +434,7 @@ pub async fn get_incident_service_graph(_path: Path<(String, String)>) -> Respon
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
@@ -460,7 +460,7 @@ pub async fn trigger_incident_rca(_path: Path<(String, String)>) -> Response {
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/incidents",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "ListIncidents",
@@ -486,7 +486,7 @@ pub async fn list_incidents(_path: Path<String>, _query: Query<ListIncidentsQuer
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncident",
@@ -512,7 +512,7 @@ pub async fn get_incident(_path: Path<(String, String)>) -> Response {
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     put,
-    path = "/{org_id}/{incident_id}",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/status",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "UpdateIncidentStatus",
@@ -542,7 +542,7 @@ pub async fn update_incident_status(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/incidents/stats",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentStats",

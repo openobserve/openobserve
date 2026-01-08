@@ -163,7 +163,7 @@ pub async fn agent_chat(
 /// Streaming agent chat endpoint (SSE)
 #[utoipa::path(
     post,
-    path = "/{org_id}/agent/chat_stream",
+    path = "/{org_id}/agent/chat/stream",
     context_path = "/api",
     tag = "Agents",
     operation_id = "AgentChatStream",

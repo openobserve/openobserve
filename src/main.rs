@@ -1371,7 +1371,9 @@ pub fn create_script_server_router() -> Router {
         .route("/{org_id}/app/{name}", get(script_server::get_app_details))
         .route("/{org_id}/apps", get(script_server::list_deployed_apps))
         .route("/{org_id}/action/{id}", patch(script_server::patch_action))
-        .layer(middleware::from_fn(script_server_auth_middleware))
+        .layer(middleware::from_fn(
+            openobserve::handler::http::auth::script_server::auth_middleware,
+        ))
         .layer(cors_layer());
 
     // Nest under base URI
@@ -1379,47 +1381,6 @@ pub fn create_script_server_router() -> Router {
         Router::new().nest("/api", api_routes)
     } else {
         Router::new().nest(&format!("{}/api", base_uri), api_routes)
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn script_server_auth_middleware(
-    mut request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    use axum::{http::header, response::IntoResponse};
-    use openobserve::{
-        common::utils::auth::AuthExtractor,
-        handler::http::auth::{
-            script_server::validator as script_server_validator,
-            validator::{AuthError, RequestData},
-        },
-    };
-
-    // Extract request data
-    let req_data = RequestData {
-        uri: request.uri().clone(),
-        method: request.method().clone(),
-        headers: request.headers().clone(),
-    };
-
-    // Extract auth info
-    let auth_info = match AuthExtractor::extract_from_request_sync(&request) {
-        Ok(info) => info,
-        Err(e) => return AuthError::Unauthorized(e).into_response(),
-    };
-
-    // Validate authentication
-    match script_server_validator(&req_data, &auth_info).await {
-        Ok(result) => {
-            request.headers_mut().insert(
-                header::HeaderName::from_static("user_id"),
-                header::HeaderValue::from_str(&result.user_email)
-                    .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-            );
-            next.run(request).await
-        }
-        Err(e) => e.into_response(),
     }
 }
 
@@ -1500,8 +1461,13 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 /// %{Content-Length}i - Size of request payload in bytes
 /// %{Referer}i - Referer header
 /// %{User-Agent}i - User-Agent header
+// TODO: Implement HTTP access logging for Axum using this format
+// For now, this function is preserved but not actively used
+// Axum doesn't have built-in Logger middleware like actix-web
+// We should implement a custom tower::Layer that uses this format
 #[allow(dead_code)]
 fn get_http_access_log_format() -> String {
+    // TODO: Implement HTTP access logging for Axum using this format
     let log_format = get_config().http.access_log_format.to_string();
     if log_format.is_empty() || log_format.to_lowercase() == "common" {
         r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
@@ -1524,6 +1490,21 @@ mod tests {
         let _guard = setup_logs();
 
         // Just verify that the guard is valid and the logs setup doesn't panic
+    }
+
+    #[test]
+    fn test_log_formatting_patterns() {
+        // Test the log format string used in HTTP server setup
+        let log_format = get_http_access_log_format();
+
+        assert!(log_format.contains("%a")); // Remote IP
+        assert!(log_format.contains("%r")); // Request line
+        assert!(log_format.contains("%s")); // Response status
+        assert!(log_format.contains("%b")); // Response size
+        assert!(log_format.contains("%T")); // Time taken
+        assert!(log_format.contains("Content-Length"));
+        assert!(log_format.contains("Referer"));
+        assert!(log_format.contains("User-Agent"));
     }
 
     #[test]

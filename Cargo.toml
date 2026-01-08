@@ -48,7 +48,6 @@ codegen-units = 4
 split-debuginfo = "packed"
 
 [dependencies]
-# Axum HTTP framework
 axum.workspace = true
 axum-extra.workspace = true
 axum-server.workspace = true
@@ -60,7 +59,6 @@ http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 mime_guess = "2.0"
-
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -228,7 +226,6 @@ report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
-# Axum HTTP framework
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
 axum-extra = { version = "0.10", features = ["typed-header", "query", "cookie"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }

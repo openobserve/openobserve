@@ -32,7 +32,6 @@ use crate::{common::meta, handler::http::request};
         request::organization::org::organizations,
         request::organization::org::create_org,
         request::organization::org::rename_org,
-        #[cfg(feature = "enterprise")]
         request::organization::assume_service_account::assume_service_account,
         request::organization::org::org_summary,
         request::organization::org::get_user_passcode,
@@ -128,17 +127,11 @@ use crate::{common::meta, handler::http::request};
         request::alerts::generate_sql,
         request::alerts::move_alerts,
         request::alerts::history::get_alert_history,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::list_incidents,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::get_incident,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::update_incident_status,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::get_incident_stats,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::trigger_incident_rca,
-        #[cfg(feature = "enterprise")]
         request::alerts::incidents::get_incident_service_graph,
         request::agent::chat::agent_chat,
         request::agent::chat::agent_chat_stream,
@@ -167,11 +160,8 @@ use crate::{common::meta, handler::http::request};
         request::service_accounts::update,
         request::service_accounts::delete,
         request::service_accounts::get_api_token,
-        #[cfg(feature = "enterprise")]
         request::mcp::handle_mcp_post,
-        #[cfg(feature = "enterprise")]
         request::mcp::handle_mcp_get,
-        #[cfg(feature = "enterprise")]
         request::mcp::oauth_authorization_server_metadata,
         request::pipeline::save_pipeline,
         request::pipeline::list_pipelines,
@@ -194,39 +184,22 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::reports::delete_report,
         request::dashboards::reports::enable_report,
         request::dashboards::reports::trigger_report,
-        #[cfg(feature = "enterprise")]
         request::actions::action::upload_zipped_action,
-        #[cfg(feature = "enterprise")]
         request::actions::action::delete_action,
-        #[cfg(feature = "enterprise")]
         request::actions::action::serve_action_zip,
-        #[cfg(feature = "enterprise")]
         request::actions::action::update_action_details,
-        #[cfg(feature = "enterprise")]
         request::actions::action::list_actions,
-        #[cfg(feature = "enterprise")]
         request::actions::action::get_action_from_id,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::create_role,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::delete_role,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::get_roles,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::update_role,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::get_role_permissions,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::get_users_with_role,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::create_group,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::update_group,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::get_groups,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::get_group_details,
-        #[cfg(feature = "enterprise")]
         request::authz::fga::delete_group,
         request::keys::save,
         request::keys::get,
@@ -242,27 +215,16 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::retry_job,
         request::search::search_stream::search_http2_stream,
         request::search::search_stream::values_http2_stream,
-        #[cfg(feature = "enterprise")]
         request::patterns::extract_patterns,
-        #[cfg(feature = "enterprise")]
         crate::service::traces::service_graph::api::get_current_topology,
-        #[cfg(feature = "enterprise")]
         request::service_streams::get_dimension_analytics,
-        #[cfg(feature = "enterprise")]
         request::service_streams::correlate_streams,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::get_config,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::set_config,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::delete_config,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::get_semantic_groups,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::preview_semantic_groups_diff,
-        #[cfg(feature = "enterprise")]
         request::alerts::deduplication::save_semantic_groups,
-        #[cfg(feature = "enterprise")]
         request::alerts::dedup_stats::get_dedup_summary,
     ),
     components(

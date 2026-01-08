@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -403,4 +403,38 @@ mod tests {
 
     // Note: Test for test_run_function disabled as it requires integration testing
     // with the full HTTP stack to properly test response bodies
+    #[tokio::test]
+    async fn validate_test_function_processing() {
+        use serde_json::json;
+
+        let org_id = "test_org";
+        let function = r#"
+        . = {
+            "new_field": "new_value",
+            "nested": {
+                "key": 42
+            }
+        }
+        .
+    "#
+        .to_string();
+
+        let events = vec![json!({
+            "original_field": "original_value"
+        })];
+
+        let response = test_run_function(org_id, function, events).await.unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        let body: TestVRLResponse =
+            serde_json::from_slice(&to_bytes(response.into_body()).await.unwrap()).unwrap();
+
+        // Validate transformed events
+        assert_eq!(body.results.len(), 1);
+        assert_eq!(body.results[0].message, "");
+        assert_eq!(
+            body.results[0].event,
+            json! {{"nested_key":42,"new_field":"new_value"}}
+        );
+    }
 }

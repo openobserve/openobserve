@@ -52,7 +52,7 @@ use crate::{
 /// TracesIngest
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}/traces",
+    path = "/{org_id}/traces",
     context_path = "/api",
     tag = "Traces",
     operation_id = "PostTraces",
@@ -146,7 +146,7 @@ async fn handle_req(
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
     get,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/traces/latest",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetLatestTraces",

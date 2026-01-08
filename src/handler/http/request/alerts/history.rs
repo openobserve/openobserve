@@ -132,7 +132,7 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
 /// authentication.
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/history",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlertHistory",
