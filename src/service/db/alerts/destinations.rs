@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use config::meta::destinations::Destination;
 use infra::table;
@@ -38,6 +38,10 @@ pub enum DestinationError {
     InvalidName,
     #[error("HTTP destination must have a url")]
     EmptyUrl,
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+    #[error("URL targets restricted address (private IP, localhost, or metadata endpoint): {0}")]
+    RestrictedUrl(String),
     #[error("SNS destination must have Topic ARN and Region")]
     InvalidSns,
     #[error("Email destination must have at least one email recipient")]
@@ -239,4 +243,86 @@ pub(super) fn parse_event_key<'a>(
     }
 
     Ok((org_id, name))
+}
+
+/// Validates URL to prevent SSRF attacks
+pub fn validate_url(url_str: &str) -> Result<(), DestinationError> {
+    // Parse URL
+    let url = url::Url::parse(url_str)
+        .map_err(|e| DestinationError::InvalidUrl(format!("Failed to parse URL: {}", e)))?;
+
+    // Only allow http and https schemes
+    let scheme = url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(DestinationError::InvalidUrl(format!(
+            "Only http and https schemes are allowed, got: {}",
+            scheme
+        )));
+    }
+
+    // Get host
+    let host = url
+        .host_str()
+        .ok_or_else(|| DestinationError::InvalidUrl("URL must have a host".to_string()))?;
+
+    // Check for localhost
+    if host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || host.starts_with("127.")
+        || host.ends_with(".localhost")
+    {
+        return Err(DestinationError::RestrictedUrl(format!(
+            "localhost not allowed: {}",
+            host
+        )));
+    }
+
+    // Check for metadata endpoints
+    if host == "169.254.169.254" || host == "fd00:ec2::254" {
+        return Err(DestinationError::RestrictedUrl(
+            "Cloud metadata endpoints not allowed".to_string(),
+        ));
+    }
+
+    // Try to parse as IP address
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        // Check for private IP ranges
+        if is_private_ip(&ip) {
+            return Err(DestinationError::RestrictedUrl(format!(
+                "Private IP address not allowed: {}",
+                ip
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Checks if an IP address is private
+fn is_private_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => {
+            let octets = ipv4.octets();
+            // 10.0.0.0/8
+            octets[0] == 10
+            // 172.16.0.0/12
+            || (octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31))
+            // 192.168.0.0/16
+            || (octets[0] == 192 && octets[1] == 168)
+            // 169.254.0.0/16 (link-local)
+            || (octets[0] == 169 && octets[1] == 254)
+            // 127.0.0.0/8 (loopback)
+            || octets[0] == 127
+        }
+        IpAddr::V6(ipv6) => {
+            let segments = ipv6.segments();
+            // ::1 (loopback)
+            ipv6.is_loopback()
+            // fe80::/10 (link-local)
+            || (segments[0] & 0xffc0) == 0xfe80
+            // fc00::/7 (unique local)
+            || (segments[0] & 0xfe00) == 0xfc00
+        }
+    }
 }
