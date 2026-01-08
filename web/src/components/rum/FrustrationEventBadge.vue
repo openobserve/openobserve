@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="frustration-event-badge-wrapper" data-test="frustration-event-badge-wrapper">
+  <span
+    class="frustration-event-badge-wrapper"
+    data-test="frustration-event-badge-wrapper"
+  >
     <q-badge
       v-for="(type, index) in frustrationTypes"
       :key="index"
@@ -51,31 +54,26 @@ const frustrationConfig: Record<string, { label: string; class: string; tooltip:
     label: "Rage Click",
     class: "frustration-badge-rage",
     tooltip: "User clicked rapidly multiple times (3+) - indicating frustration",
-    icon: "😤"
   },
   dead_click: {
     label: "Dead Click",
     class: "frustration-badge-dead",
     tooltip: "Click produced no response - element may be broken or misleading",
-    icon: "⚠️"
   },
   error_click: {
     label: "Error Click",
     class: "frustration-badge-error",
     tooltip: "Click triggered a JavaScript error",
-    icon: "❌"
   },
   rage_tap: {
     label: "Rage Tap",
     class: "frustration-badge-rage",
     tooltip: "User tapped rapidly multiple times (3+) - indicating frustration",
-    icon: "😤"
   },
   error_tap: {
     label: "Error Tap",
     class: "frustration-badge-error",
     tooltip: "Tap triggered a JavaScript error",
-    icon: "❌"
   },
 };
 
