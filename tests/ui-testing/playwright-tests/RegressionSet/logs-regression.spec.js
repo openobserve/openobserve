@@ -3,7 +3,6 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
-const { expandFieldAndValidate } = require('../utils/test-helpers.js');
 
 test.describe("Logs Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -255,9 +254,9 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.waitForTimeout(2000);
     testLogger.info('Query results loaded successfully');
 
-    // Expand field and validate using helper function
+    // Expand field and validate using POM method
     const fieldToExpand = 'kubernetes_pod_name';
-    const result = await expandFieldAndValidate(page, pm, fieldToExpand, testLogger);
+    const result = await pm.logsPage.expandFieldAndValidate(fieldToExpand, testLogger);
     testLogger.info(`Subquery test completed: API status ${result.apiStatus}, ${result.valueCount} values found`);
   });
 
@@ -292,9 +291,9 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogTableColumnSourceVisible();
     testLogger.info('Query results loaded successfully');
 
-    // Expand field and validate using helper function
+    // Expand field and validate using POM method
     const fieldToExpand = 'kubernetes_pod_name';
-    const result = await expandFieldAndValidate(page, pm, fieldToExpand, testLogger);
+    const result = await pm.logsPage.expandFieldAndValidate(fieldToExpand, testLogger);
     testLogger.info(`CTE test completed: API status ${result.apiStatus}, ${result.valueCount} values found`);
   });
 
@@ -325,9 +324,9 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogTableColumnSourceVisible();
     testLogger.info('Query results loaded successfully');
 
-    // Expand field and validate using helper function
+    // Expand field and validate using POM method
     const fieldToExpand = 'kubernetes_pod_name';
-    const result = await expandFieldAndValidate(page, pm, fieldToExpand, testLogger);
+    const result = await pm.logsPage.expandFieldAndValidate(fieldToExpand, testLogger);
     testLogger.info(`GROUP BY test completed: API status ${result.apiStatus}, ${result.valueCount} values found`);
   });
 

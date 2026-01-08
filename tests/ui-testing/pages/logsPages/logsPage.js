@@ -3392,6 +3392,80 @@ export class LogsPage {
         return await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).count();
     }
 
+    /**
+     * Expands a field and validates that values API does not return 400 error.
+     * Used by Bug #7751 tests to verify field expansion works correctly with complex queries.
+     *
+     * This method performs three levels of validation:
+     * 1. PRIMARY: Values API responds with non-400 status
+     * 2. SECONDARY: No 400 error message displayed in UI
+     * 3. TERTIARY: Field values actually appear in dropdown
+     *
+     * @param {string} fieldName - Name of the field to expand
+     * @param {Object} testLogger - Test logger instance
+     * @returns {Promise<{apiStatus: number|null, valueCount: number}>} API status and field value count
+     * @example
+     * const result = await logsPage.expandFieldAndValidate('kubernetes_pod_name', testLogger);
+     * // Returns: { apiStatus: 200, valueCount: 10 }
+     */
+    async expandFieldAndValidate(fieldName, testLogger) {
+        const { expect } = require('@playwright/test');
+
+        // Search for the field first to make it visible in sidebar
+        testLogger.info(`Searching for field: ${fieldName}`);
+        await this.fillIndexFieldSearchInput(fieldName);
+
+        // Wait for expand button to be visible
+        testLogger.info(`Expanding field: ${fieldName}`);
+        await this.waitForFieldExpandButtonVisible(fieldName);
+
+        // Set up values API response waiter BEFORE clicking expand
+        testLogger.info('Setting up values API listener');
+        const valuesApiPromise = this.page.waitForResponse(
+            response => response.url().includes('/_values') && response.status() !== 0,
+            { timeout: 20000 }
+        ).catch(() => null);
+
+        // Click expand button
+        testLogger.info('Clicking expand to trigger values API call');
+        await this.clickFieldExpandButton(fieldName);
+
+        // Wait for values API response
+        let apiStatus = null;
+        const apiResponse = await valuesApiPromise;
+
+        if (apiResponse) {
+            apiStatus = apiResponse.status();
+            testLogger.info(`✓ Values API responded with status: ${apiStatus}`);
+
+            // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
+            expect(apiStatus).not.toBe(400);
+            testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
+        } else {
+            testLogger.warn('Values API response timeout');
+        }
+
+        // Wait for field expansion content to be visible
+        await this.waitForFieldExpansionContent(fieldName);
+
+        // Get expansion content text
+        const contentText = await this.getFieldExpansionContent(fieldName);
+
+        // Secondary assertion: NO 400 error in UI
+        expect(contentText).not.toContain('400');
+        expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
+        testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
+
+        // TERTIARY ASSERTION: Verify field values actually appear in dropdown
+        await this.waitForFieldValues(fieldName);
+        const valueCount = await this.getFieldValuesCount(fieldName);
+
+        expect(valueCount).toBeGreaterThanOrEqual(1);
+        testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
+
+        return { apiStatus, valueCount };
+    }
+
     async expectVrlFunctionVisible(functionText) {
         return await expect(this.page.locator(this.vrlFunctionText(functionText))).toBeVisible();
     }
