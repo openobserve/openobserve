@@ -370,7 +370,8 @@
     "sizekb": "Dimensione (kb)",
     "viewURL": "Visualizza URL",
     "events": "Eventi",
-    "location": "Posizione"
+    "location": "Posizione",
+    "frustrationCount": "Frustrazioni"
   },
   "about": {
     "name": "Apri Observe",

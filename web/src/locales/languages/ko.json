@@ -370,7 +370,8 @@
     "sizekb": "크기 (킬로바이트)",
     "viewURL": "URL 보기",
     "events": "이벤트",
-    "location": "위치"
+    "location": "위치",
+    "frustrationCount": "좌절"
   },
   "about": {
     "name": "오픈 옵저브",
