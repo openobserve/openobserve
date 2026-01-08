@@ -370,7 +370,8 @@
     "sizekb": "大小 (kb)",
     "viewURL": "查看网址",
     "events": "事件",
-    "location": "地点"
+    "location": "地点",
+    "frustrationCount": "挫折"
   },
   "about": {
     "name": "OpenObserve",
