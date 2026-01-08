@@ -514,7 +514,21 @@ const getSessionLogs = (req: any) => {
     whereClause = `where session_id IN (${sessionsKeys.map((item) => `'${item}'`).join(", ")})`;
   }
 
-  req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, ${userFields} ${geoFields} session_id from "_rumdata" ${whereClause} group by session_id order by zo_sql_timestamp DESC`;
+  req.query.sql = req.query.sql = `
+    select 
+      min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
+      min(type) as type,
+      -- Count total errors for this session
+      SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
+      -- Count actions with frustration signals (action_frustration_type is NOT NULL)
+      SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count,
+      -- Count all non-null event types
+      SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
+      ${userFields} ${geoFields} 
+      session_id 
+    from "_rumdata" ${whereClause} 
+    group by session_id 
+    order by zo_sql_timestamp DESC`;
 
   isLoading.value.push(true);
   searchService
