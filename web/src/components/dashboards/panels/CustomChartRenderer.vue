@@ -131,7 +131,7 @@ export default defineComponent({
     const initChart = async () => {
       if (!chartRef.value) return;
 
-      const echartsGL = await import("echarts-gl");
+      // const echartsGL = await import("echarts-gl");
 
       // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {
