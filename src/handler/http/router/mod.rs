@@ -41,6 +41,7 @@ use {
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    serde_json,
 };
 
 use super::request::*;
@@ -72,6 +73,98 @@ pub fn get_cors() -> Rc<Cors> {
         .supports_credentials()
         .max_age(3600);
     Rc::new(cors)
+}
+
+#[cfg(feature = "enterprise")]
+/// Sanitize request body to redact sensitive information before logging
+fn sanitize_request_body(body: &str, path: &str) -> String {
+    // Redact entire body for sensitive endpoints
+    let sensitive_paths = [
+        "/auth",
+        "/password",
+        "/login",
+        "/credentials",
+        "/keys",
+        "/secrets",
+        "/tokens",
+    ];
+
+    if sensitive_paths.iter().any(|p| path.contains(p)) {
+        return "[REDACTED - SENSITIVE ENDPOINT]".to_string();
+    }
+
+    // Try to parse as JSON and redact sensitive fields
+    if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(body) {
+        redact_sensitive_json_fields(&mut json);
+        serde_json::to_string(&json).unwrap_or_else(|_| "[INVALID JSON]".to_string())
+    } else {
+        // If not JSON, redact the entire body if it looks like it contains sensitive data
+        let sensitive_keywords = [
+            "password",
+            "token",
+            "key",
+            "secret",
+            "credential",
+            "authorization",
+        ];
+        let body_lower = body.to_lowercase();
+
+        if sensitive_keywords
+            .iter()
+            .any(|keyword| body_lower.contains(keyword))
+        {
+            "[REDACTED - CONTAINS SENSITIVE DATA]".to_string()
+        } else {
+            body.to_string()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// Recursively redact sensitive fields in JSON
+fn redact_sensitive_json_fields(value: &mut serde_json::Value) {
+    let sensitive_fields = [
+        "password",
+        "passwd",
+        "pwd",
+        "token",
+        "access_token",
+        "refresh_token",
+        "api_key",
+        "apikey",
+        "secret",
+        "client_secret",
+        "private_key",
+        "privatekey",
+        "encryption_key",
+        "encryptionkey",
+        "authorization",
+        "auth",
+        "credential",
+        "credentials",
+    ];
+
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, val) in map.iter_mut() {
+                let key_lower = key.to_lowercase();
+                if sensitive_fields
+                    .iter()
+                    .any(|field| key_lower.contains(field))
+                {
+                    *val = serde_json::Value::String("[REDACTED]".to_string());
+                } else {
+                    redact_sensitive_json_fields(val);
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                redact_sensitive_json_fields(item);
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -126,7 +219,9 @@ async fn audit_middleware(
                 // Binary data, encode it with base64
                 general_purpose::STANDARD.encode(&request_body)
             } else {
-                String::from_utf8(request_body.to_vec()).unwrap_or_default()
+                let raw_body = String::from_utf8(request_body.to_vec()).unwrap_or_default();
+                // Sanitize the body to redact sensitive information
+                sanitize_request_body(&raw_body, &path)
             };
             let error_header = res.response().headers().get(ERROR_HEADER);
             let error_msg = error_header
