@@ -370,7 +370,8 @@
     "sizekb": "Tamanho (kb)",
     "viewURL": "Exibir URL",
     "events": "Eventos",
-    "location": "Localização"
+    "location": "Localização",
+    "frustrationCount": "Frustrações"
   },
   "about": {
     "name": "Abra o Observe",

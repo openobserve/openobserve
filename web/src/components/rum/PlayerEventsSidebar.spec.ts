@@ -281,7 +281,7 @@ describe("PlayerEventsSidebar Component", () => {
     });
 
     it("should render event type selector", () => {
-      const eventSelector = wrapper.find('[data-test="q-select"]');
+      const eventSelector = wrapper.find('[data-test="player-events-filter-select"]');
       expect(eventSelector.exists()).toBe(true);
     });
 
@@ -357,6 +357,7 @@ describe("PlayerEventsSidebar Component", () => {
         "error",
         "action",
         "view",
+        "frustration",
       ]);
     });
 
@@ -365,6 +366,7 @@ describe("PlayerEventsSidebar Component", () => {
         { label: "Error", value: "error" },
         { label: "Action", value: "action" },
         { label: "View", value: "view" },
+        { label: "Frustration", value: "frustration" },
       ]);
     });
 
@@ -614,6 +616,197 @@ describe("PlayerEventsSidebar Component", () => {
 
       expect(wrapper.vm.filteredEvents).toHaveLength(1);
       expect(wrapper.vm.filteredEvents[0].type).toBe("error");
+    });
+  });
+
+  describe("Frustration Signals", () => {
+    const mockEventsWithFrustrations = [
+      {
+        id: "frustrated1",
+        type: "action",
+        name: "click on Submit Button",
+        displayTime: "00:45",
+        relativeTime: 45000,
+        frustration_types: ["rage_click"],
+      },
+      {
+        id: "frustrated2",
+        type: "action",
+        name: "click on Nav Menu",
+        displayTime: "01:23",
+        relativeTime: 83000,
+        frustration_types: ["dead_click"],
+      },
+      {
+        id: "normal1",
+        type: "action",
+        name: "click on Cancel",
+        displayTime: "02:00",
+        relativeTime: 120000,
+        frustration_types: null,
+      },
+      {
+        id: "frustrated3",
+        type: "action",
+        name: "click on Checkout",
+        displayTime: "02:30",
+        relativeTime: 150000,
+        frustration_types: ["rage_click", "error_click"],
+      },
+    ];
+
+    beforeEach(async () => {
+      wrapper = mount(PlayerEventsSidebar, {
+        attachTo: "#app",
+        props: {
+          events: mockEventsWithFrustrations,
+          sessionDetails: mockSessionDetails,
+        },
+        global: {
+          plugins: [i18n],
+          stubs: {
+            FrustrationEventBadge: {
+              name: "FrustrationEventBadge",
+              template: '<span data-test="frustration-badge-stub">{{ frustrationTypes }}</span>',
+              props: ["frustrationTypes"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+    });
+
+    it("should calculate correct frustration event count", () => {
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(3);
+    });
+
+    it("should return 0 frustration count when no frustrated events", async () => {
+      await wrapper.setProps({ events: [mockEventsWithFrustrations[2]] });
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(0);
+    });
+
+    it("should have frustration option in event filter", () => {
+      expect(wrapper.vm.eventOptions).toContainEqual({
+        label: "Frustration",
+        value: "frustration",
+      });
+    });
+
+    it("should include frustration in default selected filters", () => {
+      expect(wrapper.vm.selectedEventTypes).toContain("frustration");
+    });
+
+    it("should filter to show only frustrated events", async () => {
+      wrapper.vm.selectedEventTypes = ["frustration"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredEvents).toHaveLength(3);
+      wrapper.vm.filteredEvents.forEach((event: any) => {
+        expect(event.frustration_types).toBeTruthy();
+        expect(event.frustration_types.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("should combine frustration filter with error filter", async () => {
+      const mixedEvents = [
+        ...mockEventsWithFrustrations,
+        {
+          id: "error1",
+          type: "error",
+          name: "TypeError",
+          displayTime: "03:00",
+          relativeTime: 180000,
+          frustration_types: null,
+        },
+      ];
+
+      await wrapper.setProps({ events: mixedEvents });
+      wrapper.vm.selectedEventTypes = ["error", "frustration"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+
+      const filteredTypes = wrapper.vm.filteredEvents.map((e: any) => e.type);
+      const hasFrustrations = wrapper.vm.filteredEvents.some(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+
+      expect(filteredTypes).toContain("error");
+      expect(hasFrustrations).toBe(true);
+    });
+
+    it("should not show non-frustrated actions when only frustration filter is selected", async () => {
+      wrapper.vm.selectedEventTypes = ["frustration"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+
+      const nonFrustratedEvent = wrapper.vm.filteredEvents.find(
+        (e: any) => e.id === "normal1"
+      );
+      expect(nonFrustratedEvent).toBeUndefined();
+    });
+
+    it("should show all actions when both action and frustration filters are selected", async () => {
+      wrapper.vm.selectedEventTypes = ["action", "frustration"];
+      wrapper.vm.searchEvents("");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredEvents).toHaveLength(4);
+    });
+
+    it("should apply search filter on frustrated events", async () => {
+      wrapper.vm.selectedEventTypes = ["frustration"];
+      wrapper.vm.searchEvents("Submit");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.filteredEvents).toHaveLength(1);
+      expect(wrapper.vm.filteredEvents[0].name).toContain("Submit");
+    });
+
+    it("should update frustration count when events change", async () => {
+      let frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(3);
+
+      await wrapper.setProps({
+        events: [mockEventsWithFrustrations[0]], // Only 1 frustrated event
+      });
+
+      frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(1);
+    });
+
+    it("should handle events with multiple frustration types", () => {
+      const multipleTypes = wrapper.vm.events.find((e: any) => e.id === "frustrated3");
+      expect(multipleTypes.frustration_types).toHaveLength(2);
+      expect(multipleTypes.frustration_types).toContain("rage_click");
+      expect(multipleTypes.frustration_types).toContain("error_click");
+    });
+
+    it("should handle empty frustration_types array", async () => {
+      const eventWithEmptyArray = {
+        id: "empty",
+        type: "action",
+        name: "click",
+        displayTime: "00:00",
+        relativeTime: 0,
+        frustration_types: [],
+      };
+
+      await wrapper.setProps({ events: [eventWithEmptyArray] });
+      const frustratedEvents = wrapper.vm.events.filter(
+        (e: any) => e.frustration_types && e.frustration_types.length > 0
+      );
+      expect(frustratedEvents.length).toBe(0);
     });
   });
 });

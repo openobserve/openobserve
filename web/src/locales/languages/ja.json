@@ -370,7 +370,8 @@
     "sizekb": "サイズ（kb）",
     "viewURL": "ビューURL",
     "events": "イベント",
-    "location": "ロケーション"
+    "location": "ロケーション",
+    "frustrationCount": "フラストレーション"
   },
   "about": {
     "name": "OpenObserve",

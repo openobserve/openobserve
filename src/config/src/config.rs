@@ -1402,6 +1402,8 @@ pub struct Limit {
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
+    #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
+    pub metrics_inlist_filter_enabled: bool,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds

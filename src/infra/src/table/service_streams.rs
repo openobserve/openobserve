@@ -90,7 +90,9 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug, Serialize, Deserialize)]
+/// Service record for cross-region synchronization.
+/// Clone is required for super-cluster queue message serialization.
+#[derive(FromQueryResult, Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceRecord {
     pub org_id: String,
     pub service_key: String,
