@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData } = require('../utils/data-ingestion.js');
+const { expandFieldAndValidate } = require('../utils/test-helpers.js');
 
 test.describe("Logs Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -25,80 +26,6 @@ test.describe("Logs Regression Bugs", () => {
 
     testLogger.info('Logs regression bug test setup completed');
   });
-
-  /**
-   * Helper function to expand a field and validate that values API does not return 400 error.
-   * Used by Bug #7751 tests to reduce code duplication.
-   *
-   * @param {Page} page - Playwright page object
-   * @param {PageManager} pm - Page Manager instance
-   * @param {string} fieldName - Name of the field to expand
-   * @param {Object} testLogger - Test logger instance
-   * @returns {Promise<{apiStatus: number|null, valueCount: number}>} API status and field value count
-   */
-  async function expandFieldAndValidate(page, pm, fieldName, testLogger) {
-    // Search for the field first to make it visible in sidebar
-    testLogger.info(`Searching for field: ${fieldName}`);
-    await pm.logsPage.fillIndexFieldSearchInput(fieldName);
-
-    const expandButton = page.locator(pm.logsPage.fieldExpandButton(fieldName));
-
-    testLogger.info(`Expanding field: ${fieldName}`);
-    await expandButton.waitFor({ state: 'visible', timeout: 10000 });
-
-    // Set up values API response waiter BEFORE clicking expand
-    testLogger.info('Setting up values API listener');
-    const valuesApiResponse = page.waitForResponse(
-      response => response.url().includes('/_values') && response.status() !== 0,
-      { timeout: 20000 }
-    );
-
-    testLogger.info('Clicking expand to trigger values API call');
-    await expandButton.click();
-
-    // Wait for values API response
-    let apiStatus = null;
-    try {
-      const apiResponse = await valuesApiResponse;
-      apiStatus = apiResponse.status();
-      testLogger.info(`✓ Values API responded with status: ${apiStatus}`);
-
-      // PRIMARY ASSERTION: Values API should NOT return 400 (this was the bug #7751)
-      expect(apiStatus).not.toBe(400);
-      testLogger.info('✓ PRIMARY CHECK PASSED: Values API did not return 400 error');
-    } catch (error) {
-      testLogger.warn(`Values API response timeout or error: ${error.message}`);
-      // If API times out, we'll still check the UI for 400 errors below
-    }
-
-    // Wait for field expansion content to be visible (values or error message)
-    const fieldExpansionContent = page.locator(pm.logsPage.fieldListItem(fieldName));
-    await fieldExpansionContent.waitFor({ state: 'visible', timeout: 10000 });
-
-    let contentText = '';
-    try {
-      contentText = await fieldExpansionContent.textContent() || '';
-    } catch (error) {
-      testLogger.debug(`Could not read field expansion content: ${error.message}`);
-    }
-
-    // Secondary assertion: NO 400 error in UI
-    expect(contentText).not.toContain('400');
-    expect(contentText.toLowerCase()).not.toMatch(/error.*400|400.*error/);
-    testLogger.info('✓ SECONDARY CHECK PASSED: No 400 error displayed in UI');
-
-    // TERTIARY ASSERTION: Verify field values actually appear in dropdown
-    // Wait for at least one field value to load (proves dropdown populated successfully)
-    const firstFieldValue = page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).first();
-    await firstFieldValue.waitFor({ state: 'visible', timeout: 5000 });
-
-    const fieldValues = page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`);
-    const valueCount = await fieldValues.count();
-    expect(valueCount).toBeGreaterThanOrEqual(1);
-    testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
-
-    return { apiStatus, valueCount };
-  }
 
   test("should display error icon and error message when entering invalid time in absolute time range", {
     tag: ['@absoluteTimeError', '@regressionBugs', '@P0', '@logs']

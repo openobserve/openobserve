@@ -3313,6 +3313,85 @@ export class LogsPage {
         }
     }
 
+    // ============================================================================
+    // Field Expansion Methods (Bug #7751 regression tests)
+    // ============================================================================
+
+    /**
+     * Waits for the field expand button to be visible.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldExpandButtonVisible('kubernetes_pod_name');
+     */
+    async waitForFieldExpandButtonVisible(fieldName, timeout = 10000) {
+        await this.page.locator(this.fieldExpandButton(fieldName)).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Clicks the field expand button to trigger values API.
+     * @param {string} fieldName - Name of the field to expand
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.clickFieldExpandButton('kubernetes_pod_name');
+     */
+    async clickFieldExpandButton(fieldName) {
+        await this.page.locator(this.fieldExpandButton(fieldName)).click();
+    }
+
+    /**
+     * Waits for field expansion content to be visible after expanding a field.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldExpansionContent('kubernetes_pod_name');
+     */
+    async waitForFieldExpansionContent(fieldName, timeout = 10000) {
+        await this.page.locator(this.fieldListItem(fieldName)).waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Gets the text content of field expansion area (for error checking).
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<string>} The text content, or empty string on error
+     * @example
+     * const content = await logsPage.getFieldExpansionContent('kubernetes_pod_name');
+     */
+    async getFieldExpansionContent(fieldName, timeout = 10000) {
+        try {
+            return await this.page.locator(this.fieldListItem(fieldName)).textContent({ timeout }) || '';
+        } catch {
+            return '';
+        }
+    }
+
+    /**
+     * Waits for at least one field value to appear in the dropdown after expansion.
+     * @param {string} fieldName - Name of the field
+     * @param {number} [timeout=5000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.waitForFieldValues('kubernetes_pod_name');
+     */
+    async waitForFieldValues(fieldName, timeout = 5000) {
+        await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).first()
+            .waitFor({ state: 'visible', timeout });
+    }
+
+    /**
+     * Gets the count of field values displayed in the dropdown.
+     * @param {string} fieldName - Name of the field
+     * @returns {Promise<number>} Number of field values
+     * @example
+     * const count = await logsPage.getFieldValuesCount('kubernetes_pod_name');
+     */
+    async getFieldValuesCount(fieldName) {
+        return await this.page.locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`).count();
+    }
+
     async expectVrlFunctionVisible(functionText) {
         return await expect(this.page.locator(this.vrlFunctionText(functionText))).toBeVisible();
     }
