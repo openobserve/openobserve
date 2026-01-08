@@ -228,7 +228,14 @@ jobs:
               ]
           - testfolder: "RegressionSet"
             browser: "chrome"
-            run_files: ["logs-regression.spec.js", "streams-regression.spec.js", "enrichment-regression.spec.js", "ui-regression.spec.js"]
+            run_files:
+              [
+                "logs-regression.spec.js",
+                "streams-regression.spec.js",
+                "enrichment-regression.spec.js",
+                "ui-regression.spec.js",
+                "pipeline-regression.spec.js",
+              ]
             # - testfolder: "Dashboards-Variables-Scoped"
             #   browser: "chrome"
             #   run_files:
