@@ -49,10 +49,7 @@ impl TraceService for TraceServer {
         }
 
         let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
+        let in_stream_name: Option<&str> = stream_name.and_then(|s| s.to_str().ok());
 
         let user_email = metadata
             .get("user_id")
