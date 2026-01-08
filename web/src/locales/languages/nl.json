@@ -370,7 +370,8 @@
     "sizekb": "Grootte (kb)",
     "viewURL": "URL bekijken",
     "events": "Evenementen",
-    "location": "Locatie"
+    "location": "Locatie",
+    "frustrationCount": "Frustraties"
   },
   "about": {
     "name": "OpenObserve",

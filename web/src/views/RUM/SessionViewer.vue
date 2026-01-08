@@ -45,6 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
+        <div
+          v-if="frustrationCount > 0"
+          class="text-caption ellipsis row items-center"
+          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          data-test="session-viewer-frustration-summary"
+        >
+          <q-icon name="sentiment_very_dissatisfied" size="0.875rem" class="q-pr-xs" style="color: #fb923c;" data-test="frustration-summary-icon" />
+          <span class="tw:font-semibold" style="color: #fb923c;" data-test="frustration-summary-text">{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? 's' : '' }}</span>
+        </div>
       </div>
     </div>
     <div
@@ -96,6 +105,8 @@ const defaultEvent = {
   loading_time: "",
   loading_type: "",
   user: {},
+  frustration_type: null,
+  frustration_types: [],
 };
 
 const sessionId = ref("1");
@@ -124,6 +135,12 @@ const sessionDetails = ref({
   city: "",
   country: "",
   id: "",
+});
+
+const frustrationCount = computed(() => {
+  return segmentEvents.value.filter((event: any) =>
+    event.frustration_types && event.frustration_types.length > 0
+  ).length;
 });
 
 onBeforeMount(async () => {
@@ -396,9 +413,27 @@ const handleErrorEvent = (event: any) => {
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
   _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
-  // if (event.event.custom.error) {
-  //   _event.name = event.event.custom.error.message;
-  // }
+
+  // Add frustration information if present
+  if (event?.action_frustration_type) {
+    _event.frustration_type = event.action_frustration_type;
+    try {
+      const frustrationTypes = JSON.parse(event.action_frustration_type);
+      if (Array.isArray(frustrationTypes)) {
+        _event.frustration_types = frustrationTypes;
+      } else {
+        _event.frustration_types = [frustrationTypes];
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to parse frustration type as JSON:",
+        event.action_frustration_type,
+        error,
+      );
+      _event.frustration_types = [event.action_frustration_type];
+    }
+  }
+
   return _event;
 };
 
