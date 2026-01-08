@@ -173,9 +173,9 @@ if .filter_out == true {
 
       const functionName = `js_result_array_${Date.now()}`;
       const jsCode = `#ResultArray#
-row.new_field = "processed";
-row.source = "javascript";
-[row, row];`;
+rows[0].new_field = "processed";
+rows[0].source = "javascript";
+rows;`;
 
       // Create JS function with #ResultArray#
       await pm.functionsPage.createJavaScriptFunction(functionName, jsCode);
