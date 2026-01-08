@@ -546,8 +546,6 @@ const initializeWorker = () => {
       new URL("../../workers/rumcssworker.js", import.meta.url),
       { type: "module" },
     );
-
-    console.log("Worker created successfully.");
   } else {
     console.error("Web Workers are not supported in this browser.");
   }

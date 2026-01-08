@@ -47,15 +47,22 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Severity levels based on Datadog and Sentry patterns
+
+// Standard Severity levels
 // 0: None (green)
 // 1-3: Low (yellow/warning)
 // 4-7: Medium (orange/concerning)
 // 8+: High (red/critical)
+const SEVERITY_THRESHOLDS = {
+  LOW: 3, // 1-3: Normal friction - minor UX issues
+  MEDIUM: 7, // 4-7: Concerning pattern - needs investigation
+  // 8+: Critical - immediate attention required
+} as const;
+
 const severity = computed(() => {
   if (props.count === 0) return "none";
-  if (props.count <= 3) return "low";
-  if (props.count <= 7) return "medium";
+  if (props.count <= SEVERITY_THRESHOLDS.LOW) return "low";
+  if (props.count <= SEVERITY_THRESHOLDS.MEDIUM) return "medium";
   return "high";
 });
 
