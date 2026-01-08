@@ -49,9 +49,7 @@ impl LogsService for LogsServer {
         let in_stream_name: Option<&str> = stream_name.and_then(|s| s.to_str().ok());
 
         let user_id = metadata.get("user_id");
-        let user_email: &str = user_id
-            .and_then(|id| id.to_str().ok())
-            .unwrap_or_else(|| "");
+        let user_email: &str = user_id.and_then(|id| id.to_str().ok()).unwrap_or("");
 
         match crate::service::logs::otlp::handle_request(
             0,
