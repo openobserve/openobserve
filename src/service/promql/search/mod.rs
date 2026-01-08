@@ -433,7 +433,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
             let mut samples = samples
@@ -448,9 +448,11 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         })
         .collect::<Vec<_>>();
 
-    // Check series limit
+    // Check series limit and truncate if necessary
     let max_limit = get_max_series_limit(org_id).await;
-    check_series_limit(merged_data.len(), max_limit)?;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
@@ -472,7 +474,7 @@ async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
             merged_metrics.insert(signature(&labels), labels);
         }
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
@@ -480,9 +482,11 @@ async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         })
         .collect::<Vec<_>>();
 
-    // Check series limit
+    // Check series limit and truncate if necessary
     let max_limit = get_max_series_limit(org_id).await;
-    check_series_limit(merged_data.len(), max_limit)?;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Vector(merged_data);
     value.sort();
@@ -523,7 +527,7 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
             });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, exemplars)| {
             let mut exemplars: Vec<Arc<Exemplar>> = exemplars
@@ -535,9 +539,11 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
         })
         .collect::<Vec<_>>();
 
-    // Check series limit
+    // Check series limit and truncate if necessary
     let max_limit = get_max_series_limit(org_id).await;
-    check_series_limit(merged_data.len(), max_limit)?;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
@@ -576,16 +582,29 @@ async fn get_max_series_limit(org_id: &str) -> usize {
     }
 }
 
-/// Check if series count exceeds the limit
-fn check_series_limit(series_count: usize, max_limit: usize) -> Result<()> {
+/// Check if series count exceeds the limit and log a warning if truncation is needed.
+///
+/// This function does not return an error. Instead, it logs a warning when the series
+/// count exceeds the limit, allowing the caller to truncate the results.
+///
+/// # Arguments
+/// * `series_count` - The actual number of series in the result
+/// * `max_limit` - The maximum allowed series limit
+///
+/// # Returns
+/// `true` if series count exceeds limit (truncation needed), `false` otherwise
+fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
     if series_count > max_limit {
-        return Err(Error::ErrorCode(ErrorCodes::TooManyRecords(format!(
-            "Query result exceeds maximum allowed series limit of {}. Current result: {} series. \
+        log::warn!(
+            "Query result exceeds maximum allowed series limit. Returning first {} series out of {}. \
              You can increase this limit via organization settings or ZO_METRICS_MAX_SERIES_RESPONSE environment variable.",
-            max_limit, series_count
-        ))));
+            max_limit,
+            series_count
+        );
+        true
+    } else {
+        false
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -593,45 +612,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_check_series_limit_within_limit() {
-        // Test series count within limit
-        let result = check_series_limit(1000, 10000);
-        assert!(result.is_ok());
+    fn test_should_truncate_series_within_limit() {
+        // Test series count within limit - should not truncate
+        assert!(!should_truncate_series(1000, 10000));
 
-        // Test series count exactly at limit
-        let result = check_series_limit(10000, 10000);
-        assert!(result.is_ok());
+        // Test series count exactly at limit - should not truncate
+        assert!(!should_truncate_series(10000, 10000));
     }
 
     #[test]
-    fn test_check_series_limit_exceeds_limit() {
-        // Test series count exceeds limit
-        let result = check_series_limit(10001, 10000);
-        assert!(result.is_err());
-
-        // Verify error message contains expected information
-        let err = result.unwrap_err();
-        let err_msg = format!("{:?}", err);
-        assert!(err_msg.contains("exceeds maximum allowed series limit"));
-        assert!(err_msg.contains("10000"));
-        assert!(err_msg.contains("10001"));
+    fn test_should_truncate_series_exceeds_limit() {
+        // Test series count exceeds limit - should truncate
+        assert!(should_truncate_series(10001, 10000));
+        assert!(should_truncate_series(50000, 10000));
     }
 
     #[test]
-    fn test_check_series_limit_edge_cases() {
-        // Test zero series (should always pass)
-        let result = check_series_limit(0, 1000);
-        assert!(result.is_ok());
+    fn test_should_truncate_series_edge_cases() {
+        // Test zero series - should not truncate
+        assert!(!should_truncate_series(0, 1000));
 
         // Test with limit of 1
-        let result = check_series_limit(0, 1);
-        assert!(result.is_ok());
-
-        let result = check_series_limit(1, 1);
-        assert!(result.is_ok());
-
-        let result = check_series_limit(2, 1);
-        assert!(result.is_err());
+        assert!(!should_truncate_series(0, 1));
+        assert!(!should_truncate_series(1, 1));
+        assert!(should_truncate_series(2, 1));
     }
 
     #[tokio::test]
