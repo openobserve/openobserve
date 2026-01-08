@@ -181,8 +181,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
         match ev {
             Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(prefix).unwrap();
-                let (org, name) = item_key.split_once("/").unwrap();
+                let item_key = match ev.key.strip_prefix(prefix) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid cipher key format: {}", ev.key);
+                        continue;
+                    }
+                };
+                let (org, name) = match item_key.split_once("/") {
+                    Some((o, n)) => (o, n),
+                    None => {
+                        log::error!("Invalid org/name format in cipher key: {}", item_key);
+                        continue;
+                    }
+                };
                 let item = match infra::table::cipher::get_data(
                     org,
                     infra::table::cipher::EntryKind::CipherKey,
@@ -200,9 +212,26 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                let cd: CipherData = serde_json::from_str(&item).unwrap();
+                let cd: CipherData = match serde_json::from_str(&item) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!(
+                            "Error deserializing cipher data for {}/{}: {}",
+                            org,
+                            name,
+                            e
+                        );
+                        continue;
+                    }
+                };
                 let kname = format!("{org}:{name}");
-                let key = cd.get_key().await.unwrap();
+                let key = match cd.get_key().await {
+                    Ok(k) => k,
+                    Err(e) => {
+                        log::error!("Error getting key for {}: {}", kname, e);
+                        continue;
+                    }
+                };
                 {
                     let mut lock = REGISTRY.write();
                     lock.add_key(kname, Box::new(key));
@@ -210,8 +239,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
             }
             Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(prefix).unwrap();
-                let (org, name) = item_key.split_once("/").unwrap();
+                let item_key = match ev.key.strip_prefix(prefix) {
+                    Some(k) => k,
+                    None => {
+                        log::error!("Invalid cipher key format: {}", ev.key);
+                        continue;
+                    }
+                };
+                let (org, name) = match item_key.split_once("/") {
+                    Some((o, n)) => (o, n),
+                    None => {
+                        log::error!("Invalid org/name format in cipher key: {}", item_key);
+                        continue;
+                    }
+                };
                 let kname = format!("{org}:{name}");
                 {
                     let mut lock = REGISTRY.write();
