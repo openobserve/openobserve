@@ -38,10 +38,12 @@ jobs:
         image: postgres:17.5-alpine3.22
         env:
           POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        # needed because the postgres container does not provide a healthcheck
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        # Health check that verifies postgres is ready to accept connections
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
 
     steps:
       - name: Clone the current repo
@@ -93,6 +95,19 @@ jobs:
       - name: Run clippy
         if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+
+      - name: Wait for PostgreSQL to be ready
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          echo "Waiting for PostgreSQL to be fully ready..."
+          for i in {1..30}; do
+            if PGPASSWORD=password psql -h localhost -U postgres -d postgres -c "SELECT 1" > /dev/null 2>&1; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Waiting for PostgreSQL... attempt $i/30"
+            sleep 2
+          done
 
       - name: Run unit tests
         if: steps.check_changes.outputs.has_changes == 'true'
