@@ -77,19 +77,13 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL:", { copiedUrl });
 
-    // Verify the copied URL contains the dashboard ID
-    expect(copiedUrl).toContain(dashboardId);
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
-    // Verify the copied URL contains the folder parameter
-    expect(copiedUrl).toContain(`folder=${folderId}`);
-
-    // Verify the copied URL contains the tab parameter
-    expect(copiedUrl).toContain(`tab=${tabId}`);
-
-    // Navigate to the copied URL to verify it works
+    // Navigate to the copied URL (it will redirect to the full URL)
     await page.goto(copiedUrl);
 
-    // Wait for dashboard to load
+    // Wait for dashboard to load after redirect
     await page.locator('[data-test="dashboard-back-btn"]').waitFor({
       state: "visible",
       timeout: 15000,
@@ -99,6 +93,19 @@ test.describe("dashboard share URL button testcases", () => {
     await expect(page.getByText(randomDashboardName)).toBeVisible({
       timeout: 10000,
     });
+
+    // Get the redirected URL and verify it contains all expected parameters
+    const redirectedUrl = page.url();
+    testLogger.info("Redirected URL:", { redirectedUrl });
+
+    // Verify the redirected URL contains the dashboard ID
+    expect(redirectedUrl).toContain(dashboardId);
+
+    // Verify the redirected URL contains the folder parameter
+    expect(redirectedUrl).toContain(`folder=${folderId}`);
+
+    // Verify the redirected URL contains the tab parameter
+    expect(redirectedUrl).toContain(`tab=${tabId}`);
 
     // Clean up: Go back to dashboard list and delete
     await pm.dashboardCreate.backToDashboardList();
@@ -163,8 +170,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with time:", { copiedUrl });
 
-    // Verify the copied URL contains the period parameter for relative time
-    expect(copiedUrl).toContain("period=15m");
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page/context to simulate new tab
     const context = page.context();
@@ -181,6 +188,11 @@ test.describe("dashboard share URL button testcases", () => {
     await expect(newPage.getByText(randomDashboardName)).toBeVisible({
       timeout: 10000,
     });
+
+    // Verify the redirected URL contains the period parameter
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL:", { newPageUrl });
+    expect(newPageUrl).toContain("period=15m");
 
     // Verify the time range is correctly set (check the date-time button)
     const dateTimeBtn = newPage.locator('[data-test="date-time-btn"]');
@@ -265,9 +277,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with absolute time:", { copiedUrl });
 
-    // Verify the copied URL contains 'from' and 'to' parameters
-    expect(copiedUrl).toContain("from=");
-    expect(copiedUrl).toContain("to=");
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
     const context = page.context();
@@ -284,6 +295,12 @@ test.describe("dashboard share URL button testcases", () => {
     await expect(newPage.getByText(randomDashboardName)).toBeVisible({
       timeout: 10000,
     });
+
+    // Verify the redirected URL contains 'from' and 'to' parameters
+    const newPageUrl = newPage.url();
+    testLogger.info("New page redirected URL:", { newPageUrl });
+    expect(newPageUrl).toContain("from=");
+    expect(newPageUrl).toContain("to=");
 
     // Close the new page
     await newPage.close();
@@ -376,8 +393,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with variable:", { copiedUrl });
 
-    // Verify the copied URL contains the variable parameter
-    expect(copiedUrl).toContain(`var-${variableName}`);
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page to simulate new tab
     const context = page.context();
@@ -394,6 +411,11 @@ test.describe("dashboard share URL button testcases", () => {
     await expect(newPage.getByText(randomDashboardName)).toBeVisible({
       timeout: 10000,
     });
+
+    // Verify the redirected URL contains the variable parameter
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL with variable:", { newPageUrl });
+    expect(newPageUrl).toContain(`var-${variableName}`);
 
     // Verify the variable selector exists and has the correct value selected
     const newPageVariableSelector = newPage.locator(
@@ -521,9 +543,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with multiple variables:", { copiedUrl });
 
-    // Verify the copied URL contains both variable parameters
-    expect(copiedUrl).toContain(`var-${variableName1}`);
-    expect(copiedUrl).toContain(`var-${variableName2}`);
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
     const context = page.context();
@@ -535,6 +556,12 @@ test.describe("dashboard share URL button testcases", () => {
       state: "visible",
       timeout: 15000,
     });
+
+    // Verify the redirected URL contains both variable parameters
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL with multiple variables:", { newPageUrl });
+    expect(newPageUrl).toContain(`var-${variableName1}`);
+    expect(newPageUrl).toContain(`var-${variableName2}`);
 
     // Verify both variable selectors exist in the new page
     await newPage
@@ -624,8 +651,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with tab:", { copiedUrl });
 
-    // Verify the copied URL contains the tab parameter
-    expect(copiedUrl).toContain(`tab=${tabParam}`);
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
     const context = page.context();
@@ -722,10 +749,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied URL with timezone:", { copiedUrl });
 
-    // If timezone was set, verify it's in the copied URL
-    if (timezoneParam) {
-      expect(copiedUrl).toContain(`timezone=${timezoneParam}`);
-    }
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
     const context = page.context();
@@ -742,6 +767,13 @@ test.describe("dashboard share URL button testcases", () => {
     await expect(newPage.getByText(randomDashboardName)).toBeVisible({
       timeout: 10000,
     });
+
+    // Verify timezone in redirected URL if it was set
+    const newPageUrl = newPage.url();
+    testLogger.info("New page URL with timezone:", { newPageUrl });
+    if (timezoneParam) {
+      expect(newPageUrl).toContain(`timezone=${timezoneParam}`);
+    }
 
     // Close the new page
     await newPage.close();
@@ -845,18 +877,8 @@ test.describe("dashboard share URL button testcases", () => {
     );
     testLogger.info("Copied complete URL:", { copiedUrl });
 
-    // Verify all parameters are in the copied URL
-    expect(copiedUrl).toContain(dashboardId);
-    expect(copiedUrl).toContain(`folder=${folderId}`);
-    expect(copiedUrl).toContain(`tab=${tabId}`);
-    
-    if (period) {
-      expect(copiedUrl).toContain(`period=${period}`);
-    }
-    
-    if (variableParam) {
-      expect(copiedUrl).toContain(`var-${variableName}`);
-    }
+    // The copied URL should be a short URL
+    expect(copiedUrl).toContain("/short/");
 
     // Open the copied URL in a new page
     const context = page.context();
@@ -890,8 +912,18 @@ test.describe("dashboard share URL button testcases", () => {
 
     // Verify the URL in new page contains all parameters
     const newPageURL = newPage.url();
+    testLogger.info("Complete redirected URL:", { newPageURL });
+    
     expect(newPageURL).toContain(dashboardId);
     expect(newPageURL).toContain(`folder=${folderId}`);
+    
+    if (period) {
+      expect(newPageURL).toContain(`period=${period}`);
+    }
+    
+    if (variableParam) {
+      expect(newPageURL).toContain(`var-${variableName}`);
+    }
 
     // Close the new page
     await newPage.close();
