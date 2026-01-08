@@ -57,6 +57,8 @@ pub async fn save(
                 if endpoint.url.is_empty() {
                     return Err(DestinationError::EmptyUrl);
                 }
+                // Validate URL to prevent SSRF attacks
+                db::alerts::destinations::validate_url(&endpoint.url)?;
             }
             DestinationType::Sns(aws_sns) => {
                 if aws_sns.sns_topic_arn.is_empty() || aws_sns.aws_region.is_empty() {
@@ -68,6 +70,8 @@ pub async fn save(
             if endpoint.url.is_empty() {
                 return Err(DestinationError::EmptyUrl);
             }
+            // Validate URL to prevent SSRF attacks
+            db::alerts::destinations::validate_url(&endpoint.url)?;
         }
     }
 
