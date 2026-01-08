@@ -1190,6 +1190,7 @@ size="md" />
                     class="o2-secondary-button tw-h-[36px]"
                     flat
                     no-caps
+                    @mousedown.prevent
                     @click="$emit('delete:node')"
                   >
                     <q-icon name="delete" class="q-mr-xs" />
@@ -1202,6 +1203,7 @@ size="md" />
                     :label="t('alerts.cancel')"
                     flat
                     no-caps
+                    @mousedown.prevent
                     @click="$emit('cancel:form')"
                   />
                   <q-btn
@@ -1211,6 +1213,7 @@ size="md" />
                     "
                     class="no-border q-ml-md o2-primary-button tw-h-[36px]"
                     no-caps
+                    @mousedown.prevent
                     @click.prevent="$emit('submit:form')"
                     :disable="validatingSqlQuery"
                   />
