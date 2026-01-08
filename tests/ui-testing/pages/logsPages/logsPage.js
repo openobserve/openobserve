@@ -3187,11 +3187,56 @@ export class LogsPage {
     }
 
     async getLogsTableContent() {
-        return await this.page.locator(this.logsTable).textContent();
+        return await this.page.locator(this.logsTable).textContent({ timeout: 30000 });
     }
 
     async getLogsTableRowCount() {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
+    }
+
+    // Stream display methods for multi-stream scenarios
+    async getStreamDisplayElement() {
+        return this.page.locator(this.logsSearchIndexList).first();
+    }
+
+    async expectStreamDisplayVisible(timeout = 10000) {
+        await this.page.locator(this.logsSearchIndexList).first().waitFor({ state: 'visible', timeout });
+    }
+
+    async getStreamDisplayText() {
+        return await this.page.locator(this.logsSearchIndexList).first().textContent();
+    }
+
+    async getStreamDisplayStyles() {
+        const element = await this.getStreamDisplayElement();
+        return await element.evaluate((el) => {
+            const computed = window.getComputedStyle(el);
+            return {
+                overflow: computed.overflow,
+                textOverflow: computed.textOverflow,
+                whiteSpace: computed.whiteSpace,
+                scrollWidth: el.scrollWidth,
+                clientWidth: el.clientWidth,
+                width: computed.width
+            };
+        });
+    }
+
+    async hoverStreamDisplay() {
+        await this.page.locator(this.logsSearchIndexList).first().hover();
+    }
+
+    // Tooltip methods
+    async isTooltipVisible(timeout = 3000) {
+        try {
+            return await this.page.locator('[role="tooltip"], .q-tooltip').first().isVisible({ timeout });
+        } catch {
+            return false;
+        }
+    }
+
+    async getTooltipText() {
+        return await this.page.locator('[role="tooltip"], .q-tooltip').first().textContent();
     }
 
     async expectVrlFunctionVisible(functionText) {
