@@ -133,4 +133,218 @@ describe('SessionViewer.vue', () => {
     // Component renders the structure for location display
     expect(wrapper.find('[name="location_on"]').exists()).toBe(true);
   });
+
+  describe('Frustration Signals', () => {
+    it('should display frustration summary when events have frustrations', async () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      // Simulate events with frustrations
+      wrapper.vm.segmentEvents = [
+        {
+          id: '1',
+          type: 'action',
+          frustration_types: ['rage_click'],
+          name: 'click on Submit',
+        },
+        {
+          id: '2',
+          type: 'action',
+          frustration_types: ['dead_click'],
+          name: 'click on Nav',
+        },
+      ];
+
+      await wrapper.vm.$nextTick();
+
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.exists()).toBe(true);
+    });
+
+    it('should not display frustration summary when no frustrations', async () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      wrapper.vm.segmentEvents = [
+        {
+          id: '1',
+          type: 'action',
+          frustration_types: null,
+          name: 'click',
+        },
+      ];
+
+      await wrapper.vm.$nextTick();
+
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.exists()).toBe(false);
+    });
+
+    it('should calculate correct frustration count', async () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      wrapper.vm.segmentEvents = [
+        { id: '1', type: 'action', frustration_types: ['rage_click'], name: 'click' },
+        { id: '2', type: 'action', frustration_types: ['dead_click'], name: 'click' },
+        { id: '3', type: 'action', frustration_types: null, name: 'click' },
+      ];
+
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.frustrationCount).toBe(2);
+    });
+
+    it('should display singular "Frustration" for count of 1', async () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      wrapper.vm.segmentEvents = [
+        { id: '1', type: 'action', frustration_types: ['rage_click'], name: 'click' },
+      ];
+
+      await wrapper.vm.$nextTick();
+
+      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
+      expect(summaryText.text()).toBe('1 Frustration');
+    });
+
+    it('should display plural "Frustrations" for count > 1', async () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      wrapper.vm.segmentEvents = [
+        { id: '1', type: 'action', frustration_types: ['rage_click'], name: 'click' },
+        { id: '2', type: 'action', frustration_types: ['dead_click'], name: 'click' },
+      ];
+
+      await wrapper.vm.$nextTick();
+
+      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
+      expect(summaryText.text()).toContain('Frustrations');
+    });
+
+    it('should handle action events with JSON string frustration types', () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      const mockEvent = {
+        type: 'action',
+        action_type: 'click',
+        action_target_name: 'Submit',
+        action_frustration_type: '["rage_click","dead_click"]',
+        date: 1000000,
+      };
+
+      const formattedEvent = wrapper.vm.handleActionEvent(mockEvent);
+
+      expect(formattedEvent.frustration_types).toEqual(['rage_click', 'dead_click']);
+    });
+
+    it('should handle single frustration type string', () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      const mockEvent = {
+        type: 'action',
+        action_type: 'click',
+        action_target_name: 'Submit',
+        action_frustration_type: 'rage_click',
+        date: 1000000,
+      };
+
+      const formattedEvent = wrapper.vm.handleActionEvent(mockEvent);
+
+      expect(formattedEvent.frustration_types).toEqual(['rage_click']);
+    });
+
+    it('should handle malformed JSON gracefully', () => {
+      const wrapper = mount(SessionViewer, {
+        global: {
+          plugins: [router, i18n, [Quasar, {}]],
+          stubs: {
+            QIcon: true,
+            VideoPlayer: true,
+            PlayerEventsSidebar: true,
+            QSeparator: true,
+          },
+        },
+      });
+
+      const mockEvent = {
+        type: 'action',
+        action_type: 'click',
+        action_target_name: 'Submit',
+        action_frustration_type: 'invalid-json{',
+        date: 1000000,
+      };
+
+      const formattedEvent = wrapper.vm.handleActionEvent(mockEvent);
+
+      expect(formattedEvent.frustration_types).toEqual(['invalid-json{']);
+    });
+  });
 });
