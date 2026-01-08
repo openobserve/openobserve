@@ -452,13 +452,14 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: metric name is required".into(),
+                    ));
+                }
+            };
 
             selector.name = Some(name);
         }
