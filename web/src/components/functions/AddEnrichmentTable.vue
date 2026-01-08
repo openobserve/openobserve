@@ -95,12 +95,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-file>
 
-            <!-- URL Display for Update Mode (for URL-based tables) -->
-            <!-- From URL Option (for both new and edit mode) -->
-            <div v-if="formData.source === 'url'" class="col-12">
+            <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
+            <div v-if="isUpdating && formData.source === 'url'" class="col-12 q-py-md">
+              <div class="text-grey-8 text-bold tw:mb-2">Update Mode</div>
+              <q-option-group
+                v-model="formData.updateMode"
+                :options="updateModeOptions"
+                color="primary"
+                inline
+              />
+            </div>
+
+            <!-- Show existing URLs (only when updating URL-based tables) -->
+            <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="col-12 q-py-md">
+              <div class="text-grey-8 text-bold q-mb-sm" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
+              <q-card flat bordered class="q-pa-sm" style="background-color: #fafafa;">
+                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="q-mb-xs">
+                  <div class="row items-center q-gutter-x-xs">
+                    <div class="col-auto">
+                      <span class="text-weight-medium text-grey-7" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
+                    </div>
+                    <div class="col-auto">
+                      <q-icon
+                        :name="job.status === 'completed' ? 'check_circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
+                        :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'"
+                        size="16px"
+                        :class="{'rotate-animation': job.status === 'processing'}"
+                      />
+                    </div>
+                    <div class="col text-grey-8" style="font-size: 13px; word-break: break-all;">
+                      {{ job.url }}
+                    </div>
+                  </div>
+                  <q-separator v-if="Number(index) < formData.urlJobs.length - 1" class="q-my-xs" />
+                </div>
+              </q-card>
+            </div>
+
+            <!-- Mode explanation (always show for URL-based tables in edit mode) -->
+            <div v-if="isUpdating && formData.source === 'url'" class="col-12">
+              <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
+                'tw:bg-blue-50': formData.updateMode === 'reload',
+                'tw:bg-green-50': formData.updateMode === 'append',
+                'tw:bg-orange-50': formData.updateMode === 'replace'
+              }">
+                <template v-if="formData.updateMode === 'reload'">
+                  <strong>🔄 Reload Mode:</strong> Re-process all existing URLs from scratch. Use this when the CSV file content at the URLs has been updated but the URLs themselves haven't changed.
+                </template>
+                <template v-else-if="formData.updateMode === 'append'">
+                  <strong>➕ Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
+                  <div class="tw:mt-2 tw:text-orange-700">
+                    ⚠️ <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
+                  </div>
+                </template>
+                <template v-else-if="formData.updateMode === 'replace'">
+                  <strong>⚠️ Replace Mode:</strong> Delete all existing URLs and data, then use only the new URL you provide below.
+                </template>
+              </div>
+            </div>
+
+            <!-- URL input field for append or replace mode (only when updating URL-based tables) -->
+            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace')" class="col-12">
               <q-input
                 v-model="formData.url"
-                label="CSV File URL"
+                :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-md showLabelOnTop text-grey-8 text-bold"
+                stack-label
+                outlined
+                filled
+                dense
+                placeholder="https://example.com/data.csv"
+                :rules="[
+                  (val: any) => {
+                    if (formData.updateMode === 'reload') return true;
+                    return !!val || 'URL is required!';
+                  },
+                  (val: any) => {
+                    if (formData.updateMode === 'reload' || !val) return true;
+                    return (val.startsWith('http://') || val.startsWith('https://')) || 'URL must start with http:// or https://';
+                  }
+                ]"
+                tabindex="0"
+              >
+                <template v-slot:hint>
+                  <div class="tw:text-xs">
+                    <template v-if="formData.updateMode === 'append'">
+                      Enter a new URL to add to this enrichment table
+                    </template>
+                    <template v-else>
+                      Enter a URL to replace all existing URLs
+                    </template>
+                  </div>
+                </template>
+              </q-input>
+            </div>
+
+            <!-- From URL Option (only for new tables) -->
+            <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
+              <q-input
+                v-model="formData.url"
+                :label="'CSV File URL'"
                 color="input-border"
                 bg-color="input-bg"
                 class="q-py-md showLabelOnTop text-grey-8 text-bold"
@@ -121,15 +217,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </q-input>
-            </div>
-
-            <!-- Append Data Toggle (only when updating existing tables) -->
-            <div v-if="isUpdating" class="col-12">
-              <q-toggle
-                class="q-py-md text-grey-8 text-bold lookup-table-append-toggle"
-                v-model="formData.append"
-                :label="t('function.appendData')"
-              />
             </div>
           </div>
 
@@ -163,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -178,6 +265,7 @@ const defaultValue: any = () => {
     file: "",
     url: "",
     append: false,
+    updateMode: "reload", // "reload", "append", or "replace"
   };
 };
 
@@ -214,6 +302,12 @@ export default defineComponent({
       { label: t('function.fromUrl'), value: 'url' }
     ];
 
+    const updateModeOptions = [
+      { label: 'Reload existing URLs', value: 'reload' },
+      { label: 'Add new URL', value: 'append' },
+      { label: 'Replace all URLs', value: 'replace' }
+    ];
+
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
     };
@@ -227,21 +321,52 @@ export default defineComponent({
 
       // Handle URL-based enrichment table creation
       if (formData.value.source === 'url') {
+        // Determine the append flag and retry flag based on update mode
+        let appendFlag = false;
+        let retryFlag = false;
+        let urlToSend = formData.value.url;
+
+        if (props.isUpdating) {
+          // Update mode logic
+          if (formData.value.updateMode === 'reload') {
+            // Reload: Trigger retry of all existing jobs (no new URL)
+            urlToSend = '';
+            appendFlag = false;
+            retryFlag = true;
+          } else if (formData.value.updateMode === 'append') {
+            // Append: Add new URL to existing ones
+            appendFlag = true;
+            retryFlag = false;
+          } else if (formData.value.updateMode === 'replace') {
+            // Replace: Delete all and use new URL
+            appendFlag = false;
+            retryFlag = false;
+          }
+        } else {
+          // Create mode: just use the URL as-is
+          appendFlag = false;
+          retryFlag = false;
+        }
+
         jsTransformService
           .create_enrichment_table_from_url(
             store.state.selectedOrganization.identifier,
             formData.value.name,
-            formData.value.url,
-            formData.value.append
+            urlToSend,
+            appendFlag,
+            false, // resume
+            retryFlag
           )
-          .then((res) => {
+          .then(() => {
             formData.value = { ...defaultValue() };
             emit("update:list");
 
             dismiss();
             q.notify({
               type: "positive",
-              message: "Enrichment table job started. Processing in background...",
+              message: formData.value.updateMode === 'reload'
+                ? "Enrichment table reload started. Processing in background..."
+                : "Enrichment table job started. Processing in background...",
             });
           })
           .catch((err) => {
@@ -258,15 +383,15 @@ export default defineComponent({
           });
 
         segment.track("Button Click", {
-          button: "Save Enrichment Table from URL",
+          button: props.isUpdating ? `Update Enrichment Table (${formData.value.updateMode})` : "Save Enrichment Table from URL",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
           function_name: formData.value.name,
           page: "Add/Update Enrichment Table",
         });
         track("Button Click", {
-          button: "Save Enrichment Table from URL",
-          page: "Add Enrichment Table"
+          button: props.isUpdating ? `Update Enrichment Table (${formData.value.updateMode})` : "Save Enrichment Table from URL",
+          page: "Add/Update Enrichment Table"
         });
       }
       // Handle file upload enrichment table creation (existing logic)
@@ -333,6 +458,7 @@ export default defineComponent({
       isFetchingStreams,
       onSubmit,
       sourceOptions,
+      updateModeOptions,
     };
   },
   created() {
@@ -346,8 +472,12 @@ export default defineComponent({
       // Detect if this is a URL-based enrichment table
       if (this.formData.urlJobs && this.formData.urlJobs.length > 0) {
         this.formData.source = 'url';
-        // For now, just use the first URL (users can add more URLs via append)
-        this.formData.url = this.formData.urlJobs[0].url || '';
+        // Leave URL field empty so user can enter a new URL
+        this.formData.url = '';
+        // Default to reload mode (safest - just reprocesses existing URLs)
+        if (this.formData.updateMode === undefined) {
+          this.formData.updateMode = 'reload';
+        }
       } else {
         this.formData.source = 'file';
       }
@@ -362,6 +492,19 @@ export default defineComponent({
   min-height: 15rem;
   padding-bottom: 14px;
   resize: both;
+}
+
+.rotate-animation {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
 <style lang="scss">
