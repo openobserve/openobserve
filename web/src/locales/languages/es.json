@@ -457,7 +457,8 @@
     "value_support_cloud": "Nube",
     "value_cost_free": "Gratuito",
     "value_cost_enterprise": "Si se aloja en el servidor propio, es gratis para la ingesta de hasta 200 GB por día de datos. Se paga después",
-    "value_cost_cloud": "Prueba gratuita de 14 días. Pagado después"
+    "value_cost_cloud": "Prueba gratuita de 14 días. Pagado después",
+    "feature_comparison_lbl": "Comparación de funciones"
   },
   "login": {
     "userid": "ID de usuario",

@@ -457,7 +457,8 @@
     "value_support_cloud": "Wolke",
     "value_cost_free": "Kostenlos",
     "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 200 GB/Tag aufgenommene Daten. Danach bezahlt",
-    "value_cost_cloud": "14-tägige kostenlose Testversion. Danach bezahlt"
+    "value_cost_cloud": "14-tägige kostenlose Testversion. Danach bezahlt",
+    "feature_comparison_lbl": "Vergleich der Funktionen"
   },
   "login": {
     "userid": "Benutzer-ID",

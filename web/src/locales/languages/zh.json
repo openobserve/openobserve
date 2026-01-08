@@ -457,7 +457,8 @@
     "value_support_cloud": "云",
     "value_cost_free": "免费",
     "value_cost_enterprise": "如果是自托管，则每天最多可免费摄取 200 GB 的数据。之后付款",
-    "value_cost_cloud": "14 天免费试用。之后付款"
+    "value_cost_cloud": "14 天免费试用。之后付款",
+    "feature_comparison_lbl": "功能对比"
   },
   "login": {
     "userid": "账号",

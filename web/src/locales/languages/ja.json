@@ -457,7 +457,8 @@
     "value_support_cloud": "クラウド",
     "value_cost_free": "無料",
     "value_cost_enterprise": "セルフホストの場合、1日あたり最大200 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
-    "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。"
+    "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。",
+    "feature_comparison_lbl": "機能比較"
   },
   "login": {
     "userid": "ユーザーID",

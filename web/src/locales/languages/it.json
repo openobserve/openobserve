@@ -457,7 +457,8 @@
     "value_support_cloud": "Nuvola",
     "value_cost_free": "Gratuito",
     "value_cost_enterprise": "Se ospitato autonomamente, è gratuito per l'acquisizione di dati fino a 200 GB/giorno. Pagato successivamente",
-    "value_cost_cloud": "14 giorni di prova gratuita. Pagato successivamente"
+    "value_cost_cloud": "14 giorni di prova gratuita. Pagato successivamente",
+    "feature_comparison_lbl": "Confronto delle funzionalità"
   },
   "login": {
     "userid": "ID utente",

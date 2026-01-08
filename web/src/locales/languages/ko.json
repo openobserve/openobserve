@@ -457,7 +457,8 @@
     "value_support_cloud": "클라우드",
     "value_cost_free": "무료",
     "value_cost_enterprise": "셀프 호스팅의 경우 하루 최대 200GB의 데이터를 무료로 수집할 수 있습니다.이후 유료",
-    "value_cost_cloud": "14일 무료 평가판.이후 유료"
+    "value_cost_cloud": "14일 무료 평가판.이후 유료",
+    "feature_comparison_lbl": "기능 비교"
   },
   "login": {
     "userid": "사용자 ID",

@@ -457,7 +457,8 @@
     "value_support_cloud": "Wolk",
     "value_cost_free": "Gratis",
     "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 200 GB aan data die per dag wordt opgenomen. Daarna betaald",
-    "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald"
+    "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald",
+    "feature_comparison_lbl": "Vergelijking van functies"
   },
   "login": {
     "userid": "Gebruikers-ID",

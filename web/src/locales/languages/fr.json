@@ -457,7 +457,8 @@
     "value_support_cloud": "Nuage",
     "value_cost_free": "Gratuit",
     "value_cost_enterprise": "En cas d'auto-hébergement, gratuit jusqu'à 200 Go de données ingérées par jour. Payé par la suite",
-    "value_cost_cloud": "Essai gratuit de 14 jours. Payé par la suite"
+    "value_cost_cloud": "Essai gratuit de 14 jours. Payé par la suite",
+    "feature_comparison_lbl": "Comparaison des fonctionnalités"
   },
   "login": {
     "userid": "ID utilisateur",

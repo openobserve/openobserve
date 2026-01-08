@@ -457,7 +457,8 @@
     "value_support_cloud": "Bulut",
     "value_cost_free": "Bedava",
     "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 200 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
-    "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir"
+    "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir",
+    "feature_comparison_lbl": "Özellik Karşılaştırması"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",

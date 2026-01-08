@@ -457,7 +457,8 @@
     "value_support_cloud": "Nuvem",
     "value_cost_free": "Gratuito",
     "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 200 GB/dia de dados ingeridos. Pago depois disso",
-    "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso"
+    "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso",
+    "feature_comparison_lbl": "Comparação de recursos"
   },
   "login": {
     "userid": "ID do usuário",
