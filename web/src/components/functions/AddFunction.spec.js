@@ -294,12 +294,14 @@ describe("AddFunction Component", () => {
       expect(wrapper.vm.formData.function).toContain("test function");
     });
 
-    it("updates editor content for transType 1", () => {
+    it("updates editor content for transType 1 (JavaScript)", () => {
       wrapper.vm.formData.transType = "1";
       wrapper.vm.formData.function = "test function";
       wrapper.vm.updateEditorContent();
-      expect(wrapper.vm.formData.function).toContain("function(row)");
-      expect(wrapper.vm.formData.function).toContain("end");
+      // JavaScript functions don't get prefix/suffix - written as-is
+      expect(wrapper.vm.prefixCode).toBe("");
+      expect(wrapper.vm.suffixCode).toBe("");
+      expect(wrapper.vm.formData.function).toContain("test function");
     });
 
     it("handles editor update event", () => {

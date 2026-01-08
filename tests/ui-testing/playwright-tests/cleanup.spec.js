@@ -224,5 +224,36 @@ test.describe("Pre-Test Cleanup", () => {
 
     testLogger.info('Pre-test cleanup completed successfully');
   });
+
+  test('Clean up JavaScript function test data', {
+    tag: ['@cleanup', '@functions', '@jsFunctions']
+  }, async ({ page }) => {
+    testLogger.info('Starting JavaScript functions cleanup');
+
+    const pm = new PageManager(page);
+
+    // Navigate to functions page
+    await pm.functionsPage.navigate();
+
+    // Cleanup patterns for JS function tests
+    const testPatterns = [
+      'test_js_fn_',
+      'test_js_validate_',
+      'test_js_exec_',
+      'test_js_error_',
+      'pipeline_js_fn_',
+      'test_js_array_',
+      'test_js_syntax_err_',
+      'test_js_empty_'
+    ];
+
+    // Delete all test functions matching each pattern
+    for (const pattern of testPatterns) {
+      testLogger.info(`Cleaning up functions matching pattern: ${pattern}`);
+      await pm.functionsPage.deleteAllFunctionsMatching(pattern);
+    }
+
+    testLogger.info('JavaScript functions cleanup completed successfully');
+  });
 });
 

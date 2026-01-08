@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 no-caps
                 :label="t(`function.add`)"
+                data-test="function-list-add-function-btn"
                 @click="showAddUpdateFn({})"
               />
           </div>
