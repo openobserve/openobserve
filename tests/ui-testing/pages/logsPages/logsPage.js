@@ -3186,27 +3186,63 @@ export class LogsPage {
         return await expect(this.page.locator(this.logsSearchIndexList)).toContainText(text);
     }
 
-    async getLogsTableContent() {
-        return await this.page.locator(this.logsTable).textContent({ timeout: 30000 });
+    /**
+     * Gets the text content of the logs table.
+     * @param {number} [timeout=30000] - Timeout in milliseconds (increased from default 10s to handle large result sets)
+     * @returns {Promise<string>} The text content of the logs table
+     */
+    async getLogsTableContent(timeout = 30000) {
+        return await this.page.locator(this.logsTable).textContent({ timeout });
     }
 
     async getLogsTableRowCount() {
         return await this.page.locator(`${this.logsTable} tbody tr`).count();
     }
 
+    // ============================================================================
     // Stream display methods for multi-stream scenarios
+    // ============================================================================
+
+    /**
+     * Gets the first stream display element from the stream list.
+     * @returns {Promise<Locator>} The stream display element locator
+     * @example
+     * const element = await logsPage.getStreamDisplayElement();
+     * await element.click();
+     */
     async getStreamDisplayElement() {
         return this.page.locator(this.logsSearchIndexList).first();
     }
 
+    /**
+     * Waits for the stream display element to be visible.
+     * @param {number} [timeout=10000] - Timeout in milliseconds
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.expectStreamDisplayVisible(5000);
+     */
     async expectStreamDisplayVisible(timeout = 10000) {
         await this.page.locator(this.logsSearchIndexList).first().waitFor({ state: 'visible', timeout });
     }
 
+    /**
+     * Gets the text content of the stream display element.
+     * @returns {Promise<string>} The stream display text
+     * @example
+     * const text = await logsPage.getStreamDisplayText();
+     * console.log(`Selected streams: ${text}`);
+     */
     async getStreamDisplayText() {
         return await this.page.locator(this.logsSearchIndexList).first().textContent();
     }
 
+    /**
+     * Gets computed styles and dimensions of the stream display element for overflow detection.
+     * @returns {Promise<Object>} Object containing overflow, textOverflow, whiteSpace, scrollWidth, clientWidth, and width
+     * @example
+     * const styles = await logsPage.getStreamDisplayStyles();
+     * const isOverflowing = styles.scrollWidth > styles.clientWidth;
+     */
     async getStreamDisplayStyles() {
         const element = await this.getStreamDisplayElement();
         return await element.evaluate((el) => {
@@ -3222,21 +3258,59 @@ export class LogsPage {
         });
     }
 
+    /**
+     * Hovers over the stream display element to trigger tooltips.
+     * @returns {Promise<void>}
+     * @example
+     * await logsPage.hoverStreamDisplay();
+     * const isVisible = await logsPage.isTooltipVisible();
+     */
     async hoverStreamDisplay() {
         await this.page.locator(this.logsSearchIndexList).first().hover();
     }
 
+    // ============================================================================
     // Tooltip methods
+    // ============================================================================
+
+    /**
+     * Checks if a tooltip is visible with proper state detection.
+     * @param {number} [timeout=3000] - Timeout in milliseconds
+     * @returns {Promise<boolean>} True if tooltip is visible, false otherwise
+     * @example
+     * await logsPage.hoverStreamDisplay();
+     * if (await logsPage.isTooltipVisible()) {
+     *   const text = await logsPage.getTooltipText();
+     * }
+     */
     async isTooltipVisible(timeout = 3000) {
         try {
-            return await this.page.locator('[role="tooltip"], .q-tooltip').first().isVisible({ timeout });
+            await this.page.locator('[role="tooltip"], .q-tooltip').first().waitFor({
+                state: 'visible',
+                timeout
+            });
+            return true;
         } catch {
             return false;
         }
     }
 
-    async getTooltipText() {
-        return await this.page.locator('[role="tooltip"], .q-tooltip').first().textContent();
+    /**
+     * Gets the text content of the tooltip with error handling.
+     * @param {number} [timeout=3000] - Timeout in milliseconds
+     * @returns {Promise<string|null>} The tooltip text, or null if tooltip is not found
+     * @example
+     * const tooltipText = await logsPage.getTooltipText();
+     * if (tooltipText) {
+     *   console.log(`Tooltip: ${tooltipText}`);
+     * }
+     */
+    async getTooltipText(timeout = 3000) {
+        try {
+            return await this.page.locator('[role="tooltip"], .q-tooltip').first().textContent({ timeout });
+        } catch {
+            return null;
+        }
     }
 
     async expectVrlFunctionVisible(functionText) {

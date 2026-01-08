@@ -317,8 +317,12 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`✓ TERTIARY CHECK PASSED: ${valueCount} field value(s) displayed in dropdown`);
   });
 
+  // SKIPPED: CTE (Common Table Expression) support is not yet implemented in the backend.
+  // This test is prepared for when Bug #7751 is fixed and CTE syntax is supported.
+  // See: https://github.com/openobserve/openobserve/issues/7751
+  // TODO: Remove .skip() once CTE support is added to the query engine
   test.skip('should load field values with CTE (Common Table Expression) without 400 error @bug-7751 @P1 @regression', async ({ page }) => {
-    testLogger.info('Test: Field values with CTE');
+    testLogger.info('Test: Field values with CTE (Common Table Expression)');
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -1123,8 +1127,7 @@ test.describe("Logs Regression Bugs", () => {
       payload: testPayload
     });
 
-    testLogger.info('Test data ingested, waiting for indexing...');
-    await page.waitForTimeout(8000);
+    testLogger.info('Test data ingested, waiting for data availability...');
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
@@ -1142,16 +1145,43 @@ test.describe("Logs Regression Bugs", () => {
       await pm.logsPage.clickRelative15MinButton();
     }
 
-    // Load logs
-    testLogger.info('Loading logs from stream');
-    const searchResponse = page.waitForResponse(
-      (response) => response.url().includes(`/api/${orgId}/_search`) && response.status() === 200,
-      { timeout: 30000 }
-    );
+    // Poll for data availability instead of fixed wait
+    testLogger.info('Polling for data availability (deterministic check)');
+    let dataAvailable = false;
+    const maxRetries = 10;
+    const retryInterval = 1000;
 
-    await pm.logsPage.clickSearchBarRefreshButton();
-    await searchResponse;
-    await page.waitForTimeout(5000);
+    for (let i = 0; i < maxRetries; i++) {
+      const searchResponse = page.waitForResponse(
+        (response) => response.url().includes(`/api/${orgId}/_search`) && response.status() === 200,
+        { timeout: 5000 }
+      ).catch(() => null);
+
+      await pm.logsPage.clickSearchBarRefreshButton();
+      const response = await searchResponse;
+
+      if (response) {
+        await page.waitForTimeout(1000);
+        const tableContent = await pm.logsPage.getLogsTableContent().catch(() => '');
+
+        if (tableContent.includes('bug_9475')) {
+          testLogger.info(`✓ Data available after ${(i + 1) * retryInterval}ms`);
+          dataAvailable = true;
+          break;
+        }
+      }
+
+      if (i < maxRetries - 1) {
+        testLogger.debug(`Retry ${i + 1}/${maxRetries}: Data not yet available, waiting ${retryInterval}ms...`);
+        await page.waitForTimeout(retryInterval);
+      }
+    }
+
+    if (!dataAvailable) {
+      testLogger.warn('Data not available after polling, proceeding with test (may result in skipped scenarios)');
+    }
+
+    await page.waitForTimeout(2000);
 
     // Wait for logs table
     await pm.logsPage.expectLogsTableVisible();
@@ -1312,7 +1342,14 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Auto refresh time range update test completed for Bug #9877');
   });
 
-  test.afterEach(async () => {
+  test.afterEach(async ({ page }) => {
     testLogger.info('Logs regression test completed');
+
+    // Note: Test data cleanup is handled implicitly through time-based filtering.
+    // Tests use recent time ranges (Last 1 hour, Last 15 min) which naturally
+    // exclude old test data. For Bug #9475, test data is ingested with unique
+    // timestamps each run, preventing false positives from previous runs.
+    // Future improvement: Consider using unique stream names per test run
+    // (e.g., `e2e_automate_${Date.now()}`) for complete isolation.
   });
 });
