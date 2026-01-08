@@ -396,7 +396,7 @@
     "ingestion_type": "Ingestion Type",
     "ingestion_limit": "Ingestion Limit",
     "today_usage": "Today's Usage",
-    "feature_comparision_lbl": "Feature Comparison",
+    "feature_comparison_lbl": "Feature Comparison",
     "feature_comparision_ent_msg": "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
     "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 200 GB/day (~6 TB/month) of data ingestion.",
     "feature_comparision_os_msg": "You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.",

@@ -160,7 +160,7 @@ interface FeatureData {
 const store = useStore();
 const { t } = useI18n();
 
-const columns: QTableColumn[] = [
+const columns = ref<QTableColumn[]>([
   {
     name: 'name',
     label: t('about.feature_column_name'),
@@ -193,13 +193,13 @@ const columns: QTableColumn[] = [
     sortable: false,
     style: 'width: 150px; max-width: 150px;'
   }
-];
+]);
 
 const pagination = ref({
   rowsPerPage: 0 // 0 means show all rows
 });
 
-const featureData: FeatureData = {
+const featureData = ref<FeatureData>({
   editions: [
     { id: 'opensource', name: t('about.edition_opensource') },
     { id: 'enterprise', name: t('about.edition_enterprise') },
@@ -235,11 +235,11 @@ const featureData: FeatureData = {
     { name: t('about.feature_extreme_performance'), values: { opensource: false, enterprise: true, cloud: true } },
     { name: t('about.feature_query_optimizer'), values: { opensource: false, enterprise: true, cloud: true } }
   ]
-};
+});
 
 const currentPlanName = computed(() => {
   const buildType = store.state.zoConfig.build_type;
-  const edition = featureData.editions.find((ed) => ed.id === buildType);
+  const edition = featureData.value.editions.find((ed) => ed.id === buildType);
   return edition ? edition.name : "";
 });
 </script>
