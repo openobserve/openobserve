@@ -169,6 +169,13 @@ export class PipelinesPage {
         this.connectAllNodesError = page.getByText("Please connect all nodes");
         this.logsOptionRole = page.getByRole("option", { name: "logs" });
         this.fileInput = page.locator('input[type="file"]');
+
+        // Scheduled Pipeline Validation locators (Issue #9901 regression tests)
+        this.validateAndCloseBtn = page.locator('[data-test="stream-routing-query-save-btn"]');
+        this.streamRoutingQueryCancelBtn = page.locator('[data-test="stream-routing-query-cancel-btn"]');
+        this.discardChangesDialog = page.getByText('Discard Changes');
+        this.discardChangesOkBtn = page.locator('.q-dialog').locator('[data-test="confirm-button"]');
+        this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
     }
 
     // Methods from original PipelinesPage
@@ -1208,6 +1215,60 @@ export class PipelinesPage {
     }
 
     /**
+     * Ingest metrics data using the simple JSON API
+     * POST /api/{org}/ingest/metrics/_json
+     * @param {string} streamName - The name of the metrics stream (will be used as __name__)
+     * @param {number} recordCount - Number of records to generate (default: 10)
+     * @returns {Promise<{status: number, data: object}>} The ingestion response
+     */
+    async ingestMetricsData(streamName, recordCount = 10) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        // Create metrics data with realistic values
+        const metricsData = [];
+        for (let i = 0; i < recordCount; i++) {
+            metricsData.push({
+                "__name__": streamName,
+                "__type__": "gauge",
+                "host_name": `server-${i % 3 + 1}`,
+                "k8s_cluster": "prod-cluster",
+                "k8s_container_name": "app-container",
+                "region": ["us-east-1", "us-west-2", "eu-west-1"][i % 3],
+                "_timestamp": timestamp - (i * 60), // Spread across time
+                "value": 20 + Math.random() * 60 // Random value between 20-80
+            });
+        }
+
+        const response = await this.page.evaluate(async ({ url, headers, orgId, metricsData }) => {
+            const fetchResponse = await fetch(`${url}/api/${orgId}/ingest/metrics/_json`, {
+                method: 'POST',
+                headers: {
+                    "Authorization": `Basic ${headers}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(metricsData)
+            });
+            return {
+                status: fetchResponse.status,
+                data: await fetchResponse.json()
+            };
+        }, {
+            url: process.env.INGESTION_URL,
+            headers: basicAuthCredentials,
+            orgId: orgId,
+            metricsData: metricsData
+        });
+
+        testLogger.info('Metrics ingestion response', { streamName, status: response.status, data: response.data });
+        return response;
+    }
+
+    /**
      * Connect input node directly to output node (for simple source->destination pipelines)
      */
     async connectInputToOutput() {
@@ -1710,5 +1771,101 @@ export class PipelinesPage {
         const trimmed = queryText?.trim() || '';
         expect(trimmed.length).toBeLessThanOrEqual(10);
         testLogger.info(`Query is cleared (length: ${trimmed.length})`);
+    }
+
+    // ========== Issue #9901 Regression Test Methods ==========
+
+    /**
+     * Click the Validate and Close button in scheduled pipeline dialog
+     */
+    async clickValidateAndClose() {
+        await this.validateAndCloseBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await this.validateAndCloseBtn.click();
+        testLogger.info('Clicked Validate and Close button');
+    }
+
+    /**
+     * Click the Cancel button in stream routing query dialog
+     */
+    async clickStreamRoutingQueryCancel() {
+        await this.streamRoutingQueryCancelBtn.click();
+        testLogger.info('Clicked Stream Routing Query Cancel button');
+    }
+
+    /**
+     * Check if Discard Changes dialog is visible
+     * @returns {Promise<boolean>} - true if visible, false otherwise
+     */
+    async isDiscardChangesDialogVisible() {
+        const isVisible = await this.discardChangesDialog.isVisible().catch(() => false);
+        testLogger.info(`Discard Changes dialog visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Expect Discard Changes dialog to NOT be visible
+     */
+    async expectDiscardDialogNotVisible() {
+        await expect(this.discardChangesDialog).not.toBeVisible({ timeout: 2000 });
+        testLogger.info('Verified Discard Changes dialog is not visible');
+    }
+
+    /**
+     * Expect Invalid SQL Query error to be visible
+     * @returns {Promise<boolean>} - true if visible, false otherwise
+     */
+    async isInvalidSqlQueryErrorVisible() {
+        const isVisible = await this.invalidSqlQueryText.isVisible().catch(() => false);
+        return isVisible;
+    }
+
+    /**
+     * Focus the SQL editor in scheduled pipeline dialog
+     */
+    async focusSqlEditor() {
+        await this.scheduledPipelineSqlEditor.click();
+        testLogger.info('Focused SQL editor');
+    }
+
+    /**
+     * Click Cancel button in scheduled pipeline dialog and confirm
+     */
+    async clickCancelAndConfirm() {
+        await this.scheduledPipelineCancelBtn.click({ force: true });
+        await this.page.waitForTimeout(1500);
+
+        // Check if confirmation dialog appeared and confirm
+        const dialogVisible = await this.qDialog.isVisible().catch(() => false);
+        if (dialogVisible) {
+            testLogger.info('Confirmation dialog shown, clicking confirm');
+            await this.confirmButton.click().catch(() => {});
+        }
+    }
+
+    /**
+     * Clean up pipeline creation - cancel and confirm any dialogs
+     */
+    async cleanupPipelineCreation() {
+        await this.cancelPipelineBtn.click().catch(() => {});
+        await this.page.waitForTimeout(500);
+        await this.confirmButton.click().catch(() => {});
+        testLogger.info('Pipeline creation cleanup completed');
+    }
+
+    /**
+     * Check if confirmation dialog is visible
+     * @returns {Promise<boolean>} - true if visible, false otherwise
+     */
+    async isConfirmationDialogVisible() {
+        const isVisible = await this.qDialog.isVisible().catch(() => false);
+        return isVisible;
+    }
+
+    /**
+     * Click confirm button in dialog
+     */
+    async clickConfirmButton() {
+        await this.confirmButton.click().catch(() => {});
+        testLogger.info('Clicked confirm button');
     }
 }

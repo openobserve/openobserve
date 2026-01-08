@@ -185,11 +185,17 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
-        /^incident_e2e_/                               // Incident e2e test streams (incident_e2e_*)
+        /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
+        /^e2e_test_cpu_usage$/                         // Pipeline regression test metrics stream (Issue #9901)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
     );
+
+    // Note: Metrics stream 'e2e_test_cpu_usage' is created by pipeline-regression.spec.js
+    // for Issue #9901 regression tests. The metrics stream uses a separate API endpoint
+    // and is not cleaned up by the logs stream cleanup above. However, since the stream
+    // is re-used with fresh timestamps each test run, cleanup is not strictly required.
 
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();
