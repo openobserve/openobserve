@@ -45,17 +45,19 @@ impl LogsService for LogsServer {
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }
-        let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
+        let in_stream_name = metadata
+            .get(&cfg.grpc.stream_header_key)
+            .and_then(|name| name.to_str().ok());
 
-        let user_id = metadata.get("user_id");
-        let mut user_email: &str = "";
-        if let Some(user_id) = user_id {
-            user_email = user_id.to_str().unwrap();
-        };
+        let user_email = metadata
+            .get("user_id")
+            .and_then(|id| id.to_str().ok())
+            .unwrap_or_else(|| {
+                log::warn!(
+                    "[gRPC Logs] user_id metadata is invalid or missing, using empty string"
+                );
+                ""
+            });
 
         match crate::service::logs::otlp::handle_request(
             0,
