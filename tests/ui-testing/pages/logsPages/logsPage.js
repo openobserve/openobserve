@@ -4144,4 +4144,334 @@ export class LogsPage {
             return '';
         }
     }
+
+    // ============================================================================
+    // REGRESSION TEST POM METHODS
+    // Added to fix POM violations in logs-regression.spec.js
+    // ============================================================================
+
+    /**
+     * Get pagination text from table bottom
+     * @returns {Promise<string>} The pagination text (e.g., "1-50 of 100")
+     */
+    async getPaginationText() {
+        const paginationLocator = this.page.locator(this.tableBottom).first();
+        await paginationLocator.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await paginationLocator.textContent().catch(() => 'N/A');
+    }
+
+    /**
+     * Fill the streams search input field
+     * @param {string} text - The text to fill
+     */
+    async fillStreamsSearchInput(text) {
+        const searchInput = this.page.locator(this.streamsSearchInputField);
+        await searchInput.fill(text);
+    }
+
+    /**
+     * Clear the streams search input field
+     */
+    async clearStreamsSearchInput() {
+        const searchInput = this.page.locator(this.streamsSearchInputField);
+        await searchInput.clear();
+    }
+
+    /**
+     * Get the count of table body rows with index
+     * @returns {Promise<number>} The number of rows
+     */
+    async getTableRowCount() {
+        return await this.page.locator(this.tableBodyRowWithIndex).count();
+    }
+
+    /**
+     * Get the count of error indicators on the page
+     * @returns {Promise<number>} The number of error indicators
+     */
+    async getErrorIndicatorCount() {
+        return await this.page.locator(this.errorIndicators).count();
+    }
+
+    /**
+     * Get the result text content
+     * @returns {Promise<string>} The result text
+     */
+    async getResultText() {
+        try {
+            return await this.page.locator(this.resultText).textContent() || '';
+        } catch (error) {
+            return '';
+        }
+    }
+
+    /**
+     * Click the query history button
+     */
+    async clickHistoryButton() {
+        const historyButton = this.page.locator(`${this.queryHistoryButton}, button:has-text("History")`).first();
+        if (await historyButton.isVisible()) {
+            await historyButton.click();
+        }
+    }
+
+    /**
+     * Check if the history panel is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isHistoryPanelVisible() {
+        const historyPanel = this.page.locator(this.historyPanel).first();
+        return await historyPanel.isVisible();
+    }
+
+    /**
+     * Check if timestamp column is visible in table header
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isTimestampColumnVisible() {
+        const timestampHeader = this.page.locator('th:has-text("_timestamp"), [data-test*="_timestamp"]').first();
+        return await timestampHeader.isVisible().catch(() => false);
+    }
+
+    /**
+     * Click the first table body row
+     */
+    async clickFirstTableRow() {
+        const logRows = this.page.locator(this.tableBodyRow).first();
+        if (await logRows.isVisible()) {
+            await logRows.click();
+        }
+    }
+
+    /**
+     * Check if timestamp is visible in detail view
+     * @param {number} timeout - Timeout in milliseconds
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isTimestampDetailVisible(timeout = 5000) {
+        const timestampInDetail = this.page.locator(this.timestampInDetail).first();
+        try {
+            await expect(timestampInDetail).toBeVisible({ timeout });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Expect timestamp detail to be visible
+     */
+    async expectTimestampDetailVisible() {
+        const timestampInDetail = this.page.locator(this.timestampInDetail).first();
+        await expect(timestampInDetail).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Get the count of table headers
+     * @returns {Promise<number>} The number of headers
+     */
+    async getTableHeaderCount() {
+        return await this.page.locator(this.tableHeaders).count();
+    }
+
+    /**
+     * Get the count of field expand buttons
+     * @returns {Promise<number>} The number of field expand buttons
+     */
+    async getFieldExpandButtonCount() {
+        return await this.page.locator(this.allFieldExpandButtons).count();
+    }
+
+    /**
+     * Click a field button by field name
+     * @param {string} fieldName - The name of the field
+     */
+    async clickFieldByName(fieldName) {
+        const fieldItem = this.page.locator(this.fieldIndexListButton(fieldName)).first();
+        if (await fieldItem.isVisible()) {
+            await fieldItem.click();
+        }
+    }
+
+    /**
+     * Check if source column is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isSourceColumnVisible() {
+        const sourceVisible = this.page.locator('th:has-text("source"), th:has-text("_source")').first();
+        return await sourceVisible.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if either timestamp or source column is visible
+     * @returns {Promise<boolean>} True if either is visible
+     */
+    async isTimestampOrSourceVisible() {
+        const timestampVisible = await this.isTimestampColumnVisible();
+        const sourceVisible = await this.isSourceColumnVisible();
+        return timestampVisible || sourceVisible;
+    }
+
+    /**
+     * Hover over the download table menu
+     */
+    async hoverDownloadTableMenu() {
+        const downloadTableMenu = this.page.locator('text=/Download Table/i').first();
+        if (await downloadTableMenu.isVisible()) {
+            await downloadTableMenu.hover();
+        }
+    }
+
+    /**
+     * Click the CSV download button
+     */
+    async clickDownloadCSVButton() {
+        const csvDownloadButton = this.page.locator('[data-test="search-download-csv-btn"]');
+        if (await csvDownloadButton.isVisible()) {
+            await csvDownloadButton.click();
+        }
+    }
+
+    /**
+     * Click the JSON download button
+     */
+    async clickDownloadJSONButton() {
+        const jsonDownloadButton = this.page.locator('[data-test="search-download-json-btn"]');
+        if (await jsonDownloadButton.isVisible()) {
+            await jsonDownloadButton.click();
+        }
+    }
+
+    /**
+     * Get the notification message text
+     * @returns {Promise<string>} The notification text
+     */
+    async getNotificationText() {
+        const notifications = this.page.locator('.q-notification__message');
+        const notificationCount = await notifications.count();
+        if (notificationCount > 0) {
+            return await notifications.first().textContent() || '';
+        }
+        return '';
+    }
+
+    /**
+     * Get the count of notifications
+     * @returns {Promise<number>} The number of notifications
+     */
+    async getNotificationCount() {
+        return await this.page.locator('.q-notification__message').count();
+    }
+
+    /**
+     * Check if the refresh button is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isRefreshButtonVisible() {
+        const refreshButton = this.page.locator(this.queryButton);
+        return await refreshButton.isVisible();
+    }
+
+    /**
+     * Check if error notification is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async hasErrorNotification() {
+        const errorNotifications = this.page.locator('.q-notification--negative, text=/error/i, text=/syntax/i').first();
+        return await errorNotifications.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if stream validation error is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async hasStreamValidationError() {
+        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        return await errorNotifications.isVisible().catch(() => false);
+    }
+
+    /**
+     * Get stream validation error text
+     * @returns {Promise<string>} The error text
+     */
+    async getStreamValidationErrorText() {
+        const errorNotifications = this.page.locator('.q-notification__message, text=/select.*stream/i').first();
+        if (await errorNotifications.isVisible().catch(() => false)) {
+            return await errorNotifications.textContent() || '';
+        }
+        return '';
+    }
+
+    /**
+     * Check if logs search result table is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isLogsSearchResultTableVisible() {
+        const resultsTable = this.page.locator(this.logsSearchResultLogsTable);
+        return await resultsTable.isVisible().catch(() => false);
+    }
+
+    /**
+     * Click the SQL Mode switch by role
+     */
+    async clickSQLModeSwitch() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
+        await sqlModeToggle.click();
+    }
+
+    /**
+     * Get SQL mode aria-checked state
+     * @returns {Promise<string|null>} The aria-checked value
+     */
+    async getSQLModeState() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        return await sqlModeToggle.getAttribute('aria-checked');
+    }
+
+    /**
+     * Click the Last 1 hour relative time button
+     */
+    async clickRelative1HourButton() {
+        const oneHourButton = this.page.locator(this.relative1HourButton);
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+        }
+    }
+
+    /**
+     * Check if Last 1 hour button is visible and click it, fallback to 15 min
+     */
+    async clickRelative1HourOrFallback() {
+        const oneHourButton = this.page.getByText('Last 1 hour');
+        if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await oneHourButton.click();
+            return 'Last 1 hour';
+        } else {
+            await this.clickRelative15MinButton();
+            return 'Last 15 minutes';
+        }
+    }
+
+    /**
+     * Disable auto refresh by clicking the off button
+     */
+    async disableAutoRefresh() {
+        await this.clickLiveModeButton();
+        await this.page.waitForTimeout(500);
+        const offButton = this.page.locator('[data-test="logs-search-bar-refresh-time-0"]');
+        if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await offButton.click();
+        }
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Get logs table content as text
+     * @returns {Promise<string>} The table content text
+     */
+    async getLogsTableContent() {
+        const table = this.page.locator(this.logsTable);
+        return await table.textContent().catch(() => '');
+    }
 }

@@ -341,18 +341,14 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Pagination count after search');
 
     // Navigate to streams page (has many items and search functionality)
-    await page.locator(pm.logsPage.streamsMenuItem).click();
+    await pm.logsPage.clickStreamsMenuItem();
     await page.waitForTimeout(2000);
 
-    // Get initial pagination text (shows total count)
-    const paginationLocator = page.locator(pm.logsPage.tableBottom).first();
-
-    // Wait for pagination to load
-    await paginationLocator.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    // Get initial pagination text (shows total count) - using POM method
     await page.waitForLoadState('networkidle').catch(() => {});
     await page.waitForTimeout(1000); // Extra wait for pagination to update
 
-    const initialPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    const initialPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`Initial pagination text: ${initialPaginationText}`);
 
     // Extract initial total count (e.g., "1-50 of 100")
@@ -364,18 +360,17 @@ test.describe("Logs Regression Bugs", () => {
     const initialTotal = parseInt(initialMatch[1]);
     testLogger.info(`Initial total count: ${initialTotal}`);
 
-    // Perform search with a specific term that will filter results
+    // Perform search with a specific term that will filter results - using POM method
     const searchTerm = 'e2e';
-    const searchInput = page.locator(pm.logsPage.streamsSearchInputField);
-    await searchInput.fill(searchTerm);
+    await pm.logsPage.fillStreamsSearchInput(searchTerm);
     testLogger.info(`Entered search term: "${searchTerm}"`);
 
     // Wait for table filtering to complete
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500); // Small buffer for UI update
 
-    // Get pagination text after search
-    const filteredPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    // Get pagination text after search - using POM method
+    const filteredPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`Filtered pagination text: ${filteredPaginationText}`);
 
     // Extract filtered total count
@@ -394,15 +389,15 @@ test.describe("Logs Regression Bugs", () => {
       testLogger.warn(`⚠ Search returned all results - pagination count unchanged (${filteredTotal})`);
     }
 
-    // Verify table shows filtered results
-    const tableRows = await page.locator(pm.logsPage.tableBodyRowWithIndex).count();
+    // Verify table shows filtered results - using POM method
+    const tableRows = await pm.logsPage.getTableRowCount();
     testLogger.info(`Table shows ${tableRows} rows after filtering`);
 
-    // Clear search and verify count returns to original
-    await searchInput.clear();
+    // Clear search and verify count returns to original - using POM method
+    await pm.logsPage.clearStreamsSearchInput();
     await page.waitForTimeout(2000); // Wait for table to reload
 
-    const clearedPaginationText = await paginationLocator.textContent().catch(() => 'N/A');
+    const clearedPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`After clearing search, pagination text: ${clearedPaginationText}`);
 
     const clearedMatch = clearedPaginationText.match(/of\s+(\d+)/i);
@@ -441,38 +436,28 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Check for any error messages
-    const errorIndicators = await page.locator(pm.logsPage.errorIndicators).count();
+    // Check for any error messages - using POM method
+    const errorIndicators = await pm.logsPage.getErrorIndicatorCount();
     expect(errorIndicators).toBe(0);
     testLogger.info('✓ No error notifications displayed after histogram query');
 
-    // Verify results are displayed
-    const resultTextLocator = page.locator(pm.logsPage.resultText);
-    let resultText = '';
-    try {
-      resultText = await resultTextLocator.textContent() || '';
-    } catch (error) {
-      testLogger.debug(`Could not read result text: ${error.message}`);
-    }
+    // Verify results are displayed - using POM method
+    const resultText = await pm.logsPage.getResultText();
     expect(resultText).toBeTruthy();
     testLogger.info(`✓ Results displayed: ${resultText.substring(0, 50)}`);
 
-    // Check if histogram query appears in search history
-    const historyButton = page.locator(`${pm.logsPage.queryHistoryButton}, button:has-text("History")`).first();
-    if (await historyButton.isVisible()) {
-      await historyButton.click();
-      await page.waitForTimeout(1000);
+    // Check if histogram query appears in search history - using POM methods
+    await pm.logsPage.clickHistoryButton();
+    await page.waitForTimeout(1000);
 
-      // Verify history panel opened
-      const historyPanel = page.locator(pm.logsPage.historyPanel).first();
-      if (await historyPanel.isVisible()) {
-        testLogger.info('✓ Search history panel opened successfully');
-      }
-
-      // Close history panel
-      await historyButton.click();
-      await page.waitForTimeout(500);
+    // Verify history panel opened - using POM method
+    if (await pm.logsPage.isHistoryPanelVisible()) {
+      testLogger.info('✓ Search history panel opened successfully');
     }
+
+    // Close history panel
+    await pm.logsPage.clickHistoryButton();
+    await page.waitForTimeout(500);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Histogram query executed without error');
   });
@@ -484,13 +469,11 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(2000);
 
-    // Ensure we're in quick mode (not SQL mode)
-    const sqlModeToggle = page.locator(pm.logsPage.sqlModeToggle);
-    const sqlModeDiv = sqlModeToggle.locator('div').first();
-    const isSQLMode = await sqlModeDiv.getAttribute('aria-checked');
+    // Ensure we're in quick mode (not SQL mode) - using POM method
+    const isSQLMode = await pm.logsPage.getSQLModeState();
 
     if (isSQLMode === 'true') {
-      await sqlModeToggle.click();
+      await pm.logsPage.clickSQLModeSwitch();
       await page.waitForTimeout(1000);
       testLogger.info('Switched to quick mode');
     }
@@ -499,23 +482,18 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Check if timestamp column/field is visible in results
-    const timestampHeader = page.locator('th:has-text("_timestamp"), [data-test*="_timestamp"]').first();
-    const timestampVisible = await timestampHeader.isVisible().catch(() => false);
+    // Check if timestamp column/field is visible in results - using POM method
+    const timestampVisible = await pm.logsPage.isTimestampColumnVisible();
 
     if (timestampVisible) {
       testLogger.info('✓ Timestamp header found in table view');
     } else {
-      // Check if timestamp appears in expanded log view
-      const logRows = page.locator(pm.logsPage.tableBodyRow).first();
-      if (await logRows.isVisible()) {
-        await logRows.click();
-        await page.waitForTimeout(500);
+      // Check if timestamp appears in expanded log view - using POM methods
+      await pm.logsPage.clickFirstTableRow();
+      await page.waitForTimeout(500);
 
-        const timestampInDetail = page.locator(pm.logsPage.timestampInDetail).first();
-        await expect(timestampInDetail).toBeVisible({ timeout: 5000 });
-        testLogger.info('✓ Timestamp found in log detail view');
-      }
+      await pm.logsPage.expectTimestampDetailVisible();
+      testLogger.info('✓ Timestamp found in log detail view');
     }
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Timestamp field displays in quick mode');
@@ -532,15 +510,13 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Get list of currently displayed fields in table
-    const tableHeaders = page.locator(pm.logsPage.tableHeaders);
-    const initialHeaderCount = await tableHeaders.count();
+    // Get list of currently displayed fields in table - using POM method
+    const initialHeaderCount = await pm.logsPage.getTableHeaderCount();
     testLogger.info(`Initial field count in table: ${initialHeaderCount}`);
 
     // Try to remove fields until only _timestamp remains (or close to it)
-    // This simulates the scenario where user removes fields
-    const fieldListItems = page.locator(pm.logsPage.allFieldExpandButtons);
-    const fieldCount = await fieldListItems.count();
+    // This simulates the scenario where user removes fields - using POM method
+    const fieldCount = await pm.logsPage.getFieldExpandButtonCount();
 
     if (fieldCount > 0) {
       // Search for a specific field to remove
@@ -548,28 +524,23 @@ test.describe("Logs Regression Bugs", () => {
       await pm.logsPage.fillIndexFieldSearchInput(fieldToRemove);
       await page.waitForTimeout(500);
 
-      // Check if field has a remove/toggle button
-      const fieldItem = page.locator(pm.logsPage.fieldIndexListButton(fieldToRemove)).first();
-      if (await fieldItem.isVisible()) {
-        // Click to toggle field (remove from view)
-        await fieldItem.click();
-        await page.waitForTimeout(1000);
-
-        testLogger.info(`Toggled field: ${fieldToRemove}`);
-      }
+      // Check if field has a remove/toggle button and click it - using POM method
+      await pm.logsPage.clickFieldByName(fieldToRemove);
+      await page.waitForTimeout(1000);
+      testLogger.info(`Toggled field: ${fieldToRemove}`);
 
       // Clear search to see all remaining fields
       await pm.logsPage.fillIndexFieldSearchInput('');
       await page.waitForTimeout(500);
     }
 
-    // Check current table state
-    const updatedHeaderCount = await tableHeaders.count();
+    // Check current table state - using POM method
+    const updatedHeaderCount = await pm.logsPage.getTableHeaderCount();
     testLogger.info(`Updated field count in table: ${updatedHeaderCount}`);
 
-    // Verify that when minimal fields remain, source field OR _timestamp is still visible
-    const timestampVisible = await page.locator('th:has-text("_timestamp")').isVisible().catch(() => false);
-    const sourceVisible = await page.locator('th:has-text("source"), th:has-text("_source")').first().isVisible().catch(() => false);
+    // Verify that when minimal fields remain, source field OR _timestamp is still visible - using POM methods
+    const timestampVisible = await pm.logsPage.isTimestampColumnVisible();
+    const sourceVisible = await pm.logsPage.isSourceColumnVisible();
 
     expect(timestampVisible || sourceVisible).toBeTruthy();
 
@@ -600,36 +571,28 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    const moreOptionsButton = page.locator('[data-test="logs-search-bar-more-options-btn"]');
-    if (await moreOptionsButton.isVisible()) {
-      await moreOptionsButton.click();
-      await page.waitForTimeout(500);
+    // Using POM methods for download flow
+    await pm.logsPage.clickMoreOptionsButton();
+    await page.waitForTimeout(500);
 
-      const downloadTableMenu = page.locator('text=/Download Table/i').first();
-      if (await downloadTableMenu.isVisible()) {
-        await downloadTableMenu.hover();
-        await page.waitForTimeout(500);
+    await pm.logsPage.hoverDownloadTableMenu();
+    await page.waitForTimeout(500);
 
-        const csvDownloadButton = page.locator('[data-test="search-download-csv-btn"]');
-        if (await csvDownloadButton.isVisible()) {
-          await csvDownloadButton.click();
-          await page.waitForTimeout(2000);
+    await pm.logsPage.clickDownloadCSVButton();
+    await page.waitForTimeout(2000);
 
-          const notifications = page.locator('.q-notification__message');
-          const notificationCount = await notifications.count();
+    // Check for notification - using POM method
+    const notificationCount = await pm.logsPage.getNotificationCount();
 
-          if (notificationCount > 0) {
-            const notificationText = await notifications.first().textContent();
-            testLogger.info(`✓ Notification displayed: ${notificationText}`);
-            expect(notificationText.length).toBeGreaterThan(0);
-          } else {
-            testLogger.info('✓ Download prevented for empty results');
-          }
-
-          testLogger.info('✓ PRIMARY CHECK PASSED: Empty CSV download handled');
-        }
-      }
+    if (notificationCount > 0) {
+      const notificationText = await pm.logsPage.getNotificationText();
+      testLogger.info(`✓ Notification displayed: ${notificationText}`);
+      expect(notificationText.length).toBeGreaterThan(0);
+    } else {
+      testLogger.info('✓ Download prevented for empty results');
     }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Empty CSV download handled');
   });
 
   test('should handle empty results download for JSON @bug-9455 @P1 @regression @download', async ({ page }) => {
@@ -646,36 +609,28 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    const moreOptionsButton = page.locator('[data-test="logs-search-bar-more-options-btn"]');
-    if (await moreOptionsButton.isVisible()) {
-      await moreOptionsButton.click();
-      await page.waitForTimeout(500);
+    // Using POM methods for download flow
+    await pm.logsPage.clickMoreOptionsButton();
+    await page.waitForTimeout(500);
 
-      const downloadTableMenu = page.locator('text=/Download Table/i').first();
-      if (await downloadTableMenu.isVisible()) {
-        await downloadTableMenu.hover();
-        await page.waitForTimeout(500);
+    await pm.logsPage.hoverDownloadTableMenu();
+    await page.waitForTimeout(500);
 
-        const jsonDownloadButton = page.locator('[data-test="search-download-json-btn"]');
-        if (await jsonDownloadButton.isVisible()) {
-          await jsonDownloadButton.click();
-          await page.waitForTimeout(2000);
+    await pm.logsPage.clickDownloadJSONButton();
+    await page.waitForTimeout(2000);
 
-          const notifications = page.locator('.q-notification__message');
-          const notificationCount = await notifications.count();
+    // Check for notification - using POM method
+    const notificationCount = await pm.logsPage.getNotificationCount();
 
-          if (notificationCount > 0) {
-            const notificationText = await notifications.first().textContent();
-            testLogger.info(`✓ Notification displayed: ${notificationText}`);
-            expect(notificationText.length).toBeGreaterThan(0);
-          } else {
-            testLogger.info('✓ Download prevented for empty results');
-          }
-
-          testLogger.info('✓ PRIMARY CHECK PASSED: Empty JSON download handled');
-        }
-      }
+    if (notificationCount > 0) {
+      const notificationText = await pm.logsPage.getNotificationText();
+      testLogger.info(`✓ Notification displayed: ${notificationText}`);
+      expect(notificationText.length).toBeGreaterThan(0);
+    } else {
+      testLogger.info('✓ Download prevented for empty results');
     }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: Empty JSON download handled');
   });
 
   test('should validate stream selection before search @bug-9455 @P1 @regression', async ({ page }) => {
@@ -684,28 +639,27 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForTimeout(2000);
 
-    const refreshButton = page.locator(pm.logsPage.queryButton);
-    const isRefreshButtonVisible = await refreshButton.isVisible();
+    // Using POM method to check refresh button visibility
+    const isRefreshButtonVisible = await pm.logsPage.isRefreshButtonVisible();
 
     // PRIMARY ASSERTION: Refresh button should be visible
     expect(isRefreshButtonVisible).toBeTruthy();
 
-    await refreshButton.click();
+    await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(2000);
 
-    const errorNotifications = page.locator('.q-notification__message, text=/select.*stream/i').first();
-    const errorVisible = await errorNotifications.isVisible().catch(() => false);
+    // Using POM method to check for stream validation error
+    const errorVisible = await pm.logsPage.hasStreamValidationError();
 
     // PRIMARY ASSERTION: Either error notification appears OR search was silently prevented
     if (errorVisible) {
-      const errorText = await errorNotifications.textContent();
+      const errorText = await pm.logsPage.getStreamValidationErrorText();
       testLogger.info(`✓ Validation message: ${errorText}`);
       expect(errorText.toLowerCase()).toMatch(/stream|select/);
       testLogger.info('✓ PRIMARY CHECK PASSED: Validation message displayed correctly');
     } else {
-      // If no error notification, verify no results were loaded (search was prevented)
-      const resultsTable = page.locator(pm.logsPage.logsSearchResultLogsTable);
-      const hasResults = await resultsTable.isVisible().catch(() => false);
+      // If no error notification, verify no results were loaded (search was prevented) - using POM method
+      const hasResults = await pm.logsPage.isLogsSearchResultTableVisible();
 
       // Assert search was prevented (no results loaded without stream selection)
       expect(hasResults).toBeFalsy();
@@ -723,14 +677,11 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(2000);
 
-    // Make sure we're in quick mode initially
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    await sqlModeToggle.waitFor({ state: 'visible', timeout: 10000 });
-
-    const isSQLMode = await sqlModeToggle.getAttribute('aria-checked');
+    // Make sure we're in quick mode initially - using POM method
+    const isSQLMode = await pm.logsPage.getSQLModeState();
 
     if (isSQLMode === 'true') {
-      await sqlModeToggle.click();
+      await pm.logsPage.clickSQLModeSwitch();
       await page.waitForTimeout(1000);
       testLogger.info('Switched to quick mode');
     }
@@ -743,8 +694,8 @@ test.describe("Logs Regression Bugs", () => {
 
     await page.waitForTimeout(1000);
 
-    // Toggle to SQL mode
-    await sqlModeToggle.click();
+    // Toggle to SQL mode - using POM method
+    await pm.logsPage.clickSQLModeSwitch();
     await page.waitForTimeout(1500);
     testLogger.info('Toggled to SQL mode');
 
@@ -760,27 +711,21 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // Check for syntax errors
-    const errorNotifications = page.locator('.q-notification--negative, text=/error/i, text=/syntax/i').first();
-    const hasError = await errorNotifications.isVisible().catch(() => false);
+    // Check for syntax errors - using POM method
+    const hasError = await pm.logsPage.hasErrorNotification();
 
     // PRIMARY ASSERTION 2: No syntax errors should occur after SQL conversion
     expect(hasError).toBeFalsy();
 
     if (hasError) {
-      const errorText = await errorNotifications.textContent();
+      const errorText = await pm.logsPage.getNotificationText();
       testLogger.error(`Unexpected error after SQL conversion: ${errorText}`);
     } else {
       testLogger.info('✓ No syntax errors after SQL mode conversion');
     }
 
-    // Verify results or at least that query executed
-    let resultText = '';
-    try {
-      resultText = await page.locator(pm.logsPage.resultText).textContent() || '';
-    } catch (error) {
-      testLogger.debug(`Could not read result text: ${error.message}`);
-    }
+    // Verify results or at least that query executed - using POM method
+    const resultText = await pm.logsPage.getResultText();
 
     // PRIMARY ASSERTION 3: Query should execute and return results
     expect(resultText).toBeTruthy();
@@ -966,13 +911,9 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream(streamName);
     await pm.logsPage.clickDateTimeButton();
 
-    const oneHourButton = page.getByText('Last 1 hour');
-    if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await oneHourButton.click();
-      testLogger.info('Set time range to Last 1 hour');
-    } else {
-      await pm.logsPage.clickRelative15MinButton();
-    }
+    // Using POM method for time range selection with fallback
+    const timeRangeSet = await pm.logsPage.clickRelative1HourOrFallback();
+    testLogger.info(`Set time range to ${timeRangeSet}`);
 
     // Poll for data availability instead of fixed wait
     testLogger.info('Polling for data availability (deterministic check)');
@@ -1117,16 +1058,9 @@ test.describe("Logs Regression Bugs", () => {
     const afterRefreshSearchResponse = await afterRefreshResponse;
     testLogger.info('Auto refresh search detected');
 
-    // Disable auto refresh
+    // Disable auto refresh - using POM method
     testLogger.info('Disabling auto refresh');
-    await pm.logsPage.clickLiveModeButton();
-    await page.waitForTimeout(500);
-
-    const offButton = page.locator('[data-test="logs-search-bar-refresh-time-0"]');
-    if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await offButton.click();
-    }
-    await page.waitForTimeout(500);
+    await pm.logsPage.disableAutoRefresh();
 
     // Get time range after auto refresh
     const afterRefreshRequest = afterRefreshSearchResponse.request();
