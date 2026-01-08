@@ -1222,7 +1222,7 @@ export default defineComponent({
     border-radius: 4px;
     overflow: visible;
     border-radius: inherit;
-    height: 100%;
+    // height: 100%;
   }
 }
 
