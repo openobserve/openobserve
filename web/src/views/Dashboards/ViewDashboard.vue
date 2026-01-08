@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
+        @variablesManagerReady="onVariablesManagerReady"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
@@ -379,7 +380,6 @@ import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
-import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import {
   createDashboardsContextProvider,
   contextRegistry,
@@ -427,11 +427,9 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    // Initialize variables manager for scoped variables
-    const variablesManager = useVariablesManager();
-
-    // Provide to child components
-    provide("variablesManager", variablesManager);
+    // Variables manager will be initialized by RenderDashboardCharts
+    // and we'll receive a reference to it via the @variablesManagerReady event
+    const variablesManager = ref(null);
 
     let moment: any = () => {};
 
@@ -560,9 +558,6 @@ export default defineComponent({
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
-    // Track if we're using the scoped variables manager
-    const usingScopedVariablesManager = ref(false);
-
     // variables data
     const variablesData = reactive({});
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
@@ -580,13 +575,22 @@ export default defineComponent({
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
-    const isVariablesChanged = computed(() => {
-      // If using variables manager, use its hasUncommittedChanges computed
-      // This is the proper way to detect live vs committed state differences
-      if (variablesManager) {
-        return variablesManager.hasUncommittedChanges.value;
-      }
 
+    // Handler for when variables manager is ready from RenderDashboardCharts
+    const onVariablesManagerReady = (manager: any) => {
+      variablesManager.value = manager;
+    };
+
+    const isVariablesChanged = computed(() => {
+      // If using variables manager, access hasUncommittedChanges directly from the manager
+      // Explicitly dereference to ensure Vue tracks the dependency
+      const manager = variablesManager.value;
+
+      if (manager && 'hasUncommittedChanges' in manager) {
+        // Access the value (Vue auto-unwraps computed refs in composable returns)
+        const hasChanges = manager.hasUncommittedChanges;
+        return hasChanges;
+      }
       // Legacy mode: Convert both objects to a consistent format for comparison
       const normalizeVariables = (obj) => {
         const normalized = JSON.parse(JSON.stringify(obj));
@@ -682,36 +686,7 @@ export default defineComponent({
         return;
       }
 
-      // Initialize variables manager for all dashboards to ensure consistent handling
-      try {
-        await variablesManager.initialize(
-          dashboard?.variables?.list || [],
-          dashboard,
-        );
-
-        // Load variable values from URL if present
-        variablesManager.loadFromUrl(route);
-
-        // COMMIT IMMEDIATELY! loadFromUrl() marks variables with URL values as fully loaded,
-        // so we can commit right away without waiting for API calls.
-        // This allows instant rendering on page refresh with URL parameter values.
-        variablesManager.commitAll();
-
-        // Track that we're using the scoped variables manager
-        usingScopedVariablesManager.value = true;
-      } catch (error: any) {
-        console.error("Error initializing variables manager:", error);
-        if (error.message?.includes("Circular dependency")) {
-          showErrorNotification(
-            "Circular dependency detected in dashboard variables",
-          );
-        } else if (error.message?.includes("Invalid dependency")) {
-          showErrorNotification("Invalid variable dependency configuration");
-        }
-      }
-
-      // NOW set the reactive dashboard data to trigger rendering
-      // By this point, the variables manager is fully initialized and structurally committed.
+      // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
 
       // set selected tab from query params
@@ -722,11 +697,6 @@ export default defineComponent({
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
         : dashboard?.tabs?.[0]?.tabId;
-
-      // If using manager, set the selected tab as visible
-      if (selectedTabId.value) {
-        variablesManager.setTabVisibility(selectedTabId.value, true);
-      }
 
       // if variables data is null, set it to empty list
       if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
@@ -904,11 +874,8 @@ export default defineComponent({
 
         // CRITICAL: Commit all live variable changes to committed state
         // This is the key mechanism that prevents premature API calls
-        // Similar to updating currentVariablesDataRef.__global in main branch
-        if (variablesManager) {
-          variablesManager.commitAll();
-          // After committing, sync committed values to URL so only committed state is reflected in the URL
-        }
+        // Call commitAllVariables via the RenderDashboardCharts ref
+        renderDashboardChartsRef.value?.commitAllVariables();
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
@@ -996,39 +963,23 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // Watch for tab changes and update visibility in manager
-    watch(selectedTabId, (newTabId, oldTabId) => {
-      // Check if using manager (has scoped variables)
-      const hasScopedVariables =
-        currentDashboardData.data?.variables?.list?.some(
-          (v: any) => v.scope === "tabs" || v.scope === "panels",
-        );
-
-      if (hasScopedVariables && newTabId) {
-        // Set old tab as not visible
-        if (oldTabId) {
-          variablesManager.setTabVisibility(oldTabId, false);
-        }
-        // Set new tab as visible
-        variablesManager.setTabVisibility(newTabId, true);
-      }
-    });
-
     // Get current variable params from manager (uses new centralized getUrlParams method)
     const getVariableParamsFromManager = (): Record<string, any> => {
-      if (!variablesManager) return {};
-
-      // Use the centralized getUrlParams method with committed state (useLive: false)
-      return variablesManager.getUrlParams({ useLive: false });
+      if (renderDashboardChartsRef.value?.getUrlParams) {
+        return renderDashboardChartsRef.value.getUrlParams({ useLive: false });
+      }
+      return {};
     };
 
     // whenever the refreshInterval is changed, update the query params
+    // Note: We're removing the variablesManager.committedVariablesData watch
+    // because URL updates should only happen when user clicks refresh (handled in refreshData)
+    // This watch is just for time/tab/refresh interval changes
     watch(
       [
         refreshInterval,
         selectedDate,
         selectedTabId,
-        () => variablesManager.committedVariablesData,
       ],
       () => {
         generateNewDashboardRunId();
@@ -1036,7 +987,7 @@ export default defineComponent({
         // Build variable params - prefer manager if available, otherwise use route.query
         let variableParams: Record<string, any> = {};
 
-        if (variablesManager) {
+        if (variablesManager.value) {
           // Get from manager
           variableParams = getVariableParamsFromManager();
 
@@ -1316,27 +1267,6 @@ export default defineComponent({
       }
     });
 
-    // Initial commitment once all variables have settled (for manager mode)
-    let initialCommitDone = false;
-    watch(
-      () => [
-        variablesManager.isLoading.value,
-        variablesManager.variablesData.isInitialized,
-      ],
-      ([loading, initialized]) => {
-        if (
-          initialized &&
-          !loading &&
-          !initialCommitDone &&
-          usingScopedVariablesManager.value
-        ) {
-          variablesManager.commitAll();
-          initialCommitDone = true;
-        }
-      },
-      { immediate: true },
-    );
-
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -1403,6 +1333,7 @@ export default defineComponent({
       saveJsonDashboard,
       setTimeForVariables,
       runId,
+      onVariablesManagerReady,
     };
   },
 });

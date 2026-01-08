@@ -32,9 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <VariablesValueSelector
         v-if="
-          variablesManager &&
-          (globalVariables.length > 0 ||
-            dashboardData.variables?.showDynamicFilters)
+          globalVariables.length > 0 ||
+          dashboardData.variables?.showDynamicFilters
         "
         :scope="'global'"
         :variablesConfig="{ list: globalVariables }"
@@ -42,22 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selectedTimeDate="currentTimeObj['__global']"
         :initialVariableValues="initialVariableValues"
         data-test="global-variables-selector"
-      />
-
-      <!-- Legacy Variables Selector (if not using manager) -->
-      <VariablesValueSelector
-        v-else-if="
-          !variablesManager &&
-          (currentTimeObj['__global'] || currentTimeObj['__variables'])
-        "
-        :variablesConfig="dashboardData?.variables"
-        :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-        :selectedTimeDate="
-          currentTimeObj['__variables'] || currentTimeObj['__global']
-        "
-        :initialVariableValues="initialVariableValues"
-        @variablesData="variablesDataUpdated"
-        ref="variablesValueSelectorRef"
       />
 
       <!-- Tab List -->
@@ -300,7 +283,8 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
-import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import type { useVariablesManager as UseVariablesManagerType } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
@@ -322,6 +306,7 @@ export default defineComponent({
     "onMovePanel",
     "panelsValues",
     "searchRequestTraceIds",
+    "variablesManagerReady",
   ],
   props: {
     viewOnly: {},
@@ -384,7 +369,6 @@ export default defineComponent({
     // Initialize GridStack instance
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
     let gridStackInstance = null;
-    const variablesValueSelectorRef = ref(null);
 
     const showViewPanel = ref(false);
     // holds the view panel id
@@ -398,8 +382,6 @@ export default defineComponent({
 
     // Helper function to set up panel visibility observers
     const setupPanelObservers = async () => {
-      if (!variablesManager) return;
-
       // Clean up existing observer
       if (panelObserver.value) {
         panelObserver.value.disconnect();
@@ -414,11 +396,12 @@ export default defineComponent({
         (entries) => {
           entries.forEach((entry) => {
             const panelId = entry.target.getAttribute("gs-id");
-            if (panelId) {
-              variablesManager.setPanelVisibility(
-                panelId,
-                entry.isIntersecting,
-              );
+            if (panelId && entry.isIntersecting) {
+              // Mark panel as visible - variables will load if ready
+              variablesManager.setPanelVisibility(panelId, true);
+            } else if (panelId && !entry.isIntersecting) {
+              // Panel is leaving viewport
+              variablesManager.setPanelVisibility(panelId, false);
             }
           });
         },
@@ -436,11 +419,14 @@ export default defineComponent({
       panelObserver.value = observer;
     };
 
-    // Inject variables manager from parent ViewDashboard
-    const variablesManager = inject<ReturnType<typeof useVariablesManager>>(
-      "variablesManager",
-      undefined,
-    );
+    // Create our own variables manager instead of injecting from parent
+    // This makes RenderDashboardCharts self-contained and reusable
+    const variablesManager = useVariablesManager();
+
+    // Removed committedVersion and getAllVariablesFlat - no longer needed after cleanup
+
+    // Provide to child components (VariablesValueSelector, etc.)
+    provide("variablesManager", variablesManager);
 
     // Computed properties for filtered variables by scope
     const globalVariables = computed(() => {
@@ -478,11 +464,6 @@ export default defineComponent({
         return currentVariablesDataRef.value[panelId];
       }
 
-      if (!variablesManager) {
-        // Fallback to legacy behavior: __global mechanism
-        return currentVariablesDataRef.value["__global"] || { values: [] };
-      }
-
       // Priority 2: Use manager's committed state
       // CRITICAL: Use COMMITTED state (not live state)!
       // This prevents panels from reloading on every variable change
@@ -503,11 +484,6 @@ export default defineComponent({
     // Helper to get LIVE (uncommitted) variables for a panel
     // Used for detecting changes and showing yellow refresh icon
     const getLiveVariablesForPanel = (panelId: string) => {
-      if (!variablesManager) {
-        // Legacy mode: use variablesData ref
-        return variablesData.value;
-      }
-
       // Get live variables for the selected tab and panel
       // This allows panel to detect uncommitted changes including panel-scoped ones
       const liveVars = variablesManager.getVariablesForPanel(
@@ -589,25 +565,17 @@ export default defineComponent({
     watch(
       () => props?.currentTimeObj?.__global,
       () => {
-        if (!variablesManager) {
-          // Legacy mode: replace entire currentVariablesDataRef with just __global
-          // This clears all panel-specific overrides, applying global variables everywhere
-          currentVariablesDataRef.value = {
-            __global: JSON.parse(JSON.stringify(variablesData.value)),
-          };
-        } else {
-          // Manager mode: sync currentVariablesDataRef with manager state
-          // Convert manager's variables to legacy format for backward compatibility
-          const allGlobalVars = variablesManager.variablesData.global;
-          currentVariablesDataRef.value = {
-            __global: JSON.parse(
-              JSON.stringify({
-                isVariablesLoading: variablesManager.isLoading.value,
-                values: allGlobalVars,
-              }),
-            ),
-          };
-        }
+        // Sync currentVariablesDataRef with manager's COMMITTED state
+        // Use committed state to match what panels are rendering
+        const allGlobalVars = variablesManager.committedVariablesData.global;
+        currentVariablesDataRef.value = {
+          __global: JSON.parse(
+            JSON.stringify({
+              isVariablesLoading: variablesManager.isLoading.value,
+              values: allGlobalVars,
+            }),
+          ),
+        };
       },
     );
 
@@ -669,28 +637,13 @@ export default defineComponent({
       }
     });
 
-    let needsVariablesAutoUpdate = true;
-
     const variablesDataUpdated = (data: any) => {
       try {
         // Update the live variables data (immediate UI state)
         variablesData.value = data;
 
-        if (needsVariablesAutoUpdate) {
-          // Check if the variables have loaded (length > 0)
-          if (checkIfVariablesAreLoaded(variablesData.value)) {
-            needsVariablesAutoUpdate = false;
-            // Auto-update committed state on first load (legacy mode only)
-            if (!variablesManager) {
-              currentVariablesDataRef.value = {
-                __global: JSON.parse(JSON.stringify(variablesData.value)),
-              };
-            }
-          }
-        }
-
-        // In manager mode, the manager handles variable updates directly
-        // This function is primarily for legacy mode where variables are managed centrally
+        // The manager handles variable updates directly
+        // This function is primarily for compatibility with legacy variable selectors
         return;
       } catch (error) {
         return;
@@ -1012,12 +965,124 @@ export default defineComponent({
       await setupPanelObservers();
     });
 
+    // Initialize variables manager when dashboard data changes
+    watch(
+      () => props.dashboardData,
+      async (newDashboardData) => {
+        if (!newDashboardData) return;
+
+        try {
+          // Initialize variables manager with dashboard variables
+          await variablesManager.initialize(
+            newDashboardData?.variables?.list || [],
+            newDashboardData,
+          );
+
+          // Load variables from URL parameters (e.g., ?var-foo=bar)
+          // This is critical for dashboard links from the list page
+          variablesManager.loadFromUrl(route);
+
+          // INITIALIZATION COMMIT: Commit initial state to populate committedVariablesData
+          // This serves multiple purposes:
+          // 1. Prevents false "uncommitted changes" indicator on dashboard load
+          // 2. Allows panels to see variable structure immediately (even with null/pending values)
+          // 3. Establishes baseline for auto-commit logic (first load vs reload detection)
+          variablesManager.commitAll();
+
+          // Notify parent that manager is ready
+          emit("variablesManagerReady", variablesManager);
+
+          // Set the selected tab as visible if available
+          if (selectedTabId.value) {
+            variablesManager.setTabVisibility(selectedTabId.value, true);
+          }
+        } catch (error: any) {
+          console.error("Error initializing variables manager:", error);
+        }
+      },
+      { immediate: true },
+    );
+
+    // PROGRESSIVE LOADING: Auto-commit when variables finish loading for the first time
+    // This enables panels to see variable values immediately without user clicking Refresh
+    //
+    // How it works:
+    // - Watch for isVariablePartialLoaded transitions from false → true
+    // - Check if variable was already loaded in committed state
+    // - If NOT in committed state (or was never loaded) → first load → AUTO-COMMIT
+    // - If in committed state with isVariablePartialLoaded=true → reload → NO COMMIT
+    //
+    // Scenarios:
+    // 1. Initial dashboard load → variables not in committed state → AUTO-COMMIT ✅
+    // 2. Tab switch → tab variables not in committed state → AUTO-COMMIT ✅
+    // 3. Panel visible → panel variables not in committed state → AUTO-COMMIT ✅
+    // 4. User changes parent → child reloads, but child already in committed state → NO COMMIT ✅
+    watch(
+      () => ({
+        global: variablesManager.variablesData.global,
+        tabs: variablesManager.variablesData.tabs,
+        panels: variablesManager.variablesData.panels,
+      }),
+      (newData) => {
+        // Helper to find variable in committed state
+        const findInCommitted = (v: any) => {
+          if (v.scope === 'global') {
+            return variablesManager.committedVariablesData.global.find(
+              (cv: any) => cv.name === v.name
+            );
+          } else if (v.scope === 'tabs' && v.tabId) {
+            const tabVars = variablesManager.committedVariablesData.tabs[v.tabId] || [];
+            return tabVars.find((cv: any) => cv.name === v.name);
+          } else if (v.scope === 'panels' && v.panelId) {
+            const panelVars = variablesManager.committedVariablesData.panels[v.panelId] || [];
+            return panelVars.find((cv: any) => cv.name === v.name);
+          }
+          return null;
+        };
+
+        // Check all variables for newly loaded ones
+        const allVariables = [
+          ...newData.global,
+          ...Object.values(newData.tabs).flat(),
+          ...Object.values(newData.panels).flat(),
+        ];
+
+        let shouldAutoCommit = false;
+
+        for (const variable of allVariables) {
+          // Only check query_values variables that just finished loading
+          if (variable.type !== 'query_values') continue;
+          if (!variable.isVariablePartialLoaded) continue;
+
+          // Find this variable in committed state
+          const committedVar = findInCommitted(variable);
+
+          if (!committedVar) {
+            // Variable doesn't exist in committed state → first load
+            shouldAutoCommit = true;
+            break;
+          } else if (committedVar.isVariablePartialLoaded === false) {
+            // Variable exists but was never loaded → first load
+            shouldAutoCommit = true;
+            break;
+          }
+          // else: committedVar.isVariablePartialLoaded === true → reload → no commit
+        }
+
+        if (shouldAutoCommit) {
+          // Auto-commit so panels see the new values
+          variablesManager.commitAll();
+        }
+      },
+      { deep: true }
+    );
+
     // Watch for tab visibility changes
     watch(
       () => selectedTabId.value,
       (newTabId, oldTabId) => {
-        if (variablesManager && newTabId) {
-          // Mark new tab as visible
+        if (newTabId) {
+          // Mark new tab as visible - variables will load if ready
           variablesManager.setTabVisibility(newTabId, true);
 
           // Mark old tab as hidden (optional - for cleanup)
@@ -1044,11 +1109,6 @@ export default defineComponent({
         gridStackInstance.destroy(false);
         gridStackInstance = null;
       }
-
-      // Clean up other references
-      if (variablesValueSelectorRef.value) {
-        variablesValueSelectorRef.value = null;
-      }
     });
 
     // Final cleanup when component is fully unmounted
@@ -1060,8 +1120,8 @@ export default defineComponent({
     });
 
     /**
-     * Updates the initial variable values using the variable value selector ref
-     * @param args - Any arguments to be passed to `changeInitialVariableValues` method
+     * Updates the initial variable values (used for drilldowns)
+     * @param args - Any arguments (not used with variables manager)
      */
     const updateInitialVariableValues = async (...args: any) => {
       // if view panel is open then close it
@@ -1070,16 +1130,20 @@ export default defineComponent({
       // first, refresh the dashboard
       refreshDashboard(true);
 
-      // NOTE: after variables in variables feature, it works without changing the initial variable values
-      // then, update the initial variable values
-      await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args,
-      );
+      // NOTE: With the variables manager, this works without changing the initial variable values
+      // The manager handles variable updates automatically
 
       // This is necessary to ensure that panels refresh automatically based on the drilldown
       // without requiring the user to click on refresh to load the panel/whole dashboard
+      // Use committed state to match panel expectations
+      const allGlobalVars = variablesManager.committedVariablesData.global;
       currentVariablesDataRef.value = {
-        __global: JSON.parse(JSON.stringify(variablesData.value)),
+        __global: JSON.parse(
+          JSON.stringify({
+            isVariablesLoading: variablesManager.isLoading.value,
+            values: allGlobalVars,
+          }),
+        ),
       };
     };
 
@@ -1090,32 +1154,24 @@ export default defineComponent({
       emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
 
       // Panel-specific refresh: creates a snapshot for this panel only
-      if (!variablesManager) {
-        // Legacy mode: store current variablesData as panel-specific override
-        currentVariablesDataRef.value = {
-          ...currentVariablesDataRef.value,
-          [panelId]: JSON.parse(JSON.stringify(variablesData.value)),
-        };
-      } else {
-        // Manager mode: commit ONLY the panel scope if needed,
-        // but the main reload driver is the local override in currentVariablesDataRef
-        variablesManager.commitScope("panels", panelId);
+      // Commit ONLY the panel scope if needed,
+      // but the main reload driver is the local override in currentVariablesDataRef
+      variablesManager.commitScope("panels", panelId);
 
-        // Get merged variables for this panel and store as override
-        const panelVars = variablesManager.getVariablesForPanel(
-          panelId,
-          selectedTabId.value,
-        );
-        currentVariablesDataRef.value = {
-          ...currentVariablesDataRef.value,
-          [panelId]: JSON.parse(
-            JSON.stringify({
-              isVariablesLoading: variablesManager.isLoading.value,
-              values: panelVars,
-            }),
-          ),
-        };
-      }
+      // Get merged variables for this panel and store as override
+      const panelVars = variablesManager.getVariablesForPanel(
+        panelId,
+        selectedTabId.value,
+      );
+      currentVariablesDataRef.value = {
+        ...currentVariablesDataRef.value,
+        [panelId]: JSON.parse(
+          JSON.stringify({
+            isVariablesLoading: variablesManager.isLoading.value,
+            values: panelVars,
+          }),
+        ),
+      };
     };
 
     const updateRunId = (newRunId) => {
@@ -1124,6 +1180,19 @@ export default defineComponent({
 
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
+    };
+
+    // Exposed methods for parent components to interact with variables manager
+    const commitAllVariables = () => {
+      variablesManager.commitAll();
+    };
+
+    const getUrlParams = (options = { useLive: false }) => {
+      return variablesManager.getUrlParams(options);
+    };
+
+    const getVariablesManager = () => {
+      return variablesManager;
     };
 
     return {
@@ -1144,7 +1213,6 @@ export default defineComponent({
       onMovePanel,
       refreshPanelRequest,
       updateRunId,
-      variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
@@ -1160,6 +1228,10 @@ export default defineComponent({
       getPanelVariables,
       getMergedVariablesForPanel,
       getLiveVariablesForPanel,
+      // Exposed methods for parent components
+      commitAllVariables,
+      getUrlParams,
+      getVariablesManager,
     };
   },
   methods: {

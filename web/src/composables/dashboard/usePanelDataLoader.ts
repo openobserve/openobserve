@@ -79,9 +79,9 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (false) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
   let runCount = 0;
 
@@ -275,38 +275,26 @@ export const usePanelDataLoader = (
     return new Promise<void>((resolve, reject) => {
       log("waitForTheVariablesToLoad: entering...");
 
-      // CRITICAL: Check if variables are still loading
-      // This prevents premature API calls during initial dashboard load
-      if (variablesData.value?.isVariablesLoading === true) {
-        log(
-          "waitForTheVariablesToLoad: variables are loading (isVariablesLoading=true), waiting...",
-        );
-        // Don't resolve immediately - wait for them to finish loading
-      } else if (ifPanelVariablesCompletedLoading()) {
-        log("waitForTheVariablesToLoad: variables are already loaded");
+      // PROGRESSIVE LOADING: Check if PANEL-SPECIFIC variables are ready
+      // This allows panels to load as soon as THEIR dependencies are ready
+      // instead of waiting for ALL dashboard variables to finish loading
+      if (ifPanelVariablesCompletedLoading()) {
+        log("waitForTheVariablesToLoad: panel variables are already loaded");
         resolve();
         return;
       }
 
-      // Watch for changes in isVisible
+      // Watch for changes in variables data
       const stopWatching = watch(
         () => variablesData.value,
-        (newVal) => {
-          // First check: are variables still marked as loading?
-          if (newVal?.isVariablesLoading === true) {
-            log(
-              "waitForTheVariablesToLoad: still loading (isVariablesLoading=true)...",
-            );
-            return; // Keep waiting
-          }
-
-          // Second check: are panel-specific variables ready?
+        () => {
+          // Check if panel-specific variables are ready
           if (ifPanelVariablesCompletedLoading()) {
             log(
-              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+              "waitForTheVariablesToLoad: panel variables are loaded (inside watch)",
             );
             resolve();
-            stopWatching(); // Stop watching once isVisible is true
+            stopWatching(); // Stop watching once panel variables are ready
           }
         },
         { deep: true }, // Watch nested properties
@@ -2036,12 +2024,28 @@ export const usePanelDataLoader = (
     const result = newDependentVariablesData?.some((it: any) => {
       const hasNullValue = it.value == null;
       const hasEmptyArray = Array.isArray(it.value) && it.value.length === 0;
-      const isStillLoading = it.isLoading || it.isVariableLoadingPending;
 
-      const shouldBlock = (hasNullValue || hasEmptyArray) && isStillLoading;
+      // CRITICAL FIX: Only block if variable has NEVER been loaded (isVariablePartialLoaded=false)
+      // If isVariablePartialLoaded=true but value=null, that's VALID (query returned no results)
+      // Don't check isLoading or isVariableLoadingPending - those flags can be stale in committed state
+      const hasNeverBeenLoaded = !it.isVariablePartialLoaded;
+
+      // Block only if: (null/empty value) AND (never been loaded)
+      const shouldBlock = (hasNullValue || hasEmptyArray) && hasNeverBeenLoaded;
+
+      log(`[areDependentVariablesStillLoading] Variable ${it.name}:`, {
+        value: it.value,
+        hasNullValue,
+        hasEmptyArray,
+        isVariablePartialLoaded: it.isVariablePartialLoaded,
+        hasNeverBeenLoaded,
+        shouldBlock,
+      });
+
       return shouldBlock;
     });
 
+    log(`[areDependentVariablesStillLoading] Final result: ${result}`);
     return result;
   };
 

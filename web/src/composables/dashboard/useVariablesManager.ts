@@ -244,7 +244,9 @@ export const useVariablesManager = () => {
       variablesData.global,
       committedVariablesData.global,
     );
-    if (globalChanged) return true;
+    if (globalChanged) {
+      return true;
+    }
 
     const allTabIds = new Set([
       ...Object.keys(variablesData.tabs),
@@ -765,6 +767,7 @@ export const useVariablesManager = () => {
       // Mark variables as pending ONLY if they can actually load
       // (i.e. all their parents are already ready)
       const panelVars = variablesData.panels[panelId] || [];
+
       panelVars.forEach((v) => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
           // Skip custom and "all" variables - they don't need API calls on visibility change
