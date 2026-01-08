@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 variableData.scope === 'tabs' || variableData.scope === 'panels'
               "
-              class="q-mt-md"
+              class="q-mt-md q-mb-md"
             >
               <q-select
                 hint="Variables will be available only in the selected tabs."
