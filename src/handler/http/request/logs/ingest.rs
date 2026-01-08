@@ -17,7 +17,7 @@ use axum::{
     Json,
     body::Bytes,
     extract::Path,
-    http::{HeaderMap, StatusCode, header::HeaderName},
+    http::{HeaderMap, HeaderValue, StatusCode, header::HeaderName},
     response::{IntoResponse, Response},
 };
 use config::meta::otlp::OtlpRequestType;
@@ -57,9 +57,9 @@ fn get_process_time() -> i64 {
     }
 }
 
-fn insert_process_time_header(time: i64, headers: &mut axum::http::HeaderMap) {
+fn insert_process_time_header(time: i64, headers: &mut HeaderMap) {
     if time > 0
-        && let Ok(value) = axum::http::HeaderValue::from_str(&time.to_string())
+        && let Ok(value) = HeaderValue::from_str(&time.to_string())
     {
         headers.insert(HEADER_O2_PROCESS_TIME.clone(), value);
     }

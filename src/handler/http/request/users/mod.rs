@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use axum::{
     body::Body,
     extract::{Path, Query},
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -487,7 +487,7 @@ context_path = "/auth",
     )
 )]
 pub async fn authentication(
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     auth: Option<axum::Json<SignInUser>>,
 ) -> Response {
@@ -655,7 +655,7 @@ const fn default_exp_in() -> u32 {
 
 pub async fn get_presigned_url(
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     Query(params): Query<PresignedURLGenerator>,
 ) -> Response {
     // Extract basic auth from Authorization header
@@ -734,7 +734,7 @@ pub async fn get_presigned_url(
 }
 
 pub async fn get_auth(
-    _headers: axum::http::HeaderMap,
+    _headers: HeaderMap,
     Query(_query): Query<HashMap<String, String>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]

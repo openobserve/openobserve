@@ -1063,7 +1063,7 @@ fn prepare_empty_cookie<T: Serialize + ?Sized>(
 
 pub async fn logout(
     cookies: axum_extra::extract::CookieJar,
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
 ) -> Response {
     // remove the session
     let conf = get_config();

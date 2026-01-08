@@ -401,8 +401,6 @@ mod tests {
         assert!(delete_function("nexus", "dummyfn").await.is_ok());
     }
 
-    // Note: Test for test_run_function disabled as it requires integration testing
-    // with the full HTTP stack to properly test response bodies
     #[tokio::test]
     async fn validate_test_function_processing() {
         use serde_json::json;
@@ -426,8 +424,8 @@ mod tests {
         let response = test_run_function(org_id, function, events).await.unwrap();
         assert_eq!(response.status(), http::StatusCode::OK);
 
-        let body: TestVRLResponse =
-            serde_json::from_slice(&to_bytes(response.into_body()).await.unwrap()).unwrap();
+        let body = response.body();
+        let body: TestVRLResponse = serde_json::from_slice(&body).unwrap();
 
         // Validate transformed events
         assert_eq!(body.results.len(), 1);

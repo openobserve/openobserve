@@ -18,7 +18,7 @@ use std::io::Read;
 use axum::{
     body::Bytes,
     extract::Path,
-    http::{HeaderMap, StatusCode, header::HeaderName},
+    http::{HeaderMap, HeaderValue, StatusCode, header::HeaderName},
     response::{IntoResponse, Response},
 };
 use flate2::read::GzDecoder;
@@ -33,7 +33,7 @@ use crate::{
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/loki/api/v1/push",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionLoki",
@@ -127,7 +127,7 @@ pub async fn loki_push(Path(org_id): Path<String>, headers: HeaderMap, body: Byt
     };
 
     if process_time > 0
-        && let Ok(value) = axum::http::HeaderValue::from_str(&process_time.to_string())
+        && let Ok(value) = HeaderValue::from_str(&process_time.to_string())
     {
         resp.headers_mut()
             .insert(HeaderName::from_static("o2_process_time"), value);

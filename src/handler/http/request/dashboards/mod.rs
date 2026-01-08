@@ -15,6 +15,7 @@
 
 use axum::{
     extract::{Path, Query},
+    http::HeaderMap,
     response::Response,
 };
 use config::meta::dashboards::Dashboard;
@@ -210,7 +211,7 @@ pub async fn update_dashboard(
 pub async fn list_dashboards(
     Path(org_id): Path<String>,
     Query(query): Query<ListDashboardsQuery>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Response {
     let params = query.into(&org_id);
     let Some(user_id) = get_user_id(&headers) else {
@@ -526,7 +527,7 @@ pub fn is_overwrite(query_str: &str) -> bool {
 }
 
 /// Tries to get the user ID from the request headers.
-fn get_user_id(headers: &axum::http::HeaderMap) -> Option<String> {
+fn get_user_id(headers: &HeaderMap) -> Option<String> {
     headers
         .get("user_id")
         .and_then(|v| v.to_str().ok())

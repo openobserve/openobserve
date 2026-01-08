@@ -98,7 +98,7 @@ pub async fn submit_job(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     Headers(_user_email): Headers<UserEmail>,
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     Json(req): Json<Request>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
