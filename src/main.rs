@@ -793,6 +793,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 factory
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .service(get_metrics)
+                    .configure(get_config_routes)
                     .service(router::http::config)
                     .service(router::http::config_paths)
                     .service(router::http::api)
@@ -893,6 +894,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 factory
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
                     .service(get_metrics)
+                    .configure(get_config_routes)
                     .service(router::http::config)
                     .service(router::http::config_paths)
                     .service(router::http::api)

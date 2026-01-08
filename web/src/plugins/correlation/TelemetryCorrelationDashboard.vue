@@ -124,6 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Logs Tab Panel -->
         <q-tab-panel name="logs" class="tw:p-0">
+          <!-- Refresh Button -->
+          <div v-if="logsDashboardData" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
+            <q-btn
+              flat
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('common.refresh')"
+              @click="loadDashboard"
+              :loading="loading"
+              size="sm"
+            />
+          </div>
+
           <!-- Loading State -->
           <div
             v-if="loading"
@@ -160,8 +174,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Panel -->
         <q-tab-panel name="metrics" class="tw:p-0">
-          <!-- Metrics Selector Button (only shown in metrics tab) -->
-          <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end">
+          <!-- Metrics Selector and Refresh Buttons -->
+          <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2">
+            <q-btn
+              v-if="dashboardData"
+              flat
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('common.refresh')"
+              @click="loadDashboard"
+              :loading="loading"
+              size="sm"
+            />
             <q-btn
               outline
               dense
@@ -229,6 +254,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Traces Tab Panel -->
         <q-tab-panel name="traces" class="tw:p-0">
+          <!-- Refresh Button -->
+          <div v-if="traceCorrelationMode !== null" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
+            <q-btn
+              flat
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('common.refresh')"
+              @click="loadCorrelatedTraces"
+              :loading="tracesLoading"
+              size="sm"
+            />
+          </div>
+
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
@@ -496,6 +535,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="correlation-content tw:flex-1 tw:overflow-auto"
     >
       <q-tab-panel name="logs" class="tw:p-0">
+        <!-- Refresh Button -->
+        <div v-if="logsDashboardData" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
+          <q-btn
+            flat
+            dense
+            color="primary"
+            icon="refresh"
+            :label="t('common.refresh')"
+            @click="loadDashboard"
+            :loading="loading"
+            size="sm"
+          />
+        </div>
+
         <RenderDashboardCharts
           v-if="logsDashboardData"
           :key="logsDashboardRenderKey"
@@ -508,7 +561,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <q-tab-panel name="metrics" class="tw:p-0">
-        <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end">
+        <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2">
+          <q-btn
+            v-if="dashboardData"
+            flat
+            dense
+            color="primary"
+            icon="refresh"
+            :label="t('common.refresh')"
+            @click="loadDashboard"
+            :loading="loading"
+            size="sm"
+          />
           <q-btn
             outline
             dense
@@ -534,6 +598,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab-panel>
 
       <q-tab-panel name="traces" class="tw:p-0">
+          <!-- Refresh Button -->
+          <div v-if="traceCorrelationMode !== null" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
+            <q-btn
+              flat
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('common.refresh')"
+              @click="loadCorrelatedTraces"
+              :loading="tracesLoading"
+              size="sm"
+            />
+          </div>
+
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
