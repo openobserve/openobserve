@@ -424,7 +424,12 @@ const handleActionEvent = (event: any) => {
       } else {
         _event.frustration_types = [frustrationTypes];
       }
-    } catch (_error) {
+    } catch (error) {
+      console.warn(
+        "Failed to parse frustration type as JSON:",
+        event.action_frustration_type,
+        error,
+      );
       _event.frustration_types = [event.action_frustration_type];
     }
   }
