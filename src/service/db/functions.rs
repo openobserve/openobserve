@@ -41,7 +41,7 @@ pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), an
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
     let val = db::get(&format!("/function/{org_id}/{name}")).await?;
-    Ok(json::from_slice(&val).unwrap())
+    json::from_slice(&val).map_err(|e| anyhow::anyhow!("Error deserializing transform: {}", e))
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
@@ -57,11 +57,18 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    Ok(db::list(&format!("/function/{org_id}/"))
-        .await?
-        .values()
-        .map(|val| json::from_slice(val).unwrap())
-        .collect())
+    let items = db::list(&format!("/function/{org_id}/")).await?;
+    let mut transforms = Vec::new();
+    for val in items.values() {
+        match json::from_slice(val) {
+            Ok(transform) => transforms.push(transform),
+            Err(e) => {
+                log::error!("Error deserializing transform in list: {e}");
+                continue;
+            }
+        }
+    }
+    Ok(transforms)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -111,7 +118,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Transform = json::from_slice(&item_value).unwrap();
+        let json_val: Transform = match json::from_slice(&item_value) {
+            Ok(val) => val,
+            Err(e) => {
+                log::error!("Error deserializing transform in cache for key {item_key}: {e}");
+                continue;
+            }
+        };
         QUERY_FUNCTIONS.insert(item_key.to_string(), json_val);
     }
     log::info!("Functions Cached");
