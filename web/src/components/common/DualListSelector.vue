@@ -226,6 +226,7 @@ const addSelected = () => {
 const addAll = () => {
   const newValue = [...props.modelValue, ...availableItems.value.map(i => i.value)];
   emit('update:modelValue', newValue);
+  rightSelected.value = [];
 };
 
 const removeSelected = () => {
@@ -236,6 +237,8 @@ const removeSelected = () => {
 
 const removeAll = () => {
   emit('update:modelValue', []);
+  leftSelected.value = [];
+  rightSelected.value = [];
 };
 
 const removeItem = (value: string) => {

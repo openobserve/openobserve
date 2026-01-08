@@ -104,32 +104,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
             <q-item
-              v-for="(dim, index) in filteredPriorityDimensions"
-              :key="dim"
+              v-for="item in filteredPriorityDimensions"
+              :key="item.dim"
               clickable
-              @click="togglePrioritySelection(dim)"
-              :active="selectedPriorityDimensions.includes(dim)"
+              @click="togglePrioritySelection(item.dim)"
+              :active="selectedPriorityDimensions.includes(item.dim)"
               dense
               class="tw:py-2 tw:cursor-move"
               draggable="true"
-              @dragstart="handleDragStart(index, $event)"
+              @dragstart="handleDragStart(item.actualIndex, $event)"
               @dragover.prevent
-              @drop="handleDrop(index, $event)"
+              @drop="handleDrop(item.actualIndex, $event)"
             >
               <q-item-section avatar class="tw:min-w-0 tw:mr-1">
                 <q-icon name="drag_indicator" size="sm" class="tw:text-gray-400" />
               </q-item-section>
               <q-item-section avatar class="tw:min-w-0 tw:mr-3">
                 <q-badge
-                  :color="index < 4 ? 'primary' : 'grey'"
+                  :color="item.actualIndex < 4 ? 'primary' : 'grey'"
                   text-color="white"
                   class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
                 >
-                  {{ localFqnPriority.indexOf(dim) + 1 }}
+                  {{ item.actualIndex + 1 }}
                 </q-badge>
               </q-item-section>
               <q-item-section>
-                <q-item-label class="tw:font-medium">{{ getDimensionDisplay(dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ dim }})</span></q-item-label>
+                <q-item-label class="tw:font-medium">{{ getDimensionDisplay(item.dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span></q-item-label>
               </q-item-section>
               <q-item-section side>
                 <div class="tw:flex tw:gap-1">
@@ -139,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="sm"
                     icon="arrow_upward"
-                    :disable="localFqnPriority.indexOf(dim) === 0"
-                    @click="moveFqnDimensionUp(localFqnPriority.indexOf(dim))"
+                    :disable="item.actualIndex === 0"
+                    @click.stop="moveFqnDimensionUp(item.actualIndex)"
                   >
                     <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
                   </q-btn>
@@ -150,8 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     round
                     size="sm"
                     icon="arrow_downward"
-                    :disable="localFqnPriority.indexOf(dim) === localFqnPriority.length - 1"
-                    @click="moveFqnDimensionDown(localFqnPriority.indexOf(dim))"
+                    :disable="item.actualIndex === localFqnPriority.length - 1"
+                    @click.stop="moveFqnDimensionDown(item.actualIndex)"
                   >
                     <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
                   </q-btn>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon="delete"
                     color="negative"
-                    @click="removeFqnDimension(localFqnPriority.indexOf(dim))"
+                    @click.stop="removeFqnDimension(item.actualIndex)"
                   >
                     <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
                   </q-btn>
@@ -352,11 +352,14 @@ const availableSemanticGroups = computed(() => {
     }));
 });
 
-// Filtered priority dimensions based on search
+// Filtered priority dimensions with actual indices
 const filteredPriorityDimensions = computed(() => {
-  if (!prioritySearchQuery.value) return localFqnPriority.value;
+  const items = localFqnPriority.value.map((dim, actualIndex) => ({ dim, actualIndex }));
+
+  if (!prioritySearchQuery.value) return items;
+
   const query = prioritySearchQuery.value.toLowerCase();
-  return localFqnPriority.value.filter(dim => {
+  return items.filter(({ dim }) => {
     const display = getDimensionDisplay(dim).toLowerCase();
     return display.includes(query) || dim.toLowerCase().includes(query);
   });
