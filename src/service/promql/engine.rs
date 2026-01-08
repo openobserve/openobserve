@@ -456,7 +456,11 @@ impl Engine {
                 .matchers
                 .find_matchers(NAME_LABEL)
                 .first()
-                .unwrap()
+                .ok_or_else(|| {
+                    DataFusionError::Plan(
+                        "PromQL query missing metric name in selector".to_string(),
+                    )
+                })?
                 .value
                 .clone();
 
