@@ -444,23 +444,59 @@ impl super::Db for PostgresDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+
+        // Build parameterized query to prevent SQL injection
+        // PostgreSQL uses $1, $2, etc. for parameters
+        let mut param_num = 1;
+        let mut conditions = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            conditions.push(format!("module = ${}", param_num));
+            param_num += 1;
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            conditions.push(format!("key1 = ${}", param_num));
+            param_num += 1;
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            conditions.push(format!(
+                "(key2 = ${} OR key2 LIKE ${})",
+                param_num,
+                param_num + 1
+            ));
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+
+        let sql = if conditions.is_empty() {
+            "SELECT id, module, key1, key2, start_dt, value FROM meta ORDER BY start_dt ASC"
+                .to_string()
+        } else {
+            format!(
+                "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE {} ORDER BY start_dt ASC",
+                conditions.join(" AND ")
+            )
+        };
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let ret = if !module.is_empty() {
+            ret.bind(&module)
+        } else {
+            ret
+        };
+        let ret = if !key1.is_empty() {
+            ret.bind(&key1)
+        } else {
+            ret
+        };
+        let like_pattern = format!("{}/%", key2);
+        let ret = if !key2.is_empty() {
+            ret.bind(&key2).bind(&like_pattern)
+        } else {
+            ret
+        };
+        let ret = ret.fetch_all(&pool).await?;
+
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -474,22 +510,58 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta ".to_string();
+
+        // Build parameterized query to prevent SQL injection
+        let mut conditions = Vec::new();
+        let mut param_num = 1;
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            conditions.push(format!("module = ${}", param_num));
+            param_num += 1;
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            conditions.push(format!("key1 = ${}", param_num));
+            param_num += 1;
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            conditions.push(format!(
+                "(key2 = ${} OR key2 LIKE ${})",
+                param_num,
+                param_num + 1
+            ));
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+
+        let sql = if conditions.is_empty() {
+            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta ORDER BY start_dt ASC"
+                .to_string()
+        } else {
+            format!(
+                "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE {} ORDER BY start_dt ASC",
+                conditions.join(" AND ")
+            )
+        };
+
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let ret = if !module.is_empty() {
+            ret.bind(&module)
+        } else {
+            ret
+        };
+        let ret = if !key1.is_empty() {
+            ret.bind(&key1)
+        } else {
+            ret
+        };
+        let like_pattern = format!("{}/%", key2);
+        let ret = if !key2.is_empty() {
+            ret.bind(&key2).bind(&like_pattern)
+        } else {
+            ret
+        };
+        let ret = ret.fetch_all(&pool).await?;
+
         Ok(ret
             .into_iter()
             .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
@@ -518,24 +590,57 @@ impl super::Db for PostgresDb {
 
         let (min_dt, max_dt) = start_dt.unwrap();
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+
+        // Build parameterized query to prevent SQL injection
+        let mut conditions = Vec::new();
+        let mut param_num = 1;
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            conditions.push(format!("module = ${}", param_num));
+            param_num += 1;
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            conditions.push(format!("key1 = ${}", param_num));
+            param_num += 1;
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            conditions.push(format!(
+                "(key2 = ${} OR key2 LIKE ${})",
+                param_num,
+                param_num + 1
+            ));
+            param_num += 2;
         }
-        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        conditions.push(format!("start_dt >= ${}", param_num));
+        conditions.push(format!("start_dt <= ${}", param_num + 1));
+
+        let sql = format!(
+            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE {} ORDER BY start_dt ASC",
+            conditions.join(" AND ")
+        );
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        let ret = if !module.is_empty() {
+            ret.bind(&module)
+        } else {
+            ret
+        };
+        let ret = if !key1.is_empty() {
+            ret.bind(&key1)
+        } else {
+            ret
+        };
+        let like_pattern = format!("{}/%", key2);
+        let ret = if !key2.is_empty() {
+            ret.bind(&key2).bind(&like_pattern)
+        } else {
+            ret
+        };
+        let ret = ret.bind(min_dt).bind(max_dt);
+        let ret = ret.fetch_all(&pool).await?;
+
         Ok(ret
             .into_iter()
             .map(|r| (r.start_dt, Bytes::from(r.value)))
@@ -544,19 +649,56 @@ impl super::Db for PostgresDb {
 
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
+
+        // Build parameterized query to prevent SQL injection
+        let mut conditions = Vec::new();
+        let mut param_num = 1;
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            conditions.push(format!("module = ${}", param_num));
+            param_num += 1;
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            conditions.push(format!("key1 = ${}", param_num));
+            param_num += 1;
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            conditions.push(format!(
+                "(key2 = ${} OR key2 LIKE ${})",
+                param_num,
+                param_num + 1
+            ));
         }
+
+        let sql = if conditions.is_empty() {
+            "SELECT COUNT(*) AS num FROM meta".to_string()
+        } else {
+            format!(
+                "SELECT COUNT(*) AS num FROM meta WHERE {}",
+                conditions.join(" AND ")
+            )
+        };
+
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+        let query = sqlx::query_scalar(&sql);
+        let query = if !module.is_empty() {
+            query.bind(&module)
+        } else {
+            query
+        };
+        let query = if !key1.is_empty() {
+            query.bind(&key1)
+        } else {
+            query
+        };
+        let like_pattern = format!("{}/%", key2);
+        let query = if !key2.is_empty() {
+            query.bind(&key2).bind(&like_pattern)
+        } else {
+            query
+        };
+        let count: i64 = query.fetch_one(&pool).await?;
         Ok(count)
     }
 
