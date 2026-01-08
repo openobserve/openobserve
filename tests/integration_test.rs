@@ -4288,10 +4288,7 @@ mod tests {
             // Delete may fail if job is in progress, which is acceptable
             match delete_result {
                 Ok(_) => log::info!("Successfully deleted backfill job: {}", job_id),
-                Err(e) => log::warn!(
-                    "Could not delete backfill job (may be in progress): {}",
-                    e
-                ),
+                Err(e) => log::warn!("Could not delete backfill job (may be in progress): {}", e),
             }
         }
     }
