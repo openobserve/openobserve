@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="card-container"
-    :class="store.state.printMode ? '' : 'tw:h-full'"
+    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
   >
     <div class="tw:px-[0.625rem]">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
