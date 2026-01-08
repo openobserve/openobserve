@@ -773,15 +773,6 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
-    // CRITICAL: Log EXACTLY what variablesData looks like
-
-
-    // // CRITICAL: Final safety check at loadData entry point
-    // if (variablesData?.value?.isVariablesLoading === true) {
-    //   console.log('[usePanelDataLoader] ' + panelSchema?.value?.title + ': BLOCKED - variables still loading');
-    //   return;
-    // }
-
     log(
       "[usePanelDataLoader] " +
         panelSchema?.value?.title +
