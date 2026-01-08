@@ -629,7 +629,7 @@ const processTestResults = async (results: any) => {
 
 const handleTestError = (err: any) => {
   const rawErrMsg = err.response?.data?.message || "Error in testing function";
-  const isJSFunction = props.vrlFunction.transType === '1' || props.vrlFunction.transType === 1;
+  const isJSFunction = String(props.vrlFunction.transType) === '1';
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs

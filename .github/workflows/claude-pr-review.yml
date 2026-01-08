@@ -30,72 +30,58 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
-            REVIEW_MARKER: <!-- claude-pr-review -->
 
-            ## Your Task: Incremental PR Review
+            ## CRITICAL: ONE COMMENT ONLY
 
-            You maintain a SINGLE review comment that you UPDATE on each run.
-            This prevents comment spam when PRs have many commits.
+            You must post EXACTLY ONE comment on this PR. Never post multiple comments.
+            Never post a summary AND a review - combine everything into ONE comment.
 
-            ### Step 1: Find Your Existing Review Comment
+            ### Step 1: Check for Existing Review
 
-            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- claude-pr-review -->")) | {id: .id, body: .body}'`
+            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- claude-pr-review -->")) | .id'`
 
-            ### Step 2: Get Current PR State
+            ### Step 2: Review the Code
 
-            Run: `gh pr diff ${{ github.event.pull_request.number }}` to see all changes.
+            Run: `gh pr diff ${{ github.event.pull_request.number }}`
 
-            ### Step 3: Review the Code
+            Focus on bugs, security issues, and performance problems only.
+            Skip style suggestions, documentation, and "nice to have" improvements.
 
-            Focus areas:
-            1. Code Quality - clean code, error handling, readability
-            2. Security - vulnerabilities, input validation, auth
-            3. Performance - bottlenecks, N+1 queries, memory issues
-            4. Testing - coverage and edge cases
-            5. Documentation - when critical
+            ### Step 3: Post or Update Comment
 
-            ### Step 4: Update or Create Your Review Comment
-
-            **If you found an existing review comment:**
-            - Re-validate each issue against the CURRENT code
-            - Remove issues that were FIXED
-            - Keep issues that are STILL present
-            - Add any NEW issues found
-            - Update the comment using: `gh pr comment ${{ github.event.pull_request.number }} --edit-last --body "..."`
+            **If existing comment found (Step 1 returned an ID):**
+            Use `gh api` to update it:
+            ```
+            gh api repos/${{ github.repository }}/issues/comments/{COMMENT_ID} -X PATCH -f body='...'
+            ```
 
             **If no existing comment:**
-            - Create one with your findings
+            Create one: `gh pr comment ${{ github.event.pull_request.number }} --body '...'`
 
-            ### Comment Format
-
-            Your comment MUST start with the marker and follow this format:
+            ### Comment Format (EXACT FORMAT - NO ADDITIONS)
 
             ```
             <!-- claude-pr-review -->
-            ## Claude Code Review
+            ## Code Review
 
-            **Last updated:** [commit SHA] | **Status:** [X issues / LGTM]
+            **Status:** [X issues / LGTM ✅] | **Commit:** [short SHA]
 
-            ### Open Issues
+            | File | Issue | Severity |
+            |------|-------|----------|
+            | `file:line` | Brief description. Fix: suggestion | High/Med/Low |
 
-            | # | File | Issue | Severity |
-            |---|------|-------|----------|
-            | 1 | `path/file.ts:42` | [Bug] Description. Fix: suggestion | High |
-
-            ### Resolved ✅
-            - ~~Issue that was fixed~~
-
-            ---
-            *Auto-updated on each push. Only open issues need attention.*
+            ### Resolved
+            - ~~Fixed issue~~
             ```
 
-            ### Rules
+            ### STRICT RULES
 
-            - **Be concise**: 1-2 sentences per issue
-            - **No duplicates**: If issue exists, don't add it again
-            - **Track resolution**: Move fixed issues to "Resolved" section
-            - **If no issues**: Just show "Status: LGTM ✅" with empty table
-            - **Max 10 open issues**: Prioritize by severity if more
+            - **ONE comment only** - never post multiple comments
+            - **No summaries** - no "Review Complete", no "Security Assessment", no highlights
+            - **No praise** - no "excellent", "strong", "great work" sections
+            - **2 sentences max** per issue
+            - **Max 10 issues** - prioritize by severity
+            - **LGTM if clean** - just show "Status: LGTM ✅" with empty table
 
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Read,Grep,Glob"

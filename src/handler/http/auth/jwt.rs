@@ -1038,9 +1038,7 @@ async fn process_custom_claim_parsing(
         }
     };
 
-    let js_execute_fn = |function_content: &String,
-                         claims: Value|
-     -> Result<Value, anyhow::Error> {
+    let js_execute_fn = |function_content: &str, claims: Value| -> Result<Value, anyhow::Error> {
         // Compile the JavaScript function
         let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;

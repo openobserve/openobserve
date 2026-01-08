@@ -165,6 +165,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 const { t } = useI18n();
 
 const q = useQuasar();

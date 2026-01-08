@@ -227,15 +227,15 @@ mod tests {
         };
         assert!(vrl_trans.is_vrl());
 
-        let lua_trans = Transform {
+        let js_trans = Transform {
             function: "function test() end".to_string(),
             name: "test".to_string(),
             params: "row".to_string(),
             num_args: 1,
-            trans_type: Some(1), // Lua
+            trans_type: Some(1), // JavaScript
             streams: None,
         };
-        assert!(!lua_trans.is_vrl());
+        assert!(!js_trans.is_vrl());
     }
 
     #[test]

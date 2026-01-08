@@ -56,7 +56,9 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::{
             functions::get_vrl_compiler_config,
-            js::{apply_js_fn as apply_js, compile_js_function as compile_js_func},
+            js::{
+                JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
+            },
         },
     },
     service::{
@@ -101,17 +103,14 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
 
 /// Compile a JS function and return configuration
 /// This wraps the common::utils::js::compile_js_function
-pub fn compile_js_function(
-    func: &str,
-    org_id: &str,
-) -> Result<crate::common::utils::js::JSRuntimeConfig, std::io::Error> {
+pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
     compile_js_func(func, org_id)
 }
 
 /// Apply a JS function to transform data
 /// This wraps the common::utils::js::apply_js_fn
 pub fn apply_js_fn(
-    js_config: &crate::common::utils::js::JSRuntimeConfig,
+    js_config: &JSRuntimeConfig,
     row: Value,
     org_id: &str,
     stream_name: &[String],

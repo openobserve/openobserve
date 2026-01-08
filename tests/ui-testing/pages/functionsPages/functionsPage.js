@@ -304,8 +304,11 @@ class FunctionsPage {
     await this.searchFunction(pattern);
     await this.page.waitForTimeout(1000);
 
-    // Delete all visible functions matching pattern
-    while (true) {
+    // Delete all visible functions matching pattern with max attempts safety
+    const maxAttempts = 50;
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
       const deleteBtn = this.page.locator(this.deleteButton).first();
       if (await deleteBtn.isVisible({ timeout: 2000 })) {
         await deleteBtn.click();
@@ -316,6 +319,7 @@ class FunctionsPage {
           await confirmButton.click();
           await this.page.waitForTimeout(1000);
         }
+        attempts++;
       } else {
         break; // No more functions to delete
       }
