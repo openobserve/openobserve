@@ -95,6 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-file>
 
+            <!-- Append Toggle for File Upload (only when updating file-based tables) -->
+            <div v-if="isUpdating && formData.source === 'file'" class="col-12">
+              <q-toggle
+                class="q-py-md text-grey-8 text-bold lookup-table-append-toggle"
+                v-model="formData.append"
+                :label="t('function.appendData')"
+              />
+            </div>
+
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url'" class="col-12 q-py-md">
               <div class="text-grey-8 text-bold tw:mb-2">Update Mode</div>
