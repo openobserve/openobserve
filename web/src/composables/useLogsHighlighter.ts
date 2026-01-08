@@ -489,8 +489,7 @@ export function useLogsHighlighter() {
 
       // Add opening quote for key if needed: "level" vs level
       if (showQuotes) {
-        keyContent +=
-          keyContent += `<span class="log-key">"${escapeHtml(key)}"</span>`;
+        keyContent += `<span class="log-key">"${escapeHtml(key)}"</span>`;
       } else {
         keyContent += `<span class="log-key">${escapeHtml(key)}</span>`;
       }

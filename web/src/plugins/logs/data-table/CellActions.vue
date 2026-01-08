@@ -75,7 +75,12 @@ const props = defineProps({
 
 const store = useStore();
 
-const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
+const emit = defineEmits([
+  "copy",
+  "addSearchTerm",
+  "addFieldToTable",
+  "sendToAiChat",
+]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value, false);
@@ -96,8 +101,9 @@ const sendToAiChat = (value: any) => {
 };
 
 const isStreamField = computed(() => {
-  return props.selectedStreamFields?.some((item: any) =>
-    item.name === props.column.id ? item.isSchemaField : "",
+  const field: any = props.selectedStreamFields?.find(
+    (item: any) => item.name === props.column.id,
   );
+  return field?.isSchemaField ?? false;
 });
 </script>
