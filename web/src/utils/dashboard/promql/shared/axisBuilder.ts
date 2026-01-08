@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,10 @@ import { TOOLTIP_SCROLL_STYLE } from "./types";
  * @param triggerType - Tooltip trigger type (axis or item)
  * @returns Tooltip configuration object for ECharts
  */
-export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "axis"): any {
+export function buildTooltip(
+  panelSchema: any,
+  triggerType: "axis" | "item" = "axis",
+): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
@@ -65,10 +68,12 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
 
           // Apply unit formatting
           const formattedValue = formatUnitValue(
-            getUnitValue(value, unit, unitCustom, decimals)
+            getUnitValue(value, unit, unitCustom, decimals),
           );
 
-          tooltipItems.push(`${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`);
+          tooltipItems.push(
+            `${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`,
+          );
         }
       });
 
@@ -85,7 +90,11 @@ export function buildTooltip(panelSchema: any, triggerType: "axis" | "item" = "a
  * @param hasData - Whether the chart has any data to display
  * @returns X-axis configuration object for ECharts
  */
-export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true): any {
+export function buildXAxis(
+  panelSchema: any,
+  store: any,
+  hasData: boolean = true,
+): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
@@ -137,8 +146,8 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
             value,
             config?.unit,
             config?.unit_custom,
-            config?.decimals
-          )
+            config?.decimals,
+          ),
         );
       },
     },
@@ -161,8 +170,8 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
               value,
               config?.unit,
               config?.unit_custom,
-              config?.decimals
-            )
+              config?.decimals,
+            ),
           );
         },
       },
@@ -198,7 +207,10 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
  * @param panelSchema - Panel configuration schema
  * @returns Category X-axis configuration object for ECharts
  */
-export function buildCategoryXAxis(categories: string[], panelSchema: any): any {
+export function buildCategoryXAxis(
+  categories: string[],
+  panelSchema: any,
+): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -227,7 +239,10 @@ export function buildCategoryXAxis(categories: string[], panelSchema: any): any 
  * @param panelSchema - Panel configuration schema
  * @returns Category Y-axis configuration object for ECharts
  */
-export function buildCategoryYAxis(categories: string[], panelSchema: any): any {
+export function buildCategoryYAxis(
+  categories: string[],
+  panelSchema: any,
+): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -269,8 +284,8 @@ export function buildValueAxis(panelSchema: any): any {
             value,
             config?.unit,
             config?.unit_custom,
-            config?.decimals
-          )
+            config?.decimals,
+          ),
         );
       },
     },

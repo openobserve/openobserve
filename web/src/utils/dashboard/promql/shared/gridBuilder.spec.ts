@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ vi.mock("../../legendConfiguration", () => ({
   calculateRightLegendWidth: vi.fn(
     (seriesCount, width, height, series, scrollable) => {
       return scrollable ? 200 : 150;
-    }
+    },
   ),
   getChartDimensions: vi.fn((ref) => ({
     chartWidth: 800,
@@ -89,7 +89,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.bottom).toBe("54px");
@@ -108,7 +108,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.right).toBe(200);
@@ -127,7 +127,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.right).toBe(150);
@@ -145,7 +145,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.top).toBe("15%");
@@ -163,7 +163,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.left).toBe("15%");
@@ -182,7 +182,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.left).toBe("120px");
@@ -200,7 +200,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.bottom).toBe("3%");
@@ -230,7 +230,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.bottom).toBe("52px");
@@ -261,7 +261,7 @@ describe("gridBuilder", () => {
       const result = buildDynamicGrid(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.right).toBe(200);
@@ -288,7 +288,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.show).toBe(true);
@@ -309,12 +309,14 @@ describe("gridBuilder", () => {
 
       // Reset mock to return 200
       const legendConfig = await import("../../legendConfiguration");
-      vi.mocked(legendConfig.calculateRightLegendWidth).mockReturnValueOnce(200);
+      vi.mocked(legendConfig.calculateRightLegendWidth).mockReturnValueOnce(
+        200,
+      );
 
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.orient).toBe("vertical");
@@ -334,7 +336,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.orient).toBe("vertical");
@@ -353,7 +355,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.orient).toBe("horizontal");
@@ -372,7 +374,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.type).toBe("plain");
@@ -387,7 +389,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.type).toBe("scroll");
@@ -400,7 +402,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.textStyle).toEqual({
@@ -420,7 +422,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.tooltip).toEqual({
@@ -439,7 +441,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.padding).toEqual([10, 20, 10, 10]);
@@ -457,7 +459,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.width).toBeUndefined();
@@ -478,7 +480,7 @@ describe("gridBuilder", () => {
       const result = buildLegendConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.show).toBe(true);
@@ -495,7 +497,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.radius).toBe("70%");
@@ -510,7 +512,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        true
+        true,
       );
 
       expect(result.radius).toEqual(["40%", "70%"]);
@@ -529,7 +531,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        true
+        true,
       );
 
       expect(result.radius).toEqual(["40%", "50%"]);
@@ -551,7 +553,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.center).toEqual(["30%", "40%"]);
@@ -570,7 +572,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.center).toEqual(["25%", "50%"]);
@@ -589,7 +591,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.center).toEqual(["50%", "50%"]);
@@ -608,7 +610,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.center).toEqual(["75%", "50%"]);
@@ -627,7 +629,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.center).toEqual(["50%", "50%"]);
@@ -644,7 +646,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         [],
-        false
+        false,
       );
 
       expect(result.radius).toBe("70%");
@@ -663,7 +665,7 @@ describe("gridBuilder", () => {
         panelSchema,
         mockChartPanelRef,
         seriesData,
-        false
+        false,
       );
 
       expect(result.radius).toBe("70%");
@@ -681,7 +683,7 @@ describe("gridBuilder", () => {
       const result = buildPieChartConfig(
         panelSchema,
         mockChartPanelRef,
-        seriesData
+        seriesData,
       );
 
       expect(result.radius).toBe("70%");

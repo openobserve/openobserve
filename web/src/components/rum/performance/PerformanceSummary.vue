@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
         searchType="RUM"
+        @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
@@ -94,7 +95,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup() {
+  emits: ["variablesManagerReady"],
+  setup(props, { emit }) {
     // onMounted(async () => {
     //   await loadDashboard();
     // });
@@ -307,6 +309,11 @@ export default defineComponent({
       await loadDashboard();
     };
 
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
+    };
+
     return {
       currentDashboardData,
       goBackToDashboardList,
@@ -322,7 +329,7 @@ export default defineComponent({
       refreshData,
       onDeletePanel,
       variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       showDashboardSettingsDialog,
       openSettingsDialog,
       loadDashboard,

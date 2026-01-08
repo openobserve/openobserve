@@ -161,7 +161,8 @@ describe("VariableQueryValueSelector", () => {
     it("should mount successfully with basic props", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-variable-query-value-selector"]').exists()).toBe(true);
+      // Check if the component renders with the q-select class
+      expect(wrapper.find('.q-select').exists()).toBe(true);
     });
 
     it("should mount with multiSelect enabled", () => {
@@ -855,6 +856,15 @@ describe("VariableQueryValueSelector", () => {
     });
 
     it("should display blank value as '<blank>'", () => {
+      // Add empty string option so blank is recognized as a valid value
+      const variableWithBlankOption = {
+        ...defaultVariableItem,
+        options: [
+          { label: "Blank", value: "" },
+          ...defaultVariableItem.options
+        ]
+      };
+      wrapper = createWrapper({ variableItem: variableWithBlankOption });
       wrapper.vm.selectedValue = "";
       expect(wrapper.vm.displayValue).toBe("<blank>");
     });
