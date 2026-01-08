@@ -1108,11 +1108,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mt-1"
                     />
                   </span>
-                  <TenstackTable
+                  <div
+                    v-if="loading && expandState.output && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important"
-                    v-show="
+                    class="flex justify-center items-center"
+                  >
+                    <q-spinner-hourglass color="primary" size="lg" />
+                  </div>
+
+                  <TenstackTable
+                    v-else-if="
                       expandState.output && rows.length > 0 && tab == 'sql'
                     "
+                    style="height: calc(100vh - 190px) !important"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
@@ -1122,13 +1130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @copy="copyLogToClipboard"
                     @sendToAiChat="sendToAiChat"
                   />
-                  <div
-                    v-if="loading"
-                    style="height: calc(100vh - 190px) !important"
-                    class="flex justify-center items-center"
-                  >
-                    <q-spinner-hourglass color="primary" size="lg" />
-                  </div>
 
                   <div
                     v-else-if="
@@ -1164,7 +1165,7 @@ size="md" />
                     </h6>
                   </div>
 
-                  <div v-else-if="tab == 'promql'">
+                  <div v-else-if="tab == 'promql' && expandState.output">
                     <PreviewPromqlQuery
                       ref="previewPromqlQueryRef"
                       :query="query"
@@ -1414,13 +1415,13 @@ const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
 
-const query = ref(props.sql);
+const tab = ref(props.query_type || "custom");
+
+const query = ref(tab.value === "promql" ? props.promql : props.sql);
 
 const promqlQuery = ref(props.promql);
 
 const delayCondition = ref(props.delay);
-
-const tab = ref(props.query_type || "custom");
 const stream_type = ref(props.streamType || "logs");
 const collapseFields = ref(false);
 
@@ -1559,6 +1560,14 @@ onMounted(async () => {
       selectedStreamName.value = parsedQuery?.ast.from[0].table;
 
       getStreamFields();
+    } else if (tab.value === "promql" && query.value != "") {
+      // Extract stream name from PromQL query
+      // PromQL query format: stream_name{} or stream_name{label="value"}
+      const match = query.value.match(/^([a-zA-Z0-9_-]+)/);
+      if (match) {
+        selectedStreamName.value = match[1];
+        getStreamFields();
+      }
     }
   }, 200);
 
@@ -2201,7 +2210,7 @@ const updateDateChange = (date: any) => {
 
 const runQuery = async () => {
   notificationMsgValue.value = "";
-  //check if datetime is present or not 
+  //check if datetime is present or not
   //else show the error message
   if(!dateTime.value.startTime) {
     notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
@@ -2250,7 +2259,11 @@ const runQuery = async () => {
         loading.value = false;
       });
   } else if (tab.value == "promql") {
-    previewPromqlQueryRef.value.refreshData();
+    // Wait for next tick to ensure PreviewPromqlQuery component is mounted
+    await nextTick();
+    if (previewPromqlQueryRef.value) {
+      previewPromqlQueryRef.value.refreshData();
+    }
   }
 };
 
