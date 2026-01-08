@@ -185,7 +185,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
-        /^incident_e2e_/                               // Incident e2e test streams (incident_e2e_*)
+        /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
+        /ellipsis_testing/                             // Bug #7468 ellipsis test streams (long stream names)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
