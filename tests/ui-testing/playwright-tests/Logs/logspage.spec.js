@@ -579,7 +579,7 @@ test.describe("Logs Page testcases", () => {
     tag: ['@paginationSQLGroupOrder', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing pagination behavior with SQL group/order/limit query');
-    
+
     await page.waitForLoadState('networkidle'); // Replace hard wait
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
