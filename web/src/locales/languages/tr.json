@@ -105,7 +105,9 @@
     "lightMode": "Işık Modu",
     "darkMode": "Karanlık Mod",
     "manageTheme": "Tema Yönet",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
+    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -368,7 +370,8 @@
     "sizekb": "Boyut (kb)",
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
-    "location": "Yer"
+    "location": "Yer",
+    "frustrationCount": "Hayal kırıklıkları"
   },
   "about": {
     "name": "Açık Gözlem",

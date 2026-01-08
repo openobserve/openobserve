@@ -2061,4 +2061,452 @@ describe("AddAlert Component", () => {
     });
   });
 
+  describe('Panel Data Import - Alert Name Sanitization', () => {
+    let w: any;
+
+    it('should sanitize spaces in panel title when creating alert name', async () => {
+      const panelData = {
+        panelTitle: 'My Test Panel',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      // Mock router with panel query params
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_My_Test_Panel');
+    });
+
+    it('should sanitize colon characters in panel title', async () => {
+      const panelData = {
+        panelTitle: 'CPU:Usage',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_CPU_Usage');
+    });
+
+    it('should sanitize multiple special characters in panel title', async () => {
+      const panelData = {
+        panelTitle: 'Panel #1: Usage?',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Panel #1: Usage? -> Panel_1_Usage (trailing underscore trimmed)
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_1_Usage');
+    });
+
+    it('should sanitize all forbidden characters: : # ? & % \' "', async () => {
+      const panelData = {
+        panelTitle: 'Test:#?&%\'"Panel',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Test_Panel');
+    });
+
+    it('should handle consecutive special characters by replacing with single underscore', async () => {
+      const panelData = {
+        panelTitle: 'Panel  ::  Name',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should handle empty/null panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: null,
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle empty string panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: '',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle whitespace-only panel title with fallback', async () => {
+      const panelData = {
+        panelTitle: '   ',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should handle panel title with only special characters with fallback', async () => {
+      const panelData = {
+        panelTitle: ':#?&%\'"',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_panel');
+    });
+
+    it('should trim leading underscores from sanitized panel title', async () => {
+      const panelData = {
+        panelTitle: '  ##Panel Name',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should trim trailing underscores from sanitized panel title', async () => {
+      const panelData = {
+        panelTitle: 'Panel Name##  ',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name');
+    });
+
+    it('should truncate very long panel titles to 200 characters', async () => {
+      const longTitle = 'A'.repeat(250); // 250 characters
+      const panelData = {
+        panelTitle: longTitle,
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Should be Alert_from_ (11 chars) + truncated title (200 chars) = 211 chars max
+      expect(w.vm.formData.name).toBe('Alert_from_' + 'A'.repeat(200));
+      expect(w.vm.formData.name.length).toBe(211);
+    });
+
+    it('should handle panel title with mix of valid and invalid characters', async () => {
+      const panelData = {
+        panelTitle: 'CPU_Usage-Metrics:2024#Q1?Test&Info%',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // CPU_Usage-Metrics:2024#Q1?Test&Info%
+      // Underscores and hyphens are valid, others replaced
+      // Expected: CPU_Usage-Metrics_2024_Q1_Test_Info_
+      // After trimming trailing underscore: CPU_Usage-Metrics_2024_Q1_Test_Info
+      expect(w.vm.formData.name).toBe('Alert_from_CPU_Usage-Metrics_2024_Q1_Test_Info');
+    });
+
+    it('should collapse multiple consecutive invalid characters into single underscore', async () => {
+      const panelData = {
+        panelTitle: 'Panel:::Name???Test',
+        queries: [{
+          fields: {
+            stream_type: 'logs',
+            stream: 'test-stream'
+          }
+        }]
+      };
+
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+
+      // Panel:::Name???Test -> Panel_Name_Test (collapsed)
+      expect(w.vm.formData.name).toBe('Alert_from_Panel_Name_Test');
+    });
+  });
+
 });

@@ -105,7 +105,8 @@
     "showMore": "Show More",
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
-    "status": "Status"
+    "status": "Status",
+    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue."
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -357,6 +358,7 @@
     "sessionType": "Session Type",
     "timeSpent": "Time Spent",
     "errorCount": "Error Count",
+    "frustrationCount": "Frustrations",
     "initialViewName": "Initial View Name",
     "timestamp": "Timestamp",
     "type": "Type",

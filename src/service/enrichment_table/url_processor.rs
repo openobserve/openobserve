@@ -318,7 +318,9 @@ async fn process_url_jobs(mut rx: mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>
 /// the status check prevents duplicate processing. Only jobs in Pending or Failed status
 /// will proceed past the initial checks.
 async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
-    use crate::service::db::enrichment_table::{get_url_jobs_for_table, notify_update, save_url_job};
+    use crate::service::db::enrichment_table::{
+        get_url_jobs_for_table, notify_update, save_url_job,
+    };
 
     // ===== MULTI-URL SUPPORT: Process all pending jobs sequentially =====
     // Fetch all jobs for this table. We process them one by one in the order they appear.
@@ -430,7 +432,9 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 // Fetch the latest job state to preserve progress updates made during processing.
                 // The process_enrichment_table_url function updates progress after each batch,
                 // so we need the latest state before marking as completed.
-                let mut job = match crate::service::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                let mut job = match crate::service::db::enrichment_table::get_url_job_by_id(&job_id)
+                    .await
+                {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -488,28 +492,29 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                     e
                 );
 
-                // Fetch the latest job state to preserve progress updates (last_byte_position, etc.)
-                // made during processing before the failure occurred.
-                let mut job = match crate::service::db::enrichment_table::get_url_job_by_id(&job_id).await {
-                    Ok(Some(j)) => j,
-                    Ok(None) => {
-                        log::warn!(
-                            "[ENRICHMENT::URL] Job {} for {}/{} not found after failure",
-                            job_id,
-                            org_id,
-                            table_name
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "[ENRICHMENT::URL] Failed to fetch job {} after failure: {}",
-                            job_id,
-                            e
-                        );
-                        continue;
-                    }
-                };
+                // Fetch the latest job state to preserve progress updates (last_byte_position,
+                // etc.) made during processing before the failure occurred.
+                let mut job =
+                    match crate::service::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                        Ok(Some(j)) => j,
+                        Ok(None) => {
+                            log::warn!(
+                                "[ENRICHMENT::URL] Job {} for {}/{} not found after failure",
+                                job_id,
+                                org_id,
+                                table_name
+                            );
+                            continue;
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[ENRICHMENT::URL] Failed to fetch job {} after failure: {}",
+                                job_id,
+                                e
+                            );
+                            continue;
+                        }
+                    };
 
                 let cfg = get_config();
                 job.retry_count += 1;
@@ -582,7 +587,10 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 
                         // Trigger a new event to retry the job. This goes through the
                         // same MPSC channel as the original request, maintaining consistency.
-                        if let Err(e) = trigger_url_job_processing(org_id_owned.clone(), table_name_owned.clone()) {
+                        if let Err(e) = trigger_url_job_processing(
+                            org_id_owned.clone(),
+                            table_name_owned.clone(),
+                        ) {
                             log::error!(
                                 "[ENRICHMENT::URL] Failed to re-trigger job for {}/{}: {}",
                                 org_id_owned,
@@ -1456,9 +1464,7 @@ async fn process_enrichment_table_url(
     let has_schema_clone = has_schema.clone();
     let last_batch_timestamp_clone = last_batch_timestamp.clone();
 
-    // Clone job data for callback (need to save progress after each batch)
-    let org_id_for_save = org_id.to_string();
-    let table_name_for_save = table_name.to_string();
+    // Clone job ID for callback (need to save progress after each batch)
     let job_id_for_save = job.id.clone();
 
     // Process each batch as it arrives using a callback
@@ -1474,8 +1480,6 @@ async fn process_enrichment_table_url(
             // Clone variables needed in async block
             let org_id = org_id.to_string();
             let table_name = table_name.to_string();
-            let org_id_for_save = org_id_for_save.clone();
-            let table_name_for_save = table_name_for_save.clone();
             let job_id_for_save = job_id_for_save.clone();
             let total_records = total_records_clone.clone();
             let total_bytes = total_bytes_clone.clone();

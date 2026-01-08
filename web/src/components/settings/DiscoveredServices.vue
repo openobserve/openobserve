@@ -16,11 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full discovered-services">
-    <div class="tw:mb-6">
-      <div class="text-h6 tw:mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
-      <div class="text-body2 text-grey-7">
-        {{ t("settings.correlation.discoveredServicesDescription") }}
+    <div class="tw:mb-6 tw:flex tw:justify-between tw:items-start">
+      <div>
+        <div class="text-h6 tw:mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
+        <div class="text-body2 text-grey-7">
+          {{ t("settings.correlation.discoveredServicesDescription") }}
+        </div>
       </div>
+      <q-btn
+        flat
+        dense
+        color="primary"
+        icon="refresh"
+        :label="t('common.refresh')"
+        @click="loadServices"
+        :loading="loading"
+      />
     </div>
 
     <!-- Loading State -->

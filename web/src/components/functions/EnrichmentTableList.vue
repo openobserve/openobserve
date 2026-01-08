@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
     </q-dialog>
 
-    <!-- URL Jobs Dialog (placeholder for now - will create component next) -->
+    <!-- URL Jobs Dialog -->
     <q-dialog
       v-model="showUrlJobsDialogState"
       position="right"
@@ -444,10 +444,11 @@ export default defineComponent({
       },
       {
         name: "type",
-        field: "type",
+        field: (row: any) => row.urlJob ? "Url" : "File",
         label: "Type",
         align: "left",
         sortable: true,
+        sort: (a: string, b: string) => a.localeCompare(b),
         style: "width: 150px",
       },
       {
@@ -1061,4 +1062,6 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
+
+/* No custom styles needed - using Quasar components */
 </style>

@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "enrichment_table_urls")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,  // KSUID (27 chars)
+    pub id: String, // KSUID (27 chars)
     pub org: String,
     pub name: String,
     pub url: String,

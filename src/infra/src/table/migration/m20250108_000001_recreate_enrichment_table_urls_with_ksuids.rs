@@ -23,7 +23,8 @@
 //! 1. Rename the legacy `enrichment_table_urls` table to `legacy_enrichment_table_urls`
 //! 2. Add a temporary `ksuid` column to the `legacy_enrichment_table_urls` table and populate it
 //! 3. Create new `enrichment_table_urls` table with KSUID as primary key
-//! 4. Select all records from the `legacy_enrichment_table_urls` table and copy them to the new table
+//! 4. Select all records from the `legacy_enrichment_table_urls` table and copy them to the new
+//!    table
 //! 5. Drop the `legacy_enrichment_table_urls` table
 
 use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, TransactionTrait};

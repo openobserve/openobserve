@@ -105,7 +105,9 @@
     "lightMode": "Licht-Modus",
     "darkMode": "Dunkler Modus",
     "manageTheme": "Theme verwalten",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
+    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -368,7 +370,8 @@
     "sizekb": "Größe (kb)",
     "viewURL": "URL anzeigen",
     "events": "Ereignisse",
-    "location": "Standort"
+    "location": "Standort",
+    "frustrationCount": "Frustrationen"
   },
   "about": {
     "name": "Observe öffnen",

@@ -105,7 +105,9 @@
     "lightMode": "Modo de luz",
     "darkMode": "Modo oscuro",
     "manageTheme": "Administrar tema",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
+    "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar."
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -368,7 +370,8 @@
     "sizekb": "Tamaño (kb)",
     "viewURL": "Ver URL",
     "events": "Eventos",
-    "location": "Ubicación"
+    "location": "Ubicación",
+    "frustrationCount": "Frustraciones"
   },
   "about": {
     "name": "Abrir Observe",

@@ -28,7 +28,7 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichmentTableUrlRecord {
-    pub id: String,  // KSUID (27 chars)
+    pub id: String, // KSUID (27 chars)
     pub org: String,
     pub name: String,
     pub url: String,

@@ -211,7 +211,8 @@ pub async fn save_enrichment_table_from_url(
     // Extract append_data from query parameter to match file upload endpoint consistency.
     // This keeps both endpoints (file upload and URL) using the same parameter pattern.
     // Also extract resume parameter to support resuming from last byte position on retry.
-    // Also extract retry parameter to distinguish between retry (recreate all jobs) vs update (new URL).
+    // Also extract retry parameter to distinguish between retry (recreate all jobs) vs update (new
+    // URL).
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let append_data = match query.get("append") {
         Some(append_str) => append_str.parse::<bool>().unwrap_or(false),
@@ -259,41 +260,40 @@ pub async fn save_enrichment_table_from_url(
     }
 
     // SSRF protection: Block internal IPs and localhost (skip in retry mode)
-    if !retry {
-        if let Ok(parsed_url) = url::Url::parse(&request_body.url)
-            && let Some(host) = parsed_url.host_str()
-        {
-            // Block localhost
-            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-                return Ok(MetaHttpResponse::bad_request(
-                    "Cannot access localhost URLs",
-                ));
-            }
+    if !retry
+        && let Ok(parsed_url) = url::Url::parse(&request_body.url)
+        && let Some(host) = parsed_url.host_str()
+    {
+        // Block localhost
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            return Ok(MetaHttpResponse::bad_request(
+                "Cannot access localhost URLs",
+            ));
+        }
 
-            // Block private IP ranges and AWS metadata endpoint
-            if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-                match ip {
-                    std::net::IpAddr::V4(v4) => {
-                        let octets = v4.octets();
-                        // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-                        // AWS metadata: 169.254.169.254
-                        if octets[0] == 10
-                            || (octets[0] == 172 && (16..=31).contains(&octets[1]))
-                            || (octets[0] == 192 && octets[1] == 168)
-                            || (octets[0] == 169 && octets[1] == 254)
-                        {
-                            return Ok(MetaHttpResponse::bad_request(
-                                "Cannot access private IP addresses",
-                            ));
-                        }
+        // Block private IP ranges and AWS metadata endpoint
+        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+            match ip {
+                std::net::IpAddr::V4(v4) => {
+                    let octets = v4.octets();
+                    // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+                    // AWS metadata: 169.254.169.254
+                    if octets[0] == 10
+                        || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                        || (octets[0] == 192 && octets[1] == 168)
+                        || (octets[0] == 169 && octets[1] == 254)
+                    {
+                        return Ok(MetaHttpResponse::bad_request(
+                            "Cannot access private IP addresses",
+                        ));
                     }
-                    std::net::IpAddr::V6(v6) => {
-                        // Block IPv6 localhost and private ranges
-                        if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
-                            return Ok(MetaHttpResponse::bad_request(
-                                "Cannot access private IP addresses",
-                            ));
-                        }
+                }
+                std::net::IpAddr::V6(v6) => {
+                    // Block IPv6 localhost and private ranges
+                    if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                        return Ok(MetaHttpResponse::bad_request(
+                            "Cannot access private IP addresses",
+                        ));
                     }
                 }
             }
@@ -423,16 +423,17 @@ pub async fn save_enrichment_table_from_url(
         );
 
         // Delete all existing job records if in replace mode
-        if !append_data && !existing_jobs.is_empty() {
-            if let Err(e) = delete_url_job(&org_id, &table_name).await {
-                log::error!(
-                    "[ENRICHMENT::URL] Failed to delete existing jobs for {}/{}: {}",
-                    org_id,
-                    table_name,
-                    e
-                );
-                // Continue anyway - we'll create the new job
-            }
+        if !append_data
+            && !existing_jobs.is_empty()
+            && let Err(e) = delete_url_job(&org_id, &table_name).await
+        {
+            log::error!(
+                "[ENRICHMENT::URL] Failed to delete existing jobs for {}/{}: {}",
+                org_id,
+                table_name,
+                e
+            );
+            // Continue anyway - we'll create the new job
         }
 
         vec![EnrichmentTableUrlJob::new(
@@ -636,8 +637,10 @@ pub async fn get_all_enrichment_table_statuses(
 
             // Convert Vec<Job> to HashMap<table_name, Vec<Job>> for multi-URL support
             // Group jobs by table_name
-            let mut job_map: HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>> =
-                HashMap::new();
+            let mut job_map: HashMap<
+                String,
+                Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>,
+            > = HashMap::new();
 
             for job in filtered_jobs {
                 job_map

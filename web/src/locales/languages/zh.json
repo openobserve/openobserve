@@ -105,7 +105,9 @@
     "lightMode": "灯光模式",
     "darkMode": "黑暗模式",
     "manageTheme": "管理主题",
-    "url": "网址"
+    "url": "网址",
+    "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
+    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -368,7 +370,8 @@
     "sizekb": "大小 (kb)",
     "viewURL": "查看网址",
     "events": "事件",
-    "location": "地点"
+    "location": "地点",
+    "frustrationCount": "挫折"
   },
   "about": {
     "name": "OpenObserve",
