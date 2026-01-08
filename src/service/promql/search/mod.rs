@@ -359,19 +359,30 @@ async fn search_in_cluster(
     // Execute tasks with cancellation and timeout support (Enterprise)
     #[cfg(feature = "enterprise")]
     let task_results = {
+        // Wrap all tasks in a single spawned task so we can abort it
+        let query_task = tokio::spawn(async move { try_join_all(tasks).await });
+        tokio::pin!(query_task);
+
         tokio::select! {
-            ret = try_join_all(tasks) => {
+            ret = &mut query_task => {
                 match ret {
-                    Ok(res) => res,
-                    Err(err) => {
+                    Ok(Ok(res)) => res,
+                    Ok(Err(err)) => {
                         SEARCH_SERVER.remove(trace_id, false).await;
                         return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                             err.to_string(),
                         )));
                     }
+                    Err(err) => {
+                        SEARCH_SERVER.remove(trace_id, false).await;
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            format!("task join error: {err}"),
+                        )));
+                    }
                 }
             },
             _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+                query_task.abort();
                 log::error!("[trace_id {trace_id}] promql->search: query timeout after {timeout}s");
                 SEARCH_SERVER.remove(trace_id, false).await;
                 return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(
@@ -379,6 +390,7 @@ async fn search_in_cluster(
                 )));
             },
             _ = abort_receiver => {
+                query_task.abort();
                 log::info!("[trace_id {trace_id}] promql->search: query cancelled");
                 SEARCH_SERVER.remove(trace_id, false).await;
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(
