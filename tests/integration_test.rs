@@ -144,8 +144,8 @@ mod tests {
     }
 
     /// Cleanup any leftover state from previous test runs/retries.
-    /// Order matters: alerts first (they reference destinations), then destinations, then templates.
-    /// This ensures idempotency when tests are retried.
+    /// Order matters: alerts first (they reference destinations), then destinations, then
+    /// templates. This ensures idempotency when tests are retried.
     async fn cleanup_previous_test_state() {
         let auth = setup();
         let app = test::init_service(
@@ -179,10 +179,7 @@ mod tests {
                         && let Some(id) = alert.get("alert_id").and_then(|id| id.as_str())
                     {
                         let delete_req = test::TestRequest::delete()
-                            .uri(&format!(
-                                "/api/e2e/olympics_schema/alerts/{}?type=logs",
-                                id
-                            ))
+                            .uri(&format!("/api/e2e/olympics_schema/alerts/{}?type=logs", id))
                             .insert_header(ContentType::json())
                             .append_header(auth)
                             .to_request();
@@ -432,7 +429,15 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let status = resp.status();
+        if !status.is_success() {
+            let body = test::read_body(resp).await;
+            let body_str = String::from_utf8_lossy(&body);
+            panic!(
+                "e2e_1_post_bulk failed with status {}: {}",
+                status, body_str
+            );
+        }
     }
 
     async fn e2e_post_json() {
