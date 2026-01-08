@@ -1,65 +1,8 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
 const logData = require("../../fixtures/log.json");
-
-// ============================================================================
-// Helper functions for stream ingestion
-// ============================================================================
-
-/**
- * Generates authentication headers for API requests.
- * @returns {Object} Headers object with Basic Authentication and Content-Type
- * @example
- * const headers = getHeaders();
- * // Returns: { Authorization: "Basic ...", Content-Type: "application/json" }
- */
-function getHeaders() {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  return {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-}
-
-/**
- * Constructs the ingestion URL for a specific stream.
- * @param {string} orgId - The organization ID
- * @param {string} streamName - The name of the stream to ingest data into
- * @returns {string} The complete ingestion URL
- * @example
- * const url = getIngestionUrl("default", "my_stream");
- * // Returns: "http://localhost:5080/api/default/my_stream/_json"
- */
-function getIngestionUrl(orgId, streamName) {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-}
-
-/**
- * Sends an ingestion request via page.evaluate to bypass CORS restrictions.
- * @param {Page} page - Playwright page object
- * @param {string} url - The ingestion URL
- * @param {Object} payload - The data payload to ingest
- * @param {Object} headers - Request headers including authentication
- * @returns {Promise<Object>} The API response
- * @example
- * const response = await sendRequest(page, url, { log: "test" }, headers);
- * // Returns: { code: 200, status: [{ name: "stream", successful: 1 }] }
- */
-async function sendRequest(page, url, payload, headers) {
-  return await page.evaluate(async ({ url, headers, payload }) => {
-    const fetchResponse = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload)
-    });
-    return await fetchResponse.json();
-  }, { url, headers, payload });
-}
 
 test.describe("Streams Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
