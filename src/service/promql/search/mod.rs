@@ -46,7 +46,6 @@ use tracing::{Instrument, info_span};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::SEARCH_SERVER;
-
 use crate::service::{
     promql::{
         DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
@@ -279,9 +278,9 @@ async fn search_in_cluster(
         .await
         .is_err()
     {
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(
-            format!("[trace_id {trace_id}] promql->search: query cancelled before execution"),
-        )));
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] promql->search: query cancelled before execution"
+        ))));
     }
 
     // make cluster request
