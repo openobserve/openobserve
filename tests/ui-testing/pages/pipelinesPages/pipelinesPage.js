@@ -1269,6 +1269,128 @@ export class PipelinesPage {
     }
 
     /**
+     * Ingest traces data using OTLP JSON API
+     * POST /api/{org}/v1/traces
+     *
+     * By default, traces go to the "default" stream. To use a custom stream,
+     * pass the streamName parameter which sets the "stream-name" header
+     * (configurable via ZO_GRPC_STREAM_HEADER_KEY env var).
+     *
+     * @param {string} serviceName - The service name for trace attributes
+     * @param {number} spanCount - Number of spans to generate (default: 5)
+     * @param {string|null} streamName - Custom stream name (default: null, uses "default" stream)
+     * @returns {Promise<{status: number, data: object}>} The ingestion response
+     */
+    async ingestTracesData(serviceName, spanCount = 5, streamName = null) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        // Generate current timestamps in nanoseconds
+        const baseTimeNano = BigInt(Date.now()) * BigInt(1000000);
+
+        // Generate a random trace ID (32 hex chars)
+        const traceId = Array.from({ length: 32 }, () =>
+            Math.floor(Math.random() * 16).toString(16)
+        ).join('');
+
+        // Create spans with proper nested parent-child timing
+        // Root span is longest, each child starts after parent and ends before parent
+        // This creates proper waterfall visualization like in the deployed env
+        const spans = [];
+        const totalDurationNano = BigInt(100000000); // 100ms total for root span
+        const offsetPerLevel = BigInt(5000000); // 5ms offset for each nested level
+
+        for (let i = 0; i < spanCount; i++) {
+            const spanId = Array.from({ length: 16 }, () =>
+                Math.floor(Math.random() * 16).toString(16)
+            ).join('');
+
+            // Each nested span starts slightly after parent and ends slightly before
+            // Root span: starts at baseTime, ends at baseTime + totalDuration
+            // Child 1: starts at baseTime + offset, ends at baseTime + totalDuration - offset
+            // Child 2: starts at baseTime + 2*offset, ends at baseTime + totalDuration - 2*offset
+            const spanStartTime = baseTimeNano + (BigInt(i) * offsetPerLevel);
+            const spanEndTime = baseTimeNano + totalDurationNano - (BigInt(i) * offsetPerLevel);
+
+            spans.push({
+                traceId: traceId,
+                spanId: spanId,
+                parentSpanId: i === 0 ? "" : spans[i - 1].spanId,
+                name: `${serviceName}-operation-${i + 1}`,
+                kind: i === 0 ? 2 : 1, // 2 = SERVER, 1 = INTERNAL
+                startTimeUnixNano: spanStartTime.toString(),
+                endTimeUnixNano: spanEndTime.toString(),
+                attributes: [
+                    { key: "http.method", value: { stringValue: "GET" } },
+                    { key: "http.url", value: { stringValue: `/api/v1/test/${i}` } },
+                    { key: "http.status_code", value: { intValue: 200 } }
+                ],
+                droppedAttributesCount: 0,
+                events: [],
+                droppedEventsCount: 0,
+                links: [],
+                droppedLinksCount: 0,
+                status: { message: "", code: 1 }
+            });
+        }
+
+        // Build OTLP traces payload
+        const tracesData = {
+            resourceSpans: [{
+                resource: {
+                    attributes: [
+                        { key: "service.name", value: { stringValue: serviceName } },
+                        { key: "telemetry.sdk.language", value: { stringValue: "javascript" } },
+                        { key: "telemetry.sdk.name", value: { stringValue: "opentelemetry" } },
+                        { key: "telemetry.sdk.version", value: { stringValue: "1.0.0" } }
+                    ],
+                    droppedAttributesCount: 0
+                },
+                scopeSpans: [{
+                    scope: {
+                        name: `${serviceName}-instrumentation`,
+                        version: "1.0.0",
+                        attributes: [],
+                        droppedAttributesCount: 0
+                    },
+                    spans: spans
+                }]
+            }]
+        };
+
+        const response = await this.page.evaluate(async ({ url, headers, orgId, tracesData, streamName }) => {
+            const requestHeaders = {
+                "Authorization": `Basic ${headers}`,
+                "Content-Type": "application/json",
+            };
+            // Add custom stream header if streamName is provided
+            if (streamName) {
+                requestHeaders["stream-name"] = streamName;
+            }
+            const fetchResponse = await fetch(`${url}/api/${orgId}/v1/traces`, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: JSON.stringify(tracesData)
+            });
+            return {
+                status: fetchResponse.status,
+                data: await fetchResponse.json().catch(() => ({}))
+            };
+        }, {
+            url: process.env.INGESTION_URL,
+            headers: basicAuthCredentials,
+            orgId: orgId,
+            tracesData: tracesData,
+            streamName: streamName
+        });
+
+        testLogger.info('Traces ingestion response', { serviceName, streamName: streamName || 'default', status: response.status, data: response.data });
+        return response;
+    }
+
+    /**
      * Connect input node directly to output node (for simple source->destination pipelines)
      */
     async connectInputToOutput() {

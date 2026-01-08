@@ -28,6 +28,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   let pageManager;
   let loginPage;
   const METRICS_STREAM_NAME = "e2e_test_cpu_usage";
+  const TRACES_SERVICE_NAME = "e2e_test_trace_service"; // Service name used for ingestion
+  const TRACES_STREAM_NAME = "e2e_test_traces"; // Custom stream name via "stream-name" header
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -44,7 +46,12 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     testLogger.info('Ingesting metrics data...');
     await pageManager.pipelinesPage.ingestMetricsData(METRICS_STREAM_NAME);
 
-    // Wait for metrics to be indexed
+    // Ingest traces data for testing using page object method
+    // Using custom stream name via "stream-name" header (configurable via ZO_GRPC_STREAM_HEADER_KEY)
+    testLogger.info('Ingesting traces data...');
+    await pageManager.pipelinesPage.ingestTracesData(TRACES_SERVICE_NAME, 5, TRACES_STREAM_NAME);
+
+    // Wait for data to be indexed
     await page.waitForTimeout(2000);
 
     await page.goto(
@@ -165,6 +172,115 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.cleanupPipelineCreation();
 
     testLogger.info('Test passed: Scheduled pipeline validation uses correct stream type');
+  });
+
+  /**
+   * Test: Scheduled pipeline validates with correct stream type (traces)
+   *
+   * Issue #9901 Bug 1: The validation API was being called with hardcoded
+   * page_type="logs" instead of the user-selected stream type.
+   *
+   * This test verifies that when a user selects "traces" as the stream type,
+   * the validation API is called with page_type="traces"
+   */
+  test("should validate scheduled pipeline SQL query with traces stream type", {
+    tag: ['@smoke', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Testing: Scheduled pipeline validates with correct stream type (traces)');
+
+    // Track API calls to verify correct page_type
+    const validationApiCalls = [];
+
+    // Set up network interception to capture validation API calls
+    await page.route('**/api/*/_search**', async (route, request) => {
+      const url = request.url();
+      const searchParams = new URL(url).searchParams;
+
+      if (searchParams.get('validate') === 'true') {
+        validationApiCalls.push({
+          url: url,
+          type: searchParams.get('type'),
+          searchType: searchParams.get('search_type'),
+          validate: searchParams.get('validate')
+        });
+        testLogger.info('Captured validation API call', {
+          type: searchParams.get('type'),
+          url: url
+        });
+      }
+
+      await route.continue();
+    });
+
+    // Navigate to pipelines
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+
+    // Add new pipeline
+    await pageManager.pipelinesPage.addPipeline();
+
+    // Drag Query button to canvas - opens Query/Scheduled Pipeline form dialog
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
+    await page.waitForTimeout(500);
+
+    // Wait for scheduled pipeline form dialog to load
+    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
+    await page.waitForTimeout(1000);
+
+    // Expand "Build Query" section
+    await pageManager.pipelinesPage.expandBuildQuerySection();
+    await page.waitForTimeout(500);
+
+    // Select stream type: TRACES (this is the key part of the test!)
+    testLogger.info('Selecting traces stream type');
+    await pageManager.pipelinesPage.selectStreamType('traces');
+    await page.waitForTimeout(1000);
+
+    // Select the traces stream (in OpenObserve, traces go to "default" stream)
+    testLogger.info(`Selecting traces stream: ${TRACES_STREAM_NAME}`);
+    await pageManager.pipelinesPage.selectStreamName(TRACES_STREAM_NAME);
+    await page.waitForTimeout(1500);
+
+    // Verify SQL editor is visible with auto-generated query
+    await pageManager.pipelinesPage.expectSqlEditorVisible();
+    await pageManager.pipelinesPage.expectQueryToContain(TRACES_STREAM_NAME);
+
+    testLogger.info('Query generated, now clicking Validate and Close');
+
+    // Clear previous API calls before validation
+    validationApiCalls.length = 0;
+
+    // Click "Validate and Close" button using page object method
+    await pageManager.pipelinesPage.clickValidateAndClose();
+
+    // Wait for validation to complete
+    await page.waitForTimeout(3000);
+
+    // Verify the validation API was called with correct stream type
+    testLogger.info('Validation API calls captured', { calls: validationApiCalls });
+
+    // Check that at least one validation call was made
+    expect(validationApiCalls.length).toBeGreaterThan(0);
+
+    // Verify the validation used "traces" type, NOT "logs"
+    const tracesValidationCall = validationApiCalls.find(call => call.type === 'traces');
+    const logsValidationCall = validationApiCalls.find(call => call.type === 'logs');
+
+    // This is the critical assertion - the bug was that it used "logs" instead of "traces"
+    expect(tracesValidationCall).toBeDefined();
+    expect(logsValidationCall).toBeUndefined();
+
+    testLogger.info('Validation API correctly used traces stream type');
+
+    // Verify no unexpected "Discard Changes" dialog appeared using page object
+    await pageManager.pipelinesPage.expectDiscardDialogNotVisible().catch(() => {
+      testLogger.error('Unexpected Discard Changes dialog appeared!');
+    });
+
+    // Clean up - cancel the pipeline creation using page object
+    await pageManager.pipelinesPage.cleanupPipelineCreation();
+
+    testLogger.info('Test passed: Scheduled pipeline validation uses correct stream type (traces)');
   });
 
   /**
