@@ -1237,7 +1237,8 @@ export default defineComponent({
         }
 
         await nextTick();
-        // Don't set chartData here - will be set after loadDashboard()
+        // Set chartData immediately after loading panel, regardless of variables
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         updateDateTime(selectedDate.value);
       } else {
         editMode.value = false;
@@ -1255,15 +1256,6 @@ export default defineComponent({
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
       await loadDashboard();
-
-      // In edit mode: set chartData after dashboard loads
-      // Only if there are NO variables (if there are variables, variablesDataUpdated will handle it)
-      if (editMode.value) {
-        const hasVariables = currentDashboardData.data?.variables?.list?.length > 0;
-        if (!hasVariables) {
-          chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        }
-      }
 
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
@@ -1368,6 +1360,12 @@ export default defineComponent({
           // This allows variables scoped to "current_panel" to load
           variablesManager.setPanelVisibility("current_panel", true);
         }
+
+        // Load variable values from URL parameters
+        variablesManager.loadFromUrl(route);
+
+        // Commit the URL values immediately so they're used by the chart
+        variablesManager.commitAll();
 
         // Initialize updatedVariablesData with current variable state
         updateCommittedVariables();
