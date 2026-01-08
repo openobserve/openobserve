@@ -223,41 +223,6 @@ impl IntoResponse for HttpResponse {
     }
 }
 
-// TODO: Removed actix_web::HttpResponse conversion - no longer needed after full axum migration
-// /// Convert actix_web::HttpResponse to axum::response::Response
-// /// This is a temporary bridge during the actix-web to axum migration.
-// /// It extracts the status code and body from the actix response and
-// /// reconstructs them into an axum response.
-// impl From<actix_web::HttpResponse> for Response {
-//     fn from(actix_resp: actix_web::HttpResponse) -> Self {
-//         use actix_web::body::MessageBody;
-//
-//         let status_code = actix_resp.status();
-//         let axum_status = StatusCode::from_u16(status_code.as_u16()).unwrap_or(StatusCode::OK);
-//
-//         // Extract headers from the actix response
-//         let mut builder = axum::http::Response::builder().status(axum_status);
-//
-//         for (key, value) in actix_resp.headers().iter() {
-//             if let Ok(header_name) = axum::http::HeaderName::try_from(key.as_str()) {
-//                 if let Ok(header_value) = axum::http::HeaderValue::from_bytes(value.as_bytes()) {
-//                     builder = builder.header(header_name, header_value);
-//                 }
-//             }
-//         }
-//
-//         // Extract the body - actix body is complex, so we convert to bytes
-//         let (_, body) = actix_resp.into_parts();
-//         let body_bytes = body
-//             .try_into_bytes()
-//             .unwrap_or_else(|_| bytes::Bytes::new());
-//
-//         builder
-//             .body(Body::from(body_bytes))
-//             .unwrap_or_else(|_| Response::new(Body::empty()))
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,6 +322,55 @@ mod tests {
 
         assert_eq!(response.took, deserialized.took);
         assert_eq!(response.errors, deserialized.errors);
+    }
+
+    #[test]
+    fn test_http_response_ok() {
+        let response = HttpResponse::ok("success");
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_http_response_bad_request() {
+        let response = HttpResponse::bad_request("bad request");
+        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_http_response_unauthorized() {
+        let response = HttpResponse::unauthorized("unauthorized");
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_http_response_forbidden() {
+        let response = HttpResponse::forbidden("forbidden");
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_http_response_conflict() {
+        let response = HttpResponse::conflict("conflict");
+        assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn test_http_response_not_found() {
+        let response = HttpResponse::not_found("not found");
+        assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_http_response_internal_error() {
+        let response = HttpResponse::internal_error("internal error");
+        assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_http_response_json() {
+        let payload = vec![1, 2, 3];
+        let response = HttpResponse::json(payload);
+        assert_eq!(response.status(), http::StatusCode::OK);
     }
 
     #[test]

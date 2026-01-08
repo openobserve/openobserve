@@ -16,8 +16,7 @@
 use std::io::Error;
 
 use axum::{
-    Json,
-    http,
+    Json, http,
     response::{IntoResponse, Response as HttpResponse},
 };
 use config::{

@@ -517,10 +517,7 @@ const SKIP_RESPONSE_HEADERS_NORMAL: &[&str] =
     &["content-encoding", "transfer-encoding", "content-length"];
 
 /// Builds request headers for the upstream request.
-fn build_request_headers(
-    headers: &HeaderMap,
-    is_streaming: bool,
-) -> reqwest::header::HeaderMap {
+fn build_request_headers(headers: &HeaderMap, is_streaming: bool) -> reqwest::header::HeaderMap {
     let mut req_headers = reqwest::header::HeaderMap::new();
 
     for (key, value) in headers {
