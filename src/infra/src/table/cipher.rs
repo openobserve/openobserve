@@ -39,24 +39,29 @@ static MASTER_KEY: Lazy<Algorithm> = Lazy::new(|| {
     let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
         Ok(v) => v,
         Err(e) => {
-            log::debug!("potential error in configuring master encryption for cipher table: {e}");
-            log::info!("configuring cipher table master key as None");
-            return Algorithm::None;
+            log::error!("FATAL: Failed to decode master encryption key for cipher table: {e}");
+            log::error!(
+                "FATAL: Encryption is required for secure operation. Please configure a valid Z_ENCRYPTION_MASTER_KEY"
+            );
+            panic!(
+                "Failed to initialize cipher table encryption: invalid master key encoding. Encryption cannot be disabled for security reasons."
+            );
         }
     };
     match Aes256Siv::new_from_slice(&key) {
         Ok(_) => Algorithm::Aes256Siv(key),
         Err(e) => {
-            log::debug!("potential error in configuring master encryption for cipher table: {e}");
-            log::info!("configuring cipher table master key as None");
-            Algorithm::None
+            log::error!("FATAL: Failed to initialize AES-256-SIV cipher from master key: {e}");
+            log::error!("FATAL: Master key must be a valid 64-byte (512-bit) AES-256-SIV key");
+            panic!(
+                "Failed to initialize cipher table encryption: invalid master key format. Encryption cannot be disabled for security reasons."
+            );
         }
     }
 });
 
 enum Algorithm {
     Aes256Siv(Vec<u8>),
-    None,
 }
 
 impl Algorithm {
@@ -72,7 +77,6 @@ impl Algorithm {
                     })
                     .map(|v| BASE64_STANDARD.encode(&v))
             }
-            Self::None => Ok(plaintext.to_owned()),
         }
     }
     fn decrypt(&self, encrypted: &str) -> Result<String, errors::Error> {
@@ -96,7 +100,6 @@ impl Algorithm {
                     })
                     .map(|v| String::from_utf8_lossy(&v).into_owned())
             }
-            Self::None => Ok(encrypted.to_owned()),
         }
     }
 }
