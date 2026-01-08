@@ -633,4 +633,18 @@ mod tests {
         let result = check_series_limit(2, 1);
         assert!(result.is_err());
     }
+
+    #[tokio::test]
+    async fn test_get_max_series_limit_fallback_to_env_default() {
+        // Test that get_max_series_limit falls back to ENV default
+        // when org settings cannot be fetched (e.g., org doesn't exist)
+        let limit = get_max_series_limit("nonexistent_test_org_123456").await;
+
+        // Should return the default from config
+        let expected_default = get_config().limit.metrics_max_series_response;
+        assert_eq!(limit, expected_default);
+
+        // Verify the default is the expected value (40,000)
+        assert_eq!(expected_default, 40_000);
+    }
 }

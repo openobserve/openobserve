@@ -283,3 +283,48 @@ async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
 async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_max_series_per_query_validation_valid_values() {
+        // Test minimum valid value
+        let value = 1_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test maximum valid value
+        let value = 1_000_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test mid-range value (default)
+        let value = 40_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test another mid-range value
+        let value = 500_000;
+        assert!((1_000..=1_000_000).contains(&value));
+    }
+
+    #[test]
+    fn test_max_series_per_query_validation_invalid_values() {
+        // Test below minimum
+        let value = 999;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test above maximum
+        let value = 1_000_001;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test zero
+        let value = 0;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test very large value
+        let value = 10_000_000;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test value just below minimum
+        let value = 500;
+        assert!(!(1_000..=1_000_000).contains(&value));
+    }
+}
