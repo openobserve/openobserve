@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, cookie::{Cookie, SameSite}, get, post, web};
+use actix_web::{
+    HttpResponse,
+    cookie::{Cookie, SameSite},
+    get, post, web,
+};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::aws_marketplace::{api as aws_mp_api, db as aws_mp_db};
 use serde::{Deserialize, Serialize};
@@ -63,7 +67,9 @@ pub async fn aws_marketplace_register(
             crate::handler::http::auth::validator::PKCE_STATE_ORG,
             &state,
             state.clone().into(),
-        ).await {
+        )
+        .await
+        {
             log::error!("[AWS SAAS] Failed to store PKCE state: {}", e);
         }
 

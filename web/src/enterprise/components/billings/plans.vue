@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="row q-gutter-md justify-center">
       <pro-plan
         :planType="planType"
+        :billingProvider="billingProvider"
         @update:proSubscription="onLoadSubscription(config.paidPlan)"
         @update:cancelSubscription="onUnsubscribe"
       ></pro-plan>
@@ -137,6 +138,7 @@ export default defineComponent({
     try{
       const res = await BillingService.list_subscription(this.store.state.selectedOrganization.identifier);
         this.currentPlanDetail = res.data;
+        this.billingProvider = res.data.provider || "stripe";
 
         if (res.data.subscription_type !== "") {
           if (res.data.subscription_type == config.paidPlan) {
@@ -152,7 +154,8 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else {
+        } else if (this.billingProvider !== "aws") {
+          // Only show subscribe prompt for non-AWS orgs
           this.$q.notify({
             type: "warning",
             message: "Please subscribe to one of the plan.",
@@ -193,6 +196,7 @@ export default defineComponent({
     const listSubscriptionResponse: any = ref({});
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
+    const billingProvider = ref("stripe");
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -221,6 +225,7 @@ export default defineComponent({
       retrieveHostedPage,
       proLoading,
       currentPlanDetail,
+      billingProvider,
     };
   },
 });

@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
           <q-route-tab
+            v-if="showInvoiceTab"
             exact
             name="invoice_history"
             :to="
@@ -140,6 +141,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import BillingService from "@/services/billings";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -154,6 +156,26 @@ export default defineComponent({
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
+    const billingProvider = ref("stripe"); // default to stripe
+
+    // Fetch billing info to determine provider
+    const fetchBillingInfo = async () => {
+      try {
+        const res = await BillingService.list_subscription(
+          store.state.selectedOrganization.identifier
+        );
+        if (res.data?.provider) {
+          billingProvider.value = res.data.provider;
+        }
+      } catch (e) {
+        console.error("Failed to fetch billing info:", e);
+      }
+    };
+
+    // Check if invoice tab should be shown (only for Stripe)
+    const showInvoiceTab = computed(() => {
+      return billingProvider.value !== "aws";
+    });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
       if (showSidebar.value) {
@@ -164,7 +186,10 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
+    onMounted(async () => {
+      // Fetch billing info to determine provider type
+      await fetchBillingInfo();
+
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
         billingtab.value = "plans";
         router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
@@ -226,7 +251,7 @@ export default defineComponent({
       splitterModel,
       headerBasedOnRoute,
       options: [
-        {label: "30 Days", value: "30days"}, 
+        {label: "30 Days", value: "30days"},
         {label: "60 Days", value: "60days"},
         {label: "3 Months", value: "3months"},
         {label: "6 Months", value: "6months"}],
@@ -239,6 +264,8 @@ export default defineComponent({
       collapseSidebar,
       showSidebar,
       lastSplitterPosition,
+      showInvoiceTab,
+      billingProvider,
     };
   },
 });
