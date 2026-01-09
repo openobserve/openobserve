@@ -135,18 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Pending Activation State -->
       <div v-else-if="state === 'pending_activation'" class="text-center">
+        <h5 class="q-mb-lg">Waiting for AWS Confirmation</h5>
         <q-spinner-gears size="80px" color="primary" />
-        <h5 class="q-mt-md">Waiting for AWS Confirmation</h5>
-        <p class="text-grey-7">
-          Your subscription is being activated. This usually takes less than a
-          minute.
+        <p class="text-grey-7 q-mt-lg">
+          Please wait while we confirm activation with AWS and set up your account.
         </p>
-        <q-linear-progress
-          indeterminate
-          color="primary"
-          class="q-mt-lg"
-          style="max-width: 300px; margin: 0 auto"
-        />
       </div>
 
       <!-- Success State -->
@@ -318,6 +311,11 @@ export default defineComponent({
         );
 
         if (response.data.success) {
+          // Clear the token cookie immediately after successful link
+          // The token has been used (ResolveCustomer called) and can't be reused
+          deleteCookie("aws_marketplace_token");
+          token.value = "";
+
           activatedOrgId.value = orgId;
           state.value = "pending_activation";
 
@@ -352,8 +350,6 @@ export default defineComponent({
 
           if (status === "active") {
             if (pollInterval) clearInterval(pollInterval);
-            // Clear the token cookie
-            deleteCookie("aws_marketplace_token");
             state.value = "success";
             isProcessing.value = false;
 
@@ -383,7 +379,6 @@ export default defineComponent({
     };
 
     const goToDashboard = () => {
-      deleteCookie("aws_marketplace_token");
       router.push({
         path: "/",
         query: activatedOrgId.value
