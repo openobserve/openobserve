@@ -199,9 +199,9 @@ mod legacy_enrichment_table_urls {
     /// This is used during migration to ensure all super cluster regions generate the same ID
     /// for the same enrichment table job.
     ///
-    /// It is important to note that KSUIDs generated in this manner will have timestamp bits which are
-    /// effectively random, meaning that the timestamp in any KSUID generated with this function will be
-    /// random.
+    /// It is important to note that KSUIDs generated in this manner will have timestamp bits which
+    /// are effectively random, meaning that the timestamp in any KSUID generated with this
+    /// function will be random.
     fn enrichment_job_ksuid_from_hash(org: &str, name: &str) -> svix_ksuid::Ksuid {
         use sha1::{Digest, Sha1};
         use svix_ksuid::KsuidLike;
