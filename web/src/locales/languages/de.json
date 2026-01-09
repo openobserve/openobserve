@@ -657,7 +657,14 @@
     "dataSource": "Quelle der Daten",
     "uploadFile": "Datei hochladen",
     "fromUrl": "Von URL",
-    "addFunction": "Funktion hinzufügen"
+    "addFunction": "Funktion hinzufügen",
+    "javascript": "Javascript",
+    "transformType": "Transformationstyp",
+    "vrlType": "VRL (Vektor-Remap-Sprache)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "VRL-Funktion",
+    "jsFunctionHint": "Verwenden Sie das Objekt `row`, um auf Protokollfelder zuzugreifen und diese zu ändern. Beispiel: row.new_field = row.existing_field + 'verarbeitet';",
+    "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'"
   },
   "confirmDialog": {
     "cancel": "Abbrechen",

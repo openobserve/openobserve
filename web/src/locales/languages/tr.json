@@ -657,7 +657,14 @@
     "dataSource": "Veri Kaynağı",
     "uploadFile": "Dosya Yükle",
     "fromUrl": "URL'den",
-    "addFunction": "Fonksiyon Ekle"
+    "addFunction": "Fonksiyon Ekle",
+    "javascript": "JavaScript",
+    "transformType": "Dönüştürme Türü",
+    "vrlType": "VRL (Vektör Yeniden Eşleme Dili)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "VRL Fonksiyonu",
+    "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
+    "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'"
   },
   "confirmDialog": {
     "cancel": "İptal",

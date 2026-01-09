@@ -657,7 +657,14 @@
     "dataSource": "Gegevensbron",
     "uploadFile": "Bestand uploaden",
     "fromUrl": "Van URL",
-    "addFunction": "Functie toevoegen"
+    "addFunction": "Functie toevoegen",
+    "javascript": "JavaScript",
+    "transformType": "Transformatietype",
+    "vrlType": "VRL (Vector Remap Language)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "VRL-functie",
+    "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
+    "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'"
   },
   "confirmDialog": {
     "cancel": "Annuleer",
