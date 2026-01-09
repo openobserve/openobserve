@@ -107,7 +107,8 @@
     "manageTheme": "테마 관리",
     "url": "URL",
     "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
-    "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요."
+    "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
+    "id": "신분증"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "상관관계가 있는 흔적을 찾을 수 없습니다.",
     "noTracesDescription": "선택한 시간 범위에서 서비스 {service} 에 대한 추적을 찾을 수 없습니다.",
     "openTraceInNewWindow": "트레이스를 새 창에서 열기",
-    "filters": "필터"
+    "filters": "필터",
+    "semanticFieldGroupsTitle": "필드 매핑",
+    "semanticFieldGroupsCaption": "상관 관계 분석 및 중복 제거를 위한 필드 이름 매핑 정의 (예: 호스트, 호스트 이름, 노드 → 'host' 그룹)",
+    "groupsLabel": "그룹",
+    "importFromJson": "JSON에서 가져오기",
+    "addCustomGroup": "사용자 지정 그룹 추가",
+    "actionNormalize": "매칭을 위한 소문자 및 트림 값",
+    "removeSemanticGroup": "시맨틱 그룹 제거",
+    "fieldNamePlaceholder": "필드 이름 (쉼표로 구분)",
+    "category": "카테고리",
+    "categoryHint": "범주별 그룹 필터링",
+    "noSemanticGroupMessage": "이 범주에는 시맨틱 그룹이 없습니다.다른 범주를 선택하거나 사용자 지정 그룹을 추가합니다.",
+    "showingGroups": "{로컬 그룹 길이} 전체 그룹의 {필터 그룹 길이} 표시",
+    "deduplicateFields": "중복 제거 필드",
+    "deduplicateFieldTooltip": "중복 제거 핑거프린팅에 사용할 필드 매핑 선택",
+    "alertDeduplicationMessage": "이러한 필드에 동일한 값을 가진 알림은 중복 제거됩니다 (예: 동일한 핑거프린트 = 동일한 필드 값).",
+    "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
