@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
 
 test.describe("Logs Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -867,16 +867,10 @@ test.describe("Logs Regression Bugs", () => {
       }
     ];
 
-    // Ingest test data
+    // Ingest test data using shared helper functions
     testLogger.info('Ingesting test data with apostrophe scenarios');
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString('base64');
-
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getHeaders();
+    const ingestionUrl = getIngestionUrl(orgId, streamName);
 
     const testPayload = testMessages.map((msg, index) => ({
       log: msg.log,
@@ -886,20 +880,7 @@ test.describe("Logs Regression Bugs", () => {
       _timestamp: Date.now() * 1000 + index
     }));
 
-    await page.evaluate(async ({ url, headers, orgId, streamName, payload }) => {
-      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload)
-      });
-      return await fetchResponse.json();
-    }, {
-      url: process.env.INGESTION_URL,
-      headers: headers,
-      orgId: orgId,
-      streamName: streamName,
-      payload: testPayload
-    });
+    await sendRequest(page, ingestionUrl, testPayload, headers);
 
     testLogger.info('Test data ingested, waiting for data availability...');
 
