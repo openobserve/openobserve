@@ -316,17 +316,32 @@ export const convertTableData = (
             return valueMapping;
           }
 
+          // Skip if already a formatted date string (contains spaces or hyphens without T)
+          if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/.test(val)) {
+            return val;
+          }
+
           // Handle 16-digit microsecond timestamps
           let timestamp;
           if (typeof val === "string" && /^\d{16}$/.test(val)) {
             // 16-digit string represents microseconds, convert to milliseconds
             timestamp = parseInt(val) / 1000;
           } else if (typeof val === "string") {
-            // Regular ISO string, append Z if needed
-            timestamp = `${val}Z`;
+            // Check if it's an ISO timestamp string (not already formatted)
+            // ISO format: YYYY-MM-DDTHH:mm:ss or YYYY-MM-DDTHH:mm:ssZ
+            if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+              const isoString = val.endsWith("Z") ? val : `${val}Z`;
+              timestamp = new Date(isoString).getTime();
+            } else {
+              // If not ISO format, return as is (might be already formatted)
+              return val;
+            }
+          } else if (typeof val === "number") {
+            // Numeric timestamp
+            timestamp = val;
           } else {
-            // Number or Date object
-            timestamp = new Date(val)?.getTime() / 1000;
+            // Date object or other
+            timestamp = new Date(val)?.getTime();
           }
 
           return formatDate(toZonedTime(timestamp, timezone));
@@ -475,17 +490,32 @@ export const convertTableData = (
               return valueMapping;
             }
 
+            // Skip if already a formatted date string (contains spaces or hyphens without T)
+            if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/.test(val)) {
+              return val;
+            }
+
             // Handle 16-digit microsecond timestamps
             let timestamp;
             if (typeof val === "string" && /^\d{16}$/.test(val)) {
               // 16-digit string represents microseconds, convert to milliseconds
               timestamp = parseInt(val) / 1000;
             } else if (typeof val === "string") {
-              // Regular ISO string, append Z if needed
-              timestamp = `${val}Z`;
+              // Check if it's an ISO timestamp string (not already formatted)
+              // ISO format: YYYY-MM-DDTHH:mm:ss or YYYY-MM-DDTHH:mm:ssZ
+              if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+                const isoString = val.endsWith("Z") ? val : `${val}Z`;
+                timestamp = new Date(isoString).getTime();
+              } else {
+                // If not ISO format, return as is (might be already formatted)
+                return val;
+              }
+            } else if (typeof val === "number") {
+              // Numeric timestamp
+              timestamp = val;
             } else {
-              // Number or Date object
-              timestamp = new Date(val)?.getTime() / 1000;
+              // Date object or other
+              timestamp = new Date(val)?.getTime();
             }
 
             return formatDate(toZonedTime(timestamp, timezone));
