@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
       <!-- Section Header -->
       <GroupHeader :title="t('settings.correlation.serviceIdentityTitle')" :showIcon="false" class="tw:mb-2" />
-      <div class="text-body2 text-grey-7 tw:mb-4">
+      <div class="text-body2 tw:mb-4">
         {{ t("settings.correlation.serviceIdentityDescription") }}
       </div>
 
@@ -40,15 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:p-4 text-body2 tw:leading-relaxed">
         <div class="tw:mb-3">
           <div class="tw:font-semibold text-primary tw:mb-1">Service FQN</div>
-          <div class="text-grey-7">{{ t("settings.correlation.howItWorksDescription") }}</div>
+          <div>{{ t("settings.correlation.howItWorksDescription") }}</div>
         </div>
         <div class="tw:mb-0">
           <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.priorityOrderLabel") }}</div>
-          <div class="text-grey-7">{{ t("settings.correlation.priorityOrderDescription") }}</div>
+          <div>{{ t("settings.correlation.priorityOrderDescription") }}</div>
         </div>
         <div class="tw:mb-0 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
           <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.exampleLabel") }}</div>
-          <div class="text-grey-7">
+          <div>
             <i18n-t keypath="settings.correlation.exampleText" tag="span">
               <template #dim1>
                 <q-chip dense size="13" color="primary" text-color="white" class="tw:mx-1 tw:my-1 example-chip">k8s-deployment=my-app</q-chip>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div>
           <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.correlationLabel") }}</div>
-          <div class="text-grey-7">
+          <div>
             <i18n-t keypath="settings.correlation.correlationDescription" tag="span">
               <template #field>
                 <span class="tw:font-mono tw:font-semibold tw:text-sm">service</span>
@@ -88,274 +88,177 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:p-4">
         <div class="tw:flex tw:gap-4">
-        <!-- Priority Order (Left) -->
-        <div class="tw:flex-1">
-          <div class="tw:text-sm tw:font-semibold tw:mb-2">Priority Order</div>
-          <q-input
-            v-model="prioritySearchQuery"
-            dense
-            outlined
-            placeholder="Search..."
-            class="tw:mb-2"
-          >
-            <template #prepend><q-icon name="search" /></template>
-          </q-input>
-          <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
-            <q-item
-              v-for="item in filteredPriorityDimensions"
-              :key="item.dim"
-              clickable
-              @click="togglePrioritySelection(item.dim)"
-              :active="selectedPriorityDimensions.includes(item.dim)"
+          <!-- Priority Order (Left) -->
+          <div class="tw:flex-1">
+            <div class="tw:text-sm tw:font-semibold tw:mb-2">{{ t('settings.correlation.priorityOrderLabel') }}</div>
+            <q-input
+              v-model="prioritySearchQuery"
               dense
-              class="tw:py-2 tw:cursor-move"
-              draggable="true"
-              @dragstart="handleDragStart(item.actualIndex, $event)"
-              @dragover.prevent
-              @drop="handleDrop(item.actualIndex, $event)"
+              outlined
+              :placeholder="t('common.search') + '...'"
+              class="tw:mb-2"
             >
-              <q-item-section avatar class="tw:min-w-0 tw:mr-1">
-                <q-icon name="drag_indicator" size="sm" class="tw:text-gray-400" />
-              </q-item-section>
-              <q-item-section avatar class="tw:min-w-0 tw:mr-3">
-                <q-badge
-                  :color="item.actualIndex < 4 ? 'primary' : 'grey'"
-                  text-color="white"
-                  class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
-                >
-                  {{ item.actualIndex + 1 }}
-                </q-badge>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="tw:font-medium">{{ getDimensionDisplay(item.dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span></q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <div class="tw:flex tw:gap-1">
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="sm"
-                    icon="arrow_upward"
-                    :disable="item.actualIndex === 0"
-                    @click.stop="moveFqnDimensionUp(item.actualIndex)"
-                  >
-                    <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="sm"
-                    icon="arrow_downward"
-                    :disable="item.actualIndex === localFqnPriority.length - 1"
-                    @click.stop="moveFqnDimensionDown(item.actualIndex)"
-                  >
-                    <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="sm"
-                    icon="delete"
-                    color="negative"
-                    @click.stop="removeFqnDimension(item.actualIndex)"
-                  >
-                    <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
-                  </q-btn>
-                </div>
-              </q-item-section>
-            </q-item>
-            <q-item v-if="filteredPriorityDimensions.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
-              {{ prioritySearchQuery ? "No matching dimensions" : t("settings.correlation.noDimensionsConfigured") }}
-            </q-item>
-          </q-list>
-        </div>
-
-        <!-- Center Buttons -->
-        <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
-          <q-btn
-            outline
-            dense
-            icon="arrow_back"
-            @click="addSelectedDimensions"
-            :disable="selectedAvailableDimensions.length === 0"
-            size="sm"
-          />
-          <q-icon
-            :name="outlinedInfo"
-            size="1rem"
-            class="cursor-pointer tw:self-center"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="21.875rem"
-              class="tooltip-text"
-            >
-              {{ t("settings.correlation.fqnPriorityTooltip") }}
-            </q-tooltip>
-          </q-icon>
-        </div>
-
-        <div class="tw:flex tw:flex-wrap tw:gap-2 tw:p-3 tw:rounded-lg tw:border tw:border-solid"
-          :class="store.state.theme === 'dark' ? 'tw:border-gray-700 tw:bg-gray-900' : 'tw:border-gray-200 tw:bg-gray-50'"
-        >
-          <div
-            v-for="(dim, index) in localFqnPriority"
-            :key="dim"
-            class="dimension-chip tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:rounded-lg tw:border tw:border-solid"
-            :class="store.state.theme === 'dark' ? 'tw:border-gray-600 tw:bg-gray-800' : 'tw:border-gray-300 tw:bg-white'"
-          >
-            <q-badge
-              :color="index < 4 ? 'primary' : 'grey'"
-              text-color="white"
-              class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full tw:flex-shrink-0"
-            >
-              {{ index + 1 }}
-            </q-badge>
-            <div class="tw:flex tw:flex-col">
-              <span class="tw:font-medium tw:text-sm">{{ getDimensionDisplay(dim) }}</span>
-              <span class="tw:font-mono tw:text-xs tw:text-gray-500">{{ dim }}</span>
-            </div>
-            <div class="tw:flex tw:gap-1 tw:ml-2">
-              <q-btn
-                flat
+              <template #prepend><q-icon name="search" /></template>
+            </q-input>
+            <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
+              <q-item
+                v-for="item in filteredPriorityDimensions"
+                :key="item.dim"
+                clickable
+                @click="togglePrioritySelection(item.dim)"
+                :active="selectedPriorityDimensions.includes(item.dim)"
                 dense
-                round
-                size="xs"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveFqnDimensionUp(index)"
-                class="tw:w-6 tw:h-6"
+                class="tw:py-2 tw:cursor-move"
+                draggable="true"
+                @dragstart="handleDragStart(item.actualIndex, $event)"
+                @dragover.prevent
+                @drop="handleDrop(item.actualIndex, $event)"
               >
-                <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="xs"
-                icon="arrow_downward"
-                :disable="index === localFqnPriority.length - 1"
-                @click="moveFqnDimensionDown(index)"
-                class="tw:w-6 tw:h-6"
-              >
-                <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="xs"
-                icon="delete"
-                color="negative"
-                @click="removeFqnDimension(index)"
-                class="tw:w-6 tw:h-6"
-              >
-                <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
-              </q-btn>
-            </div>
-          </div>
-          <div v-if="localFqnPriority.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500 tw:w-full">
-            {{ t("settings.correlation.noDimensionsConfigured") }}
-          </div>
-        </div>
-
-      <!-- Add new semantic group to FQN priority -->
-      <div class="tw:mt-3">
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t("settings.correlation.addDimensionHint") }}
-        </div>
-        <div class="tw:flex tw:gap-2 tw:items-end">
-          <q-select
-            v-model="selectedSemanticGroup"
-            :options="availableSemanticGroups"
-            dense
-            borderless
-            stack-label
-            :label="t('settings.correlation.selectSemanticGroup')"
-            class="tw:w-1/2 showLabelOnTop"
-            emit-value
-            map-options
-            clearable
-            :disable="availableSemanticGroups.length === 0"
-          >
-            <template v-slot:option="scope">
-              <q-item v-bind="scope.itemProps">
+                <q-item-section avatar class="tw:min-w-0 tw:mr-1">
+                  <q-icon name="drag_indicator" size="sm" class="tw:text-gray-400" />
+                </q-item-section>
+                <q-item-section avatar class="tw:min-w-0 tw:mr-3">
+                  <q-badge
+                    :color="item.actualIndex < 4 ? 'primary' : 'grey'"
+                    text-color="white"
+                    class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
+                  >
+                    {{ item.actualIndex + 1 }}
+                  </q-badge>
+                </q-item-section>
                 <q-item-section>
-                  <q-item-label>
-                    <span class="tw:font-medium">{{ scope.opt.label }}</span>
-                    <span class="tw:text-xs tw:font-mono tw:text-gray-500 tw:ml-2">({{ scope.opt.value }})</span>
-                  </q-item-label>
+                  <q-item-label class="tw:font-medium">{{ getDimensionDisplay(item.dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span></q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <div class="tw:flex tw:gap-1">
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      icon="arrow_upward"
+                      :disable="item.actualIndex === 0"
+                      @click.stop="moveFqnDimensionUp(item.actualIndex)"
+                    >
+                      <q-tooltip>{{ t("settings.correlation.moveUp") }}</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      icon="arrow_downward"
+                      :disable="item.actualIndex === localFqnPriority.length - 1"
+                      @click.stop="moveFqnDimensionDown(item.actualIndex)"
+                    >
+                      <q-tooltip>{{ t("settings.correlation.moveDown") }}</q-tooltip>
+                    </q-btn>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      icon="delete"
+                      color="negative"
+                      @click.stop="removeFqnDimension(item.actualIndex)"
+                    >
+                      <q-tooltip>{{ t("settings.correlation.removeFromList") }}</q-tooltip>
+                    </q-btn>
+                  </div>
                 </q-item-section>
               </q-item>
-            </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.correlation.noSemanticGroupsAvailable") }}
-                </q-item-section>
+              <q-item v-if="filteredPriorityDimensions.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
+                {{ prioritySearchQuery ? "No matching dimensions" : t("settings.correlation.noDimensionsConfigured") }}
               </q-item>
-            </template>
-          </q-select>
+            </q-list>
+          </div>
 
-          <q-btn
-            flat
-            icon="add"
-            color="primary"
-            class="text-bold o2-secondary-button tw:h-[32px] tw:w-[32px] tw:min-w-[32px]!"
-            :disable="!selectedSemanticGroup"
-            @click="addFqnDimension"
-          >
-            <template #prepend><q-icon name="search" /></template>
-          </q-input>
-          <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
-            <q-item
-              v-for="group in filteredAvailableGroups"
-              :key="group.value"
-              clickable
-              @click="toggleAvailableSelection(group.value)"
-              :active="selectedAvailableDimensions.includes(group.value)"
+          <!-- Center Buttons -->
+          <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
+            <q-btn
+              data-test="correlation-service-identity-backward-btn"
+              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              no-caps
+              flat
+              icon="arrow_back"
+              @click="addSelectedDimensions"
+              :disable="selectedAvailableDimensions.length === 0"
+            />
+            <q-btn
+              data-test="correlation-service-identity-forward-btn"
+              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              no-caps
+              flat
+              icon="arrow_forward"
+              @click="removeSelectedDimensions"
+              :disable="selectedPriorityDimensions.length === 0"
+            />
+          </div>
+
+          <!-- Available Semantic Groups (Right) -->
+          <div class="tw:flex-1">
+            <div class="tw:text-sm tw:font-semibold tw:mb-2">{{ t('settings.correlation.availableDimensions') }}</div>
+            <q-input
+              data-test="correlation-service-identity-available-search-input"
+              v-model="availableSearchQuery"
               dense
+              outlined
+              :placeholder="t('common.search') + '...'"
+              class="tw:mb-2"
             >
-              <q-item-section>
-                <q-item-label>{{ group.label }} <span class="tw:font-normal tw:text-xs">({{ group.value }})</span></q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-item v-if="filteredAvailableGroups.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
-              {{ availableSearchQuery ? t("settings.correlation.noMatchingGroups") : t("settings.correlation.noSemanticGroupsAvailable") }}
-            </q-item>
-          </q-list>
+              <template #prepend><q-icon name="search" /></template>
+            </q-input>
+            <q-list bordered class="tw:rounded-lg tw:h-80 tw:overflow-auto">
+              <q-item
+                v-for="group in filteredAvailableGroups"
+                :key="group.value"
+                clickable
+                @click="toggleAvailableSelection(group.value)"
+                :active="selectedAvailableDimensions.includes(group.value)"
+                dense
+              >
+                <q-item-section>
+                  <q-item-label>{{ group.label }} <span class="tw:font-normal tw:text-xs">({{ group.value }})</span></q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-item v-if="filteredAvailableGroups.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
+                {{ availableSearchQuery ? t("settings.correlation.noMatchingGroups") : t("settings.correlation.noSemanticGroupsAvailable") }}
+              </q-item>
+            </q-list>
+          </div>
+        </div>
+
+        <!-- Reset and Save Buttons -->
+        <div class="tw:flex tw:justify-end tw:gap-2 tw:mt-4">
+          <q-btn
+            data-test="correlation-service-identity-reset-btn"
+            class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            flat
+            :label="t('settings.correlation.resetToDefaults')"
+            @click="resetFqnPriority"
+          />
+          <q-btn
+            data-test="correlation-service-identity-save-btn"
+            class="text-bold o2-primary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :label="t('common.save')"
+            @click="saveFqnPriority"
+            :loading="savingFqn"
+          />
+        </div>
+
+        <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw:mt-2 tw:text-sm tw:text-amber-600 dark:tw:text-amber-400">
+          {{ t("settings.correlation.noSemanticGroupsConfigured") }}
         </div>
       </div>
+    </q-expansion-item>
 
-      <!-- Reset and Save Buttons -->
-      <div class="tw:flex tw:justify-end tw:gap-2 tw:mt-4">
-        <q-btn
-          flat
-          :label="t('settings.correlation.resetToDefaults')"
-          icon="restart_alt"
-          @click="resetFqnPriority"
-        />
-        <q-btn
-          :label="t('common.save')"
-          color="primary"
-          @click="saveFqnPriority"
-          :loading="savingFqn"
-        />
-      </div>
-
-      <div v-if="availableSemanticGroups.length === 0 && localSemanticGroups.length === 0" class="tw:mt-2 tw:text-sm tw:text-amber-600 dark:tw:text-amber-400">
-        {{ t("settings.correlation.noSemanticGroupsConfigured") }}
-      </div>
-    </div>
-  </q-expansion-item>
-
-  <!-- Semantic Field Groups - Collapsible Section -->
-  <q-expansion-item
+    <!-- Semantic Field Groups - Collapsible Section -->
+    <q-expansion-item
       v-model="semanticSectionExpanded"
       icon="category"
       :label="t('settings.correlation.semanticFieldTitle')"
@@ -374,11 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Save Semantic Mappings Button -->
         <div class="tw:flex tw:justify-end tw:mt-4">
           <q-btn
+            class="text-bold o2-primary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             :label="t('common.save')"
-            color="primary"
             @click="saveSemanticMappings"
             :loading="savingSemanticMappings"
-            class="tw:px-4"
           />
         </div>
       </div>
@@ -575,6 +478,12 @@ const removeFqnDimension = (index: number) => {
   localFqnPriority.value.splice(index, 1);
 };
 
+const addFqnDimension = () => {
+  if (selectedSemanticGroup.value && !localFqnPriority.value.includes(selectedSemanticGroup.value)) {
+    localFqnPriority.value.push(selectedSemanticGroup.value);
+    selectedSemanticGroup.value = null;
+  }
+};
 
 const resetFqnPriority = () => {
   // Reset to backend defaults from O2_FQN_PRIORITY_DIMENSIONS
@@ -731,14 +640,22 @@ loadConfig();
 
 // Custom highlight for selected items in dual-list
 :deep(.q-item.q-item--active) {
-  background-color: var(--q-primary) !important;
-  color: white !important;
+  background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%) !important;
+  color: black;
+}
 
-  .q-item__label {
-    color: white !important;
-  }
 :deep(.example-chip) {
   font-size: 13px;
+}
+
+:deep(.text-caption) {
+  color: var(--o2-text-primary);
+}
+
+body.body--dark {
+  .q-list .q-item__label {
+    color: white !important;
+  }
 }
 </style>
 <style lang="scss">

@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full discovered-services q-mt-sm">
-    <div class="tw:mb-6">
+    <div>
       <GroupHeader :title="t('settings.correlation.discoveredServicesTitle')" :showIcon="false" class="tw:mb-2" />
-      <div class="text-body2 text-grey-7 tw:mb-4">
+      <div class="text-body2 tw:mb-4">
         {{ t("settings.correlation.discoveredServicesDescription") }}
       </div>
       <q-btn
+        data-test="refresh-discovered-services-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         flat
-        dense
-        color="primary"
-        icon="refresh"
         :label="t('common.refresh')"
         @click="loadServices"
         :loading="loading"
@@ -42,18 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
       <div class="text-body1 text-negative">{{ error }}</div>
       <q-btn
+        data-test="retry-discovered-services-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         flat
-        color="primary"
         :label="t('settings.correlation.retry')"
         @click="loadServices"
-        class="tw:mt-4"
       />
     </div>
 
     <!-- Empty State -->
     <div v-else-if="groupedServices.groups.length === 0" class="tw:text-center tw:py-8">
       <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
-      <div class="text-body1 text-grey-7">{{ t("settings.correlation.noServicesYet") }}</div>
+      <div class="text-body1">{{ t("settings.correlation.noServicesYet") }}</div>
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
@@ -68,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon name="hub" size="1.25rem" color="primary" />
             <span class="tw:font-semibold text-primary">{{ groupedServices.total_fqns }}</span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.fqns") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.fqns") }}</span>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon name="miscellaneous_services" size="1.25rem" color="primary" />
             <span class="tw:font-semibold text-primary">{{ groupedServices.total_services }}</span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.services") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.services") }}</span>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:font-semibold" :class="fullCorrelationCount > 0 ? 'text-positive' : 'text-warning'">
               {{ fullCorrelationCount }}
             </span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.fullyCorrelated") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.fullyCorrelated") }}</span>
           </div>
         </div>
 
@@ -137,186 +138,189 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- View: By FQN (default) - Compact table view -->
-      <q-table
-        v-if="viewMode === 'fqn'"
-        :rows="filteredGroups"
-        :columns="fqnViewColumns"
-        row-key="fqn"
-        flat
-        dense
-        class="tw:rounded-lg tw:border"
-        :pagination="{ rowsPerPage: 20 }"
-      >
-        <template #body-cell-status="props">
-          <q-td :props="props">
-            <q-icon
-              :name="props.row.stream_summary.has_full_correlation ? 'check_circle' : 'warning'"
-              :color="props.row.stream_summary.has_full_correlation ? 'positive' : 'warning'"
-              size="1.25rem"
-            />
-          </q-td>
-        </template>
-        <template #body-cell-fqn="props">
-          <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.fqn }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-correlation_key="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:flex-col tw:gap-1">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-chip
-                  size="sm"
-                  :color="getDerivedFromColor(getCorrelationSource(props.row))"
-                  text-color="white"
-                  dense
-                >
-                  {{ formatDerivedFrom(getCorrelationSource(props.row)) }}
-                </q-chip>
-                <span class="tw:font-mono tw:text-xs text-grey-7">
-                  {{ getCorrelationDimensionValue(props.row) }}
-                </span>
+      <div class="app-table-container" v-if="viewMode === 'fqn'">
+        <q-table
+          
+          :rows="filteredGroups"
+          :columns="fqnViewColumns"
+          row-key="fqn"
+          flat
+          dense
+          class="tw:rounded-lg tw:border"
+          :pagination="{ rowsPerPage: 20 }"
+        >
+          <template #body-cell-status="props">
+            <q-td :props="props">
+              <q-icon
+                :name="props.row.stream_summary.has_full_correlation ? 'check_circle' : 'warning'"
+                :color="props.row.stream_summary.has_full_correlation ? 'positive' : 'warning'"
+                size="1.25rem"
+              />
+            </q-td>
+          </template>
+          <template #body-cell-fqn="props">
+            <q-td :props="props">
+              <span>{{ props.row.fqn }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-correlation_key="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:flex-col tw:gap-1">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <q-chip
+                    size="12px"
+                    :color="getDerivedFromColor(getCorrelationSource(props.row))"
+                    text-color="white"
+                    dense
+                  >
+                    {{ formatDerivedFrom(getCorrelationSource(props.row)) }}
+                  </q-chip>
+                  <span>
+                    {{ getCorrelationDimensionValue(props.row) }}
+                  </span>
+                </div>
               </div>
-            </div>
-          </q-td>
-        </template>
-        <template #body-cell-services="props">
-          <q-td :props="props">
-            <q-btn
-              flat
-              dense
-              size="sm"
-              :label="`${props.row.services.length} ${t('settings.correlation.services').toLowerCase()}`"
-              @click="showServicesDialog(props.row)"
-            >
-              <q-tooltip>{{ t("settings.correlation.viewServices") }}</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
-        <template #body-cell-telemetry="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
-              <q-badge
-                v-if="props.row.stream_summary.logs_count > 0"
-                color="blue"
-                text-color="white"
+            </q-td>
+          </template>
+          <template #body-cell-services="props">
+            <q-td :props="props">
+              <q-btn
+                flat
+                dense
+                size="13px"
+                :label="`${props.row.services.length} ${t('settings.correlation.services').toLowerCase()}`"
+                @click="showServicesDialog(props.row)"
               >
-                {{ props.row.stream_summary.logs_count }} {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.stream_summary.traces_count > 0"
-                color="orange"
-                text-color="white"
-              >
-                {{ props.row.stream_summary.traces_count }} {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.stream_summary.metrics_count > 0"
-                color="green"
-                text-color="white"
-              >
-                {{ props.row.stream_summary.metrics_count }} {{ t("settings.correlation.metrics") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.metrics") }}
-              </q-badge>
-            </div>
-          </q-td>
-        </template>
-      </q-table>
+                <q-tooltip>{{ t("settings.correlation.viewServices") }}</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+          <template #body-cell-telemetry="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:gap-1">
+                <q-badge
+                  v-if="props.row.stream_summary.logs_count > 0"
+                  color="blue"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.logs_count }} {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.stream_summary.traces_count > 0"
+                  color="orange"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.traces_count }} {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.stream_summary.metrics_count > 0"
+                  color="green"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.metrics_count }} {{ t("settings.correlation.metrics") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.metrics") }}
+                </q-badge>
+              </div>
+            </q-td>
+          </template>
+        </q-table>
+      </div>
 
       <!-- View: By Service Name -->
-      <q-table
-        v-else-if="viewMode === 'service'"
-        :rows="filteredServicesList"
-        :columns="serviceNameViewColumns"
-        row-key="uniqueKey"
-        flat
-        dense
-        class="tw:rounded-lg tw:border"
-        :pagination="{ rowsPerPage: 20 }"
-      >
-        <template #body-cell-service_name="props">
-          <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.service_name }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-fqn="props">
-          <q-td :props="props">
-            <span class="tw:font-mono tw:text-sm">{{ props.row.fqn }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-stream_types="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
-              <q-badge
-                v-if="props.row.streams.logs?.length"
-                color="blue"
+      <div class="app-table-container" v-else-if="viewMode === 'service'">
+        <q-table
+          :rows="filteredServicesList"
+          :columns="serviceNameViewColumns"
+          row-key="uniqueKey"
+          flat
+          dense
+          class="tw:rounded-lg tw:border"
+          :pagination="{ rowsPerPage: 20 }"
+        >
+          <template #body-cell-service_name="props">
+            <q-td :props="props">
+              <span>{{ props.row.service_name }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-fqn="props">
+            <q-td :props="props">
+              <span>{{ props.row.fqn }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-stream_types="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:gap-1">
+                <q-badge
+                  v-if="props.row.streams.logs?.length"
+                  color="blue"
+                  text-color="white"
+                >
+                  {{ props.row.streams.logs.length }} {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.streams.traces?.length"
+                  color="orange"
+                  text-color="white"
+                >
+                  {{ props.row.streams.traces.length }} {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.streams.metrics?.length"
+                  color="green"
+                  text-color="white"
+                >
+                  {{ props.row.streams.metrics.length }} {{ t("settings.correlation.metrics") }}
+                </q-badge>
+              </div>
+            </q-td>
+          </template>
+          <template #body-cell-derived_from="props">
+            <q-td :props="props">
+              <q-chip
+                size="sm"
+                :color="getDerivedFromColor(props.row.derived_from)"
                 text-color="white"
+                dense
               >
-                {{ props.row.streams.logs.length }} {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.streams.traces?.length"
-                color="orange"
-                text-color="white"
+                {{ formatDerivedFrom(props.row.derived_from) }}
+              </q-chip>
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="visibility"
+                @click="showDimensionsDialog(props.row)"
               >
-                {{ props.row.streams.traces.length }} {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.streams.metrics?.length"
-                color="green"
-                text-color="white"
-              >
-                {{ props.row.streams.metrics.length }} {{ t("settings.correlation.metrics") }}
-              </q-badge>
-            </div>
-          </q-td>
-        </template>
-        <template #body-cell-derived_from="props">
-          <q-td :props="props">
-            <q-chip
-              size="sm"
-              :color="getDerivedFromColor(props.row.derived_from)"
-              text-color="white"
-              dense
-            >
-              {{ formatDerivedFrom(props.row.derived_from) }}
-            </q-chip>
-          </q-td>
-        </template>
-        <template #body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="visibility"
-              @click="showDimensionsDialog(props.row)"
-            >
-              <q-tooltip>{{ t("settings.correlation.viewDimensions") }}</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
-      </q-table>
+                <q-tooltip>{{ t("settings.correlation.viewDimensions") }}</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </div>
 
       <!-- View: By Stream -->
       <q-list v-else-if="viewMode === 'stream'" separator class="tw:rounded-lg tw:border">
