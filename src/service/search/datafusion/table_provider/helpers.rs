@@ -47,6 +47,7 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use vortex_buffer::Buffer;
+use vortex_datafusion::VortexAccessPlan;
 use vortex_scan::Selection;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
@@ -144,7 +145,7 @@ fn generate_vortex_access_plan(
         .collect();
 
     let buffer = Buffer::from(indices);
-    let selection = Selection::IncludeByIndex(buffer);
+    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(buffer));
     Some(Arc::new(selection))
 }
 
