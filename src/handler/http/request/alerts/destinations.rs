@@ -274,7 +274,7 @@ pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) ->
 /// DeleteDestinationBulk
 #[utoipa::path(
     delete,
-    path = "/{org_id}/alerts/destinations",
+    path = "/{org_id}/alerts/destinations/bulk",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertDestinationBulk",

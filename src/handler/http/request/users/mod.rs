@@ -391,8 +391,8 @@ pub async fn delete(
 
 /// BulkRemoveUserFromOrganization
 #[utoipa::path(
-    post,
-    path = "/{org_id}/users/{email_id}",
+    delete,
+    path = "/{org_id}/users/bulk",
     context_path = "/api",
     tag = "Users",
     operation_id = "BulkRemoveUserFromOrg",
@@ -468,7 +468,7 @@ pub async fn delete_bulk(
 /// AuthenticateUser
 #[utoipa::path(
 post,
-path = "/{org_id}/users",
+path = "/login",
 context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
@@ -962,8 +962,8 @@ pub async fn get_auth(
 
 /// ListUserRoles
 #[utoipa::path(
-    post,
-    path = "/{org_id}/users",
+    get,
+    path = "/{org_id}/users/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserRoles",
@@ -1032,7 +1032,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 /// ListUserInvitations
 #[cfg(feature = "cloud")]
 #[utoipa::path(
-    post,
+    get,
+    path = "/invites",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",

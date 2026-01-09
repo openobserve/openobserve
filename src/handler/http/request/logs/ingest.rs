@@ -68,7 +68,7 @@ fn insert_process_time_header(time: i64, headers: &mut HeaderMap) {
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_bulk",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionBulk",
@@ -149,7 +149,7 @@ pub async fn bulk(
 /// _multi ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_multi",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionMulti",
@@ -237,7 +237,7 @@ pub async fn multi(
 /// _json ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_json",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionJson",
@@ -318,7 +318,7 @@ pub async fn json(
 /// _kinesis_firehose ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_kinesis_firehose",
     context_path = "/api",
     tag = "Logs",
     operation_id = "AWSLogsIngestion",
@@ -580,7 +580,7 @@ pub async fn otlp_logs_write(
 /// HEC format compatible ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_hec",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionHec",

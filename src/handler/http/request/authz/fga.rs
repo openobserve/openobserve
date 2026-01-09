@@ -35,7 +35,7 @@ use crate::{
 /// CreateRoles
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/roles",
     context_path = "/api",
     tag = "Roles",
     operation_id = "CreateRoles",
@@ -87,7 +87,7 @@ pub async fn create_role(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/roles",
     context_path = "/api",
     tag = "Roles",
     operation_id = "CreateRoles",
@@ -119,7 +119,7 @@ pub async fn create_role(
 /// DeleteRole
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{role_id}",
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
@@ -152,7 +152,7 @@ pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> R
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/roles/bulk",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRoleBulk",
@@ -221,7 +221,7 @@ pub async fn delete_role_bulk(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/roles/bulk",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRoleBulk",
@@ -254,7 +254,7 @@ pub async fn delete_role_bulk(
 /// DeleteRole
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{role_id}",
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "DeleteRole",
@@ -283,7 +283,7 @@ pub async fn delete_role(Path(_path): Path<(String, String)>) -> Response {
 /// ListRoles
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/roles",
     context_path = "/api",
     tag = "Roles",
     operation_id = "ListRoles",
@@ -351,7 +351,7 @@ pub async fn get_roles(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/roles",
     context_path = "/api",
     tag = "Roles",
     operation_id = "ListRoles",
@@ -379,7 +379,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
 /// UpdateRoles
 #[utoipa::path(
     put,
-    path = "/{org_id}/{role_id}",
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "UpdateRoles",
@@ -423,8 +423,8 @@ pub async fn update_role(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
-    put,
-    path = "/{org_id}/{role_id}",
+    post,
+    path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "UpdateRoles",
@@ -453,7 +453,7 @@ pub async fn update_role(
 /// GetResourcePermission
 #[utoipa::path(
     get,
-    path = "/{org_id}/{role_id}/{resource}",
+    path = "/{org_id}/roles/{role_id}/permissions/{resource}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetResourcePermission",
@@ -484,7 +484,7 @@ pub async fn get_role_permissions(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{role_id}/{resource}",
+    path = "/{org_id}/roles/{role_id}/permissions/{resource}",
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetResourcePermission",
@@ -511,7 +511,7 @@ pub async fn get_role_permissions(Path(_path): Path<(String, String, String)>) -
 /// GetRoleUsers
 #[utoipa::path(
     get,
-    path = "/{org_id}/{role_id}",
+    path = "/{org_id}/roles/{role_id}/users",
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetRoleUsers",
@@ -539,7 +539,7 @@ pub async fn get_users_with_role(Path((org_id, role_id)): Path<(String, String)>
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{role_id}",
+    path = "/{org_id}/roles/{role_id}/users",
     context_path = "/api",
     tag = "Roles",
     operation_id = "GetRoLesUsers",
@@ -565,7 +565,7 @@ pub async fn get_users_with_role(Path(_path): Path<(String, String)>) -> Respons
 /// GetUserRoles
 #[utoipa::path(
     get,
-    path = "/{org_id}/{user_email}",
+    path = "/{org_id}/users/{user_email}/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserRoles",
@@ -592,7 +592,7 @@ pub async fn get_roles_for_user(Path((org_id, user_email)): Path<(String, String
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{user_email}",
+    path = "/{org_id}/users/{user_email}/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserRoles",
@@ -618,7 +618,7 @@ pub async fn get_roles_for_user(Path(_path): Path<(String, String)>) -> Response
 /// GetUserGroups
 #[utoipa::path(
     get,
-    path = "/{org_id}/{user_email}",
+    path = "/{org_id}/users/{user_email}/groups",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserGroups",
@@ -646,7 +646,7 @@ pub async fn get_groups_for_user(Path((org_id, user_email)): Path<(String, Strin
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/{user_email}",
+    path = "/{org_id}/users/{user_email}/groups",
     context_path = "/api",
     tag = "Users",
     operation_id = "GetUserGroups",
@@ -672,7 +672,7 @@ pub async fn get_groups_for_user(Path(_path): Path<(String, String)>) -> Respons
 /// CreateGroup
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/groups",
     context_path = "/api",
     tag = "Groups",
     operation_id = "CreateGroup",
@@ -714,7 +714,7 @@ pub async fn create_group(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/groups",
     context_path = "/api",
     tag = "Groups",
     operation_id = "CreateGroup",
@@ -743,7 +743,7 @@ pub async fn create_group(
 /// UpdateGroup
 #[utoipa::path(
     put,
-    path = "/{org_id}/{group_name}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "UpdateGroup",
@@ -786,7 +786,7 @@ pub async fn update_group(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     put,
-    path = "/{org_id}/{group_name}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "UpdateGroup",
@@ -816,7 +816,7 @@ pub async fn update_group(
 /// ListGroups
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/groups",
     context_path = "/api",
     tag = "Groups",
     operation_id = "ListGroups",
@@ -880,7 +880,7 @@ pub async fn get_groups(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/groups",
     context_path = "/api",
     tag = "Groups",
     operation_id = "ListGroups",
@@ -905,7 +905,7 @@ pub async fn get_groups(Path(_path): Path<String>) -> Response {
 /// GetGroup
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "GetGroup",
@@ -916,6 +916,7 @@ pub async fn get_groups(Path(_path): Path<String>) -> Response {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
@@ -932,7 +933,7 @@ pub async fn get_group_details(Path((org_id, group_name)): Path<(String, String)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "GetGroup",
@@ -943,6 +944,7 @@ pub async fn get_group_details(Path((org_id, group_name)): Path<(String, String)
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("group_name" = String, Path, description = "Group name"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserGroup)),
@@ -957,7 +959,7 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
 /// GetResources
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/resources",
     context_path = "/api",
     tag = "Resources",
     operation_id = "GetResources",
@@ -992,7 +994,7 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/resources",
     context_path = "/api",
     tag = "Resources",
     operation_id = "GetResources",
@@ -1017,7 +1019,7 @@ pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
 /// DeleteGroup
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{group_name}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroup",
@@ -1046,7 +1048,7 @@ pub async fn delete_group(Path((org_id, group_name)): Path<(String, String)>) ->
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/groups/bulk",
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroupBulk",
@@ -1116,7 +1118,7 @@ pub async fn delete_group_bulk(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/groups/bulk",
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroupBulk",
@@ -1148,7 +1150,7 @@ pub async fn delete_group_bulk(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{group_name}",
+    path = "/{org_id}/groups/{group_name}",
     context_path = "/api",
     tag = "Groups",
     operation_id = "DeleteGroup",

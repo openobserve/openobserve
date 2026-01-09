@@ -50,7 +50,7 @@ fn get_process_time() -> i64 {
 /// _json ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/ingest/metrics/_json",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "MetricsIngestionJson",

@@ -43,7 +43,7 @@ use crate::{
 /// prometheus remote-write endpoint for metrics
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/prometheus/api/v1/write",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRemoteWrite",
@@ -89,8 +89,8 @@ pub async fn remote_write(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
@@ -258,8 +258,8 @@ async fn query(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query_range",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
@@ -340,8 +340,8 @@ pub async fn query_range_post(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query_exemplars",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQueryExemplars",
@@ -592,8 +592,8 @@ async fn query_range(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/metadata",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
@@ -667,8 +667,8 @@ pub async fn metadata(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/series",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
@@ -832,8 +832,8 @@ async fn series(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/labels",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
@@ -944,8 +944,8 @@ async fn labels(org_id: &str, req: config::meta::promql::RequestLabels) -> Respo
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{label_name}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/label/{label_name}/values",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
@@ -1079,8 +1079,8 @@ fn validate_metadata_params(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
-    post,
-    path = "/prometheus/format_query",
+    get,
+    path = "/{org_id}/prometheus/api/v1/format_query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusFormatQuery",

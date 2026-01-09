@@ -68,7 +68,7 @@ impl From<ReportError> for Response {
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/reports",
     context_path = "/api",
     tag = "Reports",
     operation_id = "CreateReport",
@@ -119,7 +119,7 @@ pub async fn create_report(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/dashboards/{dashboard_id}/reports",
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "UpdateReport",
@@ -166,7 +166,7 @@ pub async fn update_report(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/reports",
     context_path = "/api",
     tag = "Reports",
     operation_id = "ListReports",
@@ -265,7 +265,7 @@ pub async fn list_reports(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/dashboards/{dashboard_id}/reports",
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "GetReport",
@@ -301,7 +301,7 @@ pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Respons
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/dashboards/{dashboard_id}/reports",
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReport",
@@ -340,7 +340,7 @@ pub async fn delete_report(Path((org_id, name)): Path<(String, String)>) -> Resp
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/reports/bulk",
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReportBulk",
@@ -408,7 +408,7 @@ pub async fn delete_report_bulk(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/dashboards/{dashboard_id}/reports",
+    path = "/{org_id}/reports/{name}/enable",
     context_path = "/api",
     tag = "Report",
     operation_id = "EnableReport",
@@ -453,8 +453,8 @@ pub async fn enable_report(
 /// TriggerReport
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards/{dashboard_id}/reports",
+    put,
+    path = "/{org_id}/reports/{name}/trigger",
     context_path = "/api",
     tag = "Reports",
     operation_id = "TriggerReport",

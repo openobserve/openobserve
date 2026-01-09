@@ -60,7 +60,7 @@ impl From<FolderError> for Response {
 /// CreateFolder
 #[utoipa::path(
     post,
-    path = "/{org_id}/{folder_type}",
+    path = "/v2/{org_id}/folders/{folder_type}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "CreateFolder",
@@ -108,7 +108,7 @@ pub async fn create_folder(
 /// UpdateFolder
 #[utoipa::path(
     put,
-    path = "/{org_id}/{folder_type}/{folder_id}",
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "UpdateFolder",
@@ -153,7 +153,7 @@ pub async fn update_folder(
 /// ListFolders
 #[utoipa::path(
     get,
-    path = "/{org_id}/{folder_type}",
+    path = "/v2/{org_id}/folders/{folder_type}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "ListFolders",
@@ -197,7 +197,7 @@ pub async fn list_folders(
 /// GetFolder
 #[utoipa::path(
     get,
-    path = "/{org_id}/{folder_type}/{folder_id}",
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolder",
@@ -235,7 +235,7 @@ pub async fn get_folder(
 /// GetFolderByName
 #[utoipa::path(
     get,
-    path = "/{org_id}/{folder_type}/{folder_name}",
+    path = "/v2/{org_id}/folders/{folder_type}/name/{folder_name}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolderByName",
@@ -273,7 +273,7 @@ pub async fn get_folder_by_name(
 /// DeleteFolder
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{folder_type}/{folder_id}",
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "DeleteFolder",

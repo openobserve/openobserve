@@ -52,7 +52,7 @@ use crate::{
 /// TracesIngest
 #[utoipa::path(
     post,
-    path = "/{org_id}/traces",
+    path = "/{org_id}/v1/traces",
     context_path = "/api",
     tag = "Traces",
     operation_id = "PostTraces",

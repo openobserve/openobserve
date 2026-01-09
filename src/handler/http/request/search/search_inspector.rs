@@ -55,7 +55,7 @@ use crate::{
 
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/search/profile",
     context_path = "/api",
     tag = "Search",
     operation_id = "GetSearchProfile",

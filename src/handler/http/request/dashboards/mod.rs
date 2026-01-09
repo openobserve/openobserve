@@ -261,8 +261,8 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
 
 /// ExportDashboard
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards/{dashboard_id}",
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}/export",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ExportDashboard",
@@ -329,7 +329,7 @@ pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String
 /// DeleteDashboardBulk
 #[utoipa::path(
     delete,
-    path = "/{org_id}/dashboards",
+    path = "/{org_id}/dashboards/bulk",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboardBulk",
@@ -404,8 +404,8 @@ pub async fn delete_dashboard_bulk(
 
 /// MoveDashboard
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards/{dashboard_id}",
+    put,
+    path = "/{org_id}/folders/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboard",
@@ -457,8 +457,8 @@ pub async fn move_dashboard(
 
 /// MoveDashboards
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards",
+    patch,
+    path = "/{org_id}/dashboards/move",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboards",

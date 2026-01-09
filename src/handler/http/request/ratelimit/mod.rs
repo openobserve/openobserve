@@ -162,8 +162,8 @@ impl From<RatelimitError> for Response {
 /// listApiModule
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/ratelimit/api_modules",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listApiModule",
@@ -216,8 +216,8 @@ pub async fn api_modules(Path(org_id): Path<String>) -> Response {
 /// listModuleRatelimitRule
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/ratelimit/module_list",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listModuleRatelimitRule",
@@ -293,8 +293,8 @@ pub async fn list_module_ratelimit(
 /// listRoleRatelimitRule
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/ratelimit/role_list",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listRoleRatelimitRule",
@@ -391,7 +391,7 @@ pub async fn list_role_ratelimit(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}",
+    path = "/{org_id}/ratelimit/update",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "UpdateRatelimitRule",

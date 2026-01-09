@@ -29,7 +29,7 @@ use crate::{
 /// Shorten a URL
 #[utoipa::path(
     post,
-    path = "/{short_id}",
+    path = "/{org_id}/short",
     context_path = "/api",
     operation_id = "createShortUrl",
     summary = "Create short URL",
@@ -85,7 +85,7 @@ pub struct RetrieveQuery {
 /// Retrieve the original URL from a short_id
 #[utoipa::path(
     get,
-    path = "/{short_id}",
+    path = "/{org_id}/short/{short_id}",
     context_path = "/short",
     operation_id = "resolveShortUrl",
     summary = "Resolve short URL",

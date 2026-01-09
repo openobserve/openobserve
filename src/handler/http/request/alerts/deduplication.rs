@@ -26,7 +26,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDeduplicationConfig",
@@ -63,7 +63,7 @@ pub async fn get_config(Path(org_id): Path<String>) -> Response {
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDeduplicationConfig",
@@ -88,8 +88,8 @@ pub async fn get_config(_org_id: Path<String>) -> Response {
 /// Set deduplication configuration for an organization
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
-    put,
-    path = "/{org_id}/alerts",
+    post,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SetDeduplicationConfig",
@@ -124,8 +124,8 @@ pub async fn set_config(
 /// Set deduplication configuration for an organization (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
-    put,
-    path = "/{org_id}/alerts",
+    post,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SetDeduplicationConfig",
@@ -239,7 +239,7 @@ pub struct SemanticGroupModification {
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetSemanticGroups",
@@ -268,7 +268,7 @@ pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetSemanticGroups",
@@ -298,7 +298,7 @@ pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups/preview-diff",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "PreviewSemanticGroupsDiff",
@@ -386,7 +386,7 @@ pub async fn preview_semantic_groups_diff(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups/preview-diff",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "PreviewSemanticGroupsDiff",
@@ -423,7 +423,7 @@ pub async fn preview_semantic_groups_diff(
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     put,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SaveSemanticGroups",
@@ -531,7 +531,7 @@ pub async fn save_semantic_groups(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     put,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SaveSemanticGroups",

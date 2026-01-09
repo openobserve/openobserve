@@ -33,7 +33,7 @@ use crate::{
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/{view_id}",
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "GetSavedView",
@@ -77,7 +77,7 @@ pub async fn get_view(Path(path): Path<(String, String)>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/savedviews",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "ListSavedViews",
@@ -116,7 +116,7 @@ pub async fn get_views(Path(path): Path<String>) -> Response {
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{view_id}",
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "DeleteSavedViews",
@@ -157,7 +157,7 @@ pub async fn delete_view(Path(path): Path<(String, String)>) -> Response {
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/savedviews",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "CreateSavedViews",
@@ -206,7 +206,7 @@ pub async fn create_view(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/{view_id}",
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "UpdateSavedViews",

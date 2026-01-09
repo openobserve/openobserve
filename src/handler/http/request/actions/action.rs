@@ -114,7 +114,7 @@ pub async fn delete_action(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) -> Re
 /// Delete Action
 #[utoipa::path(
     delete,
-    path = "/{org_id}/actions",
+    path = "/{org_id}/actions/bulk",
     context_path = "/api",
     tag = "Actions",
     operation_id = "DeleteActionBulk",
@@ -194,7 +194,7 @@ pub async fn delete_action_bulk(
 /// Serve Action zip file
 #[utoipa::path(
     get,
-    path = "/{org_id}/actions/{ksuid}",
+    path = "/{org_id}/actions/download/{ksuid}",
     context_path = "/api",
     tag = "Actions",
     operation_id = "GetActionZip",
@@ -250,7 +250,7 @@ pub async fn serve_action_zip(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) ->
 
 /// Update Action
 #[utoipa::path(
-    patch,
+    put,
     path = "/{org_id}/actions/{action_id}",
     context_path = "/api",
     tag = "Actions",
@@ -434,7 +434,7 @@ pub async fn get_action_from_id(Path((org_id, action_id)): Path<(String, String)
 /// processed, and executed.
 #[utoipa::path(
     post,
-    path = "/{org_id}/actions",
+    path = "/{org_id}/actions/upload",
     context_path = "/api",
     tag = "Actions",
     operation_id = "UploadZippedAction",

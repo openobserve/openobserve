@@ -53,7 +53,7 @@ use crate::{
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/organizations",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetUserOrganizations",
@@ -226,7 +226,7 @@ pub async fn all_organizations(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/summary",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationSummary",
@@ -256,7 +256,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/passcode",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
@@ -297,7 +297,7 @@ pub async fn get_user_passcode(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/passcode",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
@@ -338,7 +338,7 @@ pub async fn update_user_passcode(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserRumIngestToken",
@@ -379,7 +379,7 @@ pub async fn get_user_rumtoken(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserRumIngestToken",
@@ -420,7 +420,7 @@ pub async fn update_user_rumtoken(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganizationUserRumIngestToken",
@@ -461,7 +461,7 @@ pub async fn create_user_rumtoken(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/organizations",
+    path = "/organizations",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganization",
@@ -501,7 +501,8 @@ pub async fn create_org(
 
 #[cfg(feature = "cloud")]
 #[utoipa::path(
-    post,
+    put,
+    path = "/{org_id}/extend_trial_period",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "ExtendTrialPeriod",
@@ -560,8 +561,8 @@ pub async fn extend_trial_period(
 
 /// RenameOrganization
 #[utoipa::path(
-    post,
-    path = "/{org_id}/organizations",
+    put,
+    path = "/{org_id}/rename",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "RenameOrganization",
@@ -741,7 +742,7 @@ pub async fn accept_org_invite(
 /// the user to have access to this special organization.
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/node/list",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationNodeList",
@@ -833,7 +834,7 @@ pub async fn node_list_impl(
 /// the user to have access to this special organization.
 #[utoipa::path(
     get,
-    path = "/{org_id}/organizations",
+    path = "/{org_id}/cluster/info",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationClusterInfo",

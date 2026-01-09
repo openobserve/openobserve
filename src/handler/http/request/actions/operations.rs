@@ -31,7 +31,7 @@ use {
 /// Test Action
 #[utoipa::path(
     post,
-    path = "/{org_id}/actions/{action_id}/test",
+    path = "/{org_id}/actions/test/{action_id}",
     context_path = "/api",
     tag = "Actions",
     operation_id = "InvokeAction",
@@ -91,8 +91,8 @@ pub async fn test_action(
 
 /// Pause Action
 #[utoipa::path(
-    put,
-    path = "/{org_id}/actions/{action_id}/pause",
+    get,
+    path = "/{org_id}/actions/pause/{action_id}",
     context_path = "/api",
     tag = "Actions",
     operation_id = "PauseAction",
@@ -116,8 +116,8 @@ pub async fn pause_action(_path: Path<(String, String)>) -> Response {
 
 /// Resume Action
 #[utoipa::path(
-    put,
-    path = "/{org_id}/actions/{action_id}/resume",
+    get,
+    path = "/{org_id}/actions/resume/{action_id}",
     context_path = "/api",
     tag = "Actions",
     operation_id = "ResumeAction",
