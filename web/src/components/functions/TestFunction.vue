@@ -628,16 +628,25 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  const errMsg = err.response?.data?.message || "Error in testing function";
-  outputEventsErrorMsg.value = "Error while transforming results";
+  const rawErrMsg = err.response?.data?.message || "Error in testing function";
+  const isJSFunction = String(props.vrlFunction.transType) === '1';
+
+  // Display the raw error message from the backend without modification
+  // The backend now extracts detailed error information from rquickjs
+  outputEventsErrorMsg.value = isJSFunction
+    ? "JavaScript error - see details below"
+    : "Error while transforming results";
 
   q.notify({
     type: "negative",
-    message: errMsg,
-    timeout: 3000,
+    message: rawErrMsg,
+    timeout: 5000,
   });
 
-  outputEvents.value = errMsg;
+  outputEvents.value = rawErrMsg;
+
+  // Emit error to parent for display in error section
+  emit("function-error", rawErrMsg);
 };
 
 const testFunction = async () => {
@@ -651,6 +660,7 @@ const testFunction = async () => {
   const payload = {
     function: props.vrlFunction.function,
     events: JSON.parse(inputEvents.value),
+    trans_type: props.vrlFunction.transType ? parseInt(props.vrlFunction.transType) : undefined,
   };
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)

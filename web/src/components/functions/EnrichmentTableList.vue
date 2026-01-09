@@ -341,6 +341,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @confirm="handleRetryConfirm"
       @cancel="showRetryDialog = false"
     />
+
+    <!-- Job Details Dialog -->
+    <q-dialog v-model="showJobDetailsDialog">
+      <q-card style="min-width: 500px; max-width: 600px">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Enrichment Table Job Details</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section>
+          <div class="q-gutter-sm">
+            <div><strong>Table Name:</strong> {{ selectedJobDetails.tableName }}</div>
+
+            <div class="q-mt-md"><strong>Source URL:</strong></div>
+            <div class="text-grey-8 q-pl-md text-body2 tw:break-all">
+              {{ selectedJobDetails.url }}
+            </div>
+
+            <div class="q-mt-md">
+              <strong>Status:</strong>
+              <q-badge color="negative" label="Failed" class="q-ml-sm" />
+            </div>
+
+            <div>
+              <strong>Retry Count:</strong>
+              {{ selectedJobDetails.retryCount }} of 3
+            </div>
+
+            <div class="q-mt-md"><strong>Error Details:</strong></div>
+            <q-card flat bordered class="bg-negative-1">
+              <q-card-section>
+                <pre class="text-negative text-body2 q-ma-none tw:whitespace-pre-wrap tw:break-words">{{ selectedJobDetails.errorMessage }}</pre>
+              </q-card-section>
+            </q-card>
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Close" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -402,12 +445,19 @@ export default defineComponent({
     const selectedEnrichmentTables = ref<any[]>([]);
     const showEnrichmentSchema = ref<boolean>(false);
     const showRetryDialog = ref<boolean>(false);
+    const showJobDetailsDialog = ref<boolean>(false);
     const retryJobData = reactive({
       tableName: "",
       url: "",
       supportsRange: false,
       lastBytePosition: 0,
       appendData: false,
+    });
+    const selectedJobDetails = reactive({
+      tableName: "",
+      url: "",
+      errorMessage: "",
+      retryCount: 0,
     });
     const filterQuery = ref("");
     const { track } = useReo();
@@ -428,10 +478,11 @@ export default defineComponent({
       },
       {
         name: "type",
-        field: "type",
+        field: (row: any) => row.urlJob ? "Url" : "File",
         label: "Type",
         align: "left",
         sortable: true,
+        sort: (a: string, b: string) => a.localeCompare(b),
         style: "width: 150px",
       },
       {
@@ -895,23 +946,11 @@ export default defineComponent({
     };
 
     const showFailedJobDetails = (row: any) => {
-      $q.dialog({
-        title: 'Enrichment Table Job Details',
-        message: `
-          <div><strong>Table Name:</strong> ${row.name}</div>
-          <div><strong>Source URL:</strong> ${row.urlJob?.url || 'N/A'}</div>
-          <div><strong>Status:</strong> Failed</div>
-          <div><strong>Retry Count:</strong> ${row.urlJob?.retry_count || 0} of 3</div>
-          <br/>
-          <div><strong>Error Details:</strong></div>
-          <div>${row.urlJob?.error_message || 'Unknown error'}</div>
-        `,
-        html: true,
-        ok: {
-          label: 'Close',
-          flat: true,
-        },
-      });
+      selectedJobDetails.tableName = row.name;
+      selectedJobDetails.url = row.urlJob?.url || 'N/A';
+      selectedJobDetails.errorMessage = row.urlJob?.error_message || 'Unknown error';
+      selectedJobDetails.retryCount = row.urlJob?.retry_count || 0;
+      showJobDetailsDialog.value = true;
     };
 
     const retryUrlJob = (row: any) => {
@@ -1041,6 +1080,8 @@ export default defineComponent({
       formatSizeFromMB,
       filterTabs,
       updateActiveTab,
+      showJobDetailsDialog,
+      selectedJobDetails,
     };
   },
   computed: {
@@ -1087,4 +1128,6 @@ export default defineComponent({
     transform: rotate(360deg);
   }
 }
+
+/* No custom styles needed - using Quasar components */
 </style>

@@ -1394,7 +1394,7 @@ pub struct Limit {
     pub traces_file_retention: String,
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
-    #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "hourly")]
+    #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
@@ -1402,8 +1402,12 @@ pub struct Limit {
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
+    pub metrics_max_series_response: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
+    #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
+    pub metrics_inlist_filter_enabled: bool,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds

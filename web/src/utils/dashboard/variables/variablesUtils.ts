@@ -1,3 +1,5 @@
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+
 export const formatInterval = (interval: any) => {
   switch (true) {
     // 0.01s
@@ -133,52 +135,188 @@ export const formatRateInterval = (interval: any) => {
   return formattedStr;
 };
 
-export const processVariableContent = (content: string, variablesData: any) => {
+/**
+ * Resolves variables with scope precedence: panel > tab > global
+ * Extracted to avoid code duplication
+ */
+const resolveVariablesWithPrecedence = (
+  variablesData: any,
+  context?: { tabId?: string; panelId?: string },
+): Record<string, any> => {
+  const resolvedVariables: Record<string, any> = {};
+
+  if (!context || !variablesData?.values) {
+    return resolvedVariables;
+  }
+
+  // Group variables by name to handle multiple scopes
+  const variablesByName: Record<string, any[]> = {};
+  variablesData.values.forEach((variable: any) => {
+    if (variable.name) {
+      if (!variablesByName[variable.name]) {
+        variablesByName[variable.name] = [];
+      }
+      variablesByName[variable.name].push(variable);
+    }
+  });
+
+  // Resolve each variable with precedence: panel > tab > global
+  Object.keys(variablesByName).forEach((name) => {
+    const variables = variablesByName[name];
+    let effectiveValue = null;
+    let found = false;
+
+    // 1. Check panel-level first
+    if (context.panelId) {
+      // New format: variable has panelId property directly
+      const panelVar = variables.find(
+        (v: any) => v.scope === "panels" && v.panelId === context.panelId,
+      );
+      if (panelVar && panelVar.value !== null && panelVar.value !== undefined) {
+        effectiveValue = panelVar.value;
+        found = true;
+      } else {
+        // Old format: value is array of {panelId, value}
+        const panelVarOld = variables.find((v: any) => v.scope === "panels");
+        if (panelVarOld && Array.isArray(panelVarOld.value)) {
+          const panelValue = panelVarOld.value.find(
+            (pv: any) => pv.panelId === context.panelId,
+          );
+          if (
+            panelValue &&
+            panelValue.value !== null &&
+            panelValue.value !== undefined
+          ) {
+            effectiveValue = panelValue.value;
+            found = true;
+          }
+        }
+      }
+    }
+
+    // 2. Check tab-level next
+    if (!found && context.tabId) {
+      // New format: variable has tabId property directly
+      const tabVar = variables.find(
+        (v: any) => v.scope === "tabs" && v.tabId === context.tabId,
+      );
+      if (tabVar && tabVar.value !== null && tabVar.value !== undefined) {
+        effectiveValue = tabVar.value;
+        found = true;
+      } else {
+        // Old format: value is array of {tabId, value}
+        const tabVarOld = variables.find((v: any) => v.scope === "tabs");
+        if (tabVarOld && Array.isArray(tabVarOld.value)) {
+          const tabValue = tabVarOld.value.find(
+            (tv: any) => tv.tabId === context.tabId,
+          );
+          if (
+            tabValue &&
+            tabValue.value !== null &&
+            tabValue.value !== undefined
+          ) {
+            effectiveValue = tabValue.value;
+            found = true;
+          }
+        }
+      }
+    }
+
+    // 3. Fall back to global
+    if (!found) {
+      const globalVar = variables.find(
+        (v: any) => v.scope === "global" || !v.scope,
+      );
+      if (
+        globalVar &&
+        globalVar.value !== null &&
+        globalVar.value !== undefined
+      ) {
+        effectiveValue = globalVar.value;
+        found = true;
+      }
+    }
+
+    resolvedVariables[name] = effectiveValue;
+  });
+
+  return resolvedVariables;
+};
+
+export const processVariableContent = (
+  content: string,
+  variablesData: any,
+  context?: { tabId?: string; panelId?: string },
+) => {
   let processedContent: string = content;
 
-  if (variablesData && variablesData.values) {
-    variablesData.values.forEach((variable: any) => {
-      if (variable.name) {
-        const placeholders = [
-          `\${${variable.name}}`,
-          `\${${variable.name}:csv}`,
-          `\${${variable.name}:pipe}`,
-          `\${${variable.name}:doublequote}`,
-          `\${${variable.name}:singlequote}`,
-          `\$${variable.name}`,
-        ];
-
-        placeholders.forEach((placeholder) => {
-          let value = variable.value ?? "";
-
-          if (Array.isArray(value)) {
-            if (placeholder.includes(":csv")) {
-              value = value.join(",");
-            } else if (placeholder.includes(":pipe")) {
-              value = value.join("|");
-            } else if (placeholder.includes(":doublequote")) {
-              value = value.map((v) => `"${v}"`).join(",");
-            } else if (placeholder.includes(":singlequote")) {
-              value = value.map((v) => `'${v}'`).join(",");
-            } else {
-              value = value.join(",");
-            }
-          }
-
-          processedContent = processedContent.replace(
-            new RegExp(
-              placeholder
-                .replace(/\$/g, "\\$")
-                .replace(/\{/g, "\\{")
-                .replace(/\}/g, "\\}"),
-              "g",
-            ),
-            value,
-          );
-        });
-      }
-    });
+  if (!variablesData || !variablesData.values) {
+    return processedContent;
   }
+
+  // Build a map of resolved variable values with scope precedence
+  const resolvedVariables = resolveVariablesWithPrecedence(
+    variablesData,
+    context,
+  );
+
+  // Process each variable for replacement
+  variablesData.values.forEach((variable: any) => {
+    if (!variable.name) return;
+
+    // Get effective value based on context or use direct value
+    let effectiveValue =
+      context && resolvedVariables.hasOwnProperty(variable.name)
+        ? resolvedVariables[variable.name]
+        : variable.value;
+
+    const placeholders = [
+      "${" + variable.name + "}",
+      "${" + variable.name + ":csv}",
+      "${" + variable.name + ":pipe}",
+      "${" + variable.name + ":doublequote}",
+      "${" + variable.name + ":singlequote}",
+      "$" + variable.name,
+    ];
+
+    placeholders.forEach((placeholder) => {
+      // Check if value is null or empty array (use sentinel value)
+      const isNullValue =
+        effectiveValue === null ||
+        effectiveValue === undefined ||
+        (Array.isArray(effectiveValue) && effectiveValue.length === 0);
+
+      let value = isNullValue ? SELECT_ALL_VALUE : effectiveValue;
+
+      // Handle array formatting (only if not null)
+      if (!isNullValue && Array.isArray(value)) {
+        if (placeholder.includes(":csv")) {
+          value = value.join(",");
+        } else if (placeholder.includes(":pipe")) {
+          value = value.join("|");
+        } else if (placeholder.includes(":doublequote")) {
+          value = value.map((v) => `"${v}"`).join(",");
+        } else if (placeholder.includes(":singlequote")) {
+          value = value.map((v) => `'${v}'`).join(",");
+        } else {
+          value = value.join(",");
+        }
+      }
+
+      processedContent = processedContent.replace(
+        new RegExp(
+          placeholder
+            .replace(/\\/g, "\\\\")
+            .replace(/\$/g, "\\$")
+            .replace(/\{/g, "\\{")
+            .replace(/\}/g, "\\}")
+            .replace(/\|/g, "\\|"),
+          "g",
+        ),
+        String(value),
+      );
+    });
+  });
 
   return processedContent;
 };

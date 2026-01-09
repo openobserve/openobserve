@@ -489,16 +489,11 @@ export function useLogsHighlighter() {
 
       // Add opening quote for key if needed: "level" vs level
       if (showQuotes) {
-        keyContent += '"';
+        keyContent += `<span class="log-key">"${escapeHtml(key)}"</span>`;
+      } else {
+        keyContent += `<span class="log-key">${escapeHtml(key)}</span>`;
       }
 
-      // Process key content WITHOUT highlighting - keys should never be highlighted
-      keyContent += `${escapeHtml(key)}`;
-
-      // Add closing quote for key if needed
-      if (showQuotes) {
-        keyContent += '"';
-      }
       parts.push(keyContent);
       parts.push('<span class="log-separator">:</span>'); // Colon separator
 

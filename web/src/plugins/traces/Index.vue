@@ -79,7 +79,7 @@ style="min-height: auto">
               data-test="logs-search-field-list-collapse-btn"
               :icon="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'"
               :title="
-                searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'
+                searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
               "
               :class="searchObj.meta.showFields ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               color="primary"
@@ -107,7 +107,7 @@ style="min-height: auto">
                         searchObj.data.errorCode == 0
                       "
                     >
-                      Result not found.
+                      {{ t("traces.noTracesFound") }}
                     </div>
                     <SanitizedHtmlRenderer
                       data-test="logs-search-error-message"
@@ -130,7 +130,7 @@ style="min-height: auto">
                         "
                         >Click here</q-btn
                       >
-                      to configure a full text search field to the stream.
+                      {{ t("traces.configureFullTextSearch") }}
                     </div>
                     <br />
                     <q-item-label>{{
@@ -645,7 +645,7 @@ async function getQueryData() {
     if (searchObj.data.resultGrid.currentPage) {
       dismiss = $q.notify({
         type: "positive",
-        message: "Fetching more traces...",
+        message: t("traces.fetchingMoreTraces"),
         actions: [
           {
             icon: "cancel",
@@ -798,8 +798,7 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
   });
   $q.notify({
     type: "positive",
-    message:
-      "The selected time range did not include this trace. The time range has been updated to match the trace’s timestamp.",
+    message: t("traces.timeRangeUpdated"),
     timeout: 5000,
   });
 };

@@ -189,15 +189,19 @@ describe("ErrorsDashboard", () => {
   });
 
   describe("Variables Management", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({}, { variablesData: { old: "data" } });
+    it("should have variablesData ref initialized", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.variablesData).toBeDefined();
+      expect(wrapper.vm.variablesData).toHaveProperty("isVariablesLoading");
+      expect(wrapper.vm.variablesData).toHaveProperty("values");
     });
 
-    it("should update variables data when data changes", () => {
-      const newData = { variable1: "value1" };
-      
-      wrapper.vm.variablesDataUpdated(newData);
-      
+    it("should allow direct modification of variablesData", () => {
+      wrapper = createWrapper();
+      const newData = { isVariablesLoading: false, values: ["test"] };
+
+      wrapper.vm.variablesData = newData;
+
       expect(wrapper.vm.variablesData).toEqual(newData);
     });
   });
