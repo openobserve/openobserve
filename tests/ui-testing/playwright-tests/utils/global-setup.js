@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const logsdata = require("../../../test-data/logs_data.json");
 const testLogger = require('./test-logger.js');
+const { ingestTraces } = require('./trace-ingestion.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -97,6 +98,11 @@ async function globalSetup() {
     testLogger.info('Starting global test data ingestion');
     await performGlobalIngestion(page);
     testLogger.info('Global test data ingestion completed');
+
+    // Perform trace data ingestion
+    testLogger.info('Starting trace data ingestion');
+    await ingestTraces(page, 20); // Ingest 20 test traces
+    testLogger.info('Trace data ingestion completed');
     
   } catch (error) {
     testLogger.error('Global setup failed', { error: error.message, stack: error.stack });
