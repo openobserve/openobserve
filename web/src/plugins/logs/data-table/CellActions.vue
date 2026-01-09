@@ -52,6 +52,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import type { PropType } from "vue";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -67,7 +68,7 @@ const props = defineProps({
     required: true,
   },
   selectedStreamFields: {
-    type: Array,
+    type: Array as PropType<Array<{ name: string; isSchemaField: boolean }>>,
     required: true,
     default: () => [],
   },
