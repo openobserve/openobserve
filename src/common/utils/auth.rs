@@ -418,6 +418,7 @@ impl FromRequest for AuthExtractor {
                     || path_columns[2].eq("templates")
                     || path_columns[2].eq("destinations")
                     || path.ends_with("users/roles")
+                    || path.ends_with("pipelines/backfill")
                 {
                     if method.eq("GET") {
                         method = "LIST".to_string();
@@ -434,6 +435,15 @@ impl FromRequest for AuthExtractor {
                                 .get(path_columns[1])
                                 .map_or(path_columns[1], |model| model.key),
                             path_columns[2]
+                        )
+                    } else if path.ends_with("pipelines/backfill") {
+                        // list all backfill jobs for given org - /{org_id}/pipelines/backfill
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[1])
+                                .map_or(path_columns[1], |model| model.key),
+                            path_columns[0]
                         )
                     } else {
                         // otherwise for listing/creating we need permissions on that "sub-entity"
@@ -634,6 +644,13 @@ impl FromRequest for AuthExtractor {
                         path_columns[0]
                     )
                 } else {
+                    // Handles the backfill job creation, which is considered an UPDATE
+                    // to the pipeline from the rbac perspective.
+                    if method.eq("POST")
+                        && path_columns[1].eq("pipelines") & path_columns[3].eq("backfill")
+                    {
+                        method = "PUT".to_string();
+                    }
                     // for other get/put requests on any entities such as templates,
                     // alerts, enable pipeline, update dashboard etc, we need permission
                     // on that entity in general, this will take form of
@@ -681,7 +698,9 @@ impl FromRequest for AuthExtractor {
                     }
                 }
                 //  this is specifically for enabling alerts
-                else if path_columns[url_len - 1].eq("enable") {
+                else if !(path_columns[1].eq("pipelines") && path_columns[3].eq("backfill"))
+                    && path_columns[url_len - 1].eq("enable")
+                {
                     // this will take form name:alert
                     format!(
                         "{}:{}",

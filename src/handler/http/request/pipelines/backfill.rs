@@ -176,6 +176,7 @@ pub async fn list_backfills(path: web::Path<String>) -> Result<HttpResponse, act
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     responses(
@@ -184,11 +185,11 @@ pub async fn list_backfills(path: web::Path<String>) -> Result<HttpResponse, act
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[get("/{org_id}/pipelines/backfill/{job_id}")]
+#[get("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}")]
 pub async fn get_backfill(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, job_id) = path.into_inner();
+    let (org_id, _pipeline_id, job_id) = path.into_inner();
 
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
@@ -224,6 +225,7 @@ pub async fn get_backfill(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
         ("value" = bool, Query, description = "Enable (true) or disable (false) the backfill job"),
     ),
@@ -234,12 +236,12 @@ pub async fn get_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[put("/{org_id}/pipelines/backfill/{job_id}/enable")]
+#[put("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable")]
 pub async fn enable_backfill(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, job_id) = path.into_inner();
+    let (org_id, _pipeline_id, job_id) = path.into_inner();
 
     let enable = query
         .get("value")
@@ -294,6 +296,7 @@ pub async fn enable_backfill(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     responses(
@@ -302,11 +305,11 @@ pub async fn enable_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[delete("/{org_id}/pipelines/backfill/{job_id}")]
+#[delete("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}")]
 pub async fn delete_backfill(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, job_id) = path.into_inner();
+    let (org_id, _pipeline_id, job_id) = path.into_inner();
 
     log::info!(
         "[BACKFILL API] Delete backfill job {} for org {}",
@@ -350,6 +353,7 @@ pub async fn delete_backfill(
     ),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     request_body(
@@ -366,12 +370,12 @@ pub async fn delete_backfill(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/pipelines/backfill/{job_id}")]
+#[put("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}")]
 pub async fn update_backfill(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
     body: web::Json<BackfillRequest>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, job_id) = path.into_inner();
+    let (org_id, _pipeline_id, job_id) = path.into_inner();
     let req = body.into_inner();
 
     log::info!(
