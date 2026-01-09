@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    data-test="alert-list-page-test"
+    data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
     <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
