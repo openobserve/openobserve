@@ -109,6 +109,15 @@ export default defineComponent({
       }
     );
 
+    // Add watch for variableItem value changes
+    watch(
+      () => props.variableItem.value,
+      (newVal) => {
+        selectedValue.value = newVal;
+      },
+      { immediate: true },
+    );
+
     // isAllSelected should be true if all options are selected and false otherwise
     const isAllSelected = computed(() => {
       return (
@@ -185,4 +194,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.q-select {
+  max-width: 600px;
+}
+
+:deep(.q-field__native) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

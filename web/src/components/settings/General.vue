@@ -54,6 +54,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
+          <!-- Max Series Per Query section -->
+          <div class="settings-grid-item">
+            <span class="individual-setting-title">
+              {{ t('settings.maxSeriesPerQueryLabel') }}
+            </span>
+            <q-input
+              v-model.number="maxSeriesPerQuery"
+              type="number"
+              :min="1000"
+              :max="1000000"
+              class="showLabelOnTop q-ml-sm"
+              stack-label
+              dense
+              borderless
+              hide-bottom-space
+              data-test="general-settings-max-series-per-query"
+              :rules="[
+                (val: any) => {
+                  // Allow empty/null (user wants default)
+                  if (val === null || val === undefined || val === '') return true;
+
+                  // Validate numeric range
+                  const numVal = Number(val);
+                  return (numVal >= 1000 && numVal <= 1000000) || t('settings.maxSeriesPerQueryValidation');
+                }
+              ]"
+              :lazy-rules="true"
+              :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              style="width: 180px;"
+            >
+              <template v-slot:append>
+                <q-icon
+                  name="info"
+                  size="xs"
+                  class="cursor-pointer"
+                >
+                  <q-tooltip max-width="300px">
+                    {{ t('settings.maxSeriesPerQueryTooltip') }}
+                  </q-tooltip>
+                </q-icon>
+              </template>
+            </q-input>
+            <span class="individual-setting-description">
+              {{ t("settings.maxSeriesPerQueryDescription") }}
+            </span>
+          </div>
+
           <!-- Manage Theme section -->
           <div class="settings-grid-item tw:items-start">
             <span class="individual-setting-title">
@@ -441,6 +488,10 @@ export default defineComponent({
       store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
     );
+    const maxSeriesPerQuery = ref(
+      store.state?.organizationData?.organizationSettings?.max_series_per_query ??
+        null,
+    );
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -557,6 +608,11 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
+          max_series_per_query: maxSeriesPerQuery.value === null ||
+                                maxSeriesPerQuery.value === undefined ||
+                                maxSeriesPerQuery.value === ''
+                                ? null
+                                : maxSeriesPerQuery.value,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });
@@ -907,6 +963,7 @@ export default defineComponent({
       config,
       router,
       scrapeIntereval,
+      maxSeriesPerQuery,
       onSubmit,
       files,
       filesLight,

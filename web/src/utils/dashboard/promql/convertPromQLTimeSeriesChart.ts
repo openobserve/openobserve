@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const chartType = panelSchema.type;
     const series: any[] = [];
@@ -42,7 +42,9 @@ export class TimeSeriesConverter implements PromQLChartConverter {
 
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
-        const numericValues = seriesData.values.map(([, val]) => parseFloat(val));
+        const numericValues = seriesData.values.map(([, val]) =>
+          parseFloat(val),
+        );
         const seriesMin = Math.min(...numericValues);
         const seriesMax = Math.max(...numericValues);
 
@@ -52,13 +54,19 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     });
 
     // Get series props based on chart type
-    const seriesProps = this.getSeriesPropsBasedOnChartType(chartType, panelSchema);
+    const seriesProps = this.getSeriesPropsBasedOnChartType(
+      chartType,
+      panelSchema,
+    );
 
     // Build series for each query
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData, seriesIndex) => {
         // Fill data with null for missing timestamps
-        const data = fillMissingTimestamps(seriesData.data, queryData.timestamps);
+        const data = fillMissingTimestamps(
+          seriesData.data,
+          queryData.timestamps,
+        );
 
         // Get color for series
         let seriesColor;
@@ -70,7 +78,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             chartMin,
             chartMax,
             store.state.theme,
-            config?.color?.colorBySeries
+            config?.color?.colorBySeries,
           );
         } catch (error) {
           console.warn("Failed to get series color:", error);
@@ -93,8 +101,12 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           },
 
           // Line interpolation
-          smooth: config?.line_interpolation === "smooth" || config?.line_interpolation == null,
-          step: ["step-start", "step-end", "step-middle"].includes(config?.line_interpolation)
+          smooth:
+            config?.line_interpolation === "smooth" ||
+            config?.line_interpolation == null,
+          step: ["step-start", "step-end", "step-middle"].includes(
+            config?.line_interpolation,
+          )
             ? config.line_interpolation.replace("step-", "")
             : false,
 
@@ -153,7 +165,10 @@ export class TimeSeriesConverter implements PromQLChartConverter {
   /**
    * Get chart-type-specific series properties
    */
-  private getSeriesPropsBasedOnChartType(chartType: string, panelSchema: any): any {
+  private getSeriesPropsBasedOnChartType(
+    chartType: string,
+    panelSchema: any,
+  ): any {
     const config = panelSchema.config || {};
 
     switch (chartType) {

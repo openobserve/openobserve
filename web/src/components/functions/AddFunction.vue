@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
           <FunctionsToolbar
             v-model:name="formData.name"
+            v-model:trans-type="formData.transType"
             ref="functionsToolbarRef"
             :disable-name="beingUpdated"
+            :transform-type-options="transformTypeOptions"
             @test="onTestFunction"
             @save="onSubmit"
             @back="closeAddFunction"
@@ -32,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
       </div>
     </div>
-  
+
     <div class="tw:flex">
 
 
@@ -55,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
-                    :label="t('function.jsfunction') + '*'"
-                    class="tw:mt-1"
+                    :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
+                    class="tw-mt-1"
                   />
                   <div
                     v-show="expandState.functions"
@@ -69,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="monaco-editor"
                       :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
                       v-model:query="formData.function"
-                      language="vrl"
+                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
                     />
                   </div>
                   <div class="text-subtitle2">
@@ -77,19 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <FullViewContainer
                         name="function"
                         v-model:is-expanded="expandState.functionError"
-                        :label="t('function.errorDetails')"
-                        labelClass="tw:text-red-600"
+                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
+                        labelClass="tw:text-red-600 tw:font-semibold"
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="q-px-sm q-pb-sm"
+                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
                         :class="
                           store.state.theme === 'dark'
                             ? 'bg-grey-10'
                             : 'bg-grey-2'
                         "
                       >
-                        <pre class="q-my-none" style="white-space: pre-wrap">{{
+                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -233,6 +235,20 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
+    // Transform type options for radio buttons
+    const transformTypeOptions = computed(() => {
+      const options = [
+        { label: t("function.vrl"), value: "0" },
+      ];
+
+      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
+      if (store.state.selectedOrganization.identifier === "_meta") {
+        options.push({ label: t("function.javascript"), value: "1" });
+      }
+
+      return options;
+    });
+
     const beingUpdated = computed(() => props.isUpdated);
 
     const streamTypes = ["logs", "metrics", "traces"];
@@ -315,14 +331,10 @@ export default defineComponent({
       );
     };
     const updateEditorContent = () => {
-      if (formData.value.transType == "1") {
-        prefixCode.value = `function(row)`;
-        suffixCode.value = `
-end`;
-      } else {
-        prefixCode.value = ``;
-        suffixCode.value = ``;
-      }
+      // JS functions don't need prefix/suffix, only VRL functions might
+      // For now, both VRL and JS are written as-is
+      prefixCode.value = ``;
+      suffixCode.value = ``;
 
       formData.value.function = `${prefixCode.value}
     ${formData.value.function}
@@ -352,10 +364,8 @@ end`;
           try {
             if (!beingUpdated.value) {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.create(
                 store.state.selectedOrganization.identifier,
@@ -363,10 +373,8 @@ end`;
               );
             } else {
               formData.value.transType = parseInt(formData.value.transType);
-              //trans type is lua remove params from form
-              if (formData.value.transType == 1) {
-                formData.value.params = "";
-              }
+              // Both VRL and JS use params field (e.g., "row")
+              // No need to clear params for JS
 
               callTransform = jsTransformService.update(
                 store.state.selectedOrganization.identifier,
@@ -425,6 +433,10 @@ end`;
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
+      // Auto-expand error section when error occurs
+      if (err) {
+        expandState.value.functionError = true;
+      }
     };
 
     const closeAddFunction = () => {
@@ -514,6 +526,7 @@ end`;
       splitterModel,
       closeAddFunction,
       confirmDialogMeta,
+      transformTypeOptions,
       resetConfirmDialog,
       cancelAddFunction,
       openChat,
@@ -534,6 +547,10 @@ end`;
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
+      // Ensure transType is a string for radio button binding
+      if (this.formData.transType !== undefined) {
+        this.formData.transType = String(this.formData.transType);
+      }
     }
   },
 });

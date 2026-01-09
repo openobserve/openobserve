@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,7 @@ describe("legendBuilder", () => {
       const label = "{job} on {instance}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "node_exporter on server1:9100"
+        "node_exporter on server1:9100",
       );
     });
 
@@ -43,7 +43,7 @@ describe("legendBuilder", () => {
       const label = "Service: {job} | Host: {instance} | Env: {environment}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "Service: api | Host: server1 | Env: production"
+        "Service: api | Host: server1 | Env: production",
       );
     });
 
@@ -52,7 +52,7 @@ describe("legendBuilder", () => {
       const label = "{job} - {nonexistent}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {nonexistent}"
+        "prometheus - {nonexistent}",
       );
     });
 
@@ -61,7 +61,7 @@ describe("legendBuilder", () => {
       const label = "{job} - {instance}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}"
+        "prometheus - {instance}",
       );
     });
 
@@ -70,7 +70,7 @@ describe("legendBuilder", () => {
       const label = "{job} - {instance}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}"
+        "prometheus - {instance}",
       );
     });
 
@@ -79,7 +79,7 @@ describe("legendBuilder", () => {
       const label = "{job} - {instance}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus - {instance}"
+        "prometheus - {instance}",
       );
     });
 
@@ -95,7 +95,7 @@ describe("legendBuilder", () => {
       const label = "{job}@{instance}";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "api-server@host.example.com:8080"
+        "api-server@host.example.com:8080",
       );
     });
 
@@ -104,7 +104,7 @@ describe("legendBuilder", () => {
       const label = "{job} and {job} again";
 
       expect(getPromqlLegendName(metric, label)).toBe(
-        "prometheus and prometheus again"
+        "prometheus and prometheus again",
       );
     });
 
@@ -119,27 +119,21 @@ describe("legendBuilder", () => {
       const metric = { job: "prometheus", instance: "localhost" };
       const label = "";
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        JSON.stringify(metric)
-      );
+      expect(getPromqlLegendName(metric, label)).toBe(JSON.stringify(metric));
     });
 
     it("should return JSON stringified metric when label is null", () => {
       const metric = { __name__: "up", job: "prometheus" };
       const label = null as any;
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        JSON.stringify(metric)
-      );
+      expect(getPromqlLegendName(metric, label)).toBe(JSON.stringify(metric));
     });
 
     it("should return JSON stringified metric when label is undefined", () => {
       const metric = { job: "node", instance: "server1" };
       const label = undefined as any;
 
-      expect(getPromqlLegendName(metric, label)).toBe(
-        JSON.stringify(metric)
-      );
+      expect(getPromqlLegendName(metric, label)).toBe(JSON.stringify(metric));
     });
 
     it("should handle empty metric object with template", () => {
