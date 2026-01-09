@@ -62,6 +62,11 @@ class BuildVersionChecker {
   async checkForNewVersion(): Promise<boolean> {
     if (this.isChecking) return false;
 
+    // Skip version check if commit hash is unknown
+    if (this.currentVersion === "unknown") {
+      return false;
+    }
+
     this.isChecking = true;
     try {
       const serverCommitHash = await this.fetchCommitHash();
