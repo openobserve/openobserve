@@ -321,9 +321,12 @@ const showRefreshButton = computed(() => {
 
   // Use variables manager to check for uncommitted changes (same as ViewDashboard)
   const manager = variablesManager.value;
-  if (manager && 'hasUncommittedChanges' in manager) {
-    // Access the value (Vue auto-unwraps computed refs in composable returns)
-    const hasChanges = manager.hasUncommittedChanges;
+  // Use optional chaining for safer property access
+  if (manager?.hasUncommittedChanges !== undefined) {
+    // Access the value if it's a ref, otherwise use directly
+    const hasChanges = typeof manager.hasUncommittedChanges === 'object' && 'value' in manager.hasUncommittedChanges
+      ? manager.hasUncommittedChanges.value
+      : manager.hasUncommittedChanges;
     return hasChanges;
   }
 
@@ -515,6 +518,12 @@ const loadAnalysis = async () => {
 // Handler for when variables manager is ready from RenderDashboardCharts
 const onVariablesManagerReady = (manager: any) => {
   variablesManager.value = manager;
+
+  // Load analysis immediately when manager is ready to populate dashboard
+  // This ensures the dashboard shows data on initial load instead of remaining blank
+  if (activeAnalysisType.value === 'latency' && !dashboardData.value) {
+    loadAnalysis();
+  }
 };
 
 // Helper to get current percentile from variables manager
