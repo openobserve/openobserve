@@ -21,6 +21,7 @@ use config::{
     meta::stream::{FileMeta, StreamType},
     utils::{
         parquet::new_parquet_writer,
+        util::DISTINCT_STREAM_PREFIX,
         vortex::{Utf8Compressor, VORTEX_RUNTIME},
     },
 };
@@ -42,9 +43,8 @@ use vortex_file::WriteStrategyBuilder;
 use vortex_io::session::RuntimeSessionExt;
 
 use super::table_provider::uniontable::NewUnionTable;
-use crate::service::{
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-    search::datafusion::exec::{DATAFUSION_MIN_PARTITION, DataFusionContextBuilder},
+use crate::service::search::datafusion::exec::{
+    DATAFUSION_MIN_PARTITION, DataFusionContextBuilder,
 };
 
 #[cfg(feature = "enterprise")]
