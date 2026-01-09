@@ -704,11 +704,15 @@ export class PipelinesPage {
         // Verify pipeline creation and cleanup
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
-        const deletePipelineButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        // Click on more options (three-dot menu) then delete
+        const moreOptionsButton = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-more-options"]`
         );
-        await deletePipelineButton.waitFor({ state: "visible" });
-        await deletePipelineButton.click();
+        await moreOptionsButton.waitFor({ state: "visible" });
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
+        // Click delete option in the menu (Quasar q-item)
+        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -844,11 +848,15 @@ export class PipelinesPage {
     async deletePipelineByName(pipelineName) {
         await this.searchPipeline(pipelineName);
         await this.page.waitForTimeout(1000);
-        const deletePipelineButton = this.page.locator(
-          `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+        // Click on more options (three-dot menu) then delete
+        const moreOptionsButton = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-more-options"]`
         );
-        await deletePipelineButton.waitFor({ state: "visible" });
-        await deletePipelineButton.click();
+        await moreOptionsButton.waitFor({ state: "visible" });
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
+        // Click delete option in the menu (Quasar q-item)
+        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1174,8 +1182,14 @@ export class PipelinesPage {
         await this.pipelineSearchInput.click();
         await this.pipelineSearchInput.fill(searchPrefix);
 
-        // Delete the pipeline
-        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`).click();
+        // Delete the pipeline via more options menu
+        const moreOptionsButton = this.page.locator(
+          `[data-test="pipeline-list-${pipelineName}-more-options"]`
+        );
+        await moreOptionsButton.waitFor({ state: "visible" });
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
+        await this.page.getByRole('menuitem').filter({ hasText: 'Delete' }).click();
         await this.confirmButton.click();
     }
 

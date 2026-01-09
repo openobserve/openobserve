@@ -24,8 +24,8 @@ export class PipelinesEP {
         this.pipelineImportNameInput = '[data-test="pipeline-import-name-input"]';
         this.pipelineImportErrorDestinationFunctionNameInput = '[data-test="pipeline-import-error-0-1"] [data-test="pipeline-import-destination-function-name-input"]';
         this.pipelineImportErrorDestinationFunctionNameInput2 = '[data-test="pipeline-import-error-0-2"] [data-test="pipeline-import-destination-function-name-input"]';
-        this.pipelineExportPipelineButton = (name) => `[data-test="pipeline-list-${name}-export-pipeline"]`;
-        this.pipelineDeleteButton = '[data-test="pipeline-list-re1-delete-pipeline"]';
+        this.pipelineMoreOptionsButton = (name) => `[data-test="pipeline-list-${name}-more-options"]`;
+        // Note: Export and Delete are now in the more options menu (three-dot menu)
         this.confirmButton = '[data-test="confirm-button"]';
         this.fileInput = page.locator('input[type="file"]');
     }
@@ -220,34 +220,40 @@ export class PipelinesEP {
     }
 
     async downloadPipeline(name) {
-        const pipelineExportButton = this.page.locator(`[data-test="pipeline-list-${name}-export-pipeline"]`);
+        // Click on more options (three-dot menu) then export
+        const moreOptionsButton = this.page.locator(
+          `[data-test="pipeline-list-${name}-more-options"]`
+        );
 
         // Wait for the element to be visible and enabled before clicking
         try {
-            await pipelineExportButton.waitFor({ state: 'visible', timeout: 60000 }); // Increase timeout if necessary
+            await moreOptionsButton.waitFor({ state: 'visible', timeout: 60000 });
         } catch (error) {
-            console.error(`Pipeline export button not visible: ${error.message}`);
-            throw new Error(`Pipeline export button not visible for: ${name}`);
+            console.error(`Pipeline more options button not visible: ${error.message}`);
+            throw new Error(`Pipeline more options button not visible for: ${name}`);
         }
 
-        // Check if the button is enabled
-        const isEnabled = await pipelineExportButton.isEnabled();
-        if (!isEnabled) {
-            throw new Error(`Pipeline export button is not enabled for: ${name}`);
-        }
+        // Click the more options button to open the menu
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
 
-        // Click the button to start the download
-        await pipelineExportButton.click();
+        // Click export option in the menu (Quasar q-item)
+        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Export' }).click();
         console.log(`Clicked on the export pipeline button for pipeline: ${name}`);
-
-
     }
 
 
 
     async deletePipeline(name) {
-
-        await this.page.locator(`[data-test="pipeline-list-${name}-delete-pipeline"]`).click();
+        // Click on more options (three-dot menu) then delete
+        const moreOptionsButton = this.page.locator(
+          `[data-test="pipeline-list-${name}-more-options"]`
+        );
+        await moreOptionsButton.waitFor({ state: "visible" });
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
+        // Click delete option in the menu (Quasar q-item)
+        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
         await this.page.locator(this.confirmButton).waitFor({ state: 'visible' });
         await this.page.locator(this.confirmButton).click();
     }
