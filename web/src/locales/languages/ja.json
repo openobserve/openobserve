@@ -674,7 +674,14 @@
     "dataSource": "[データソース]",
     "uploadFile": "[ファイルをアップロード]",
     "fromUrl": "URL から",
-    "addFunction": "機能追加"
+    "addFunction": "機能追加",
+    "javascript": "JavaScript",
+    "transformType": "トランスフォームタイプ",
+    "vrlType": "VRL (ベクターリマップ言語)",
+    "jsType": "ジャバスクリプト (2023)",
+    "vrlfunction": "VRL ファンクション",
+    "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
+    "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例:.new_field = .既存のフィールド + '処理済み'"
   },
   "confirmDialog": {
     "cancel": "キャンセル",

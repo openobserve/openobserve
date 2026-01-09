@@ -657,7 +657,14 @@
     "dataSource": "데이터 소스",
     "uploadFile": "파일 업로드",
     "fromUrl": "URL에서",
-    "addFunction": "함수 추가"
+    "addFunction": "함수 추가",
+    "javascript": "자바 스크립트",
+    "transformType": "트랜스폼 타입",
+    "vrlType": "VRL (벡터 리맵 언어)",
+    "jsType": "자바스크립트 (ES2023)",
+    "vrlfunction": "VRL 함수",
+    "jsFunctionHint": "`row` 객체를 사용하여 로그 필드에 액세스하고 수정합니다.예: row.new_field = row.기존_필드 + '처리됨';",
+    "vrlFunctionHint": "`.'를 사용하여 현재 이벤트를 나타냅니다.예: .new_field = .기존_필드 + '처리됨'"
   },
   "confirmDialog": {
     "cancel": "취소",

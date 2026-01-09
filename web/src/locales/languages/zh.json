@@ -657,7 +657,14 @@
     "dataSource": "数据源",
     "uploadFile": "上传文件",
     "fromUrl": "来自 URL",
-    "addFunction": "添加函数"
+    "addFunction": "添加函数",
+    "javascript": "JavaScript的",
+    "transformType": "变换类型",
+    "vrlType": "VRL（矢量重映射语言）",
+    "jsType": "脚本 (ES2023)",
+    "vrlfunction": "VRL 函数",
+    "jsFunctionHint": "使用 `row`对象访问和修改日志字段。示例：row.new_field = row.existing_field + 'processed';",
+    "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”"
   },
   "confirmDialog": {
     "cancel": "取消",
