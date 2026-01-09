@@ -957,6 +957,76 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✓ PRIMARY CHECK PASSED: SQL mode conversion handled pipe operators');
   });
 
+  /**
+   * Bug #9724: Log detail sidebar should open with JSON tab selected by default
+   * https://github.com/openobserve/openobserve/issues/9724
+   * PR #9703 fixed the sidebar consistency issue by adding initialTab prop
+   */
+  test("Log detail sidebar opens with JSON tab by default (Bug #9724)", {
+    tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug9724', '@P1', '@logs']
+  }, async ({ page }) => {
+    testLogger.info('Test: Log detail sidebar default tab verification (Bug #9724)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+
+    // Select stream and run query to load logs
+    testLogger.info('Selecting stream and waiting for logs');
+    await pm.logsPage.selectStream("e2e_automate");
+
+    // Click refresh button to load data
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle');
+
+    // Wait for logs table to be visible
+    await pm.logsPage.expectLogsTableVisible();
+
+    // Step 1: Open log detail sidebar by clicking on a log row
+    testLogger.info('Step 1: Opening log detail sidebar');
+    await pm.logsPage.openLogDetailSidebar();
+
+    // Step 2: Verify sidebar is visible
+    testLogger.info('Step 2: Verifying sidebar is visible');
+    await pm.logsPage.expectLogDetailSidebarVisible();
+
+    // Step 3: Verify JSON tab is selected by default (Bug #9724 core verification)
+    testLogger.info('Step 3: Verifying JSON tab is selected by default');
+    await pm.logsPage.verifyJsonTabSelectedByDefault();
+
+    // Step 4: Verify both tabs are visible
+    testLogger.info('Step 4: Verifying both JSON and Table tabs are visible');
+    await pm.logsPage.verifyLogDetailTabsVisible();
+
+    // Step 5: Verify navigation buttons are visible
+    testLogger.info('Step 5: Verifying navigation buttons are visible');
+    await pm.logsPage.verifyNavigationButtonsVisible();
+
+    // Step 6: Click on Table tab and verify switch
+    testLogger.info('Step 6: Switching to Table tab');
+    await pm.logsPage.clickLogDetailTableTab();
+    await pm.logsPage.verifyTableTabSelected();
+    await pm.logsPage.verifyWrapToggleVisibleInTableTab();
+
+    // Step 7: Click back to JSON tab and verify switch
+    testLogger.info('Step 7: Switching back to JSON tab');
+    await pm.logsPage.clickLogDetailJsonTab();
+    await pm.logsPage.verifyJsonTabSelected();
+
+    // Step 8: Close sidebar and reopen - verify JSON tab is still default
+    testLogger.info('Step 8: Close and reopen sidebar to verify default state persists');
+    await pm.logsPage.closeLogDetailSidebar();
+    await pm.logsPage.expectLogDetailSidebarNotVisible();
+
+    // Reopen sidebar
+    await pm.logsPage.openLogDetailSidebar();
+    await pm.logsPage.verifyJsonTabSelectedByDefault();
+
+    // Close sidebar
+    await pm.logsPage.closeLogDetailSidebar();
+
+    testLogger.info('✓ Bug #9724 verification complete: Log detail sidebar opens with JSON tab by default');
+  });
+
   test.afterEach(async () => {
     testLogger.info('Logs regression test completed');
   });

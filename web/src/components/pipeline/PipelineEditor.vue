@@ -671,8 +671,12 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
-        functions.value[func.name] = func;
-        functionOptions.value.push(func.name);
+        // Only include VRL functions (trans_type === 0 or undefined)
+        // JavaScript functions (trans_type === 1) cannot be used in pipelines
+        if (func.trans_type !== 1) {
+          functions.value[func.name] = func;
+          functionOptions.value.push(func.name);
+        }
       });
     })
     .finally(() => {
@@ -1066,8 +1070,12 @@ const onNodeDragOver = (event: any) => {
 
 const updateNewFunction = (_function: Function) => {
   if (!functions.value[_function.name]) {
-    functions.value[_function.name] = _function;
-    functionOptions.value.push(_function.name);
+    // Only add VRL functions (trans_type !== 1) to pipeline options
+    // JavaScript functions cannot be used in pipelines
+    if (_function.trans_type !== 1) {
+      functions.value[_function.name] = _function;
+      functionOptions.value.push(_function.name);
+    }
   }
 };
 

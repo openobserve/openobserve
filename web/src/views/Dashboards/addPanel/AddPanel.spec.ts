@@ -1428,7 +1428,7 @@ describe("AddPanel.vue", () => {
     it("should handle variablesDataUpdated with markdown panel type", () => {
       // Set panel type to markdown
       wrapper.vm.dashboardPanelData.data.type = "markdown";
-      
+
       const testData = {
         values: [
           {
@@ -1440,15 +1440,15 @@ describe("AddPanel.vue", () => {
       };
 
       wrapper.vm.variablesDataUpdated(testData);
-      
-      // For markdown panels, updatedVariablesData should be assigned immediately
-      expect(wrapper.vm.updatedVariablesData).toEqual(wrapper.vm.variablesData);
+
+      // For markdown panels, variablesData should be updated (liveVariablesData is used in template)
+      expect(wrapper.vm.variablesData.values).toEqual(testData.values);
     });
 
     it("should handle variablesDataUpdated with html panel type", () => {
       // Set panel type to html
       wrapper.vm.dashboardPanelData.data.type = "html";
-      
+
       const testData = {
         values: [
           {
@@ -1460,9 +1460,9 @@ describe("AddPanel.vue", () => {
       };
 
       wrapper.vm.variablesDataUpdated(testData);
-      
-      // For html panels, updatedVariablesData should be assigned immediately
-      expect(wrapper.vm.updatedVariablesData).toEqual(wrapper.vm.variablesData);
+
+      // For html panels, variablesData should be updated (liveVariablesData is used in template)
+      expect(wrapper.vm.variablesData.values).toEqual(testData.values);
     });
 
     it("should handle querySplitterUpdated with showQueryBar enabled", () => {

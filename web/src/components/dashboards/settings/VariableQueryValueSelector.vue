@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @filter="filterOptions"
       class="textbox col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
-      data-test="dashboard-variable-query-value-selector"
+      :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
       @keydown="handleKeydown"
       ref="selectRef"
-     >
+    >
       <template v-slot:no-option>
         <template v-if="filterText">
           <q-item clickable @click="handleCustomValue(filterText)">
@@ -129,7 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import { debounce } from "lodash-es";
-import { defineComponent, ref, watch, computed, nextTick, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  nextTick,
+  onUnmounted,
+} from "vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -168,7 +175,7 @@ export default defineComponent({
     // set debouced filterText value that can trigger search
     const searchText = ref("");
     const updateSearch = debounce((val: string) => {
-        searchText.value = val;
+      searchText.value = val;
     }, 500);
 
     // --- Typeahead debounce and emit search event ---
@@ -184,8 +191,8 @@ export default defineComponent({
     watch(
       () => searchText.value,
       (newVal) => {
-        if(newVal == null || newVal == undefined) {
-          return
+        if (newVal == null || newVal == undefined) {
+          return;
         }
 
         // no need to update results if the menu is hidden
@@ -237,7 +244,7 @@ export default defineComponent({
       await closePopUpWhenValueIsSet();
     };
 
-    const onUpdateValue = (val: any) => {
+    const onUpdateValue = async (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
       if (
         props.variableItem.multiSelect &&
@@ -256,6 +263,8 @@ export default defineComponent({
       selectedValue.value = val;
       if (!props.variableItem.multiSelect) {
         emit("update:modelValue", val);
+        // Close dropdown immediately for single-select to prevent it staying open during child variable loading
+        await closePopUpWhenValueIsSet();
       }
     };
 
@@ -309,7 +318,15 @@ export default defineComponent({
               .join(", ");
           }
         } else if (selectedValue.value === "") {
-          return "<blank>";
+          // Only display <blank> if an actual option with empty-string value exists
+          if (
+            props.variableItem.options &&
+            props.variableItem.options.some((o: any) => o.value === "")
+          ) {
+            return "<blank>";
+          }
+          // Otherwise treat empty-string as unset
+          return "(No Data Found)";
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
           return "<ALL>";
         } else if (
@@ -330,7 +347,9 @@ export default defineComponent({
     watch(
       () => props.variableItem.options,
       () => {
-        if (isOpen.value && selectRef.value) {
+        // Only update input if dropdown is open AND it's a multiSelect
+        // For single-select, don't interfere as the dropdown should close after selection
+        if (isOpen.value && selectRef.value && props.variableItem.multiSelect) {
           nextTick(() => {
             if (selectRef.value) {
               if (!filterText.value) {
@@ -421,4 +440,14 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.q-select {
+  max-width: 600px;
+}
+
+:deep(.q-field__native) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

@@ -45,3 +45,10 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /tests/bug-automation
 tests/playwright_mcp/
 /tests/ui-testing/metrics-ingestion
+
+# CI-copied Claude configs (runtime only, not committed)
+CLAUDE.md
+.claude/commands/
+.claude/agents/
+.claude/skills/
+.claude/settings.json

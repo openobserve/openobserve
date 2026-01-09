@@ -1280,6 +1280,43 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
     );
 }
 
+/// Creates a service account user record if it doesn't already exist
+/// This is used when creating organizations with a specified service account
+pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
+    // Check if user already exists
+    if db::user::get_user_record(email).await.is_ok() {
+        log::debug!("Service account '{}' already exists", email);
+        return Ok(());
+    }
+
+    log::info!("Creating new service account user record for '{}'", email);
+
+    // Create the user record in the users table
+    let random_password = generate_random_string(32);
+    let salt = ider::uuid();
+    let password_hash = get_hash(&random_password, &salt);
+    let cfg = get_config();
+    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let now = chrono::Utc::now().timestamp_micros();
+    let user_record = infra::table::users::UserRecord {
+        email: email.to_string(),
+        first_name: email.split('@').next().unwrap_or("Service").to_string(),
+        last_name: "Account".to_string(),
+        password: password_hash.clone(),
+        salt,
+        is_root: false,
+        password_ext: Some(password_ext),
+        user_type: config::meta::user::UserType::Internal,
+        created_at: now,
+        updated_at: now,
+    };
+
+    infra::table::users::add(user_record).await?;
+    log::info!("Service account user record created for '{}'", email);
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::user::{UserRole, UserType};
@@ -1807,41 +1844,4 @@ mod tests {
 
         assert_eq!(filtered.len(), 0);
     }
-}
-
-/// Creates a service account user record if it doesn't already exist
-/// This is used when creating organizations with a specified service account
-pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
-    // Check if user already exists
-    if db::user::get_user_record(email).await.is_ok() {
-        log::debug!("Service account '{}' already exists", email);
-        return Ok(());
-    }
-
-    log::info!("Creating new service account user record for '{}'", email);
-
-    // Create the user record in the users table
-    let random_password = generate_random_string(32);
-    let salt = ider::uuid();
-    let password_hash = get_hash(&random_password, &salt);
-    let cfg = get_config();
-    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
-    let now = chrono::Utc::now().timestamp_micros();
-    let user_record = infra::table::users::UserRecord {
-        email: email.to_string(),
-        first_name: email.split('@').next().unwrap_or("Service").to_string(),
-        last_name: "Account".to_string(),
-        password: password_hash.clone(),
-        salt,
-        is_root: false,
-        password_ext: Some(password_ext),
-        user_type: config::meta::user::UserType::Internal,
-        created_at: now,
-        updated_at: now,
-    };
-
-    infra::table::users::add(user_record).await?;
-    log::info!("Service account user record created for '{}'", email);
-
-    Ok(())
 }

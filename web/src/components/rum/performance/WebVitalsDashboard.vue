@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="dateTime"
         searchType="RUM"
+        @variablesManagerReady="onVariablesManagerReady"
       />
     </div>
     <div
@@ -104,7 +105,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup() {
+  emits: ["variablesManagerReady"],
+  setup(props, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -123,10 +125,9 @@ export default defineComponent({
     const webVitalsChartsRef = ref(null);
     const isLoading: Ref<boolean[]> = ref([]);
 
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
     };
 
     onMounted(async () => {
@@ -253,8 +254,7 @@ export default defineComponent({
       selectedDate,
       viewOnly,
       eventLog,
-      variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,

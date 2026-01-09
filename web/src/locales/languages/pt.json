@@ -1829,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Texto do logotipo atualizado com sucesso.",
     "errorUpdatingImage": "Erro ao atualizar a imagem.",
     "fileFormatConstraint": "(Somente formatos.png, .jpg, .jpeg, .gif, .bmp e tamanho máximo: 150x30px)",
-    "filesValidationFailed": "{count} arquivo (s) não passaram pelas restrições de validação"
+    "filesValidationFailed": "{count} arquivo (s) não passaram pelas restrições de validação",
+    "maxSeriesPerQueryLabel": "Série máxima por consulta",
+    "maxSeriesPerQueryDescription": "Número máximo de séries que podem ser retornadas de uma única consulta ProMQL. Ajuda a evitar o congelamento da interface com grandes conjuntos de resultados. Deixe em branco para usar o padrão do sistema (40.000).",
+    "maxSeriesPerQueryTooltip": "Quando uma consulta ProMQL como 'count (metric) by (label) 'retorna muitas séries, ela pode congelar a interface do usuário. Esse limite evita isso. Defina como null para o padrão do sistema ou especifique um valor entre 1.000 e 1.000.000.",
+    "maxSeriesPerQueryValidation": "O valor deve estar entre 1.000 e 1.000.000 ou deixar em branco por padrão",
+    "systemDefault": "padrão do sistema"
   },
   "iam": {
     "users": "Usuários",
