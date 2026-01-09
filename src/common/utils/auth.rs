@@ -647,7 +647,8 @@ impl FromRequest for AuthExtractor {
                     // Handles the backfill job creation, which is considered an UPDATE
                     // to the pipeline from the rbac perspective.
                     if method.eq("POST")
-                        && path_columns[1].eq("pipelines") && path_columns[3].eq("backfill")
+                        && path_columns[1].eq("pipelines")
+                        && path_columns[3].eq("backfill")
                     {
                         method = "PUT".to_string();
                     }
