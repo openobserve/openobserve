@@ -32,6 +32,10 @@ describe("CellActions.vue", () => {
   const defaultProps = {
     column: { id: "status" },
     row: { status: "200", method: "GET" },
+    selectedStreamFields: [
+      { name: "status", isSchemaField: true },
+      { name: "method", isSchemaField: true },
+    ],
   };
 
   describe("rendering", () => {
@@ -274,6 +278,7 @@ describe("CellActions.vue", () => {
         props: {
           column: { id: "status" },
           row: { status: 404 },
+          selectedStreamFields: [{ name: "status", isSchemaField: true }],
         },
         global: {
           plugins: [store],
@@ -304,6 +309,7 @@ describe("CellActions.vue", () => {
         props: {
           column: { id: "is_error" },
           row: { is_error: true },
+          selectedStreamFields: [{ name: "is_error", isSchemaField: true }],
         },
         global: {
           plugins: [store],

@@ -285,6 +285,7 @@ color="warning" size="xs"></q-icon> Error while
               ? 'table-container--without-histogram'
               : 'table-container--with-histogram',
           ]"
+          :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
           @update:columnSizes="handleColumnSizesUpdate"
           @update:columnOrder="handleColumnOrderUpdate"
           @copy="copyLogToClipboard"
