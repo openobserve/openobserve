@@ -189,10 +189,27 @@ pub async fn list_backfills(path: web::Path<String>) -> Result<HttpResponse, act
 pub async fn get_backfill(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, _pipeline_id, job_id) = path.into_inner();
+    let (org_id, pipeline_id, job_id) = path.into_inner();
 
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
+            // Verify the job belongs to the specified pipeline
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    format!(
+                        "Backfill job {} not found for pipeline {}",
+                        job_id, pipeline_id
+                    ),
+                )));
+            }
+
             log::debug!(
                 "[BACKFILL API] Retrieved backfill job {} for org {}",
                 job_id,
@@ -241,12 +258,39 @@ pub async fn enable_backfill(
     path: web::Path<(String, String, String)>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, _pipeline_id, job_id) = path.into_inner();
+    let (org_id, pipeline_id, job_id) = path.into_inner();
 
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
+
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    format!(
+                        "Backfill job {} not found for pipeline {}",
+                        job_id, pipeline_id
+                    ),
+                )));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::NOT_FOUND,
+                e.to_string(),
+            )));
+        }
+    }
 
     log::info!(
         "[BACKFILL API] {} backfill job {} for org {}",
@@ -309,7 +353,40 @@ pub async fn enable_backfill(
 pub async fn delete_backfill(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, _pipeline_id, job_id) = path.into_inner();
+    let (org_id, pipeline_id, job_id) = path.into_inner();
+
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    format!(
+                        "Backfill job {} not found for pipeline {}",
+                        job_id, pipeline_id
+                    ),
+                )));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::NOT_FOUND,
+                e.to_string(),
+            )));
+        }
+    }
 
     log::info!(
         "[BACKFILL API] Delete backfill job {} for org {}",
@@ -375,8 +452,41 @@ pub async fn update_backfill(
     path: web::Path<(String, String, String)>,
     body: web::Json<BackfillRequest>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (org_id, _pipeline_id, job_id) = path.into_inner();
+    let (org_id, pipeline_id, job_id) = path.into_inner();
     let req = body.into_inner();
+
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    format!(
+                        "Backfill job {} not found for pipeline {}",
+                        job_id, pipeline_id
+                    ),
+                )));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::NOT_FOUND,
+                e.to_string(),
+            )));
+        }
+    }
 
     log::info!(
         "[BACKFILL API] Updating backfill job {} for org {}",
