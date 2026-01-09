@@ -137,16 +137,11 @@ async fn process_stream(
 
     // Build COALESCE expression for peer identification
     // Try multiple attributes in priority order (following OTel conventions)
-    // NOTE: We use server_address (hostname only) instead of http_url (full URL with path/query)
-    // to avoid creating separate nodes for each URL variation with different query parameters
-    // or path parameters. This follows OpenTelemetry and Grafana Tempo best practices.
+    // Peer service identification attributes (priority order)
     let peer_attr_candidates = [
-        "peer_service",   // peer.service - explicit peer service name
-        "server_address", // server.address - hostname only (prevents URL cardinality explosion)
-        "db_name",        // db.name - database name
-        "db_system",      /* db.system - database type
-                           * "http_url" removed - causes node explosion due to query params and
-                           * path variations */
+        "peer_service", // peer.service - explicit peer service name
+        "db_name",      // db.name - database name
+        "db_system",    // db.system - database type
     ];
 
     let mut available_peer_attrs = Vec::new();
@@ -156,16 +151,17 @@ async fn process_stream(
         }
     }
 
-    // If no peer attributes are available, we can still process INTERNAL spans
-    // by using a fallback value for the peer/server side
-    let peer_expr = if available_peer_attrs.is_empty() {
+    // If no peer attributes are available, skip this stream
+    if available_peer_attrs.is_empty() {
         log::debug!(
-            "[ServiceGraph] Stream {}/{} has no peer identification attributes - will use 'internal' fallback for INTERNAL spans",
+            "[ServiceGraph] Stream {}/{} has no peer identification attributes - skipping",
             org_id,
             stream_name
         );
-        "'internal'".to_string() // Literal string fallback
-    } else if available_peer_attrs.len() > 1 {
+        return Ok(());
+    }
+
+    let peer_expr = if available_peer_attrs.len() > 1 {
         format!("COALESCE({})", available_peer_attrs.join(", "))
     } else {
         available_peer_attrs[0].to_string()
@@ -229,6 +225,7 @@ async fn process_stream(
            approx_percentile_cont(duration, 0.99) as p99
          FROM edges
          WHERE client IS NOT NULL AND server IS NOT NULL
+           AND client != '' AND server != ''
          GROUP BY client, server",
             peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
         )
@@ -244,7 +241,7 @@ async fn process_stream(
              CASE
                WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
                WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '1' THEN COALESCE({}, 'internal')
+               WHEN CAST(span_kind AS VARCHAR) = '1' THEN {}
              END as server,
              end_time - start_time as duration,
              span_status
@@ -266,6 +263,7 @@ async fn process_stream(
            approx_percentile_cont(duration, 0.99) as p99
          FROM edges
          WHERE client IS NOT NULL AND server IS NOT NULL
+           AND client != '' AND server != ''
          GROUP BY client, server",
             peer_expr, peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
         )
