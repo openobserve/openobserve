@@ -16,26 +16,44 @@
 import configService from "@/services/config";
 
 /**
- *
  * Approach:
- * 1. Commit hash is injected at build time via Vite's define option
- * 2. On chunk errors, fetch config API to check if commit_hash changed
- * 3. Cache config responses to avoid excessive API calls
- * 4. Only treat as stale build if commit hash actually changed
- * 5. test message 
+ * 1. When app loads, config API is called (by main.ts) and stored in Vuex store
+ * 2. We store the initial commit hash from that config in localStorage
+ * 3. On chunk/resource errors, fetch config API again to check if commit hash changed
+ * 4. Cache config responses to avoid excessive API calls
+ * 5. Only treat as stale build if commit hash actually changed
  */
 
-
 class BuildVersionChecker {
-  private currentVersion: string;
+  private readonly STORAGE_KEY = 'o2_initial_commit_hash';
   private isChecking = false;
   private lastCheckTime = 0;
   private cacheDuration = 5 * 60 * 1000; // Cache for 5 minutes
   private cachedConfig: any = null;
 
-  constructor() {
-    // Get current version from build-time injected constant
-    this.currentVersion = __COMMIT_HASH__;
+  /**
+   * Get initial version from localStorage or null if not set
+   */
+  private getStoredVersion(): string | null {
+    try {
+      return localStorage.getItem(this.STORAGE_KEY);
+    } catch (error) {
+      console.warn('Failed to read from localStorage:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update the baseline version in localStorage
+   * This should be called from main.ts after the config is fetched
+   * Updates on every page load to ensure we track the current deployed version
+   */
+  public setInitialVersion(commitHash: string): void {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, commitHash);
+    } catch (error) {
+      console.warn('Failed to write to localStorage:', error);
+    }
   }
 
   /**
@@ -62,15 +80,23 @@ class BuildVersionChecker {
   async checkForNewVersion(): Promise<boolean> {
     if (this.isChecking) return false;
 
+    // Get stored version from localStorage
+    const initialVersion = this.getStoredVersion();
+
+    // Skip version check if we don't have an initial version
+    if (!initialVersion) {
+      return false;
+    }
+
     this.isChecking = true;
     try {
-      const serverCommitHash = await this.fetchCommitHash();
+      const currentServerHash = await this.fetchCommitHash();
 
-      // Compare short hashes (first 7 chars) since build uses short hash
-      const currentShort = this.currentVersion.substring(0, 7);
-      const serverShort = serverCommitHash.substring(0, 7);
+      // Compare short hashes (first 7 chars)
+      const initialShort = initialVersion.substring(0, 7);
+      const currentShort = currentServerHash.substring(0, 7);
 
-      return serverShort !== currentShort;
+      return currentShort !== initialShort;
     } catch (error) {
       return false;
     } finally {

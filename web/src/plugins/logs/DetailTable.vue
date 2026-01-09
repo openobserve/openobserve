@@ -151,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td
                 :data-test="`log-detail-${props.row.field}-key`"
                 class="text-left"
-                :class="store.state.theme == 'dark' ? 'tw:text-[#f67a7aff]' : 'tw:text-[#B71C1C]'"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'tw:text-[#f67a7aff]'
+                    : 'tw:text-[#B71C1C]'
+                "
               >
                 {{ props.row.field }}
               </q-td>
