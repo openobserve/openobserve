@@ -553,6 +553,7 @@ import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "FieldList",
@@ -623,6 +624,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
+    const { parsePromQlQuery } = usePromqlSuggestions();
 
     const metricsIconMapping: any = {
       Summary: "description",
@@ -777,13 +779,40 @@ export default defineComponent({
             // To prevent this, we added the dashboardPanelDataPageKey condition.
             // IMPORTANT: Only set default query if stream or stream_type actually changed
             if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
-              // set the query
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].query =
+              // Parse query to check if metric name differs from stream name
+              // Only override query if they differ or metric name is null
+              let parsedQuery = null;
+              try {
+                // Parse the query to get the metric name
+                parsedQuery = parsePromQlQuery(
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].query,
+                );
+              } catch (error: any) {
+                console.error("Failed to parse PromQL query:", error);
+                parsedQuery = null;
+              }
+
+              const metricName = parsedQuery?.metricName;
+              const streamName =
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream?.toString() + "{}";
+                ].fields.stream;
+
+              // Add guard
+              if (!streamName) {
+                console.warn("Cannot update query: stream name is undefined");
+                return;
+              }
+
+              // Set query if: (1) no metric name exists, OR (2) metric name differs from stream
+              if (!metricName || metricName !== streamName) {
+                // Set the query to the new stream name with curly braces
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].query = streamName + "{}";
+              }
 
               fetchPromQLLabels(
                 dashboardPanelData.data.queries[
