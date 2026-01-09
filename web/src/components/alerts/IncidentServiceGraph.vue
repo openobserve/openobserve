@@ -66,13 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ graphData.stats.total_alerts }}
         </span>
       </div>
-      <div v-if="graphData.root_cause_service" class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="gps_fixed" size="16px" class="tw-text-red-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Root Cause:</span>
-        <span class="tw-text-xs tw-font-semibold tw-text-red-500">
-          {{ graphData.root_cause_service }}
-        </span>
-      </div>
     </div>
 
     <!-- Graph Container -->
@@ -132,20 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
     >
       <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-red-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Root Cause</span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
         <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-orange-500" />
         <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">High Alerts (&gt;5)</span>
       </div>
       <div class="tw-flex tw-items-center tw-gap-1.5">
         <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-blue-500" />
         <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Normal</span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-border-2 tw-border-purple-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Primary Service</span>
       </div>
     </div>
   </div>
@@ -219,9 +204,6 @@ export default defineComponent({
     };
 
     const getNodeColor = (node: IncidentServiceNode): string => {
-      if (node.is_root_cause) {
-        return "#ef4444"; // red-500
-      }
       if (node.alert_count > 5) {
         return "#f97316"; // orange-500
       }
@@ -238,7 +220,7 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges, incident_service, root_cause_service } = graphData.value;
+      const { nodes, edges, incident_service } = graphData.value;
 
       // Convert to ECharts graph format
       const echartsNodes = nodes.map((node) => ({
@@ -246,8 +228,8 @@ export default defineComponent({
         symbolSize: getNodeSize(node),
         itemStyle: {
           color: getNodeColor(node),
-          borderColor: node.is_primary ? "#a855f7" : getNodeColor(node),
-          borderWidth: node.is_primary ? 4 : 2,
+          borderColor: getNodeColor(node),
+          borderWidth: 2,
         },
         label: {
           show: true,
@@ -261,12 +243,6 @@ export default defineComponent({
             let html = `<div style="padding: 8px; font-size: 12px;">`;
             html += `<strong style="font-size: 14px;">${node.service_name}</strong><br/><br/>`;
             html += `Alerts: <strong>${node.alert_count}</strong><br/>`;
-            if (node.is_root_cause) {
-              html += `<span style="color: #ef4444;">Suspected Root Cause</span><br/>`;
-            }
-            if (node.is_primary) {
-              html += `<span style="color: #a855f7;">Primary Service</span><br/>`;
-            }
             html += `</div>`;
             return html;
           },

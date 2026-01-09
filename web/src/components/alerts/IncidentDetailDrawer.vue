@@ -403,34 +403,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Content -->
             <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3">
               <div class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Service:</span>
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Primary Service:</span>
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.primary_service }}</span>
               </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.upstreamServices") }}:</span>
+              <div v-if="incidentDetails.topology_context.nodes && incidentDetails.topology_context.nodes.length > 0" class="tw:text-xs tw:mb-2">
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Services:</span>
                 <span class="tw:ml-1">
                   <q-badge
-                    v-for="svc in incidentDetails.topology_context.upstream_services"
-                    :key="svc"
+                    v-for="node in incidentDetails.topology_context.nodes"
+                    :key="node.service_name"
                     color="blue-grey-4"
-                    :label="svc"
+                    :label="node.service_name"
                     class="tw:mr-1 tw:mt-1"
                     size="xs"
                   />
                 </span>
               </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw:text-xs">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.downstreamServices") }}:</span>
-                <span class="tw:ml-1">
-                  <q-badge
-                    v-for="svc in incidentDetails.topology_context.downstream_services"
-                    :key="svc"
-                    color="blue-grey-4"
-                    :label="svc"
-                    class="tw:mr-1 tw:mt-1"
-                    size="xs"
-                  />
-                </span>
+              <div v-if="incidentDetails.topology_context.edges && incidentDetails.topology_context.edges.length > 0" class="tw:text-xs">
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Dependencies:</span>
+                <div class="tw:ml-1 tw:mt-1 tw:space-y-0.5">
+                  <div
+                    v-for="(edge, idx) in incidentDetails.topology_context.edges"
+                    :key="idx"
+                    class="tw:text-[10px] tw:font-mono"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
+                  >
+                    {{ edge.from }} → {{ edge.to }}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
