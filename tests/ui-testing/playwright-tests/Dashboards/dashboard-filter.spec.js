@@ -72,7 +72,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -292,7 +292,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -406,7 +406,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -481,7 +481,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -545,7 +545,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field
@@ -639,7 +639,7 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
       timeout: 5000,
     });
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add filter field and set value
@@ -744,7 +744,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     // Perform custom value search in variable dropdown to trigger _values API calls
     const variableInput = page.getByLabel("variablename", { exact: true });
@@ -836,7 +836,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -960,7 +960,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1061,7 +1061,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1159,7 +1159,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1257,7 +1257,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1355,7 +1355,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1453,7 +1453,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1551,7 +1551,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1649,7 +1649,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1747,7 +1747,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
@@ -1845,7 +1845,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Set date range
     await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Select variable value
