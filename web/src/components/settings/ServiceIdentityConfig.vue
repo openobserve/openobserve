@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full service-identity-config q-mt-sm">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-dots color="primary" size="2.5rem" />
+      <q-spinner-hourglass color="primary" size="30px" />
     </div>
 
     <div v-else>

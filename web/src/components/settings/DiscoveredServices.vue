@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-dots color="primary" size="2.5rem" />
+      <q-spinner-hourglass color="primary" size="30px" />
     </div>
 
     <!-- Error State -->
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading state for view switch -->
         <div v-if="viewModeLoading" class="tw:flex tw:justify-center tw:items-center tw:py-12 tw:rounded-lg tw:border">
           <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-            <q-spinner-dots color="primary" size="3rem" />
+            <q-spinner-hourglass color="primary" size="30px" />
             <div class="text-body2">Loading stream view...</div>
           </div>
         </div>
@@ -346,19 +346,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-expansion-item
             v-if="paginatedStreamGroups[streamType].totalStreams > 0"
             default-opened
+            class="stream-type-section"
           >
             <template #header>
-              <q-item-section avatar>
-                <q-icon
-                  :name="getStreamTypeIcon(streamType as string)"
-                  :color="getStreamTypeColor(streamType as string)"
-                  size="1.5rem"
-                />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="tw:font-semibold tw:capitalize">{{ streamType }}</q-item-label>
-                <q-item-label caption>
-                  {{ paginatedStreamGroups[streamType].totalStreams }} stream(s)
+              <q-item-section class="tw:pl-4 tw:py-3">
+                <q-item-label class="tw:capitalize" style="font-weight: 700; font-size: 1rem;">
+                  {{ streamType }} ({{ paginatedStreamGroups[streamType].totalStreams }} stream{{ paginatedStreamGroups[streamType].totalStreams !== 1 ? 's' : '' }})
                 </q-item-label>
               </q-item-section>
               <q-item-section side class="tw:flex tw:flex-row tw:items-center tw:gap-3">
@@ -389,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-list class="tw:ml-8">
               <!-- Loading indicator -->
               <div v-if="paginationLoading[streamType]" class="tw:flex tw:justify-center tw:py-4">
-                <q-spinner-dots color="primary" size="2rem" />
+                <q-spinner-hourglass color="primary" size="30px" />
               </div>
 
               <q-expansion-item
@@ -1197,19 +1190,6 @@ const formatDerivedFrom = (derivedFrom: string) => {
   }
 };
 
-const getStreamTypeIcon = (streamType: string) => {
-  switch (streamType) {
-    case "logs":
-      return "article";
-    case "traces":
-      return "timeline";
-    case "metrics":
-      return "show_chart";
-    default:
-      return "storage";
-  }
-};
-
 const getStreamTypeColor = (streamType: string) => {
   switch (streamType) {
     case "logs":
@@ -1319,5 +1299,19 @@ onMounted(() => {
 .suggestions-dialog-card {
   min-width: 43.75rem;
   max-width: 56.25rem;
+}
+
+.stream-type-section {
+  :deep(.q-item) {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    background-color: #f5f5f5;
+  }
+}
+
+body.body--dark .stream-type-section {
+  :deep(.q-item) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 }
 </style>
