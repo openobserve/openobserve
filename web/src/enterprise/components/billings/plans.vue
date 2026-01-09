@@ -138,7 +138,7 @@ export default defineComponent({
     try{
       const res = await BillingService.list_subscription(this.store.state.selectedOrganization.identifier);
         this.currentPlanDetail = res.data;
-        this.billingProvider = res.data.provider || "stripe";
+        this.billingProvider = res.data.provider || "";
 
         if (res.data.subscription_type !== "") {
           if (res.data.subscription_type == config.paidPlan) {
@@ -154,8 +154,8 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (this.billingProvider !== "aws") {
-          // Only show subscribe prompt for non-AWS orgs
+        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
+          // Only show subscribe prompt for Stripe orgs without subscription
           this.$q.notify({
             type: "warning",
             message: "Please subscribe to one of the plan.",
@@ -196,7 +196,7 @@ export default defineComponent({
     const listSubscriptionResponse: any = ref({});
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
-    const billingProvider = ref("stripe");
+    const billingProvider = ref("");
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(

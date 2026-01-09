@@ -156,7 +156,8 @@ export default defineComponent({
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
     const splitterModel = ref(220);
-    const billingProvider = ref("stripe"); // default to stripe
+    const billingProvider = ref(""); // empty until loaded
+    const billingInfoLoaded = ref(false);
 
     // Fetch billing info to determine provider
     const fetchBillingInfo = async () => {
@@ -164,17 +165,18 @@ export default defineComponent({
         const res = await BillingService.list_subscription(
           store.state.selectedOrganization.identifier
         );
-        if (res.data?.provider) {
-          billingProvider.value = res.data.provider;
-        }
+        billingProvider.value = res.data?.provider || "";
       } catch (e) {
         console.error("Failed to fetch billing info:", e);
+        billingProvider.value = "";
+      } finally {
+        billingInfoLoaded.value = true;
       }
     };
 
-    // Check if invoice tab should be shown (only for Stripe)
+    // Check if invoice tab should be shown (only for Stripe, and only after loading)
     const showInvoiceTab = computed(() => {
-      return billingProvider.value !== "aws";
+      return billingInfoLoaded.value && billingProvider.value !== "aws";
     });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
