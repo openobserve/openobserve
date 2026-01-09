@@ -444,7 +444,7 @@ export default defineComponent({
       },
       {
         name: "type",
-        field: (row: any) => row.urlJob ? "Url" : "File",
+        field: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File",
         label: "Type",
         align: "left",
         sortable: true,
