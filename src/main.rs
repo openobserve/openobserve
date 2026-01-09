@@ -295,6 +295,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
+            // start NATS visibility collector
+            infra::nats_visibility::start_collector();
+
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");

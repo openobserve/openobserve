@@ -23,6 +23,7 @@ use tokio::{
 use usage::{TriggerData, UsageData};
 
 pub mod error;
+pub mod nats;
 pub mod usage;
 
 #[derive(Debug)]
