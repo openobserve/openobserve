@@ -292,7 +292,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("30", "d");
+    await pm.dashboardTimeRefresh.setRelative("30", "w");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
