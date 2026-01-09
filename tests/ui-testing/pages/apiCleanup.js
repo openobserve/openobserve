@@ -360,10 +360,10 @@ class APICleanup {
 
     /**
      * Fetch all functions in a specific organization
-     * @param {string} org - The organization identifier
+     * @param {string} org - The organization identifier (defaults to 'default')
      * @returns {Promise<Array>} Array of function objects
      */
-    async fetchFunctionsInOrg(org) {
+    async fetchFunctionsInOrg(org = 'default') {
         try {
             const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',

@@ -11,7 +11,13 @@ The test endpoint uses snake_case (trans_type) for TestVRLRequest struct.
 
 
 class TestMetaOrgJavaScriptRestriction:
-    """Test JavaScript functions restricted to _meta org only."""
+    """Test JavaScript functions restricted to _meta org only.
+
+    IMPORTANT - API Field Name Format:
+    - Create/Update endpoints (POST/PUT /api/{org}/functions): use `transType` (camelCase)
+    - Test endpoint (POST /api/{org}/functions/test): use `trans_type` (snake_case)
+    This is due to different Rust structs: Transform (camelCase) vs TestVRLRequest (snake_case)
+    """
 
     def test_create_js_function_in_meta_org_success(self, create_session, base_url):
         """JavaScript function creation should succeed in _meta org."""

@@ -45,10 +45,13 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info('VRL radio button visible');
       await pm.functionsPage.expectJsRadioVisible();
       testLogger.info('JavaScript radio button visible in _meta org');
-      await pm.functionsPage.clickCancelButton();
 
-      // Step 2: Create JavaScript function (former Test 2)
-      await pm.functionsPage.createJavaScriptFunction(functionName, jsCode);
+      // Step 2: Create JavaScript function in same dialog (former Test 2)
+      // Continue in same dialog to avoid redundant open/close
+      await pm.functionsPage.fillFunctionName(functionName);
+      await pm.functionsPage.selectJavaScriptType();
+      await pm.functionsPage.enterFunctionCode(jsCode);
+      await pm.functionsPage.clickSaveButton();
       testLogger.info(`JavaScript function created in _meta org: ${functionName}`);
 
       // Step 3: Verify function appears in list
@@ -116,13 +119,13 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       const testEvent1 = '{"name": "test", "count": 5}';
       const output = await pm.functionsPage.testFunctionExecution(testEvent1);
 
-      if (output) {
-        testLogger.info(`Test output: ${output}`);
-        await pm.functionsPage.expectTestOutputContains('count');
-        await pm.functionsPage.expectTestOutputContains('6'); // 5 + 1
-        await pm.functionsPage.expectTestOutputContains('tested');
-        testLogger.info('JS function executed successfully');
-      }
+      // Assert output exists before checking content
+      expect(output).toBeTruthy();
+      testLogger.info(`Test output: ${output}`);
+      await pm.functionsPage.expectTestOutputContains('count');
+      await pm.functionsPage.expectTestOutputContains('6'); // 5 + 1
+      await pm.functionsPage.expectTestOutputContains('tested');
+      testLogger.info('JS function executed successfully');
       await pm.functionsPage.clickCancelButton();
 
       // Step 2: Test JS function with error

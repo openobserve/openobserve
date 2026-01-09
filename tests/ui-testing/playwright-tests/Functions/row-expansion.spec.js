@@ -45,9 +45,10 @@ test.describe('Row Expansion (#ResultArray#) Tests', { tag: ['@rowExpansion', '@
   merge(., {"index": 2})
 ]`;
 
-      // NOTE: Inline VRL test with merge() + #ResultArray# returns "Error in testing function"
-      // This is a known product limitation - VRL runtime testing doesn't support all VRL features
-      // Skip inline test and validate via function creation + marker preservation instead
+      // KNOWN LIMITATION: Inline VRL test with merge() + #ResultArray# returns "Error in testing function"
+      // VRL runtime testing in UI doesn't support all VRL features (merge with arrays)
+      // Test validates: (1) function creation succeeds, (2) #ResultArray# marker is preserved
+      // Actual row expansion behavior is tested via API tests and pipeline execution
       await pm.functionsPage.createVRLFunction(functionName, vrlCode, '_meta');
       testLogger.info('VRL function with row expansion created');
 
