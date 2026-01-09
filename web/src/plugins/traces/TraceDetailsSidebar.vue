@@ -304,7 +304,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
             <q-td colspan="2">
               <pre
-                v-once
                 class="log_json_content"
                 v-html="highlightedJSON(props.row)"
               />
