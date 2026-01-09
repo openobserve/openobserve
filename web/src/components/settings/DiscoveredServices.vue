@@ -332,8 +332,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- View: By Stream -->
-      <q-list v-else-if="viewMode === 'stream'" separator class="tw:rounded-lg tw:border">
-        <template v-for="(streamType) in ['logs', 'traces', 'metrics']" :key="streamType">
+      <div v-else-if="viewMode === 'stream'">
+        <!-- Loading state for view switch -->
+        <div v-if="viewModeLoading" class="tw:flex tw:justify-center tw:items-center tw:py-12 tw:rounded-lg tw:border">
+          <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
+            <q-spinner-dots color="primary" size="3rem" />
+            <div class="text-body2">Loading stream view...</div>
+          </div>
+        </div>
+
+        <q-list v-else separator class="tw:rounded-lg tw:border">
+          <template v-for="(streamType) in ['logs', 'traces', 'metrics']" :key="streamType">
           <q-expansion-item
             v-if="paginatedStreamGroups[streamType].totalStreams > 0"
             default-opened
@@ -425,7 +434,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-expansion-item>
         </template>
-      </q-list>
+        </q-list>
+      </div>
 
       <!-- Dimensions Dialog -->
       <q-dialog v-model="dimensionsDialog">
@@ -681,6 +691,7 @@ const groupedServices = ref<GroupedServicesResponse>({
 const searchQuery = ref("");
 const filterStatus = ref("all");
 const viewMode = ref<"fqn" | "service" | "stream">("fqn");
+const viewModeLoading = ref(false);
 const dimensionsDialog = ref(false);
 const servicesDialog = ref(false);
 const showSuggestionsDialog = ref(false);
@@ -1046,6 +1057,26 @@ const resetStreamPagination = () => {
 // Watch for search query changes to reset pagination
 watch(searchQuery, () => {
   resetStreamPagination();
+});
+
+// Watch for view mode changes to show loading state
+watch(viewMode, async (newMode, oldMode) => {
+  if (newMode === 'stream' && oldMode !== 'stream') {
+    viewModeLoading.value = true;
+
+    // Use requestAnimationFrame twice to ensure spinner animates
+    // First frame: render the spinner
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    // Second frame: allow spinner animation to start
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Use setTimeout to defer heavy computation
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    viewModeLoading.value = false;
+  } else {
+    viewModeLoading.value = false;
+  }
 });
 
 // Helper function to paginate a stream type
