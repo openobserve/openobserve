@@ -84,14 +84,12 @@ export const convertPromQLData = async (
   annotations: any,
   metadata: any = null,
 ) => {
-
-  // console.time("convertPromQLData");
-
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined
       ? panelSchema.config.show_gridlines
       : true;
+
   await importMoment();
 
   // if no data than return it
@@ -120,7 +118,6 @@ export const convertPromQLData = async (
   ];
 
   if (NEW_CHART_TYPES.includes(panelSchema.type)) {
-
     try {
       const result = await convertPromQLChartData(searchQueryData, {
         panelSchema,
@@ -178,6 +175,7 @@ export const convertPromQLData = async (
     if (!queryData || !queryData.result) {
       return queryData;
     }
+    const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
@@ -186,7 +184,15 @@ export const convertPromQLData = async (
   });
 
   // Add warning if total number of series exceeds limit
-  if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+  // Check if series limiting info is available from data loader (PromQL streaming)
+  if (metadata?.seriesLimiting) {
+    const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
+    if (totalMetricsReceived > metricsStored) {
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
+    }
+  } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+    // Fallback: Series limiting happens here (for non-streaming queries)
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
   }

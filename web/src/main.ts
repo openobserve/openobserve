@@ -67,6 +67,11 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
+
+    // Store initial commit hash for version checking
+    if (res.data.commit_hash) {
+      buildVersionChecker.setInitialVersion(res.data.commit_hash);
+    }
     if (res.data.rum.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
@@ -193,7 +198,6 @@ router.onError(async (error) => {
   const chunkFailedPattern = /Loading chunk [\d]+ failed|Failed to fetch dynamically imported module/i;
 
   if (chunkFailedPattern.test(error.message)) {
-
     // Smart detection: Check if it's stale build or network error
     const isStale = await buildVersionChecker.isStaleChunkError(error);
 
