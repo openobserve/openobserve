@@ -1,5 +1,7 @@
 /**
  * UI Regression Tests - General UI Bugs
+ * Bug #9217: Favicon icon missing on main branch
+ * https://github.com/openobserve/openobserve/issues/9217
  * Bug #9308: OpenAPI button redirect from Help menu
  * https://github.com/openobserve/openobserve/issues/9308
  */
@@ -18,6 +20,40 @@ test.describe("UI Regression Bugs", () => {
     pm = new PageManager(page);
 
     testLogger.info('UI regression test setup completed');
+  });
+
+  /**
+   * Bug #9217: Favicon icon missing on main branch
+   * Verifies that favicon is present in DOM and loads correctly via HTTP
+   * https://github.com/openobserve/openobserve/issues/9217
+   */
+  test("Favicon is present and loads correctly (Bug #9217)", {
+    tag: ['@regressionBugs', '@smoke', '@P0', '@favicon', '@bug9217']
+  }, async ({ page }) => {
+    testLogger.info('Test: Favicon verification (Bug #9217)');
+
+    // Navigate to home page
+    const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
+    await page.goto(homeUrl);
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+
+    testLogger.info('Verifying favicon is present and loads correctly');
+
+    // Verify favicon using page object method
+    const faviconResult = await pm.homePage.verifyFavicon();
+
+    // Assert favicon link exists with correct href (may be '/favicon.ico' or './favicon.ico')
+    testLogger.info('Checking favicon href attribute', { href: faviconResult.faviconHref });
+    expect(faviconResult.faviconHref).toMatch(/\.?\/favicon\.ico$/);
+    expect(faviconResult.domValid).toBe(true);
+    testLogger.info('Favicon link verified: href ends with favicon.ico');
+
+    // Assert favicon resource loads successfully (HTTP 200)
+    testLogger.info('Checking favicon resource loads via HTTP');
+    expect(faviconResult.resourceLoads).toBe(true);
+    testLogger.info('Favicon resource verified: HTTP 200 OK');
+
+    testLogger.info('Bug #9217 verification complete: Favicon is present and loads correctly');
   });
 
   /**

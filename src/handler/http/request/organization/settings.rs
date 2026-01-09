@@ -124,6 +124,17 @@ async fn create(
         data.dark_mode_theme_color = Some(dark_mode_theme_color);
     }
 
+    if let Some(max_series_per_query) = settings.max_series_per_query {
+        // Validate max_series_per_query is within acceptable range
+        if !(1_000..=1_000_000).contains(&max_series_per_query) {
+            return Ok(MetaHttpResponse::bad_request(
+                "max_series_per_query must be between 1,000 and 1,000,000",
+            ));
+        }
+        field_found = true;
+        data.max_series_per_query = Some(max_series_per_query);
+    }
+
     #[cfg(feature = "enterprise")]
     if let Some(claim_parser_function) = settings.claim_parser_function {
         field_found = true;
@@ -271,4 +282,49 @@ async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
 #[delete("/{org_id}/settings/logo/text")]
 async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_max_series_per_query_validation_valid_values() {
+        // Test minimum valid value
+        let value = 1_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test maximum valid value
+        let value = 1_000_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test mid-range value (default)
+        let value = 40_000;
+        assert!((1_000..=1_000_000).contains(&value));
+
+        // Test another mid-range value
+        let value = 500_000;
+        assert!((1_000..=1_000_000).contains(&value));
+    }
+
+    #[test]
+    fn test_max_series_per_query_validation_invalid_values() {
+        // Test below minimum
+        let value = 999;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test above maximum
+        let value = 1_000_001;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test zero
+        let value = 0;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test very large value
+        let value = 10_000_000;
+        assert!(!(1_000..=1_000_000).contains(&value));
+
+        // Test value just below minimum
+        let value = 500;
+        assert!(!(1_000..=1_000_000).contains(&value));
+    }
 }

@@ -186,11 +186,18 @@ test.describe("Pre-Test Cleanup", () => {
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
-        /ellipsis_testing/                             // Bug #7468 ellipsis test streams (long stream names)
+        /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
+        /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
+        /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
     );
+
+    // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
+    // are created by pipeline-regression.spec.js for Issue #9901 regression tests.
+    // Custom traces stream uses "stream-name" header (ZO_GRPC_STREAM_HEADER_KEY config).
+    // Since streams are re-used with fresh timestamps each test run, cleanup is not strictly required.
 
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();
@@ -217,6 +224,37 @@ test.describe("Pre-Test Cleanup", () => {
     // The cleanup patterns above will clean up old test streams via regex matching
 
     testLogger.info('Pre-test cleanup completed successfully');
+  });
+
+  test('Clean up JavaScript function test data', {
+    tag: ['@cleanup', '@functions', '@jsFunctions']
+  }, async ({ page }) => {
+    testLogger.info('Starting JavaScript functions cleanup');
+
+    const pm = new PageManager(page);
+
+    // Navigate to functions page
+    await pm.functionsPage.navigate();
+
+    // Cleanup patterns for JS function tests
+    const testPatterns = [
+      'test_js_fn_',
+      'test_js_validate_',
+      'test_js_exec_',
+      'test_js_error_',
+      'pipeline_js_fn_',
+      'test_js_array_',
+      'test_js_syntax_err_',
+      'test_js_empty_'
+    ];
+
+    // Delete all test functions matching each pattern
+    for (const pattern of testPatterns) {
+      testLogger.info(`Cleaning up functions matching pattern: ${pattern}`);
+      await pm.functionsPage.deleteAllFunctionsMatching(pattern);
+    }
+
+    testLogger.info('JavaScript functions cleanup completed successfully');
   });
 });
 
