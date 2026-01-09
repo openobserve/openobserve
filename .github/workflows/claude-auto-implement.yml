@@ -112,7 +112,7 @@ jobs:
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
       )
 
-    uses: openobserve/o2-enterprise/.github/workflows/claude-auto-implement-reusable.yml@main
+    uses: ./.github/workflows/claude-auto-implement-reusable.yml
     with:
       source_repo: openobserve
       issue_number: ${{ github.event.issue.number }}

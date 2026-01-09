@@ -120,10 +120,10 @@ jobs:
               console.log(`Will create branch: ${branchName}`);
             }
 
-  # Call the reusable workflow from o2-enterprise
+  # Call the reusable workflow (local copy)
   fix:
     needs: [check-permission, prepare]
-    uses: openobserve/o2-enterprise/.github/workflows/claude-auto-implement-reusable.yml@main
+    uses: ./.github/workflows/claude-auto-implement-reusable.yml
     with:
       source_repo: openobserve
       issue_number: ${{ needs.prepare.outputs.number }}

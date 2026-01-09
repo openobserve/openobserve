@@ -1,0 +1,2575 @@
+name: "Claude Auto-Implement (Hybrid: Critical Gates + Smart Testing)"
+
+on:
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string  # "openobserve" or "o2-enterprise"
+      issue_number:
+        required: true
+        type: string  # Changed to string to support matrix
+      issue_title:
+        required: false
+        type: string
+        default: ''
+      issue_body:
+        required: false
+        type: string
+        default: ''
+      is_manual_trigger:
+        required: false
+        type: boolean
+        default: false
+      # Fix mode inputs
+      mode:
+        required: false
+        type: string
+        default: 'implement'  # "implement" | "pr_fix" | "issue_fix"
+      branch:
+        required: false
+        type: string
+        default: ''  # For pr_fix/issue_fix mode - the branch to work on
+      pr_number:
+        required: false
+        type: string
+        default: ''  # For pr_fix mode - the PR number
+      trigger_comment:
+        required: false
+        type: string
+        default: ''  # The @claude_fix comment body
+      trigger_comment_id:
+        required: false
+        type: string
+        default: ''  # For reacting to the trigger comment
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+      E2E_DEV_CI_TOKEN:
+        required: true
+      O2_ENTERPRISE_REPO_TOKEN:
+        required: false  # Only needed if triggering from openobserve for frontend
+
+jobs:
+  auto-implement:
+    runs-on: ubicloud-standard-8  # 160GB disk (vs 14GB on ubuntu-latest) for Rust builds
+
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    timeout-minutes: 240  # 4 hours for complex features
+
+    steps:
+      # React to trigger comment (fix modes only)
+      - name: React to Trigger Comment
+        if: inputs.mode != 'implement' && inputs.trigger_comment_id != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const commentId = '${{ inputs.trigger_comment_id }}';
+            if (commentId && commentId !== '') {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: 'openobserve',
+                  repo: '${{ inputs.source_repo }}',
+                  comment_id: parseInt(commentId),
+                  content: 'eyes'
+                });
+              } catch (e) {
+                console.log(`Could not add reaction: ${e.message}`);
+              }
+            }
+
+      # PRIMARY repo at workspace ROOT - Claude Code action requires .git at $GITHUB_WORKSPACE
+      - name: Checkout ${{ inputs.source_repo }} (Primary - at workspace root for Claude Code)
+        uses: actions/checkout@v5
+        with:
+          repository: openobserve/${{ inputs.source_repo }}
+          # NO path: parameter - checkout to workspace root so .git is at $GITHUB_WORKSPACE
+          ref: ${{ inputs.branch != '' && inputs.branch || 'main' }}
+          fetch-depth: 50  # Shallow clone for disk space efficiency
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+
+      # For issue_fix mode, create branch from main if it doesn't exist
+      - name: Create Branch (issue_fix mode)
+        if: inputs.mode == 'issue_fix'
+        # Primary repo is at workspace root - no working-directory needed
+        run: |
+          BRANCH="${{ inputs.branch }}"
+
+          # Check if we're on the branch or need to create it
+          CURRENT=$(git branch --show-current)
+          if [ "$CURRENT" != "$BRANCH" ]; then
+            # Branch doesn't exist, create it from main
+            git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+          fi
+
+      # SECONDARY repo in subdirectory - for cross-repo access (build dependencies, etc.)
+      # Claude can cd into this directory to make changes if needed
+      - name: Checkout ${{ inputs.source_repo == 'openobserve' && 'o2-enterprise' || 'openobserve' }} (Secondary - in subdirectory)
+        uses: actions/checkout@v5
+        with:
+          repository: openobserve/${{ inputs.source_repo == 'openobserve' && 'o2-enterprise' || 'openobserve' }}
+          path: ${{ inputs.source_repo == 'openobserve' && 'o2-enterprise' || 'openobserve' }}
+          ref: main  # Always use main - PR branches don't exist in secondary repo
+          fetch-depth: 50  # Shallow clone for disk space efficiency
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+
+      - name: Checkout Designs Repo
+        uses: actions/checkout@v5
+        with:
+          repository: openobserve/designs
+          path: designs
+          fetch-depth: 1  # Shallow clone for disk space efficiency
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+
+      - name: Checkout E2E Agents Repository
+        uses: actions/checkout@v5
+        with:
+          repository: openobserve/test_agents
+          path: test_agents
+          fetch-depth: 1  # Shallow clone for disk space efficiency
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+
+      # ========================================
+      # SET UP REPO PATH VARIABLES
+      # Primary repo is at workspace root, secondary in subdirectory
+      # These variables are used throughout the workflow
+      # ========================================
+      - name: Set Repo Path Variables
+        id: paths
+        run: |
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          SOURCE_REPO="${{ inputs.source_repo }}"
+
+          # Primary repo (where issue/PR was created) is at workspace root
+          # Secondary repo is in a subdirectory
+
+          if [ "$SOURCE_REPO" = "openobserve" ]; then
+            # openobserve triggered: openobserve at root, o2-enterprise in subdir
+            OPENOBSERVE_REPO_PATH="$WORKSPACE"
+            O2_ENTERPRISE_REPO_PATH="$WORKSPACE/o2-enterprise"
+          else
+            # o2-enterprise triggered: o2-enterprise at root, openobserve in subdir
+            OPENOBSERVE_REPO_PATH="$WORKSPACE/openobserve"
+            O2_ENTERPRISE_REPO_PATH="$WORKSPACE"
+          fi
+
+          # Fixed paths (always in subdirectories)
+          DESIGNS_REPO_PATH="$WORKSPACE/designs"
+          TEST_AGENTS_REPO_PATH="$WORKSPACE/test_agents"
+
+          # Export to GITHUB_ENV for use in all subsequent steps
+          echo "OPENOBSERVE_REPO_PATH=$OPENOBSERVE_REPO_PATH" >> $GITHUB_ENV
+          echo "O2_ENTERPRISE_REPO_PATH=$O2_ENTERPRISE_REPO_PATH" >> $GITHUB_ENV
+          echo "DESIGNS_REPO_PATH=$DESIGNS_REPO_PATH" >> $GITHUB_ENV
+          echo "TEST_AGENTS_REPO_PATH=$TEST_AGENTS_REPO_PATH" >> $GITHUB_ENV
+
+          # Also output for steps that need outputs
+          echo "openobserve_repo_path=$OPENOBSERVE_REPO_PATH" >> $GITHUB_OUTPUT
+          echo "o2_enterprise_repo_path=$O2_ENTERPRISE_REPO_PATH" >> $GITHUB_OUTPUT
+          echo "designs_repo_path=$DESIGNS_REPO_PATH" >> $GITHUB_OUTPUT
+          echo "test_agents_repo_path=$TEST_AGENTS_REPO_PATH" >> $GITHUB_OUTPUT
+
+          # Log for debugging
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "REPO PATH VARIABLES SET"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "SOURCE_REPO: $SOURCE_REPO"
+          echo "OPENOBSERVE_REPO_PATH: $OPENOBSERVE_REPO_PATH"
+          echo "O2_ENTERPRISE_REPO_PATH: $O2_ENTERPRISE_REPO_PATH"
+          echo "DESIGNS_REPO_PATH: $DESIGNS_REPO_PATH"
+          echo "TEST_AGENTS_REPO_PATH: $TEST_AGENTS_REPO_PATH"
+          echo ""
+          echo "Directory verification:"
+          echo "  openobserve exists: $([ -d \"$OPENOBSERVE_REPO_PATH\" ] && echo 'YES' || echo 'NO')"
+          echo "  o2-enterprise exists: $([ -d \"$O2_ENTERPRISE_REPO_PATH\" ] && echo 'YES' || echo 'NO')"
+          echo "  .git at root: $([ -d \"$WORKSPACE/.git\" ] && echo 'YES' || echo 'NO')"
+
+      - name: Setup Claude Code Config
+        run: |
+          echo "🔧 Setting up Claude Code config..."
+
+          # Use env vars set by "Set Repo Path Variables" step
+          E2E_DIR="${TEST_AGENTS_REPO_PATH}/e2e-dev"
+
+          setup_repo() {
+            local REPO_PATH="$1"
+            [ ! -d "$REPO_PATH" ] && return
+
+            echo "Setting up Claude config in: $REPO_PATH"
+
+            # Copy CLAUDE.md
+            [ -f "$E2E_DIR/CLAUDE.md" ] && cp "$E2E_DIR/CLAUDE.md" "$REPO_PATH/CLAUDE.md"
+
+            # Create .claude directory structure
+            mkdir -p "$REPO_PATH/.claude/commands" "$REPO_PATH/.claude/agents" "$REPO_PATH/.claude/skills" "$REPO_PATH/.claude/state"
+
+            # Copy configs
+            [ -d "$E2E_DIR/.claude/commands" ] && cp -r "$E2E_DIR/.claude/commands/"* "$REPO_PATH/.claude/commands/" 2>/dev/null || true
+            [ -d "$E2E_DIR/.claude/agents" ] && cp -r "$E2E_DIR/.claude/agents/"* "$REPO_PATH/.claude/agents/" 2>/dev/null || true
+            [ -d "$E2E_DIR/.claude/skills" ] && cp -r "$E2E_DIR/.claude/skills/"* "$REPO_PATH/.claude/skills/" 2>/dev/null || true
+            [ -f "$E2E_DIR/.claude/settings.json" ] && cp "$E2E_DIR/.claude/settings.json" "$REPO_PATH/.claude/settings.json"
+
+            # Add to .gitignore (prevent accidental commits)
+            if ! grep -q "# CI-copied Claude configs" "$REPO_PATH/.gitignore" 2>/dev/null; then
+              echo "" >> "$REPO_PATH/.gitignore"
+              echo "# CI-copied Claude configs (runtime only, not committed)" >> "$REPO_PATH/.gitignore"
+              echo "CLAUDE.md" >> "$REPO_PATH/.gitignore"
+              echo ".claude/commands/" >> "$REPO_PATH/.gitignore"
+              echo ".claude/agents/" >> "$REPO_PATH/.gitignore"
+              echo ".claude/skills/" >> "$REPO_PATH/.gitignore"
+              echo ".claude/settings.json" >> "$REPO_PATH/.gitignore"
+            fi
+          }
+
+          # Setup both repos using env vars
+          setup_repo "$OPENOBSERVE_REPO_PATH"
+          setup_repo "$O2_ENTERPRISE_REPO_PATH"
+
+          echo "✅ Claude Code config setup complete"
+
+      # Write fix mode context to files (for @claude_fix triggered runs)
+      - name: Write Fix Mode Context
+        if: inputs.mode == 'pr_fix' || inputs.mode == 'issue_fix'
+        run: |
+          echo "📝 Writing fix mode context..."
+
+          # Write trigger comment
+          cat > /tmp/trigger-comment.txt << 'TRIGGER_EOF'
+          ${{ inputs.trigger_comment }}
+          TRIGGER_EOF
+
+          echo "Mode: ${{ inputs.mode }}"
+          echo "Branch: ${{ inputs.branch }}"
+          echo "Trigger comment written to /tmp/trigger-comment.txt"
+
+      # Fetch PR context (review comments, diff, etc.) for pr_fix mode
+      - name: Fetch PR Context (pr_fix mode)
+        if: inputs.mode == 'pr_fix' && inputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const prNumber = parseInt('${{ inputs.pr_number }}');
+
+            // Get review comments (inline comments on code)
+            const { data: reviewComments } = await github.rest.pulls.listReviewComments({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              pull_number: prNumber,
+              per_page: 100
+            });
+
+            // Get PR conversation comments
+            const { data: issueComments } = await github.rest.issues.listComments({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              issue_number: prNumber,
+              per_page: 100
+            });
+
+            // Get reviews (approve/request changes)
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              pull_number: prNumber
+            });
+
+            // Get the PR diff
+            const { data: diff } = await github.rest.pulls.get({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              pull_number: prNumber,
+              mediaType: { format: 'diff' }
+            });
+
+            // Format review comments (include code review bots like greptile, claude)
+            const formattedReviewComments = reviewComments
+              .filter(c => {
+                const isBot = c.user.login.includes('bot');
+                const isCodeReviewBot = c.user.login.includes('greptile') ||
+                  c.user.login === 'claude' ||
+                  c.body.includes('Severity') ||
+                  c.body.includes('security') ||
+                  c.body.includes('SSRF') ||
+                  c.body.includes('unwrap');
+                // Keep non-bot comments OR code review bot comments
+                return !isBot || isCodeReviewBot;
+              })
+              .map(c => ({
+                file: c.path,
+                line: c.line || c.original_line,
+                body: c.body,
+                user: c.user.login
+              }));
+
+            // Format conversation (include claude code review comments, exclude other bot noise)
+            const formattedConversation = issueComments
+              .filter(c => {
+                const isBot = c.user.login.includes('bot');
+                const isClaudeReview = c.user.login === 'claude' && (
+                  c.body.includes('Code Review') ||
+                  c.body.includes('| File | Issue |') ||
+                  c.body.includes('Severity')
+                );
+                // Keep non-bot comments OR claude code review comments
+                // Exclude progress update comments
+                const isProgressUpdate = c.body.startsWith('## 🤖') ||
+                  c.body.startsWith('## ✅') ||
+                  c.body.startsWith('## ❌') ||
+                  c.body.includes('Auto-Implementation Started') ||
+                  c.body.includes('Auto-Implementation Complete');
+                return (!isBot || isClaudeReview) && !isProgressUpdate;
+              })
+              .map(c => ({
+                body: c.body,
+                user: c.user.login
+              }));
+
+            // Format reviews with requested changes
+            const formattedReviews = reviews
+              .filter(r => r.state === 'CHANGES_REQUESTED' || r.body)
+              .map(r => ({
+                state: r.state,
+                body: r.body,
+                user: r.user.login
+              }));
+
+            // Get PR details for body
+            const { data: prDetails } = await github.rest.pulls.get({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              pull_number: prNumber
+            });
+
+            // Extract design doc references from PR body and comments
+            const allText = [
+              prDetails.body || '',
+              ...formattedConversation.map(c => c.body),
+              ...formattedReviewComments.map(c => c.body)
+            ].join('\n');
+
+            // Patterns to match design doc references:
+            // - Full GitHub URL: https://github.com/openobserve/designs/blob/main/path/to/doc.md
+            // - designs repo path: designs/path/to/doc.md
+            // - Just path (e.g., pipelines/enrichment-file-url mentioned in context of design)
+            const designPatterns = [
+              /https?:\/\/github\.com\/openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /github\.com\/openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /designs\/([^\s\)\]]+)/gi,
+              /design[:\s]+([a-z0-9_\-\/]+)/gi  // Catches "design: pipelines/foo" or "Design pipelines/foo"
+            ];
+
+            const designDocs = new Set();
+            for (const pattern of designPatterns) {
+              const matches = allText.matchAll(pattern);
+              for (const match of matches) {
+                let path = match[1]
+                  .replace(/^\//, '')
+                  .replace(/\)$/, '')
+                  .replace(/\]$/, '')
+                  .replace(/['"`,]$/, '')
+                  .replace(/\.md$/, '');  // Normalize - remove .md extension
+                if (path && !path.includes('://') && path.length > 2) {
+                  designDocs.add(path);
+                }
+              }
+            }
+
+            // Write to files
+            fs.writeFileSync('/tmp/review-comments.json', JSON.stringify(formattedReviewComments, null, 2));
+            fs.writeFileSync('/tmp/conversation.json', JSON.stringify(formattedConversation, null, 2));
+            fs.writeFileSync('/tmp/reviews.json', JSON.stringify(formattedReviews, null, 2));
+            fs.writeFileSync('/tmp/pr-diff.txt', diff);
+            fs.writeFileSync('/tmp/design-docs.json', JSON.stringify([...designDocs], null, 2));
+
+            console.log(`Found ${formattedReviewComments.length} review comments`);
+            console.log(`Found ${formattedReviews.length} reviews`);
+            console.log(`Found ${designDocs.size} design doc references: ${[...designDocs].join(', ')}`);
+
+      # Fetch Issue context for issue_fix mode
+      - name: Fetch Issue Context (issue_fix mode)
+        if: inputs.mode == 'issue_fix'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const issueNumber = parseInt('${{ inputs.issue_number }}');
+
+            // Get issue details
+            const { data: issue } = await github.rest.issues.get({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              issue_number: issueNumber
+            });
+
+            // Get issue comments
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              issue_number: issueNumber,
+              per_page: 100
+            });
+
+            // Format comments (exclude bot comments)
+            const formattedComments = comments
+              .filter(c => !c.user.login.includes('bot'))
+              .map(c => ({
+                body: c.body,
+                user: c.user.login,
+                created_at: c.created_at
+              }));
+
+            // Extract design doc references from issue body and comments
+            const allText = [
+              issue.body || '',
+              ...formattedComments.map(c => c.body)
+            ].join('\n');
+
+            // Patterns to match design doc references:
+            // - Full GitHub URL: https://github.com/openobserve/designs/blob/main/path/to/doc.md
+            // - designs repo path: designs/path/to/doc.md
+            // - Just path (e.g., pipelines/enrichment-file-url mentioned in context of design)
+            const designPatterns = [
+              /https?:\/\/github\.com\/openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /github\.com\/openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /openobserve\/designs\/blob\/[^\/]+\/([^\s\)\]]+)/gi,
+              /designs\/([^\s\)\]]+)/gi,
+              /design[:\s]+([a-z0-9_\-\/]+)/gi  // Catches "design: pipelines/foo" or "Design pipelines/foo"
+            ];
+
+            const designDocs = new Set();
+            for (const pattern of designPatterns) {
+              const matches = allText.matchAll(pattern);
+              for (const match of matches) {
+                let path = match[1]
+                  .replace(/^\//, '')
+                  .replace(/\)$/, '')
+                  .replace(/\]$/, '')
+                  .replace(/['"`,]$/, '')
+                  .replace(/\.md$/, '');  // Normalize - remove .md extension
+                if (path && !path.includes('://') && path.length > 2) {
+                  designDocs.add(path);
+                }
+              }
+            }
+
+            // Write to files
+            fs.writeFileSync('/tmp/issue-body.txt', issue.body || '');
+            fs.writeFileSync('/tmp/issue-comments.json', JSON.stringify(formattedComments, null, 2));
+            fs.writeFileSync('/tmp/design-docs.json', JSON.stringify([...designDocs], null, 2));
+
+            console.log(`Issue: ${issue.title}`);
+            console.log(`Found ${formattedComments.length} comments`);
+            console.log(`Found ${designDocs.size} design doc references: ${[...designDocs].join(', ')}`);
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "claude-code-bot"
+          git config --global user.email "claude-code-bot@openobserve.ai"
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-11-11
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt, clippy  # ✅ Ensure components available for pre-commit checks
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Primary repo is at workspace root
+          workspaces: "."
+          cache-on-failure: true
+
+      - name: Install Protoc
+        run: |
+          # Use env var set by "Set Repo Path Variables" step
+          # protoc.sh is in openobserve repo
+          if [ -f "${OPENOBSERVE_REPO_PATH}/.github/protoc.sh" ]; then
+            bash "${OPENOBSERVE_REPO_PATH}/.github/protoc.sh"
+          else
+            echo "⚠️ Warning: protoc.sh not found at ${OPENOBSERVE_REPO_PATH}/.github/, skipping"
+          fi
+
+      - name: Install Vectorscan Dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libboost-dev cmake patch
+
+      - name: Simulate Frontend Build (for Rust compilation)
+        run: |
+          # Use env var set by "Set Repo Path Variables" step
+          # Rust build expects web/dist to exist in openobserve repo
+          if [ -d "${OPENOBSERVE_REPO_PATH}" ]; then
+            mkdir -p "${OPENOBSERVE_REPO_PATH}/web/dist"
+            touch "${OPENOBSERVE_REPO_PATH}/web/dist/index.html"
+            echo "✅ Created ${OPENOBSERVE_REPO_PATH}/web/dist/index.html"
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Frontend Dependencies
+        run: |
+          # Use env var set by "Set Repo Path Variables" step
+          # Frontend is in openobserve repo
+          if [ -d "${OPENOBSERVE_REPO_PATH}/web" ]; then
+            echo "📦 Installing frontend dependencies in ${OPENOBSERVE_REPO_PATH}/web..."
+            cd "${OPENOBSERVE_REPO_PATH}/web"
+            npm ci --prefer-offline --no-audit || npm install
+            echo "✅ Frontend dependencies installed"
+          else
+            echo "⚠️ No web directory found at ${OPENOBSERVE_REPO_PATH}/web"
+          fi
+
+      - name: Fetch Issue Details (if not provided)
+        id: fetch_issue
+        if: inputs.issue_title == '' || inputs.issue_body == ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: issue } = await github.rest.issues.get({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              issue_number: ${{ inputs.issue_number }}
+            });
+
+            core.setOutput('title', issue.title);
+            core.setOutput('body', issue.body || '');
+            core.setOutput('labels', JSON.stringify(issue.labels.map(l => l.name)));
+
+      - name: Extract Issue Details
+        id: issue
+        # Primary repo is at workspace root - no working-directory needed
+        run: |
+          ISSUE_NUMBER="${{ inputs.issue_number }}"
+
+          # Use fetched title if available, otherwise use input
+          if [ -n "${{ steps.fetch_issue.outputs.title }}" ]; then
+            ISSUE_TITLE="${{ steps.fetch_issue.outputs.title }}"
+          else
+            ISSUE_TITLE="${{ inputs.issue_title }}"
+          fi
+
+          # Determine commit type based on labels or title
+          COMMIT_TYPE="feat"
+          LABELS='${{ steps.fetch_issue.outputs.labels || '[]' }}'
+
+          # Check if issue has bug label or title contains bug/fix keywords
+          if echo "$LABELS" | grep -qi "bug"; then
+            COMMIT_TYPE="fix"
+          elif echo "$ISSUE_TITLE" | grep -qiE "^(fix|bug|bugfix):"; then
+            COMMIT_TYPE="fix"
+          elif echo "$ISSUE_TITLE" | grep -qiE "\b(fix|bug|bugfix|issue|error|broken)\b"; then
+            COMMIT_TYPE="fix"
+          fi
+
+          echo "Detected commit type: $COMMIT_TYPE"
+
+          # Create feature slug
+          FEATURE_SLUG=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | cut -c1-50)
+
+          # Branch name: use inputs.branch if provided (pr_fix/issue_fix mode), otherwise generate
+          if [ -n "${{ inputs.branch }}" ]; then
+            BRANCH_NAME="${{ inputs.branch }}"
+            echo "Using provided branch: $BRANCH_NAME"
+          else
+            BRANCH_NAME="${COMMIT_TYPE}/auto-${ISSUE_NUMBER}-${FEATURE_SLUG}"
+            echo "Generated branch: $BRANCH_NAME"
+          fi
+
+          # Designs path
+          YEAR_MONTH=$(date +%Y-%m)
+          DESIGNS_PATH="e2e-dev/${{ inputs.source_repo }}/${YEAR_MONTH}/issue-${ISSUE_NUMBER}-${FEATURE_SLUG}"
+
+          echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "slug=$FEATURE_SLUG" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "commit_type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
+          echo "year_month=$YEAR_MONTH" >> $GITHUB_OUTPUT
+          echo "designs_path=$DESIGNS_PATH" >> $GITHUB_OUTPUT
+
+      - name: Detect Existing PR and Context (Fix Mode)
+        id: detect_mode
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const branchName = '${{ steps.issue.outputs.branch }}';
+            const issueNumber = ${{ inputs.issue_number }};
+            const designsPath = '${{ steps.issue.outputs.designs_path }}';
+
+            let mode = 'CREATE'; // Default: Create new implementation
+            let existingPRs = {
+              backend: null,
+              frontend: null
+            };
+            let hasContext = false;
+            let reviewComments = [];
+
+            // 1. Check for existing PRs in both repos
+            try {
+              const backendPRs = await github.rest.pulls.list({
+                owner: 'openobserve',
+                repo: 'openobserve',
+                head: `openobserve:${branchName}`,
+                state: 'open'
+              });
+
+              if (backendPRs.data.length > 0) {
+                existingPRs.backend = backendPRs.data[0].number;
+                mode = 'FIX';
+                console.log(`✅ Found existing backend PR #${existingPRs.backend}`);
+
+                // Get review comments
+                const comments = await github.rest.pulls.listReviewComments({
+                  owner: 'openobserve',
+                  repo: 'openobserve',
+                  pull_number: existingPRs.backend
+                });
+
+                reviewComments.push(...comments.data.map(c => ({
+                  repo: 'backend',
+                  file: c.path,
+                  line: c.line,
+                  body: c.body,
+                  user: c.user.login
+                })));
+              }
+            } catch (error) {
+              console.log('No backend PR found or error:', error.message);
+            }
+
+            try {
+              const frontendPRs = await github.rest.pulls.list({
+                owner: 'openobserve',
+                repo: 'o2-enterprise',
+                head: `openobserve:${branchName}`,
+                state: 'open'
+              });
+
+              if (frontendPRs.data.length > 0) {
+                existingPRs.frontend = frontendPRs.data[0].number;
+                mode = 'FIX';
+                console.log(`✅ Found existing frontend PR #${existingPRs.frontend}`);
+
+                // Get review comments
+                const comments = await github.rest.pulls.listReviewComments({
+                  owner: 'openobserve',
+                  repo: 'o2-enterprise',
+                  pull_number: existingPRs.frontend
+                });
+
+                reviewComments.push(...comments.data.map(c => ({
+                  repo: 'frontend',
+                  file: c.path,
+                  line: c.line,
+                  body: c.body,
+                  user: c.user.login
+                })));
+              }
+            } catch (error) {
+              console.log('No frontend PR found or error:', error.message);
+            }
+
+            // 2. Check for existing context in designs repo
+            try {
+              await github.rest.repos.getContent({
+                owner: 'openobserve',
+                repo: 'designs',
+                path: designsPath
+              });
+              hasContext = true;
+              console.log(`✅ Found existing context in designs repo: ${designsPath}`);
+            } catch (error) {
+              console.log('No existing context found in designs repo');
+            }
+
+            // Set outputs
+            core.setOutput('mode', mode);
+            core.setOutput('backend_pr', existingPRs.backend || '');
+            core.setOutput('frontend_pr', existingPRs.frontend || '');
+            // 3. Get issue comments (user feedback, additional requirements)
+            let issueComments = [];
+            try {
+              const comments = await github.rest.issues.listComments({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                per_page: 50  // Last 50 comments
+              });
+
+              // Filter to relevant comments (include claude code reviews, skip other bot noise)
+              issueComments = comments.data
+                .filter(c => {
+                  const isBot = c.user.login.includes('bot');
+                  const isClaudeReview = c.user.login === 'claude' && (
+                    c.body.includes('Code Review') ||
+                    c.body.includes('| File | Issue |') ||
+                    c.body.includes('Severity')
+                  );
+                  // Keep non-bot comments OR claude code review comments
+                  // Exclude progress update comments
+                  const isProgressUpdate = c.body.startsWith('## 🤖') ||
+                    c.body.startsWith('## ✅') ||
+                    c.body.startsWith('## ❌') ||
+                    c.body.includes('Auto-Implementation Started') ||
+                    c.body.includes('Auto-Implementation Complete');
+                  return (!isBot || isClaudeReview) && !isProgressUpdate;
+                })
+                .map(c => ({
+                  user: c.user.login,
+                  body: c.body,
+                  created_at: c.created_at
+                }));
+
+              console.log(`📝 Found ${issueComments.length} relevant issue comments`);
+            } catch (error) {
+              console.log('Error fetching issue comments:', error.message);
+            }
+
+            core.setOutput('has_context', hasContext);
+            core.setOutput('review_comments_count', reviewComments.length);
+            core.setOutput('issue_comments_count', issueComments.length);
+
+            // Save review comments to file for Claude to read
+            const fs = require('fs');
+            if (reviewComments.length > 0) {
+              fs.writeFileSync('/tmp/review-comments.json', JSON.stringify(reviewComments, null, 2));
+              console.log(`📝 Saved ${reviewComments.length} review comments to /tmp/review-comments.json`);
+            }
+
+            // Save issue comments to file for Claude to read
+            if (issueComments.length > 0) {
+              fs.writeFileSync('/tmp/issue-comments.json', JSON.stringify(issueComments, null, 2));
+              console.log(`📝 Saved ${issueComments.length} issue comments to /tmp/issue-comments.json`);
+            }
+
+            console.log(`\n🎯 Mode: ${mode}`);
+            console.log(`📊 Backend PR: ${existingPRs.backend || 'none'}`);
+            console.log(`📊 Frontend PR: ${existingPRs.frontend || 'none'}`);
+            console.log(`📁 Has Context: ${hasContext}`);
+            console.log(`💬 Review Comments: ${reviewComments.length}`);
+            console.log(`💬 Issue Comments: ${issueComments.length}`);
+
+            return {
+              mode,
+              existingPRs,
+              hasContext,
+              reviewComments: reviewComments.length
+            };
+
+      - name: Create or Checkout Feature Branch
+        id: branch_setup
+        # Primary repo is at workspace root - no working-directory needed
+        continue-on-error: true  # ✅ Don't fail workflow on rebase conflicts
+        run: |
+          MODE="${{ steps.detect_mode.outputs.mode }}"
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          BASE_BRANCH="main"
+
+          if [ "$MODE" = "FIX" ]; then
+            echo "🔧 FIX MODE: Checking out existing branch"
+            git fetch origin "$BRANCH"
+            git fetch origin "$BASE_BRANCH"
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
+
+            echo "📥 Attempting rebase onto latest $BASE_BRANCH"
+            if git rebase "origin/$BASE_BRANCH"; then
+              echo "✅ Rebase successful"
+              git push origin "$BRANCH" --force-with-lease
+              echo "rebase_success=true" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ Rebase conflicts detected. Will work on current state."
+              git rebase --abort
+              echo "rebase_success=false" >> $GITHUB_OUTPUT
+              echo "rebase_conflicts=true" >> $GITHUB_OUTPUT
+              # ✅ Continue workflow - Claude can still add tests/fixes
+            fi
+          else
+            echo "🆕 CREATE MODE: Creating or checking out branch"
+
+            # Check if branch exists on remote
+            git fetch origin "$BRANCH" 2>/dev/null || true
+
+            if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+              echo "⚠️ Branch exists but no open PR found. Checking out existing branch."
+              echo "This can happen if PR was merged/closed. Will reuse branch."
+              git checkout "$BRANCH"
+              git pull origin "$BRANCH"
+            else
+              echo "🆕 Creating new branch"
+              git checkout -b "$BRANCH"
+              git push -u origin "$BRANCH"
+            fi
+            echo "rebase_success=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rebase Cross-Repo Branch (Best Effort)
+        if: steps.detect_mode.outputs.mode == 'FIX'
+        continue-on-error: true  # ✅ Don't fail on cross-repo rebase
+        run: |
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          BASE_BRANCH="main"
+          CROSS_REPO="${{ inputs.source_repo == 'openobserve' && 'o2-enterprise' || 'openobserve' }}"
+
+          echo "🔧 FIX MODE: Checking cross-repo ($CROSS_REPO)"
+          cd "$CROSS_REPO"
+
+          git fetch origin "$BRANCH" 2>/dev/null || true
+
+          if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+            echo "📥 Cross-repo branch exists, attempting rebase"
+            git fetch origin "$BASE_BRANCH"
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
+
+            if git rebase "origin/$BASE_BRANCH"; then
+              echo "✅ Cross-repo rebase successful"
+              git push origin "$BRANCH" --force-with-lease
+            else
+              echo "⚠️ Cross-repo rebase conflicts. Continuing with current state."
+              git rebase --abort
+            fi
+          else
+            echo "ℹ️ Branch does not exist in cross-repo, skipping rebase"
+          fi
+          cd ..
+        shell: bash
+
+      - name: Detect Missing Tests (Advisory)
+        if: steps.detect_mode.outputs.mode == 'FIX'
+        id: detect_test_gaps
+        continue-on-error: true  # ✅ Make advisory, not blocking
+        run: |
+          echo "🔍 Analyzing PR for missing tests (advisory)..."
+
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          BACKEND_PR="${{ steps.detect_mode.outputs.backend_pr }}"
+          FRONTEND_PR="${{ steps.detect_mode.outputs.frontend_pr }}"
+
+          # Initialize outputs
+          echo "test_gaps_backend=false" >> $GITHUB_OUTPUT
+          echo "test_gaps_frontend=false" >> $GITHUB_OUTPUT
+          echo "backend_needs_tests=false" >> $GITHUB_OUTPUT
+          echo "frontend_needs_unit_tests=false" >> $GITHUB_OUTPUT
+          echo "frontend_needs_e2e_tests=false" >> $GITHUB_OUTPUT
+          echo "has_test_gaps=false" >> $GITHUB_OUTPUT
+
+          # Check backend PR (openobserve repo)
+          if [ -n "$BACKEND_PR" ]; then
+            echo "Checking backend PR #$BACKEND_PR for test gaps..."
+            cd openobserve
+
+            git fetch origin main 2>/dev/null || true
+
+            # Get changed files (exclude test files themselves)
+            CHANGED_BACKEND_FILES=$(git diff origin/main...HEAD --name-only | grep -E '^src/.*\.rs$' | grep -v '/tests\.rs$' | grep -v '_test\.rs$' || echo "")
+            CHANGED_TEST_FILES=$(git diff origin/main...HEAD --name-only | grep -E '^(tests/.*\.rs$|src/.*/tests\.rs$|src/.*_test\.rs$)' || echo "")
+
+            if [ -n "$CHANGED_BACKEND_FILES" ]; then
+              FILE_COUNT=$(echo "$CHANGED_BACKEND_FILES" | wc -l | tr -d ' ')
+              echo "📝 Backend code changed: $FILE_COUNT Rust files"
+
+              if [ -z "$CHANGED_TEST_FILES" ]; then
+                echo "⚠️ ADVISORY: Backend code changed but NO test files detected!"
+                echo ""
+                echo "Changed files needing tests:"
+                echo "$CHANGED_BACKEND_FILES" | sed 's/^/  - /'
+                echo ""
+                echo "test_gaps_backend=true" >> $GITHUB_OUTPUT
+                echo "backend_needs_tests=true" >> $GITHUB_OUTPUT
+                echo "has_test_gaps=true" >> $GITHUB_OUTPUT
+              else
+                TEST_COUNT=$(echo "$CHANGED_TEST_FILES" | wc -l | tr -d ' ')
+                echo "✅ Backend tests found: $TEST_COUNT test files"
+                echo "Test files:"
+                echo "$CHANGED_TEST_FILES" | sed 's/^/  - /'
+              fi
+            fi
+
+            cd ..
+          fi
+
+          # Check frontend PR (o2-enterprise repo)
+          if [ -n "$FRONTEND_PR" ]; then
+            echo "Checking frontend PR #$FRONTEND_PR for test gaps..."
+            cd o2-enterprise
+
+            git fetch origin main 2>/dev/null || true
+
+            # Get changed files
+            CHANGED_VUE_FILES=$(git diff origin/main...HEAD --name-only | grep -E '\.vue$' || echo "")
+            CHANGED_TS_FILES=$(git diff origin/main...HEAD --name-only | grep -E '^web/src/.*\.(ts|js)$' | grep -v '\.spec\.' || echo "")
+            CHANGED_UNIT_TESTS=$(git diff origin/main...HEAD --name-only | grep -E '\.spec\.(ts|js)$' || echo "")
+            CHANGED_E2E_TESTS=$(git diff origin/main...HEAD --name-only | grep -E 'tests/ui-testing/playwright-tests/.*\.spec\.ts$' || echo "")
+
+            # Check for Vue files without unit tests
+            if [ -n "$CHANGED_VUE_FILES" ]; then
+              echo "📝 Frontend Vue files changed: $(echo "$CHANGED_VUE_FILES" | wc -l) files"
+
+              if [ -z "$CHANGED_UNIT_TESTS" ]; then
+                echo "⚠️ ADVISORY: Vue files changed but NO unit tests (.spec.ts) detected!"
+                echo "frontend_needs_unit_tests=true" >> $GITHUB_OUTPUT
+                echo "test_gaps_frontend=true" >> $GITHUB_OUTPUT
+                echo "has_test_gaps=true" >> $GITHUB_OUTPUT
+              else
+                echo "✅ Unit tests found"
+              fi
+
+              # Check for E2E tests
+              if [ -z "$CHANGED_E2E_TESTS" ]; then
+                echo "⚠️ ADVISORY: Vue files changed but NO Playwright E2E tests detected!"
+                echo "frontend_needs_e2e_tests=true" >> $GITHUB_OUTPUT
+                echo "test_gaps_frontend=true" >> $GITHUB_OUTPUT
+                echo "has_test_gaps=true" >> $GITHUB_OUTPUT
+              else
+                echo "✅ E2E tests found"
+              fi
+            fi
+
+            # Check for TypeScript files without unit tests
+            if [ -n "$CHANGED_TS_FILES" ] && [ -z "$CHANGED_UNIT_TESTS" ]; then
+              echo "⚠️ ADVISORY: TypeScript files changed but NO unit tests detected!"
+              echo "frontend_needs_unit_tests=true" >> $GITHUB_OUTPUT
+              echo "test_gaps_frontend=true" >> $GITHUB_OUTPUT
+              echo "has_test_gaps=true" >> $GITHUB_OUTPUT
+            fi
+
+            cd ..
+          fi
+
+          # Generate test gap summary
+          HAS_GAPS=$(cat $GITHUB_OUTPUT | grep "has_test_gaps=true" | wc -l)
+
+          if [ "$HAS_GAPS" -gt 0 ]; then
+            echo ""
+            echo "🚨 TEST GAPS DETECTED (ADVISORY)"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "The original PR is missing tests (not blocking)."
+            echo ""
+            [ -n "$BACKEND_PR" ] && echo "Backend PR: #$BACKEND_PR"
+            [ -n "$FRONTEND_PR" ] && echo "Frontend PR: #$FRONTEND_PR"
+            echo ""
+            echo "Missing tests will be listed in Claude's instructions."
+            echo ""
+            echo "📋 ADVISORY (NOT BLOCKING):"
+            echo "   Claude SHOULD add missing tests if possible"
+            echo "   But workflow will not fail if tests aren't added"
+            echo "   Gaps will be reported in final comment"
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          else
+            echo "✅ No test gaps detected - PR has appropriate test coverage"
+          fi
+        shell: bash
+
+      - name: Write Test Gap Requirements File
+        if: steps.detect_test_gaps.outputs.has_test_gaps == 'true'
+        run: |
+          echo "📝 Writing test gap requirements (advisory)..."
+
+          # Create test gaps JSON file
+          cat > /tmp/test-gaps.json << 'EOF'
+          {
+            "detected_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "has_gaps": true,
+            "advisory": true,
+            "issue_number": "${{ inputs.issue_number }}",
+            "backend": {
+              "needs_tests": ${{ steps.detect_test_gaps.outputs.backend_needs_tests }},
+              "pr_number": "${{ steps.detect_mode.outputs.backend_pr }}",
+              "changed_files_pattern": "^src/.*\\.rs$",
+              "test_files_pattern": "^(tests/.*\\.rs$|src/.*/tests\\.rs$)",
+              "requirements": [
+                "Add unit tests in tests/ directory",
+                "Add #[cfg(test)] modules for changed src/ files",
+                "Ensure test coverage for all public functions",
+                "Follow existing test patterns in the codebase"
+              ],
+              "examples": [
+                "tests/handler_test.rs for src/handler/users.rs",
+                "#[cfg(test)] mod tests { ... } in src/service/auth.rs"
+              ]
+            },
+            "frontend": {
+              "needs_unit_tests": ${{ steps.detect_test_gaps.outputs.frontend_needs_unit_tests }},
+              "needs_e2e_tests": ${{ steps.detect_test_gaps.outputs.frontend_needs_e2e_tests }},
+              "pr_number": "${{ steps.detect_mode.outputs.frontend_pr }}",
+              "unit_tests": {
+                "changed_files_pattern": "\\.(vue|ts|js)$",
+                "test_files_pattern": "\\.spec\\.(ts|js)$",
+                "requirements": [
+                  "Add .spec.ts files next to changed Vue/TS files",
+                  "Test component behavior, props, events, computed properties",
+                  "Mock external dependencies (stores, API calls)",
+                  "Aim for 80%+ code coverage"
+                ],
+                "examples": [
+                  "AddAlert.spec.ts next to AddAlert.vue",
+                  "utils.spec.ts next to utils.ts"
+                ]
+              },
+              "e2e_tests": {
+                "test_location": "tests/ui-testing/playwright-tests/",
+                "requirements": [
+                  "Add Playwright tests for all UI changes",
+                  "Cover full user workflows with new UI",
+                  "Test all interactive elements (buttons, forms, navigation)",
+                  "Use data-test selectors for element selection",
+                  "Test both success and error scenarios"
+                ],
+                "examples": [
+                  "tests/ui-testing/playwright-tests/alerts.spec.ts for alert UI",
+                  "tests/ui-testing/playwright-tests/settings.spec.ts for settings page"
+                ],
+                "reference": "PR #9896 merged Settings UI without E2E tests - DO NOT REPEAT"
+              }
+            }
+          }
+          EOF
+
+          echo "✅ Test gap requirements written to /tmp/test-gaps.json (advisory)"
+        shell: bash
+
+      - name: Ensure Designs Directory Exists
+        working-directory: designs
+        run: |
+          mkdir -p "${{ steps.issue.outputs.designs_path }}"/{plans,implementations,validations}
+          echo "Designs directory structure ready"
+
+      - name: Comment Progress Start
+        id: progress_comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const mode = '${{ steps.detect_mode.outputs.mode }}';
+            const backendPR = '${{ steps.detect_mode.outputs.backend_pr }}';
+            const frontendPR = '${{ steps.detect_mode.outputs.frontend_pr }}';
+            const reviewCommentsCount = '${{ steps.detect_mode.outputs.review_comments_count }}';
+            const hasContext = '${{ steps.detect_mode.outputs.has_context }}' === 'true';
+            const rebaseSuccess = '${{ steps.branch_setup.outputs.rebase_success }}';
+            const rebaseConflicts = '${{ steps.branch_setup.outputs.rebase_conflicts }}';
+
+            let rebaseInfo = '';
+            if (mode === 'FIX' && rebaseConflicts === 'true') {
+              rebaseInfo = `\n⚠️ **Note:** Rebase conflicts detected. Working on current branch state.`;
+            }
+
+            let modeInfo = '';
+            if (mode === 'FIX') {
+              const prLinks = [];
+              if (backendPR) prLinks.push(`[Backend PR #${backendPR}](https://github.com/openobserve/openobserve/pull/${backendPR})`);
+              if (frontendPR) prLinks.push(`[Frontend PR #${frontendPR}](https://github.com/openobserve/o2-enterprise/pull/${frontendPR})`);
+
+              modeInfo = `
+              **Mode:** 🔧 FIX - Addressing review comments and failures
+              **Existing PRs:** ${prLinks.join(', ')}
+              **Review Comments:** ${reviewCommentsCount}
+              **Has Context:** ${hasContext ? '✅ Yes' : '❌ No'}${rebaseInfo}
+              `;
+            } else {
+              modeInfo = `
+              **Mode:** 🆕 CREATE - New implementation
+              **Pipeline:** Parallel E2E Development (Cross-Repo)
+              **Estimated Time:** 4-6 hours
+              `;
+            }
+
+            const progressBody = `## 🤖 Claude Auto-Implementation Started
+
+              **Source Repository:** ${{ inputs.source_repo }}
+              **Branch:** \`${{ steps.issue.outputs.branch }}\`
+              ${modeInfo}
+
+              ### Progress
+              - [x] ${mode === 'FIX' ? 'Existing branch checked out' : 'Feature branch created'}
+              - [x] Cross-repo checkout complete
+              - [x] ${mode === 'FIX' ? 'Context loaded from designs repo' : 'Designs directory prepared'}
+              - [ ] ${mode === 'FIX' ? 'Review comments analysis' : 'Planning phase'}
+              - [ ] ${mode === 'FIX' ? 'Fixes implementation' : 'Implementation phase'}
+              - [ ] ${mode === 'FIX' ? 'Validation & testing' : 'Validation phase'}
+              - [ ] Documentation commit
+              - [ ] ${mode === 'FIX' ? 'PR update' : 'PR creation'}
+
+              ⏳ Running... Track progress: [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+              📚 Design docs: [openobserve/designs](https://github.com/openobserve/designs/tree/main/${{ steps.issue.outputs.designs_path }})
+
+              ---
+              _Last updated: ${{ github.run_id }} - Initial setup_
+              `;
+
+            // First, search for existing bot comment to avoid creating duplicates
+            const comments = await github.rest.issues.listComments({
+              owner: 'openobserve',
+              repo: '${{ inputs.source_repo }}',
+              issue_number: ${{ inputs.issue_number }},
+              per_page: 100
+            });
+
+            const botComment = comments.data.find(c =>
+              c.body.startsWith('## 🤖 Claude Auto-Implementation') ||
+              c.body.startsWith('## ✅ Auto-Implementation') ||
+              c.body.startsWith('## ❌ Auto-Implementation')
+            );
+
+            let commentId;
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                comment_id: botComment.id,
+                body: progressBody
+              });
+              commentId = botComment.id;
+              console.log(`Updated existing bot comment: ${commentId}`);
+            } else {
+              // Create new comment only if none exists
+              const { data: comment } = await github.rest.issues.createComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                body: progressBody
+              });
+              commentId = comment.id;
+              console.log(`Created new bot comment: ${commentId}`);
+            }
+
+            core.setOutput('comment_id', commentId);
+            return commentId;
+
+      - name: Start Progress Monitor (Background)
+        if: always()
+        run: |
+          # Create progress monitoring script
+          cat > /tmp/monitor_progress.sh << 'MONITOR_EOF'
+          #!/bin/bash
+          COMMENT_ID="${{ steps.progress_comment.outputs.comment_id }}"
+          ISSUE_NUMBER="${{ inputs.issue_number }}"
+          SOURCE_REPO="${{ inputs.source_repo }}"
+          DESIGNS_PATH="${{ steps.issue.outputs.designs_path }}"
+          RUN_ID="${{ github.run_id }}"
+
+          while true; do
+            sleep 120  # Check every 2 minutes
+
+            # Check for stage markers in designs repo
+            cd ../designs 2>/dev/null || continue
+
+            PLANNING_DONE=false
+            IMPLEMENTATION_DONE=false
+            VALIDATION_DONE=false
+
+            [ -f "$DESIGNS_PATH/plans/backend-plan.md" ] || [ -f "$DESIGNS_PATH/plans/frontend-plan.md" ] && PLANNING_DONE=true
+            [ -f "$DESIGNS_PATH/implementations/backend-implementation.md" ] || [ -f "$DESIGNS_PATH/implementations/frontend-implementation.md" ] && IMPLEMENTATION_DONE=true
+            [ -f "$DESIGNS_PATH/validations/backend-validation.md" ] || [ -f "$DESIGNS_PATH/validations/frontend-validation.md" ] && VALIDATION_DONE=true
+
+            # Build progress checklist
+            PROGRESS="- [x] Feature branch created
+          - [x] Cross-repo checkout complete
+          - [x] Designs directory prepared
+          - [$([ "$PLANNING_DONE" = true ] && echo "x" || echo " ")] Planning phase
+          - [$([ "$IMPLEMENTATION_DONE" = true ] && echo "x" || echo " ")] Implementation phase
+          - [$([ "$VALIDATION_DONE" = true ] && echo "x" || echo " ")] Validation phase
+          - [ ] Documentation commit
+          - [ ] PR creation"
+
+            # Update comment
+            curl -X PATCH \
+              -H "Authorization: token ${{ secrets.E2E_DEV_CI_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/openobserve/$SOURCE_REPO/issues/comments/$COMMENT_ID" \
+              -d @- << UPDATE_EOF
+          {
+            "body": "## 🤖 Claude Auto-Implementation In Progress\n\n**Source Repository:** $SOURCE_REPO\n**Branch:** \`${{ steps.issue.outputs.branch }}\`\n**Pipeline:** Parallel E2E Development (Cross-Repo)\n\n### Progress\n$PROGRESS\n\n⏳ Running... Track progress: [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID)\n\n📚 Design docs: [openobserve/designs](https://github.com/openobserve/designs/tree/main/$DESIGNS_PATH)\n\n---\n_Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC") - Auto-refreshed every 2 minutes_"
+          }
+          UPDATE_EOF
+          done
+          MONITOR_EOF
+
+          chmod +x /tmp/monitor_progress.sh
+          /tmp/monitor_progress.sh &
+          echo $! > /tmp/monitor_pid.txt
+          echo "Progress monitor started with PID $(cat /tmp/monitor_pid.txt)"
+        shell: bash
+
+      - name: Run Claude Pipeline (Cross-Repo Mode)
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          track_progress: ${{ !inputs.is_manual_trigger }}
+          show_full_output: ${{ inputs.is_manual_trigger }}
+
+          prompt: |
+            🤖 **CI AUTOMATION MODE**
+
+            ## Step 1: Read Team Guidelines
+
+            **FIRST**, read the team guidelines file:
+            ```bash
+            cat CLAUDE.md
+            ```
+
+            This file contains THE GOLDEN RULE and all development guidelines. Follow them exactly.
+
+            ## Step 2: Context Variables
+
+            | Variable | Value |
+            |----------|-------|
+            | SOURCE_REPO | ${{ inputs.source_repo }} |
+            | ISSUE_NUMBER | ${{ inputs.issue_number }} |
+            | ISSUE_TITLE | ${{ steps.fetch_issue.outputs.title || inputs.issue_title }} |
+            | BRANCH | ${{ inputs.branch != '' && inputs.branch || steps.issue.outputs.branch }} |
+            | DESIGNS_PATH | ${{ steps.issue.outputs.designs_path }} |
+            | COMMIT_TYPE | ${{ steps.issue.outputs.commit_type }} |
+            | MODE | ${{ inputs.mode != 'implement' && inputs.mode || steps.detect_mode.outputs.mode }} |
+            | GITHUB_RUN_ID | ${{ github.run_id }} |
+
+            ## Step 3 (pr_fix mode): Read Trigger Comment
+
+            The user triggered this fix with @claude_fix. Read what they want:
+            ```bash
+            cat /tmp/trigger-comment.txt
+            ```
+
+            ## Step 4: Read PR Review Feedback
+
+            **Review Comments (inline on code):**
+            ```bash
+            [ -f /tmp/review-comments.json ] && cat /tmp/review-comments.json
+            ```
+
+            **Reviews with Change Requests:**
+            ```bash
+            [ -f /tmp/reviews.json ] && cat /tmp/reviews.json
+            ```
+
+            **PR Conversation:**
+            ```bash
+            [ -f /tmp/conversation.json ] && cat /tmp/conversation.json
+            ```
+
+            ## Step 5: Understand Current Changes
+
+            ```bash
+            [ -f /tmp/pr-diff.txt ] && cat /tmp/pr-diff.txt
+            ```
+
+            ## Step 6: Read Design Documents (if any)
+
+            ```bash
+            [ -f /tmp/design-docs.json ] && cat /tmp/design-docs.json
+            ```
+
+            If design docs are listed, read them from the designs/ directory.
+
+            ## Step 7: Analyze and Fix Issues (if needed)
+
+            **IMPORTANT: Think before acting!**
+
+            1. **First, read the current code** for each file mentioned in the review comments
+            2. **Verify if issues still exist** - check if they've already been fixed
+            3. **Cross-reference with the PR diff** - the changes may have already addressed the concerns
+            4. **If all issues are already fixed**, skip to Step 9 and explain that no changes are needed
+            5. **Only fix actual remaining issues** - don't redo work that's already done
+
+            Use reasoning to understand:
+            - Is this comment about code that was already changed in the PR?
+            - Does the current code still have the problem mentioned?
+            - Are there any NEW issues not mentioned in the comments?
+
+            If nothing needs fixing, simply create a comment explaining the current state and exit successfully.
+
+            ## Step 8: Quality Gates
+
+            ```bash
+            cargo fmt --all --check || cargo fmt --all
+            cargo clippy --all-targets -- -D warnings
+            cd web && npm run type-check && npm run lint
+            ```
+
+            ## Step 9: Commit and Push
+
+            Commit message format:
+            ```
+            fix: address PR review feedback
+
+            Co-Authored-By: Claude <noreply@anthropic.com>
+            ```
+
+            ## Step 3 (issue_fix mode): Read Trigger Comment
+
+            The user triggered this fix with @claude_fix. Read what they want:
+            ```bash
+            cat /tmp/trigger-comment.txt
+            ```
+
+            ## Step 4: Read Issue Details
+
+            **Issue Body:**
+            ```bash
+            [ -f /tmp/issue-body.txt ] && cat /tmp/issue-body.txt
+            ```
+
+            **Issue Comments:**
+            ```bash
+            [ -f /tmp/issue-comments.json ] && cat /tmp/issue-comments.json
+            ```
+
+            ## Step 5: Read Design Documents (if any)
+
+            ```bash
+            [ -f /tmp/design-docs.json ] && cat /tmp/design-docs.json
+            ```
+
+            If design docs are listed, read them from the designs/ directory.
+
+            ## Step 6: Implement the Fix
+
+            Based on the issue description, comments, trigger comment, and design docs, implement the fix.
+
+            ## Step 7: Quality Gates
+
+            ```bash
+            cargo fmt --all --check || cargo fmt --all
+            cargo clippy --all-targets -- -D warnings
+            cd web && npm run type-check && npm run lint
+            ```
+
+            ## Step 8: Commit and Push
+
+            Commit message format:
+            ```
+            fix: <issue title> (#ISSUE_NUMBER)
+
+            Co-Authored-By: Claude <noreply@anthropic.com>
+            ```
+
+            ## Step 3 (implement mode): Read User Feedback
+
+            **IMPORTANT:** Check for user comments and feedback on the issue:
+            ```bash
+            # Read issue comments (user feedback, requirements updates)
+            [ -f /tmp/issue-comments.json ] && cat /tmp/issue-comments.json
+
+            # Read PR review comments (if in FIX mode)
+            [ -f /tmp/review-comments.json ] && cat /tmp/review-comments.json
+            ```
+
+            ## Step 4: Mode-Specific Context
+
+            **Context:**
+            - Check `/tmp/review-comments.json` for PR review comments (if in FIX mode)
+            - Check `/tmp/issue-comments.json` for user feedback
+            - Check `/tmp/test-gaps.json` for test coverage gaps
+
+            ## Step 5 (implement mode): Feature Request
+
+            Read the issue title and body to understand what needs to be implemented.
+
+            ## Step 6: Code Quality Rules
+
+            **CRITICAL - Avoid Dead Code:**
+            - DO NOT add structs, functions, or types that are never used in the actual implementation
+            - Every new type/function MUST be referenced in the code path that solves the issue
+            - Before committing, verify: "Is every new symbol I added actually used?"
+            - Clippy does NOT catch unused `pub` items - YOU must verify this manually
+            - If you add a struct like `MaxSeriesLimit`, it MUST appear in function signatures or be instantiated
+
+            ## Step 7: Execute
+
+            Follow the instructions from Step 1. Key phases:
+            1. **Planning** → Commit to designs repo
+            2. **Implementation** → Run tests, commit code
+            3. **Validation** → Verify all commits pushed, no dead code
+            4. **Completion** → Report success only after verification
+            ',
+            steps.fetch_issue.outputs.title || inputs.issue_title,
+            steps.fetch_issue.outputs.body || inputs.issue_body
+            ) || '' }}
+
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Task,Skill,TodoWrite"
+
+      - name: Stop Progress Monitor
+        if: always()
+        run: |
+          if [ -f /tmp/monitor_pid.txt ]; then
+            MONITOR_PID=$(cat /tmp/monitor_pid.txt)
+            echo "Stopping progress monitor (PID: $MONITOR_PID)"
+            kill $MONITOR_PID 2>/dev/null || true
+            rm /tmp/monitor_pid.txt
+          fi
+        shell: bash
+
+      # ========================================
+      # CHECK IF CLAUDE MADE ANY CHANGES
+      # Exit early if nothing to do (saves resources)
+      # ========================================
+
+      - name: Check for Changes
+        id: check_changes
+        if: success() && inputs.mode == 'pr_fix'
+        run: |
+          echo "🔍 Checking if Claude made any changes..."
+
+          # Check openobserve repo
+          OPENOBSERVE_CHANGES=false
+          if [ -d "$OPENOBSERVE_REPO_PATH" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+            if [ -n "$(git status --porcelain)" ]; then
+              OPENOBSERVE_CHANGES=true
+              echo "✅ Changes detected in openobserve repo"
+            fi
+          fi
+
+          # Check o2-enterprise repo (if exists)
+          O2_CHANGES=false
+          if [ -n "$O2_ENTERPRISE_REPO_PATH" ] && [ -d "$O2_ENTERPRISE_REPO_PATH" ]; then
+            cd "$O2_ENTERPRISE_REPO_PATH"
+            if [ -n "$(git status --porcelain)" ]; then
+              O2_CHANGES=true
+              echo "✅ Changes detected in o2-enterprise repo"
+            fi
+          fi
+
+          if [ "$OPENOBSERVE_CHANGES" = false ] && [ "$O2_CHANGES" = false ]; then
+            echo "✅ No changes needed - all issues are already addressed"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Report No Changes Needed
+        if: success() && inputs.mode == 'pr_fix' && steps.check_changes.outputs.has_changes == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const prNumber = ${{ inputs.pr_number }};
+            if (prNumber) {
+              await github.rest.issues.createComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: prNumber,
+                body: '## ✅ No Changes Needed\n\nAll review feedback has already been addressed in the current code. No additional fixes are required.\n\n🤖 *Powered by [Claude Code](https://claude.com/claude-code)*'
+              });
+            }
+
+      # ========================================
+      # AUTO-FORMAT SAFETY NET (PostToolUse equivalent)
+      # Prevents 80% of format-related CI failures
+      # ========================================
+
+      - name: Auto-Format All Changes (Safety Net)
+        if: success() && (inputs.mode != 'pr_fix' || steps.check_changes.outputs.has_changes == 'true')
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔧 AUTO-FORMAT SAFETY NET"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "This catches any formatting Claude missed."
+          echo ""
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          FORMATTED=false
+
+          echo "Workspace: $WORKSPACE"
+
+          # Backend auto-format (Rust)
+          if [ -d "$OPENOBSERVE_REPO_PATH/src" ]; then
+            echo "🦀 Auto-formatting Rust code..."
+            cd "$OPENOBSERVE_REPO_PATH"
+
+            if ! cargo fmt --all -- --check 2>/dev/null; then
+              cargo fmt --all
+              echo "  ✅ Rust code formatted"
+              FORMATTED=true
+            else
+              echo "  ✓ Rust already formatted"
+            fi
+          fi
+
+          # Frontend auto-format (TypeScript/Vue) - web/ is in openobserve repo
+          if [ -d "$OPENOBSERVE_REPO_PATH/web" ]; then
+            echo "🎨 Auto-formatting TypeScript/Vue code..."
+            cd "$OPENOBSERVE_REPO_PATH/web"
+
+            # Run ESLint with auto-fix
+            npm run lint:fix 2>/dev/null || true
+
+            # Check if anything changed in openobserve
+            cd "$OPENOBSERVE_REPO_PATH"
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "  ✅ Frontend code formatted"
+              FORMATTED=true
+            else
+              echo "  ✓ Frontend already formatted"
+            fi
+          fi
+
+          # Amend commits if formatting changed files
+          if [ "$FORMATTED" = true ]; then
+            echo ""
+            echo "📦 Amending commits with formatted code..."
+
+            MODE="${{ inputs.mode }}"
+            SOURCE_REPO="${{ inputs.source_repo }}"
+
+            # For pr_fix/issue_fix modes, only push to source repo
+            # For implement mode, push to both repos if they have changes
+
+            # openobserve repo (backend + frontend)
+            if [ -d "$OPENOBSERVE_REPO_PATH" ]; then
+              cd "$OPENOBSERVE_REPO_PATH"
+              if [ -n "$(git status --porcelain)" ]; then
+                if [ "$SOURCE_REPO" = "openobserve" ] || [ "$MODE" = "implement" ]; then
+                  git add -u
+                  git commit --amend --no-edit 2>/dev/null || git commit -m "style: auto-format" 2>/dev/null || true
+                  git push origin "$BRANCH" --force-with-lease 2>/dev/null || true
+                  echo "  ✅ openobserve commit amended"
+                else
+                  echo "  ⏭️ openobserve skipped (not source repo for $MODE mode)"
+                  git checkout -- . 2>/dev/null || true
+                fi
+              fi
+            fi
+
+            # o2-enterprise repo (enterprise backend)
+            if [ -d "$O2_ENTERPRISE_REPO_PATH" ]; then
+              cd "$O2_ENTERPRISE_REPO_PATH"
+              if [ -n "$(git status --porcelain)" ]; then
+                if [ "$SOURCE_REPO" = "o2-enterprise" ] || [ "$MODE" = "implement" ]; then
+                  git add -u
+                  git commit --amend --no-edit 2>/dev/null || git commit -m "style: auto-format" 2>/dev/null || true
+                  git push origin "$BRANCH" --force-with-lease 2>/dev/null || true
+                  echo "  ✅ o2-enterprise commit amended"
+                else
+                  echo "  ⏭️ o2-enterprise skipped (not source repo for $MODE mode)"
+                  git checkout -- . 2>/dev/null || true
+                fi
+              fi
+            fi
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ AUTO-FORMAT COMPLETE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        shell: bash
+
+      # ========================================
+      # CLIPPY AUTO-HEALER
+      # Automatically fixes simple clippy warnings
+      # ========================================
+
+      - name: Clippy Auto-Healer (Fix Simple Warnings)
+        id: clippy_healer
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🩹 CLIPPY AUTO-HEALER"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Automatically fixing simple clippy warnings..."
+          echo ""
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          HEALED=false
+          REMAINING_ERRORS=false
+
+          echo "Workspace: $WORKSPACE"
+
+          # Function to check if repo has changes (commits ahead of main)
+          has_changes() {
+            local repo_path="$1"
+            cd "$repo_path"
+            git fetch origin main 2>/dev/null || true
+            local ahead=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo "0")
+            [ "$ahead" -gt 0 ]
+          }
+
+          # openobserve repo - run clippy if it has changes
+          if [ -d "$OPENOBSERVE_REPO_PATH/src" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+            if has_changes "$OPENOBSERVE_REPO_PATH"; then
+              echo "🦀 Running clippy --fix on openobserve (has changes)..."
+
+              # Run clippy with auto-fix
+              cargo clippy --fix --allow-dirty --allow-staged --all-targets 2>&1 | tee /tmp/clippy-fix.log || true
+
+              # Check if any files were modified
+              if [ -n "$(git status --porcelain)" ]; then
+                echo "  ✅ Clippy auto-fixed some warnings"
+                HEALED=true
+                echo "  Files modified by clippy --fix:"
+                git status --porcelain | sed 's/^/    /'
+              else
+                echo "  ✓ No auto-fixable clippy warnings"
+              fi
+
+              # Check for remaining errors
+              echo ""
+              echo "🔍 Checking for remaining clippy errors in openobserve..."
+              if ! cargo clippy --all-targets -- -D warnings 2>&1 | tee /tmp/clippy-remaining.log; then
+                echo "  ⚠️ Found clippy errors that need manual fixing"
+                REMAINING_ERRORS=true
+                cat /tmp/clippy-remaining.log > /tmp/clippy-errors-for-claude.txt
+              else
+                echo "  ✅ No remaining clippy errors in openobserve"
+              fi
+            else
+              echo "ℹ️  Skipping openobserve clippy - no changes detected"
+            fi
+          fi
+
+          # o2-enterprise repo - run clippy if it has changes (separate crate)
+          if [ -d "$O2_ENTERPRISE_REPO_PATH/src" ]; then
+            cd "$O2_ENTERPRISE_REPO_PATH"
+            if has_changes "$O2_ENTERPRISE_REPO_PATH"; then
+              echo ""
+              echo "🦀 Running clippy --fix on o2-enterprise (has changes)..."
+
+              cargo clippy --fix --allow-dirty --allow-staged --all-targets 2>&1 | tee /tmp/clippy-fix-o2.log || true
+
+              if [ -n "$(git status --porcelain)" ]; then
+                echo "  ✅ Clippy auto-fixed some warnings in o2-enterprise"
+                HEALED=true
+                git status --porcelain | sed 's/^/    /'
+              else
+                echo "  ✓ No auto-fixable clippy warnings in o2-enterprise"
+              fi
+
+              # Check for remaining errors
+              echo ""
+              echo "🔍 Checking for remaining clippy errors in o2-enterprise..."
+              if ! cargo clippy --all-targets -- -D warnings 2>&1 | tee /tmp/clippy-remaining-o2.log; then
+                echo "  ⚠️ Found clippy errors in o2-enterprise that need manual fixing"
+                REMAINING_ERRORS=true
+                cat /tmp/clippy-remaining-o2.log >> /tmp/clippy-errors-for-claude.txt
+              else
+                echo "  ✅ No remaining clippy errors in o2-enterprise"
+              fi
+            else
+              echo "ℹ️  Skipping o2-enterprise clippy - no changes detected"
+            fi
+          fi
+
+          # Set output for remaining errors
+          echo "remaining_errors=$REMAINING_ERRORS" >> $GITHUB_OUTPUT
+
+          # Commit and push fixes if anything was healed
+          if [ "$HEALED" = true ]; then
+            echo ""
+            echo "📦 Committing clippy auto-fixes..."
+
+            MODE="${{ inputs.mode }}"
+            SOURCE_REPO="${{ inputs.source_repo }}"
+
+            # For pr_fix/issue_fix modes, only push to source repo
+            # For implement mode, push to both repos if they have changes
+
+            # openobserve repo
+            if [ -d "$OPENOBSERVE_REPO_PATH" ]; then
+              cd "$OPENOBSERVE_REPO_PATH"
+              if [ -n "$(git status --porcelain)" ]; then
+                if [ "$SOURCE_REPO" = "openobserve" ] || [ "$MODE" = "implement" ]; then
+                  git add -u
+                  git commit --amend --no-edit 2>/dev/null || git commit -m "fix: auto-fix clippy warnings" 2>/dev/null || true
+                  git push origin "$BRANCH" --force-with-lease 2>/dev/null || true
+                  echo "  ✅ openobserve clippy fixes committed"
+                else
+                  echo "  ⏭️ openobserve skipped (not source repo for $MODE mode)"
+                  git checkout -- . 2>/dev/null || true
+                fi
+              fi
+            fi
+
+            # o2-enterprise repo
+            if [ -d "$O2_ENTERPRISE_REPO_PATH" ]; then
+              cd "$O2_ENTERPRISE_REPO_PATH"
+              if [ -n "$(git status --porcelain)" ]; then
+                if [ "$SOURCE_REPO" = "o2-enterprise" ] || [ "$MODE" = "implement" ]; then
+                  git add -u
+                  git commit --amend --no-edit 2>/dev/null || git commit -m "fix: auto-fix clippy warnings" 2>/dev/null || true
+                  git push origin "$BRANCH" --force-with-lease 2>/dev/null || true
+                  echo "  ✅ o2-enterprise clippy fixes committed"
+                else
+                  echo "  ⏭️ o2-enterprise skipped (not source repo for $MODE mode)"
+                  git checkout -- . 2>/dev/null || true
+                fi
+              fi
+            fi
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ CLIPPY AUTO-HEALER COMPLETE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        shell: bash
+
+      - name: Claude Fix Remaining Clippy Errors
+        if: success() && steps.clippy_healer.outputs.remaining_errors == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          timeout_minutes: 30
+          prompt: |
+            🔧 **CLIPPY ERROR FIX MODE**
+
+            The auto-healer couldn't fix all clippy errors. Please fix the remaining errors.
+
+            ## Clippy Errors to Fix
+
+            ```bash
+            cat /tmp/clippy-errors-for-claude.txt
+            ```
+
+            ## Instructions
+
+            1. Read the clippy errors above
+            2. Fix ONLY the clippy errors - don't change anything else
+            3. Common fixes:
+               - `unnecessary_lazy_evaluations`: Change `.unwrap_or_else(|| value)` to `.unwrap_or(value)`
+               - `needless_borrow`: Remove unnecessary `&` references
+               - `clone_on_copy`: Remove unnecessary `.clone()` on Copy types
+               - `redundant_closure`: Simplify closures like `|x| foo(x)` to `foo`
+            4. After fixing, run `cargo clippy --all-targets -- -D warnings` to verify
+            5. Commit the fixes with message: "fix: resolve clippy warnings"
+
+            ## Important
+
+            - Fix ALL errors listed, not just some
+            - Don't introduce new issues
+            - Keep changes minimal - only fix what clippy complains about
+
+          claude_args: |
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+
+      - name: Push Claude Clippy Fixes
+        if: success() && steps.clippy_healer.outputs.remaining_errors == 'true'
+        run: |
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          BRANCH="${{ steps.issue.outputs.branch }}"
+
+          # Push any fixes Claude made
+          for REPO in openobserve o2-enterprise; do
+            if [ -d "$WORKSPACE/$REPO" ]; then
+              cd "$WORKSPACE/$REPO"
+              if [ -n "$(git status --porcelain)" ]; then
+                git add -u
+                git commit -m "fix: resolve clippy warnings" 2>/dev/null || true
+                git push origin "$BRANCH" --force-with-lease 2>/dev/null || true
+                echo "✅ Pushed clippy fixes for $REPO"
+              fi
+            fi
+          done
+        shell: bash
+
+      # ========================================
+      # CRITICAL GATES (CI Enforced - FTR)
+      # ========================================
+
+      - name: GATE 1 - Format Check (Auto-fix)
+        id: format_check
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎨 GATE 1: Format Check (Auto-fix)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          NEED_AMEND=false
+          BRANCH="${{ steps.issue.outputs.branch }}"
+
+          echo "Workspace: $WORKSPACE"
+
+          # Backend format check (Rust in openobserve)
+          if [ -d "$OPENOBSERVE_REPO_PATH/src" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+
+            if ! cargo fmt --all -- --check 2>/dev/null; then
+              echo "⚠️ Code not formatted - auto-fixing..."
+              cargo fmt --all
+              git add -u
+              NEED_AMEND=true
+            else
+              echo "✅ Backend already formatted"
+            fi
+          fi
+
+          # Frontend format check (web/ is in openobserve repo)
+          if [ -d "$OPENOBSERVE_REPO_PATH/web" ]; then
+            cd "$OPENOBSERVE_REPO_PATH/web"
+
+            # Check if there are changes to format
+            npm run lint:fix 2>/dev/null || true
+
+            cd "$OPENOBSERVE_REPO_PATH"
+            if ! git diff --quiet; then
+              git add -u
+              NEED_AMEND=true
+              echo "⚠️ Frontend linted - staging changes"
+            else
+              echo "✅ Frontend already linted"
+            fi
+          fi
+
+          # Amend commit if formatting was needed
+          if [ "$NEED_AMEND" = true ]; then
+            echo "📝 Auto-formatting applied, amending commit..."
+
+            # openobserve repo
+            if [ -d "$OPENOBSERVE_REPO_PATH" ]; then
+              cd "$OPENOBSERVE_REPO_PATH"
+              if ! git diff --cached --quiet; then
+                git commit --amend --no-edit 2>/dev/null || git commit -m "style: auto-format code"
+                git push -f origin "$BRANCH" || true
+                echo "✅ openobserve auto-formatted and pushed"
+              fi
+            fi
+
+            # o2-enterprise repo
+            if [ -d "$O2_ENTERPRISE_REPO_PATH" ]; then
+              cd "$O2_ENTERPRISE_REPO_PATH"
+              if ! git diff --cached --quiet; then
+                git commit --amend --no-edit 2>/dev/null || git commit -m "style: auto-format code"
+                git push -f origin "$BRANCH" || true
+                echo "✅ o2-enterprise auto-formatted and pushed"
+              fi
+            fi
+          fi
+
+          echo "✅ GATE 1 PASSED"
+        shell: bash
+
+      - name: GATE 2 - Lint Check (Fail fast)
+        id: lint_check
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔍 GATE 2: Lint Check"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          echo "Workspace: $WORKSPACE"
+
+          # Function to check if repo has changes (commits ahead of main)
+          has_changes() {
+            local repo_path="$1"
+            cd "$repo_path"
+            git fetch origin main 2>/dev/null || true
+            local ahead=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo "0")
+            [ "$ahead" -gt 0 ]
+          }
+
+          # Backend lint (clippy) - openobserve repo
+          if [ -d "$OPENOBSERVE_REPO_PATH/src" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+            if has_changes "$OPENOBSERVE_REPO_PATH"; then
+              echo "🦀 Running cargo clippy on openobserve (has changes)..."
+              if ! cargo clippy --all-targets -- -D warnings 2>&1 | tee /tmp/clippy.log; then
+                echo ""
+                echo "❌ GATE 2 FAILED: Clippy warnings found in openobserve"
+                echo ""
+                echo "Last 50 lines of clippy output:"
+                tail -50 /tmp/clippy.log
+                echo ""
+                echo "Claude should have caught this. Please review and fix."
+                exit 1
+              fi
+              echo "✅ openobserve clippy passed (0 warnings)"
+            else
+              echo "ℹ️  Skipping openobserve clippy - no changes detected"
+            fi
+          fi
+
+          # Backend lint (clippy) - o2-enterprise repo (separate crate)
+          if [ -d "$O2_ENTERPRISE_REPO_PATH/src" ]; then
+            cd "$O2_ENTERPRISE_REPO_PATH"
+            if has_changes "$O2_ENTERPRISE_REPO_PATH"; then
+              echo "🦀 Running cargo clippy on o2-enterprise (has changes)..."
+              if ! cargo clippy --all-targets -- -D warnings 2>&1 | tee /tmp/clippy-o2.log; then
+                echo ""
+                echo "❌ GATE 2 FAILED: Clippy warnings found in o2-enterprise"
+                echo ""
+                echo "Last 50 lines of clippy output:"
+                tail -50 /tmp/clippy-o2.log
+                echo ""
+                echo "Claude should have caught this. Please review and fix."
+                exit 1
+              fi
+              echo "✅ o2-enterprise clippy passed (0 warnings)"
+            else
+              echo "ℹ️  Skipping o2-enterprise clippy - no changes detected"
+            fi
+          fi
+
+          # Frontend type check (web/ is in openobserve repo)
+          if [ -d "$OPENOBSERVE_REPO_PATH/web" ]; then
+            cd "$OPENOBSERVE_REPO_PATH/web"
+
+            echo "Running TypeScript check..."
+            if ! npm run type-check 2>&1 | tee /tmp/typecheck.log; then
+              echo ""
+              echo "❌ GATE 2 FAILED: Type errors found"
+              echo ""
+              tail -50 /tmp/typecheck.log
+              exit 1
+            fi
+
+            echo "✅ Type check passed"
+          fi
+
+          echo "✅ GATE 2 PASSED"
+        shell: bash
+
+      - name: GATE 2.5 - Styling Standards Check (FTR)
+        id: styling_check
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎨 GATE 2.5: OpenObserve Styling Standards Check"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          STYLING_VIOLATIONS=false
+          BRANCH="${{ steps.issue.outputs.branch }}"
+
+          # Frontend styles are in openobserve/web
+          if [ -d "$OPENOBSERVE_REPO_PATH/web" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+
+            # Get changed frontend files
+            git fetch origin main 2>/dev/null || true
+            CHANGED_FILES=$(git diff origin/main...HEAD --name-only 2>/dev/null | grep -E '\.(vue|scss|css)$' || echo "")
+
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "📝 Checking styling standards for changed files..."
+              echo "$CHANGED_FILES" | head -10 | sed 's/^/  /'
+              echo ""
+
+              # Check 1: Forbidden px units (except 1px, 2px for borders)
+              echo "🔍 Check 1: px units (should use rem instead)..."
+              PX_VIOLATIONS=$(echo "$CHANGED_FILES" | xargs grep -n '[0-9][0-9]*px' 2>/dev/null | grep -v '1px\|2px\|box-shadow\|data-test' || echo "")
+              if [ -n "$PX_VIOLATIONS" ]; then
+                echo "⚠️ Found px units (use rem instead):"
+                echo "$PX_VIOLATIONS" | head -10 | sed 's/^/  /'
+                STYLING_VIOLATIONS=true
+              else
+                echo "✅ No forbidden px units found"
+              fi
+
+              # Check 2: Hardcoded hex colors
+              echo ""
+              echo "🔍 Check 2: Hardcoded colors (should use CSS variables)..."
+              COLOR_VIOLATIONS=$(echo "$CHANGED_FILES" | grep -E '\.vue$' | xargs grep -n '#[0-9a-fA-F]\{3,6\}' 2>/dev/null | grep -v '\.scss\|data-test\|<!--' || echo "")
+              if [ -n "$COLOR_VIOLATIONS" ]; then
+                echo "⚠️ Found hardcoded colors (use var(--o2-*) instead):"
+                echo "$COLOR_VIOLATIONS" | head -10 | sed 's/^/  /'
+                STYLING_VIOLATIONS=true
+              else
+                echo "✅ No hardcoded colors found in templates"
+              fi
+
+              # Check 3: Inline styles
+              echo ""
+              echo "🔍 Check 3: Inline styles (should use CSS classes)..."
+              INLINE_VIOLATIONS=$(echo "$CHANGED_FILES" | grep -E '\.vue$' | xargs grep -n 'style="[^"]*"' 2>/dev/null | grep -v 'data-test\|--' || echo "")
+              if [ -n "$INLINE_VIOLATIONS" ]; then
+                echo "⚠️ Found inline styles (use CSS classes instead):"
+                echo "$INLINE_VIOLATIONS" | head -10 | sed 's/^/  /'
+                STYLING_VIOLATIONS=true
+              else
+                echo "✅ No problematic inline styles found"
+              fi
+
+              # Report results
+              echo ""
+              if [ "$STYLING_VIOLATIONS" = true ]; then
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "⚠️ GATE 2.5 WARNING: Styling violations detected"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo ""
+                echo "OpenObserve Styling Standards:"
+                echo "  • Use rem instead of px (except 1px/2px borders)"
+                echo "  • Use CSS variables: var(--o2-text-primary), var(--o2-card-bg)"
+                echo "  • Use CSS classes instead of inline styles"
+                echo ""
+                echo "Reference: .claude/commands/frontend/reference/openobserve-styling-standards.md"
+                echo ""
+                echo "⚠️ Continuing (advisory warning - not blocking)"
+              else
+                echo "✅ All styling standards checks passed"
+              fi
+            else
+              echo "ℹ️  No frontend style files changed"
+            fi
+          else
+            echo "ℹ️  No openobserve/web directory found"
+          fi
+
+          echo "✅ GATE 2.5 PASSED (advisory)"
+        shell: bash
+
+      - name: GATE 3 - Test Coverage Check (Existence only)
+        id: test_coverage
+        if: success()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🧪 GATE 3: Test Coverage Check"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Always use absolute paths
+          WORKSPACE="${GITHUB_WORKSPACE}"
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          TEST_GAPS_FOUND=false
+
+          # Backend: Check tests exist for changed code
+          if [ -d "$OPENOBSERVE_REPO_PATH/src" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+
+            git fetch origin main 2>/dev/null || true
+
+            CHANGED_CODE=$(git diff origin/main...HEAD --name-only 2>/dev/null |
+                           grep '^src/.*\.rs$' |
+                           grep -v '/tests\.rs$' |
+                           grep -v '_test\.rs$' || echo "")
+
+            CHANGED_TESTS=$(git diff origin/main...HEAD --name-only 2>/dev/null |
+                            grep -E '^(tests/.*\.rs$|src/.*/tests\.rs$)' || echo "")
+
+            if [ -n "$CHANGED_CODE" ]; then
+              CODE_COUNT=$(echo "$CHANGED_CODE" | wc -l | tr -d ' ')
+              echo "📝 Backend code changed: $CODE_COUNT Rust files"
+
+              if [ -z "$CHANGED_TESTS" ]; then
+                echo "⚠️ WARNING: Backend code changed but NO test files detected"
+                echo "Changed code files:"
+                echo "$CHANGED_CODE" | head -10 | sed 's/^/  /'
+                TEST_GAPS_FOUND=true
+              else
+                TEST_COUNT=$(echo "$CHANGED_TESTS" | wc -l | tr -d ' ')
+                echo "✅ Backend test coverage: $TEST_COUNT test files for $CODE_COUNT code files"
+              fi
+            else
+              echo "ℹ️  No backend code changed"
+            fi
+          fi
+
+          # Frontend: Check tests exist for changed Vue/TS files (in openobserve/web)
+          if [ -d "$OPENOBSERVE_REPO_PATH/web" ]; then
+            cd "$OPENOBSERVE_REPO_PATH"
+
+            git fetch origin main 2>/dev/null || true
+
+            CHANGED_VUE=$(git diff origin/main...HEAD --name-only 2>/dev/null |
+                          grep '^web/.*\.vue$' || echo "")
+
+            CHANGED_SPECS=$(git diff origin/main...HEAD --name-only 2>/dev/null |
+                            grep '\.spec\.ts$' || echo "")
+
+            CHANGED_E2E=$(git diff origin/main...HEAD --name-only 2>/dev/null |
+                          grep 'tests/ui-testing/playwright-tests/.*\.spec\.ts$' || echo "")
+
+            if [ -n "$CHANGED_VUE" ]; then
+              VUE_COUNT=$(echo "$CHANGED_VUE" | wc -l | tr -d ' ')
+              echo "📝 Frontend Vue files changed: $VUE_COUNT files"
+
+              if [ -z "$CHANGED_SPECS" ]; then
+                echo "⚠️ WARNING: Vue files changed but NO unit tests (.spec.ts) detected"
+                TEST_GAPS_FOUND=true
+              else
+                SPEC_COUNT=$(echo "$CHANGED_SPECS" | wc -l | tr -d ' ')
+                echo "✅ Unit tests found: $SPEC_COUNT spec files"
+              fi
+
+              if [ -z "$CHANGED_E2E" ]; then
+                echo "⚠️ WARNING: E2E tests recommended for UI changes"
+                echo "Reference: PR #9896 merged without E2E tests"
+              else
+                E2E_COUNT=$(echo "$CHANGED_E2E" | wc -l | tr -d ' ')
+                echo "✅ E2E tests found: $E2E_COUNT Playwright tests"
+              fi
+            else
+              echo "ℹ️  No frontend UI changed"
+            fi
+          fi
+
+          # Report test gaps but don't fail (advisory)
+          if [ "$TEST_GAPS_FOUND" = true ]; then
+            echo ""
+            echo "⚠️ Test gaps detected (advisory - not blocking)"
+            echo "Consider adding tests in a follow-up commit"
+          fi
+
+          echo "✅ GATE 3 PASSED"
+        shell: bash
+
+      - name: Extract Token Usage
+        id: token_usage
+        if: always()
+        run: |
+          # Extract token usage from Claude Code action outputs
+          INPUT_TOKENS="${{ steps.claude.outputs.input_tokens || '0' }}"
+          OUTPUT_TOKENS="${{ steps.claude.outputs.output_tokens || '0' }}"
+
+          # Calculate total and cost
+          TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
+
+          # Cost calculation for Claude Sonnet 4.5
+          # Input: $3 per million tokens, Output: $15 per million tokens
+          INPUT_COST=$(echo "scale=4; $INPUT_TOKENS * 3 / 1000000" | bc -l)
+          OUTPUT_COST=$(echo "scale=4; $OUTPUT_TOKENS * 15 / 1000000" | bc -l)
+          COST_USD=$(echo "scale=4; $INPUT_COST + $OUTPUT_COST" | bc -l)
+
+          echo "input_tokens=$INPUT_TOKENS" >> $GITHUB_OUTPUT
+          echo "output_tokens=$OUTPUT_TOKENS" >> $GITHUB_OUTPUT
+          echo "total_tokens=$TOTAL_TOKENS" >> $GITHUB_OUTPUT
+          echo "cost_usd=$COST_USD" >> $GITHUB_OUTPUT
+
+          echo "📊 Token Usage:"
+          echo "  Input tokens: $INPUT_TOKENS"
+          echo "  Output tokens: $OUTPUT_TOKENS"
+          echo "  Total tokens: $TOTAL_TOKENS"
+          echo "  Estimated cost: \$$COST_USD"
+        shell: bash
+
+      - name: Verify Implementation (Relaxed)
+        id: verify_source
+        if: success()
+        continue-on-error: true  # ✅ Don't fail workflow on verification
+        # Primary repo is at workspace root - no working-directory needed
+        run: |
+          echo "🔍 Verifying implementation (relaxed mode)..."
+
+          BRANCH="${{ steps.issue.outputs.branch }}"
+          git fetch origin main
+          git fetch origin "$BRANCH" 2>/dev/null || true
+
+          COMMIT_COUNT=$(git log origin/main..origin/$BRANCH --oneline 2>/dev/null | wc -l)
+
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "⚠️ No new commits on branch (may be expected in some cases)"
+            echo "verification_passed=false" >> $GITHUB_OUTPUT
+            echo "commit_count=0" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Found $COMMIT_COUNT commits on branch"
+            echo "verification_passed=true" >> $GITHUB_OUTPUT
+            echo "commit_count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+          fi
+
+          # Check for implementation files
+          if git diff origin/main..origin/$BRANCH --name-only | grep -qE '^(src/|web/)'; then
+            echo "✅ Implementation files detected"
+            echo "has_implementation=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ No implementation files detected"
+            echo "has_implementation=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Verify Designs Repo (Relaxed)
+        id: verify_designs
+        if: success()
+        continue-on-error: true  # ✅ Don't fail workflow
+        working-directory: designs
+        run: |
+          echo "🔍 Verifying designs repo (relaxed mode)..."
+          DESIGNS_PATH="${{ steps.issue.outputs.designs_path }}"
+          git fetch origin main
+
+          if [ ! -d "$DESIGNS_PATH" ]; then
+            echo "⚠️ Designs directory not created (may be expected)"
+            echo "designs_verified=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Designs directory exists"
+            COMMIT_COUNT=$(git log origin/main..HEAD --oneline 2>/dev/null | wc -l)
+            echo "✅ Found $COMMIT_COUNT documentation commits"
+            echo "designs_verified=true" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+
+      - name: Create or Update Pull Request(s)
+        id: create_prs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const mode = '${{ steps.detect_mode.outputs.mode }}';
+
+            // In FIX mode, PRs already exist - just output the existing PR numbers
+            if (mode === 'FIX') {
+              const backendPR = '${{ steps.detect_mode.outputs.backend_pr }}';
+              const frontendPR = '${{ steps.detect_mode.outputs.frontend_pr }}';
+
+              if (backendPR) {
+                core.setOutput('backend_pr', backendPR);
+                console.log(`✅ Using existing backend PR #${backendPR}`);
+              }
+              if (frontendPR) {
+                core.setOutput('frontend_pr', frontendPR);
+                console.log(`✅ Using existing frontend PR #${frontendPR}`);
+              }
+
+              console.log('🔧 FIX MODE: Skipping PR creation (PRs already exist and will be updated automatically)');
+              return { backendPr: backendPR || null, frontendPr: frontendPR || null };
+            }
+
+            // CREATE mode: Create new PRs as before
+            const designsUrl = `https://github.com/openobserve/designs/tree/main/${{ steps.issue.outputs.designs_path }}`;
+
+            // Get issue title and commit type - use toJSON for safe escaping
+            const fetchedTitle = ${{ toJSON(steps.fetch_issue.outputs.title) }};
+            const inputTitle = ${{ toJSON(inputs.issue_title) }};
+            const rawTitle = fetchedTitle || inputTitle || '';
+            // Normalize title: lowercase, remove redundant prefixes like "fix:" or "feat:"
+            const issueTitle = rawTitle
+              .replace(/^(fix|feat|bug|feature|chore|refactor):\s*/i, '')
+              .toLowerCase()
+              .trim();
+            const commitType = '${{ steps.issue.outputs.commit_type }}';
+
+            let backendPr = null;
+            let frontendPr = null;
+
+            // Check if backend branch exists and has commits
+            try {
+              await github.rest.repos.getBranch({
+                owner: 'openobserve',
+                repo: 'openobserve',
+                branch: '${{ steps.issue.outputs.branch }}'
+              });
+
+              // Check if branch has actual changes
+              const { data: comparison } = await github.rest.repos.compareCommits({
+                owner: 'openobserve',
+                repo: 'openobserve',
+                base: 'main',
+                head: '${{ steps.issue.outputs.branch }}'
+              });
+
+              if (comparison.ahead_by > 0) {
+                // Create backend PR only if there are commits
+                const { data: bePr } = await github.rest.pulls.create({
+                  owner: 'openobserve',
+                  repo: 'openobserve',
+                  title: `${commitType}: ${issueTitle} (Backend)`,
+                  head: '${{ steps.issue.outputs.branch }}',
+                  base: 'main',
+                  body: `## 🤖 Auto-Implementation (Backend)
+
+                  **${commitType === 'fix' ? 'Bug Fix' : 'Feature'}:** ${issueTitle}
+                  **Source Issue:** ${{ inputs.source_repo }}#${{ inputs.issue_number }}
+
+                📚 **Complete Design Documentation:**
+                ${designsUrl}
+
+                - [Backend Plan](${designsUrl}/plans/backend-plan.md)
+                - [Backend Implementation](${designsUrl}/implementations/backend-implementation.md)
+                - [API Contract](${designsUrl}/api-contract.json)
+                - [Validation Results](${designsUrl}/validations/backend-validation.md)
+
+                ## Changes
+
+                - ✅ Backend code (Rust)
+                - ✅ Unit + integration tests
+                - ✅ All quality gates passed
+
+                ## Related PRs
+
+                Frontend PR: #FRONTEND_PR_NUMBER (to be linked)
+
+                Closes ${{ inputs.source_repo }}#${{ inputs.issue_number }}
+
+                ---
+
+                🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+                Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+                `
+              });
+
+                backendPr = bePr.number;
+                core.setOutput('backend_pr', backendPr);
+                console.log(`✅ Created backend PR #${backendPr}`);
+              } else {
+                console.log('Backend branch exists but has no commits, skipping backend PR');
+              }
+            } catch (error) {
+              console.log('Backend branch not found or error:', error.message);
+            }
+
+            // Check if frontend branch exists and has commits
+            try {
+              await github.rest.repos.getBranch({
+                owner: 'openobserve',
+                repo: 'o2-enterprise',
+                branch: '${{ steps.issue.outputs.branch }}'
+              });
+
+              // Check if branch has actual changes
+              const { data: comparison } = await github.rest.repos.compareCommits({
+                owner: 'openobserve',
+                repo: 'o2-enterprise',
+                base: 'main',
+                head: '${{ steps.issue.outputs.branch }}'
+              });
+
+              if (comparison.ahead_by > 0) {
+                // Create frontend PR only if there are commits
+                const { data: fePr } = await github.rest.pulls.create({
+                  owner: 'openobserve',
+                  repo: 'o2-enterprise',
+                  title: `${commitType}: ${issueTitle} (Frontend)`,
+                  head: '${{ steps.issue.outputs.branch }}',
+                  base: 'main',
+                  body: `## 🤖 Auto-Implementation (Frontend)
+
+                  **${commitType === 'fix' ? 'Bug Fix' : 'Feature'}:** ${issueTitle}
+                  **Source Issue:** ${{ inputs.source_repo }}#${{ inputs.issue_number }}
+
+                📚 **Complete Design Documentation:**
+                ${designsUrl}
+
+                - [Frontend Plan](${designsUrl}/plans/frontend-plan.md)
+                - [Frontend Implementation](${designsUrl}/implementations/frontend-implementation.md)
+                - [API Contract](${designsUrl}/api-contract.json)
+                - [Validation Results](${designsUrl}/validations/frontend-validation.md)
+
+                ## Changes
+
+                - ✅ Frontend code (Vue 3 + TypeScript)
+                - ✅ Component + E2E tests
+                - ✅ All quality gates passed
+                - ✅ i18n compliance
+                - ✅ data-test attributes
+
+                ## Related PRs
+
+                Backend PR: openobserve/openobserve#${backendPr || 'BACKEND_PR_NUMBER'}
+
+                Closes ${{ inputs.source_repo }}#${{ inputs.issue_number }}
+
+                ---
+
+                🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+                Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+                `
+              });
+
+                frontendPr = fePr.number;
+                core.setOutput('frontend_pr', frontendPr);
+                console.log(`✅ Created frontend PR #${frontendPr}`);
+              } else {
+                console.log('Frontend branch exists but has no commits, skipping frontend PR');
+              }
+            } catch (error) {
+              console.log('Frontend branch not found or error:', error.message);
+            }
+
+            return { backendPr, frontendPr };
+
+      - name: Comment Success (Informative)
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const backendPr = '${{ steps.create_prs.outputs.backend_pr }}';
+            const frontendPr = '${{ steps.create_prs.outputs.frontend_pr }}';
+            const commitCount = '${{ steps.verify_source.outputs.commit_count }}' || '0';
+            const hasImplementation = '${{ steps.verify_source.outputs.has_implementation }}' === 'true';
+            const designsVerified = '${{ steps.verify_designs.outputs.designs_verified }}' === 'true';
+            const rebaseConflicts = '${{ steps.branch_setup.outputs.rebase_conflicts }}' === 'true';
+            const testGaps = '${{ steps.detect_test_gaps.outputs.has_test_gaps }}' === 'true';
+
+            let prLinks = '';
+            if (backendPr && backendPr !== 'undefined') {
+              prLinks += `- **Backend PR:** openobserve/openobserve#${backendPr}\n`;
+            }
+            if (frontendPr && frontendPr !== 'undefined') {
+              prLinks += `- **Frontend PR:** openobserve/o2-enterprise#${frontendPr}\n`;
+            }
+
+            let notes = [];
+            if (rebaseConflicts) {
+              notes.push('⚠️ Rebase conflicts detected - may need manual resolution');
+            }
+            if (testGaps) {
+              notes.push('⚠️ Test gaps detected - consider adding tests');
+            }
+            if (!hasImplementation) {
+              notes.push('ℹ️ No implementation files in commits - may be docs-only');
+            }
+            if (!designsVerified) {
+              notes.push('⚠️ Design docs not fully verified');
+            }
+
+            const notesSection = notes.length > 0
+              ? `\n### ⚠️ Notes\n\n${notes.join('\n')}\n`
+              : '';
+
+            const mode = '${{ steps.detect_mode.outputs.mode }}';
+            const reviewCommentsCount = '${{ steps.detect_mode.outputs.review_comments_count }}';
+
+            // Update the existing progress comment instead of creating a new one
+            let commentId = '${{ steps.progress_comment.outputs.comment_id }}';
+
+            // If comment_id is missing, search for existing bot comment
+            if (!commentId || commentId === '') {
+              const comments = await github.rest.issues.listComments({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                per_page: 100
+              });
+              // Find the bot's progress comment (starts with "## 🤖 Claude Auto-Implementation")
+              const botComment = comments.data.find(c =>
+                c.body.startsWith('## 🤖 Claude Auto-Implementation') ||
+                c.body.startsWith('## ✅ Auto-Implementation') ||
+                c.body.startsWith('## ❌ Auto-Implementation')
+              );
+              if (botComment) {
+                commentId = botComment.id.toString();
+                console.log(`Found existing bot comment: ${commentId}`);
+              }
+            }
+
+            const successBody = `## ✅ Auto-Implementation Complete!
+
+              **Commits:** ${commitCount}
+              **Branch:** \`${{ steps.issue.outputs.branch }}\`
+
+              ### Pull Request(s)
+
+              ${prLinks || '_(No PRs created - check if commits exist)_'}
+              ${notesSection}
+              ### Next Steps
+
+              1. Review the PR(s) above
+              2. Check for any notes/warnings
+              3. Run manual testing if needed
+              4. Address any conflicts or test gaps
+              5. Merge when approved
+
+              🚀 **Implementation ready for review!**
+
+              ---
+              _Updated: ${new Date().toISOString()}_
+              `;
+
+            if (commentId && commentId !== '') {
+              await github.rest.issues.updateComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                comment_id: parseInt(commentId),
+                body: successBody
+              });
+            } else {
+              // Only create if truly no existing comment found
+              console.log('No existing bot comment found, creating new one');
+              await github.rest.issues.createComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                body: successBody
+              });
+            }
+
+      - name: Update Comment on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            // Update the existing progress comment instead of creating a new one
+            let commentId = '${{ steps.progress_comment.outputs.comment_id }}';
+
+            // If comment_id is missing, search for existing bot comment
+            if (!commentId || commentId === '') {
+              const comments = await github.rest.issues.listComments({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                per_page: 100
+              });
+              const botComment = comments.data.find(c =>
+                c.body.startsWith('## 🤖 Claude Auto-Implementation') ||
+                c.body.startsWith('## ✅ Auto-Implementation') ||
+                c.body.startsWith('## ❌ Auto-Implementation')
+              );
+              if (botComment) {
+                commentId = botComment.id.toString();
+                console.log(`Found existing bot comment: ${commentId}`);
+              }
+            }
+
+            const failureBody = `## ❌ Auto-Implementation Failed
+
+              **Branch:** \`${{ steps.issue.outputs.branch }}\`
+
+              ### Error Details
+
+              Check the workflow logs:
+              [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+              ### Next Steps
+
+              1. Review workflow logs for specific error
+              2. Check if partial work was committed
+              3. Fix issues manually or re-trigger
+              4. Common issues: compilation errors, test failures, timeouts
+
+              cc: @${{ github.event.sender.login }}
+
+              ---
+              _Updated: ${new Date().toISOString()}_
+              `;
+
+            if (commentId && commentId !== '') {
+              await github.rest.issues.updateComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                comment_id: parseInt(commentId),
+                body: failureBody
+              });
+            } else {
+              // Only create if truly no existing comment found
+              console.log('No existing bot comment found, creating new one');
+              await github.rest.issues.createComment({
+                owner: 'openobserve',
+                repo: '${{ inputs.source_repo }}',
+                issue_number: ${{ inputs.issue_number }},
+                body: failureBody
+              });
+            }
