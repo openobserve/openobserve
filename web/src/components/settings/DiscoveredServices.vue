@@ -378,9 +378,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Streams within type -->
             <q-list class="tw:ml-8">
+              <!-- Loading indicator -->
+              <div v-if="paginationLoading[streamType]" class="tw:flex tw:justify-center tw:py-4">
+                <q-spinner-dots color="primary" size="2rem" />
+              </div>
+
               <q-expansion-item
+                v-else
                 v-for="(services, streamName) in paginatedStreamGroups[streamType].streams"
-                :key="streamName"
+                :key="`${streamType}-${streamName}-${streamPagination[streamType].page}`"
                 dense
               >
                 <template #header>
@@ -630,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService, {
@@ -686,6 +692,13 @@ const streamPagination = ref({
   logs: { page: 1, rowsPerPage: 10 },
   traces: { page: 1, rowsPerPage: 10 },
   metrics: { page: 1, rowsPerPage: 10 },
+});
+
+// Loading state for pagination
+const paginationLoading = ref({
+  logs: false,
+  traces: false,
+  metrics: false,
 });
 
 const viewModeOptions = computed(() => [
@@ -1035,45 +1048,59 @@ watch(searchQuery, () => {
   resetStreamPagination();
 });
 
-// Paginated stream groups for each stream type
-const paginatedStreamGroups = computed(() => {
-  const result: Record<string, { streams: Record<string, FlatService[]>; totalStreams: number; totalPages: number }> = {};
+// Helper function to paginate a stream type
+const getPaginatedStreamType = (streamType: 'logs' | 'traces' | 'metrics') => {
+  const streamGroup = filteredStreamGroups.value[streamType];
+  const streamNames = Object.keys(streamGroup);
+  const pagination = streamPagination.value[streamType];
 
-  const streamTypes = ['logs', 'traces', 'metrics'] as const;
+  // Calculate pagination
+  const totalStreams = streamNames.length;
+  const totalPages = Math.ceil(totalStreams / pagination.rowsPerPage);
+  const startIndex = (pagination.page - 1) * pagination.rowsPerPage;
+  const endIndex = startIndex + pagination.rowsPerPage;
 
-  for (const streamType of streamTypes) {
-    const streamGroup = filteredStreamGroups.value[streamType];
-    const streamNames = Object.keys(streamGroup);
-    const pagination = streamPagination.value[streamType];
+  // Get paginated stream names
+  const paginatedStreamNames = streamNames.slice(startIndex, endIndex);
 
-    // Calculate pagination
-    const totalStreams = streamNames.length;
-    const totalPages = Math.ceil(totalStreams / pagination.rowsPerPage);
-    const startIndex = (pagination.page - 1) * pagination.rowsPerPage;
-    const endIndex = startIndex + pagination.rowsPerPage;
-
-    // Get paginated stream names
-    const paginatedStreamNames = streamNames.slice(startIndex, endIndex);
-
-    // Build paginated streams object
-    const paginatedStreams: Record<string, FlatService[]> = {};
-    for (const streamName of paginatedStreamNames) {
-      paginatedStreams[streamName] = streamGroup[streamName];
-    }
-
-    result[streamType] = {
-      streams: paginatedStreams,
-      totalStreams,
-      totalPages,
-    };
+  // Build paginated streams object
+  const paginatedStreams: Record<string, FlatService[]> = {};
+  for (const streamName of paginatedStreamNames) {
+    paginatedStreams[streamName] = streamGroup[streamName];
   }
 
-  return result;
-});
+  return {
+    streams: paginatedStreams,
+    totalStreams,
+    totalPages,
+  };
+};
+
+// Separate computed properties for each stream type for better performance
+const paginatedLogs = computed(() => getPaginatedStreamType('logs'));
+const paginatedTraces = computed(() => getPaginatedStreamType('traces'));
+const paginatedMetrics = computed(() => getPaginatedStreamType('metrics'));
+
+// Combined object for template access
+const paginatedStreamGroups = computed(() => ({
+  logs: paginatedLogs.value,
+  traces: paginatedTraces.value,
+  metrics: paginatedMetrics.value,
+}));
 
 // Pagination handlers
-const onStreamPageChange = (streamType: 'logs' | 'traces' | 'metrics', newPage: number) => {
-  streamPagination.value[streamType].page = newPage;
+const onStreamPageChange = async (streamType: 'logs' | 'traces' | 'metrics', newPage: number) => {
+  paginationLoading.value[streamType] = true;
+
+  // Use requestAnimationFrame for smoother UI updates
+  requestAnimationFrame(() => {
+    streamPagination.value[streamType].page = newPage;
+
+    // Reset loading after next tick
+    nextTick(() => {
+      paginationLoading.value[streamType] = false;
+    });
+  });
 };
 
 const loadServices = async () => {
