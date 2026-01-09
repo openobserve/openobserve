@@ -364,6 +364,7 @@ import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import { throttle } from "lodash-es";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -993,6 +994,17 @@ export default defineComponent({
       }
     };
 
+    // Track if we've rendered the first chunk with actual data
+    let hasRenderedFirstDataChunk = ref(false);
+
+    // Create a throttled version for streaming updates (350ms throttle)
+    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
+    // This prevents excessive re-renders while showing progressive updates
+    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
+      leading: true,  // Call immediately on first invocation
+      trailing: true  // Ensure final call after throttle period
+    });
+
     // Watch for panel schema changes to re-convert panel data
     watch(
       panelSchema,
@@ -1031,7 +1043,12 @@ export default defineComponent({
     );
 
     watch(
-      [data, store?.state, annotations],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        annotations
+      ],
       async () => {
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
@@ -1062,8 +1079,28 @@ export default defineComponent({
             code: "",
           };
 
-        // Use the common function to convert panel data
-        await convertPanelDataCommon();
+        // Check if this is the first chunk with actual data
+        const hasData = data.value?.length > 0 &&
+                       data.value[0]?.result?.length > 0;
+
+        // Use throttled version during loading (streaming), immediate version when complete
+        // This prevents excessive re-renders during PromQL data streaming
+        if (loading.value) {
+          // First chunk with actual data: render immediately!
+          if (hasData && !hasRenderedFirstDataChunk.value) {
+            hasRenderedFirstDataChunk.value = true;
+            await convertPanelDataCommon();
+          } else {
+            // Subsequent chunks: throttle to reduce re-render frequency
+            await convertPanelDataThrottled();
+          }
+        } else {
+          // Loading complete: immediate final render with full data
+          // Cancel any pending throttled calls and render immediately
+          convertPanelDataThrottled.cancel();
+          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          await convertPanelDataCommon();
+        }
       },
       { deep: true },
     );
