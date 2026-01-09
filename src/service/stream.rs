@@ -1062,6 +1062,15 @@ pub async fn stream_delete_inner(
         return Err(e);
     }
 
+    // delete result cache for this stream
+    let cache_path = format!("{org_id}/{stream_type}/{stream_name}");
+    log::warn!("Deleting result cache for path: {cache_path}");
+    if let Err(e) = crate::service::search::cache::cacher::delete_cache(&cache_path, 0, None, None).await {
+        log::error!(
+            "Failed to delete result cache for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
+        );
+    }
+
     Ok(())
 }
 
