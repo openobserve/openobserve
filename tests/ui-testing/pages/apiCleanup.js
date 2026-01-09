@@ -359,12 +359,13 @@ class APICleanup {
     }
 
     /**
-     * Fetch all functions
+     * Fetch all functions in a specific organization
+     * @param {string} org - The organization identifier
      * @returns {Promise<Array>} Array of function objects
      */
-    async fetchFunctions() {
+    async fetchFunctionsInOrg(org) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -373,26 +374,27 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to fetch functions', { status: response.status });
+                testLogger.error('Failed to fetch functions', { org, status: response.status });
                 return [];
             }
 
             const data = await response.json();
             return data.list || [];
         } catch (error) {
-            testLogger.error('Failed to fetch functions', { error: error.message });
+            testLogger.error('Failed to fetch functions', { org, error: error.message });
             return [];
         }
     }
 
     /**
-     * Delete a single function
+     * Delete a single function in a specific organization
+     * @param {string} org - The organization identifier
      * @param {string} functionName - The function name
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteFunction(functionName) {
+    async deleteFunctionInOrg(org, functionName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions/${functionName}`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -401,15 +403,61 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to delete function', { functionName, status: response.status });
+                testLogger.error('Failed to delete function', { org, functionName, status: response.status });
                 return { code: response.status, message: 'Failed to delete function' };
             }
 
             const result = await response.json();
             return result;
         } catch (error) {
-            testLogger.error('Failed to delete function', { functionName, error: error.message });
+            testLogger.error('Failed to delete function', { org, functionName, error: error.message });
             return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up functions matching patterns in a specific organization
+     * @param {string} org - The organization identifier
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
+     */
+    async cleanupFunctionsInOrg(org, patterns = []) {
+        testLogger.info(`Starting functions cleanup in ${org} org`, { patterns: patterns.map(p => p.source) });
+
+        try {
+            // Fetch all functions in the specified org
+            const functions = await this.fetchFunctionsInOrg(org);
+            testLogger.info(`Fetched functions from ${org}`, { total: functions.length });
+
+            // Filter functions matching patterns
+            const matchingFunctions = functions.filter(f =>
+                patterns.some(pattern => pattern.test(f.name))
+            );
+            testLogger.info(`Found functions matching cleanup patterns in ${org}`, { count: matchingFunctions.length });
+
+            if (matchingFunctions.length === 0) {
+                testLogger.info(`No functions to clean up in ${org}`);
+                return;
+            }
+
+            // Delete each function
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const func of matchingFunctions) {
+                const result = await this.deleteFunctionInOrg(org, func.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted function', { org, name: func.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete function', { org, name: func.name, result });
+                }
+            }
+
+            testLogger.info(`Functions cleanup completed in ${org}`, { deletedCount, failedCount });
+        } catch (error) {
+            testLogger.error(`Failed to cleanup functions in ${org}`, { error: error.message });
         }
     }
 
@@ -515,56 +563,6 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Enrichment tables cleanup failed', { error: error.message });
-        }
-    }
-
-    /**
-     * Clean up functions matching specified patterns
-     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
-     */
-    async cleanupFunctions(patterns = []) {
-        testLogger.info('Starting functions cleanup', { patterns: patterns.map(p => p.source) });
-
-        try {
-            // Fetch all functions
-            const functions = await this.fetchFunctions();
-            testLogger.info('Fetched functions', { total: functions.length });
-
-            // Filter functions matching patterns
-            const matchingFunctions = functions.filter(f =>
-                patterns.some(pattern => pattern.test(f.name))
-            );
-            testLogger.info('Found functions matching cleanup patterns', { count: matchingFunctions.length });
-
-            if (matchingFunctions.length === 0) {
-                testLogger.info('No functions to clean up');
-                return;
-            }
-
-            // Delete each function
-            let deletedCount = 0;
-            let failedCount = 0;
-
-            for (const func of matchingFunctions) {
-                const result = await this.deleteFunction(func.name);
-
-                if (result.code === 200) {
-                    deletedCount++;
-                    testLogger.debug('Deleted function', { name: func.name });
-                } else {
-                    failedCount++;
-                    testLogger.warn('Failed to delete function', { name: func.name, result });
-                }
-            }
-
-            testLogger.info('Functions cleanup completed', {
-                total: matchingFunctions.length,
-                deleted: deletedCount,
-                failed: failedCount
-            });
-
-        } catch (error) {
-            testLogger.error('Functions cleanup failed', { error: error.message });
         }
     }
 

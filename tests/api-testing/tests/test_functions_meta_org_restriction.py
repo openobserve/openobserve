@@ -1,17 +1,18 @@
 """
 API tests for JavaScript function _meta organization restriction.
 
-This module tests that JavaScript functions (trans_type=1) are only allowed
-in the _meta organization, while VRL functions (trans_type=0) work in all orgs.
-"""
+This module tests that JavaScript functions (transType=1) are only allowed
+in the _meta organization, while VRL functions (transType=0) work in all orgs.
 
-import pytest
+Note: The functions API uses camelCase for field names (transType) due to
+serde(rename_all = "camelCase") on the Transform struct.
+The test endpoint uses snake_case (trans_type) for TestVRLRequest struct.
+"""
 
 
 class TestMetaOrgJavaScriptRestriction:
     """Test JavaScript functions restricted to _meta org only."""
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_create_js_function_in_meta_org_success(self, create_session, base_url):
         """JavaScript function creation should succeed in _meta org."""
         session = create_session
@@ -19,9 +20,9 @@ class TestMetaOrgJavaScriptRestriction:
 
         payload = {
             "name": "test_js_meta",
-            "function": "row.processed = true; row.org = '_meta';",
+            "function": "row.processed = true;",
             "params": "row",
-            "trans_type": 1,  # JavaScript
+            "transType": 1,  # JavaScript (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -34,7 +35,6 @@ class TestMetaOrgJavaScriptRestriction:
         # Cleanup
         session.delete(f"{base_url}api/{org_id}/functions/test_js_meta")
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_create_js_function_in_default_org_blocked(self, create_session, base_url):
         """JavaScript function creation should fail in default org."""
         session = create_session
@@ -44,7 +44,7 @@ class TestMetaOrgJavaScriptRestriction:
             "name": "test_js_default",
             "function": "row.processed = true;",
             "params": "row",
-            "trans_type": 1,  # JavaScript - should be blocked
+            "transType": 1,  # JavaScript - should be blocked (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -100,29 +100,39 @@ class TestMetaOrgJavaScriptRestriction:
         response_text = resp.text
         assert "JavaScript functions are only allowed in the '_meta' organization" in response_text
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
-    def test_update_function_to_js_in_default_org_blocked(self, create_session, base_url):
-        """Updating VRL function to JavaScript should fail in default org."""
+    def test_update_vrl_to_js_in_default_org_blocked(self, create_session, base_url):
+        """
+        Test that updating a VRL function to JavaScript in default org is BLOCKED.
+
+        This ensures users cannot bypass the JS restriction by:
+        1. Creating a VRL function in default org
+        2. Updating it to JavaScript
+
+        The backend enforces JS restriction on both create AND update operations.
+        """
         session = create_session
         org_id = "default"
+
+        # Cleanup any leftover from previous runs
+        session.delete(f"{base_url}api/{org_id}/functions/test_update_to_js")
 
         # Create VRL function first
         vrl_payload = {
             "name": "test_update_to_js",
             "function": ".processed = true",
             "params": "row",
-            "trans_type": 0,  # VRL
+            "transType": 0,  # VRL
         }
 
         create_resp = session.post(f"{base_url}api/{org_id}/functions", json=vrl_payload)
-        assert create_resp.status_code == 200
+        assert create_resp.status_code == 200, f"Failed to create VRL function: {create_resp.content}"
 
-        # Try to update to JavaScript
+        # Try to update to JavaScript - should be BLOCKED
         js_payload = {
             "name": "test_update_to_js",
             "function": "row.processed = true;",
             "params": "row",
-            "trans_type": 1,  # JavaScript - should be blocked
+            "transType": 1,  # JavaScript
         }
 
         update_resp = session.put(
@@ -130,9 +140,16 @@ class TestMetaOrgJavaScriptRestriction:
             json=js_payload
         )
 
+        # Should return 400 - JS restriction enforced on updates
         assert update_resp.status_code == 400, (
-            f"Expected 400 when updating to JS in default org, "
+            f"Expected 400 for VRL->JS update in default org, "
             f"but got {update_resp.status_code}: {update_resp.content}"
+        )
+
+        # Verify error message
+        response_text = update_resp.text
+        assert "JavaScript functions are only allowed in the '_meta' organization" in response_text, (
+            f"Expected restriction error message, but got: {response_text}"
         )
 
         # Cleanup
@@ -151,7 +168,7 @@ class TestVRLFunctionsAllOrganizations:
             "name": "test_vrl_meta",
             "function": ".processed = true",
             "params": "row",
-            "trans_type": 0,  # VRL
+            "transType": 0,  # VRL (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -173,7 +190,7 @@ class TestVRLFunctionsAllOrganizations:
             "name": "test_vrl_default",
             "function": ".processed = true",
             "params": "row",
-            "trans_type": 0,  # VRL
+            "transType": 0,  # VRL (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -186,15 +203,14 @@ class TestVRLFunctionsAllOrganizations:
         # Cleanup
         session.delete(f"{base_url}api/{org_id}/functions/test_vrl_default")
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_test_vrl_function_in_all_orgs(self, create_session, base_url):
         """Testing VRL function should work in all organizations."""
         session = create_session
 
         payload = {
-            "function": ".count = (.count // 0) + 1",
+            "function": ".count = to_int!(.count) + 1",
             "events": [{"name": "test", "count": 5}],
-            "trans_type": 0,  # VRL
+            "trans_type": 0,  # VRL (snake_case for TestVRLRequest struct)
         }
 
         # Test in both _meta and default
@@ -216,7 +232,7 @@ class TestVRLFunctionsAllOrganizations:
             "name": "test_vrl_update",
             "function": ".version = 1",
             "params": "row",
-            "trans_type": 0,  # VRL
+            "transType": 0,  # VRL (camelCase for Transform struct)
         }
 
         create_resp = session.post(f"{base_url}api/{org_id}/functions", json=create_payload)
@@ -227,7 +243,7 @@ class TestVRLFunctionsAllOrganizations:
             "name": "test_vrl_update",
             "function": ".version = 2",
             "params": "row",
-            "trans_type": 0,  # VRL
+            "transType": 0,  # VRL (camelCase for Transform struct)
         }
 
         update_resp = session.put(
@@ -287,7 +303,6 @@ class TestTransTypeAutoDetection:
 class TestErrorMessages:
     """Test error message quality and consistency."""
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_error_message_content(self, create_session, base_url):
         """Error message should be clear and actionable."""
         session = create_session
@@ -297,7 +312,7 @@ class TestErrorMessages:
             "name": "test_error_msg",
             "function": "row.test = true;",
             "params": "row",
-            "trans_type": 1,  # JavaScript - blocked
+            "transType": 1,  # JavaScript - blocked (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -311,23 +326,22 @@ class TestErrorMessages:
         assert "organization" in response_text, "Error should mention organization"
         assert "VRL" in response_text, "Error should suggest VRL alternative"
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_error_message_consistency(self, create_session, base_url):
         """Error message should be consistent across save and test endpoints."""
         session = create_session
         org_id = "default"
 
-        # Test save endpoint
+        # Test save endpoint (camelCase for Transform struct)
         save_payload = {
             "name": "test_consistency",
             "function": "row.test = true;",
             "params": "row",
-            "trans_type": 1,
+            "transType": 1,
         }
         save_resp = session.post(f"{base_url}api/{org_id}/functions", json=save_payload)
         save_error = save_resp.text
 
-        # Test test endpoint
+        # Test test endpoint (snake_case for TestVRLRequest struct)
         test_payload = {
             "function": "row.test = true;",
             "events": [{"name": "test"}],
@@ -345,7 +359,6 @@ class TestErrorMessages:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    @pytest.mark.skip(reason="Temporarily disabled - failing test")
     def test_empty_function_code(self, create_session, base_url):
         """Empty JavaScript function should still be blocked in default org."""
         session = create_session
@@ -355,7 +368,7 @@ class TestEdgeCases:
             "name": "test_empty",
             "function": "",
             "params": "row",
-            "trans_type": 1,  # JavaScript - blocked even if empty
+            "transType": 1,  # JavaScript - blocked even if empty (camelCase for Transform struct)
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
@@ -396,7 +409,7 @@ class TestEdgeCases:
             "name": "test_case",
             "function": "row.test = true;",
             "params": "row",
-            "trans_type": 1,
+            "transType": 1,  # camelCase for Transform struct
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
