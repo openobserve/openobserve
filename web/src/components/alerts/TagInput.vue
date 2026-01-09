@@ -24,9 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           removable
           @remove="removeTag(index)"
-          color="primary"
-          text-color="white"
-          size="sm"
+          size="12px"
           class="tag-chip"
         >
           {{ tag }}
@@ -35,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="inputRef"
           v-model="inputValue"
           type="text"
-          :placeholder="placeholder"
+          :placeholder="modelValue.length > 0 ? '' : placeholder"
           class="tag-input"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
@@ -123,7 +121,7 @@ const handleBackspace = () => {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 8px 12px;
+  padding: 0px 5px;
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
   border-radius: 4px;
   background-color: var(--o2-card-bg);
@@ -168,7 +166,7 @@ const handleBackspace = () => {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 4px;
-  margin-top: 12px;
+  margin-top: 5px;
   width: 100%;
   overflow: hidden;
 }
@@ -176,6 +174,7 @@ const handleBackspace = () => {
 .tag-chip {
   margin: 0 !important;
   flex: 0 0 auto;
+  background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 }
 
 .tag-input {

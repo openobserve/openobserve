@@ -107,7 +107,8 @@
     "manageTheme": "Administrar tema",
     "url": "URL",
     "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
-    "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar."
+    "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
+    "id": "CARNÉ DE IDENTIDAD"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "No se han encontrado rastros correlacionados",
     "noTracesDescription": "No se han encontrado rastros del servicio {service} en el intervalo de tiempo seleccionado",
     "openTraceInNewWindow": "Abrir traza en una ventana nueva",
-    "filters": "Filtros"
+    "filters": "Filtros",
+    "semanticFieldGroupsTitle": "Mapeos de campo",
+    "semanticFieldGroupsCaption": "Defina las asignaciones de nombres de campo para la correlación y la deduplicación (por ejemplo, host, nombre de host, nodo → grupo de «anfitriones»)",
+    "groupsLabel": "grupos",
+    "importFromJson": "Importar desde JSON",
+    "addCustomGroup": "Agregar grupo personalizado",
+    "actionNormalize": "Valores en minúsculas y de recorte para hacer coincidir",
+    "removeSemanticGroup": "Eliminar grupo semántico",
+    "fieldNamePlaceholder": "Nombres de campo (separados por comas)",
+    "category": "Categoría",
+    "categoryHint": "Filtrar grupos por categoría",
+    "noSemanticGroupMessage": "No hay grupos semánticos en esta categoría. Selecciona una categoría diferente o agrega un grupo personalizado.",
+    "showingGroups": "Mostrando {filterGroupLength} del total de grupos de {localGroupLength}",
+    "deduplicateFields": "Campos de deduplicación",
+    "deduplicateFieldTooltip": "Seleccione qué asignaciones de campos usar para la toma de huellas digitales de deduplicación",
+    "alertDeduplicationMessage": "Las alertas con los mismos valores para estos campos se deduplicarán (p. ej., misma huella digital = mismos valores de campo)",
+    "atLeastOneDeduplicationField": "Se requiere al menos una asignación de campos para la deduplicación"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

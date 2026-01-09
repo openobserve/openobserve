@@ -107,7 +107,8 @@
     "manageTheme": "管理主题",
     "url": "网址",
     "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
-    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。"
+    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
+    "id": "身份证"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -2360,7 +2361,23 @@
     "noTracesFound": "未找到相关的痕迹",
     "noTracesDescription": "在所选时间范围内未找到服务 {service} 的跟踪",
     "openTraceInNewWindow": "在新窗口中打开 trace",
-    "filters": "过滤器"
+    "filters": "过滤器",
+    "semanticFieldGroupsTitle": "字段映射",
+    "semanticFieldGroupsCaption": "为关联和重复数据删除定义字段名称映射（例如，主机、主机名、节点 → “主机” 组）",
+    "groupsLabel": "组",
+    "importFromJson": "从 JSON 导入",
+    "addCustomGroup": "添加自定义群组",
+    "actionNormalize": "用于匹配的小写和修剪值",
+    "removeSemanticGroup": "移除语义组",
+    "fieldNamePlaceholder": "字段名称（以逗号分隔）",
+    "category": "类别",
+    "categoryHint": "按类别筛选群组",
+    "noSemanticGroupMessage": "该类别中没有语义组。选择其他类别或添加自定义群组。",
+    "showingGroups": "显示 {localGroupLength} 组总数中的 {filterGroupLength}",
+    "deduplicateFields": "重复数据删除字段",
+    "deduplicateFieldTooltip": "选择使用哪些字段映射进行重复数据删除指纹识别",
+    "alertDeduplicationMessage": "将对这些字段具有相同值的警报进行重复数据消除（例如，相同的指纹 = 相同的字段值）",
+    "atLeastOneDeduplicationField": "重复数据删除至少需要一个字段映射"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

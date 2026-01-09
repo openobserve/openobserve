@@ -107,7 +107,8 @@
     "manageTheme": "Tema Yönet",
     "url": "URL",
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
-    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
+    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
+    "id": "KİMLİK"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "İlişkili iz bulunamadı",
     "noTracesDescription": "Seçilen zaman aralığında {service} hizmeti için iz bulunamadı",
     "openTraceInNewWindow": "İzini yeni pencerede aç",
-    "filters": "Filtreler"
+    "filters": "Filtreler",
+    "semanticFieldGroupsTitle": "Alan Eşlemeleri",
+    "semanticFieldGroupsCaption": "Korelasyon ve tekilleştirme için alan adı eşlemelerini tanımlayın (örn., ana bilgisayar adı, düğüm → 'ana bilgisayar' grubu)",
+    "groupsLabel": "gruplar",
+    "importFromJson": "JSON'dan içe aktarma",
+    "addCustomGroup": "Özel Grup Ekle",
+    "actionNormalize": "Eşleştirme için küçük harf ve kırpma değerleri",
+    "removeSemanticGroup": "Anlamsal Grubu Kaldır",
+    "fieldNamePlaceholder": "Alan adları (virgülle ayrılmış)",
+    "category": "Kategoriler",
+    "categoryHint": "Grupları kategoriye göre filtrele",
+    "noSemanticGroupMessage": "Bu kategoride semantik grup yok. Farklı bir kategori seçin veya özel bir grup ekleyin.",
+    "showingGroups": "{localGroupLength} toplam grubundan {filterGroupLength} gösteriliyor",
+    "deduplicateFields": "Tekilleştirme Alanları",
+    "deduplicateFieldTooltip": "Tekilleştirme parmak izi almak için hangi alan eşlemelerinin kullanılacağını seçin",
+    "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
+    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
