@@ -164,78 +164,63 @@ jobs:
               console.log(`Error: ${error.message}`);
             }
 
-  # Final status comment
+  # Final status comment (success only - reusable workflow handles failure comments)
   status:
     needs: [prepare, fix]
-    if: always() && needs.prepare.result == 'success'
+    if: needs.fix.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Comment Result
+      - name: Comment Success
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
           script: |
-            const fixResult = '${{ needs.fix.result }}';
             const isPR = '${{ needs.prepare.outputs.mode }}' === 'pr_fix';
             const branch = '${{ needs.prepare.outputs.branch }}';
             const triggerCommentId = '${{ needs.prepare.outputs.trigger_comment_id }}' || null;
             const issueNumber = parseInt('${{ needs.prepare.outputs.number }}');
             const workflowUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
-            const commenter = '${{ github.event.comment.user.login }}';
 
-            // Add reaction (only if we have a valid comment ID)
+            // Add rocket reaction on success
             if (triggerCommentId) {
-              const reaction = fixResult === 'success' ? 'rocket' : 'confused';
               try {
                 await github.rest.reactions.createForIssueComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: parseInt(triggerCommentId),
-                  content: reaction
+                  content: 'rocket'
                 });
               } catch (e) {
                 console.log(`Could not add reaction: ${e.message}`);
               }
             }
 
-            // Build comment body
+            // Build success comment
             let body;
-            if (fixResult === 'success') {
-              if (isPR) {
-                body = [
-                  '## :white_check_mark: PR Fixes Applied!',
-                  '',
-                  "I've addressed the feedback and pushed fixes to this PR.",
-                  '',
-                  `**Branch:** \`${branch}\``,
-                  '',
-                  'Please review the new commits.',
-                  '',
-                  '---',
-                  `:robot: [Workflow Run](${workflowUrl})`
-                ].join('\n');
-              } else {
-                body = [
-                  '## :white_check_mark: Issue Fix Complete!',
-                  '',
-                  `I've implemented the fix and pushed to branch \`${branch}\`.`,
-                  '',
-                  '**Next:** Review the PR and merge when ready.',
-                  '',
-                  '---',
-                  `:robot: [Workflow Run](${workflowUrl})`
-                ].join('\n');
-              }
+            if (isPR) {
+              body = [
+                '## :white_check_mark: PR Fixes Applied!',
+                '',
+                "I've addressed the feedback and pushed fixes to this PR.",
+                '',
+                `**Branch:** \`${branch}\``,
+                '',
+                'Please review the new commits.',
+                '',
+                '---',
+                `:robot: [Workflow Run](${workflowUrl})`
+              ].join('\n');
             } else {
               body = [
-                '## :x: Claude Fix Failed',
+                '## :white_check_mark: Issue Fix Complete!',
                 '',
-                'I encountered an error while trying to fix this.',
+                `I've implemented the fix and pushed to branch \`${branch}\`.`,
                 '',
-                `**Check the logs:** [Workflow Run](${workflowUrl})`,
+                '**Next:** Review the PR and merge when ready.',
                 '',
-                `cc: @${commenter}`
+                '---',
+                `:robot: [Workflow Run](${workflowUrl})`
               ].join('\n');
             }
 
