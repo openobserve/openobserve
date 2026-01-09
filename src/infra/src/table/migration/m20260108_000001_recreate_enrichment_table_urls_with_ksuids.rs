@@ -170,7 +170,7 @@ mod legacy_enrichment_table_urls {
                 // We use org+name (not org+name+url) because before migration there was
                 // a unique constraint on (org, name), so only one job per table existed
                 let ksuid = enrichment_job_ksuid_from_hash(&job.org, &job.name);
-                log::debug!(
+                log::info!(
                     "[ENRICHMENT::URL] enrichment_table_url job {}/{} deterministic ksuid: {}",
                     job.org,
                     job.name,
@@ -361,7 +361,6 @@ mod new_enrichment_table_urls {
                 // Use the KSUID from legacy table
                 let ksuid = legacy_job
                     .ksuid
-                    .clone()
                     .expect("ksuid should be populated in legacy table");
 
                 // Create new record in new table
