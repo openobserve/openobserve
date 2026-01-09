@@ -46,6 +46,7 @@ import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import logsUtils from "@/composables/useLogs/logsUtils";
+import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -155,6 +156,18 @@ export const usePanelDataLoader = (
     },
     metadata: {
       queries: [] as any,
+      seriesLimiting: undefined as {
+        totalMetricsReceived: number;
+        metricsStored: number;
+        maxSeries: number;
+      } | undefined,
+    } as {
+      queries: any;
+      seriesLimiting?: {
+        totalMetricsReceived: number;
+        metricsStored: number;
+        maxSeries: number;
+      };
     },
     annotations: [] as any,
     resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
@@ -972,6 +985,15 @@ export const usePanelDataLoader = (
                 return;
               }
 
+              // Get series limit from config
+              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+
+              // Create chunk processor for efficient metric merging
+              const chunkProcessor = createPromQLChunkProcessor({
+                maxSeries,
+                enableLogging: false,
+              });
+
               const handlePromQLResponse = (data: any, res: any) => {
                 if (res.type === "event_progress") {
                   state.loadingProgressPercentage = res?.content?.percent ?? 0;
@@ -979,71 +1001,13 @@ export const usePanelDataLoader = (
                   saveCurrentStateToCache();
                 }
                 if (res?.type === "promql_response") {
-                  // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
-                  // result is the actual PromQL data (vector/matrix with values)
-                  // We need to extract and accumulate the result.result part
+                  const newData = res?.content?.results;
 
-                  const newData = res?.content?.results; // This is { result_type/resultType, result }
-
-                  if (!queryResults[queryIndex]) {
-                    // First chunk - initialize with the structure
-                    queryResults[queryIndex] = newData;
-                  } else {
-                    // Subsequent chunks - merge the result arrays
-                    const currentResult = queryResults[queryIndex];
-
-                    // If both have result arrays, merge them
-                    if (
-                      currentResult?.result &&
-                      Array.isArray(currentResult.result) &&
-                      newData?.result &&
-                      Array.isArray(newData.result)
-                    ) {
-                      // Merge the result arrays (time series data)
-                      // For matrix type, we need to merge values arrays for matching metrics
-                      const mergedResult = [...currentResult.result];
-
-                      newData.result.forEach((newMetric: any) => {
-                        // Find if this metric already exists in current results
-                        const existingIndex = mergedResult.findIndex(
-                          (existingMetric: any) => {
-                            // Compare metric labels to find matching time series
-                            return (
-                              JSON.stringify(existingMetric.metric) ===
-                              JSON.stringify(newMetric.metric)
-                            );
-                          },
-                        );
-
-                        if (existingIndex >= 0) {
-                          // Metric exists - merge the values arrays
-                          if (
-                            Array.isArray(mergedResult[existingIndex].values) &&
-                            Array.isArray(newMetric.values)
-                          ) {
-                            mergedResult[existingIndex] = {
-                              ...mergedResult[existingIndex],
-                              values: [
-                                ...mergedResult[existingIndex].values,
-                                ...newMetric.values,
-                              ],
-                            };
-                          }
-                        } else {
-                          // New metric - add it to results
-                          mergedResult.push(newMetric);
-                        }
-                      });
-
-                      queryResults[queryIndex] = {
-                        ...newData,
-                        result: mergedResult,
-                      };
-                    } else if (newData) {
-                      // Replace with new data if structure is different
-                      queryResults[queryIndex] = newData;
-                    }
-                  }
+                  // Process chunk using extracted processor module
+                  queryResults[queryIndex] = chunkProcessor.processChunk(
+                    queryResults[queryIndex],
+                    newData
+                  );
 
                   // Update state with accumulated results
                   state.data = [...queryResults];
@@ -1090,10 +1054,19 @@ export const usePanelDataLoader = (
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
 
+                // Get statistics from chunk processor
+                const stats = chunkProcessor.getStats();
+
                 // Final update with complete results
                 state.data = [...queryResults];
                 state.metadata = {
                   queries: queryMetadata,
+                  // Add series limiting information for warning message
+                  seriesLimiting: {
+                    totalMetricsReceived: stats.totalMetricsReceived,
+                    metricsStored: stats.metricsStored,
+                    maxSeries,
+                  },
                 };
 
                 removeTraceId(traceId);
