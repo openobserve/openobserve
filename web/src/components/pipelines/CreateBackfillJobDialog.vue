@@ -22,11 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     data-test="create-backfill-job-dialog"
   >
-    <q-card class="tw-w-full" style="width: 600px">
-      <q-card-section class="q-pa-md">
+    <q-card class="tw-w-full tw:flex tw:flex-col" style="width: 600px; height: 100%;">
+      <q-card-section class="q-pa-md tw:flex-shrink-0">
         <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">
-            Create Backfill Job for {{ pipelineName }}
+          <div class="tw:flex tw:items-center tw:gap-2" data-test="dialog-title">
+            <span class="text-h6">Create Backfill Job for</span>
+            <span
+              :class="[
+                'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                $q.dark.isActive
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50'
+              ]"
+            >
+              {{ pipelineName }}
+              <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
+                {{ pipelineName }}
+              </q-tooltip>
+            </span>
           </div>
           <q-btn
             icon="close"
@@ -41,22 +54,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
 
-      <q-card-section class="q-pa-md">
-        <q-form @submit="onSubmit" class="tw-space-y-4">
+      <q-card-section class="q-pa-md tw:flex-1 tw:overflow-y-auto">
+        <div class="tw:space-y-6">
           <!-- Time Range Section -->
           <div>
-            <div class="text-subtitle2 q-mb-sm">
-              Time Range <span class="text-red-600">*</span>
+            <div class="tw:flex tw:items-center tw:gap-4">
+              <div class="text-subtitle2 tw:whitespace-nowrap">
+                Time Range <span class="text-red-600">*</span>
+              </div>
+              <date-time
+                ref="dateTimeRef"
+                auto-apply
+                default-type="absolute"
+                @on:date-change="updateDateTime"
+                data-test="time-range-picker"
+                disable-relative
+                min-date="1999/01/01"
+              />
             </div>
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              default-type="absolute"
-              @on:date-change="updateDateTime"
-              data-test="time-range-picker"
-              disable-relative
-              min-date="1999/01/01"
-            />
             <div
               v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
               class="text-caption text-red-600 q-mt-xs"
@@ -66,94 +81,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <q-expansion-item
-            v-model="showAdvanced"
-            icon="settings"
-            label="Advanced Options"
-            data-test="advanced-options-expansion"
-          >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
+          <div class="collapsible-section card-container" data-test="advanced-options-section">
+            <div
+              class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+              @click="showAdvanced = !showAdvanced"
+            >
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-icon name="settings" size="20px" />
+                <span class="tw:text-sm tw:font-semibold">Advanced Options</span>
+              </div>
+              <q-btn
+                flat
+                dense
+                round
+                size="xs"
+                :icon="showAdvanced ? 'expand_less' : 'expand_more'"
+                @click.stop
+                class="expand-toggle-btn"
+              />
+            </div>
+            <div v-show="showAdvanced" class="section-content">
+              <div class="tw:space-y-4">
               <!-- Chunk Period -->
-              <div>
-                <div class="text-caption q-mb-xs">
-                  Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Size of each processing chunk in minutes. Default: 60
-                    </q-tooltip>
-                  </q-icon>
+              <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
+                <div class="tw:col-span-5">
+                  <div class="text-subtitle2 tw:mb-1">
+                    Chunk Period (minutes)
+                  </div>
+                  <div :class="['text-caption', $q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                    Size of each processing chunk
+                  </div>
                 </div>
-                <q-input
-                  v-model.number="formData.chunkPeriodMinutes"
-                  type="number"
-                  outlined
-                  dense
-                  :placeholder="String(scheduleFrequency || 60)"
-                  :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
-                  data-test="chunk-period-input"
-                />
+                <div class="tw:col-span-7">
+                  <q-input
+                    v-model.number="formData.chunkPeriodMinutes"
+                    type="number"
+                    borderless
+                    dense
+                    :placeholder="String(scheduleFrequency || 60)"
+                    :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
+                    data-test="chunk-period-input"
+                  >
+                    <template v-slot:append>
+                      <q-icon name="info_outline" size="18px" color="grey-6">
+                        <q-tooltip class="tw:text-xs">
+                          Default: {{ scheduleFrequency || 60 }} minutes
+                        </q-tooltip>
+                      </q-icon>
+                    </template>
+                  </q-input>
+                </div>
               </div>
 
               <!-- Delay Between Chunks -->
-              <div>
-                <div class="text-caption q-mb-xs">
-                  Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Delay between processing chunks in seconds. Default: 5
-                    </q-tooltip>
-                  </q-icon>
+              <div class="tw:grid tw:grid-cols-12 tw:gap-4 tw:items-start">
+                <div class="tw:col-span-5">
+                  <div class="text-subtitle2 tw:mb-1">
+                    Delay Between Chunks (seconds)
+                  </div>
+                  <div :class="['text-caption', $q.dark.isActive ? 'tw:text-gray-400' : 'tw:text-gray-600']">
+                    Wait time between processing chunks
+                  </div>
                 </div>
-                <q-input
-                  v-model.number="formData.delayBetweenChunks"
-                  type="number"
-                  outlined
-                  dense
-                  placeholder="5"
-                  :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
-                  data-test="delay-between-chunks-input"
-                />
+                <div class="tw:col-span-7">
+                  <q-input
+                    v-model.number="formData.delayBetweenChunks"
+                    type="number"
+                    borderless
+                    dense
+                    placeholder="5"
+                    :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
+                    data-test="delay-between-chunks-input"
+                  >
+                    <template v-slot:append>
+                      <q-icon name="info_outline" size="18px" color="grey-6">
+                        <q-tooltip class="tw:text-xs">
+                          Default: 5 seconds
+                        </q-tooltip>
+                      </q-icon>
+                    </template>
+                  </q-input>
+                </div>
               </div>
 
               <!-- Delete Before Backfill -->
-              <div>
+              <div class="tw:pt-2">
                 <q-checkbox
                   v-model="formData.deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
+                  class="tw:font-medium"
                 />
                 <div
                   v-if="formData.deleteBeforeBackfill"
-                  class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
+                  :class="[
+                    'tw:mt-3 tw:p-4 tw:rounded-lg tw:border',
+                    $q.dark.isActive
+                      ? 'tw:bg-orange-900/20 tw:border-orange-700'
+                      : 'tw:bg-orange-50 tw:border-orange-400'
+                  ]"
                 >
-                  <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm" />
-                    <div class="text-caption text-orange-800">
-                      <strong>Warning:</strong> This will permanently delete all
-                      data in the destination stream for the specified time
-                      range before running the backfill. This action cannot be
-                      undone.
-                      <br /><br />
-                      <strong>Time Alignment Requirements:</strong>
-                      <ul class="tw-mt-1 tw-ml-4 tw-list-disc">
-                        <li>For <strong>logs</strong> streams: Times must align to hour boundaries (e.g., 10:00:00, not 10:15:00)</li>
-                        <li>For <strong>metrics/traces</strong> streams: Times must align to day boundaries (e.g., 00:00:00)</li>
+                  <div class="tw:flex tw:items-start tw:gap-3">
+                    <q-icon name="warning" :color="$q.dark.isActive ? 'orange-4' : 'orange'" size="20px" class="tw:mt-0.5" />
+                    <div>
+                      <div :class="['tw:font-semibold tw:mb-2', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
+                      <div :class="['text-caption tw:mb-3', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                        This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
+                      </div>
+                      <div :class="['tw:font-semibold tw:text-sm tw:mb-1', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Time Alignment Requirements:</div>
+                      <ul :class="['text-caption tw:ml-5 tw:space-y-1 tw:list-disc', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
+                        <li><strong>Logs</strong> streams: Times must align to hour boundaries (e.g., 10:00:00, not 10:15:00)</li>
+                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries (e.g., 00:00:00)</li>
                       </ul>
                     </div>
                   </div>
                 </div>
               </div>
-            </q-card>
-          </q-expansion-item>
+            </div>
+            </div>
+          </div>
 
           <!-- Estimated Info -->
           <div
             v-if="estimatedInfo"
-            class="tw-p-3 tw-bg-blue-50 tw-rounded tw-border tw-border-blue-200"
+            :class="[
+              'tw:p-3 tw:rounded-lg tw:border',
+              $q.dark.isActive
+                ? 'tw:bg-blue-900/20 tw:border-blue-700'
+                : 'tw:bg-blue-50 tw:border-blue-200'
+            ]"
           >
-            <div class="text-caption text-blue-800">
-              <div>Estimated Processing Time: {{ estimatedInfo.time }}</div>
-              <div v-if="estimatedInfo.chunks">
+            <div :class="$q.dark.isActive ? 'tw:text-blue-200' : 'tw:text-blue-800'">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:font-medium tw:mb-1">
+                <q-icon name="schedule" size="18px" />
+                <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
+              </div>
+              <div v-if="estimatedInfo.chunks" class="text-caption tw:ml-6">
                 Estimated Chunks: {{ estimatedInfo.chunks }}
               </div>
             </div>
@@ -164,27 +227,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="error" class="q-mr-sm" />
             {{ errorMessage }}
           </div>
+        </div>
+      </q-card-section>
 
-          <!-- Form Actions -->
-          <div class="flex justify-end tw-gap-2 q-mt-md">
+      <q-separator />
+
+      <!-- Form Actions -->
+      <q-card-actions class="q-pa-md tw:flex-shrink-0">
+        <q-form @submit="onSubmit" class="tw:w-full">
+          <div class="flex justify-end tw:gap-2">
             <q-btn
               flat
               label="Cancel"
-              color="grey-8"
+              class="o2-secondary-button"
               @click="onCancel"
               data-test="cancel-btn"
             />
             <q-btn
               type="submit"
               label="Create Backfill Job"
-              color="primary"
+              class="o2-primary-button"
               :loading="loading"
               :disable="loading"
               data-test="create-btn"
             />
           </div>
         </q-form>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- Confirmation Dialog for Delete Before Backfill -->
+  <q-dialog v-model="showDeleteConfirmation" persistent>
+    <q-card style="min-width: 400px">
+      <q-card-section class="tw:pb-2">
+        <div class="text-h6">Confirm Data Deletion</div>
       </q-card-section>
+
+      <q-card-section class="q-pt-none">
+        <p class="tw:mb-4">
+          You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
+        </p>
+        <p class="tw:font-semibold tw:text-red-600">
+          This action CANNOT be undone or cancelled once the job is created.
+        </p>
+        <p class="tw:mt-4">Are you sure you want to proceed?</p>
+      </q-card-section>
+
+      <q-card-actions align="right" class="q-px-md q-pb-md">
+        <q-btn
+          flat
+          label="Cancel"
+          class="o2-secondary-button"
+          @click="showDeleteConfirmation = false"
+          data-test="delete-confirm-cancel-btn"
+          autofocus
+        />
+        <q-btn
+          unelevated
+          label="Yes, Delete and Backfill"
+          class="o2-primary-button"
+          @click="confirmDelete"
+          data-test="delete-confirm-yes-btn"
+        />
+      </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
@@ -220,6 +326,7 @@ const show = computed({
 });
 
 const showAdvanced = ref(false);
+const showDeleteConfirmation = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
 const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
@@ -318,27 +425,15 @@ const onSubmit = async () => {
 
   // Show confirmation dialog if delete_before_backfill is enabled
   if (formData.value.deleteBeforeBackfill) {
-    $q.dialog({
-      title: "Confirm Data Deletion",
-      message:
-        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is created. Are you sure you want to proceed?",
-      cancel: {
-        label: "Cancel",
-        color: "grey-8",
-        flat: true,
-      },
-      ok: {
-        label: "Yes, Delete and Backfill",
-        color: "negative",
-      },
-      persistent: true,
-      focus: "cancel", // Focus on cancel button by default for safety
-    }).onOk(() => {
-      createBackfillJobRequest();
-    });
+    showDeleteConfirmation.value = true;
   } else {
     createBackfillJobRequest();
   }
+};
+
+const confirmDelete = () => {
+  showDeleteConfirmation.value = false;
+  createBackfillJobRequest();
 };
 
 const createBackfillJobRequest = async () => {
@@ -376,7 +471,7 @@ const createBackfillJobRequest = async () => {
   } catch (error: any) {
     console.error("Error creating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.error ||
+      error?.response?.data?.message ||
       error?.message ||
       "Failed to create backfill job";
 
@@ -404,6 +499,50 @@ const createBackfillJobRequest = async () => {
 
 .text-caption {
   font-size: 0.75rem;
-  color: #666;
+}
+
+// Advanced Options Collapsible Styling - matching AlertWizardRightColumn.vue
+.collapsible-section {
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  background-color: var(--o2-card-bg);
+  border-radius: 0.375rem;
+  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+
+  .section-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    border-radius: 0.375rem 0.375rem 0 0;
+    user-select: none;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    &:active {
+      background: rgba(0, 0, 0, 0.06);
+    }
+  }
+
+  .section-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .expand-toggle-btn {
+    opacity: 0.5;
+    transition: all 0.2s ease;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
 }
 </style>
