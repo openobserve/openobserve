@@ -156,6 +156,18 @@ export const usePanelDataLoader = (
     },
     metadata: {
       queries: [] as any,
+      seriesLimiting: undefined as {
+        totalMetricsReceived: number;
+        metricsStored: number;
+        maxSeries: number;
+      } | undefined,
+    } as {
+      queries: any;
+      seriesLimiting?: {
+        totalMetricsReceived: number;
+        metricsStored: number;
+        maxSeries: number;
+      };
     },
     annotations: [] as any,
     resultMetaData: [] as any, // 2D array: [queryIndex][partitionIndex]
@@ -1053,10 +1065,19 @@ export const usePanelDataLoader = (
                 // Mark this query as completed
                 completedQueries.add(queryIndex);
 
+                // Get statistics from chunk processor
+                const stats = chunkProcessor.getStats();
+
                 // Final update with complete results
                 state.data = [...queryResults];
                 state.metadata = {
                   queries: queryMetadata,
+                  // Add series limiting information for warning message
+                  seriesLimiting: {
+                    totalMetricsReceived: stats.totalMetricsReceived,
+                    metricsStored: stats.metricsStored,
+                    maxSeries,
+                  },
                 };
 
                 removeTraceId(traceId);

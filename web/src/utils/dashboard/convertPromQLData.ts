@@ -184,9 +184,17 @@ export const convertPromQLData = async (
   });
 
   // Add warning if total number of series exceeds limit
-  if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+  // Check if series limiting info is available from data loader (PromQL streaming)
+  if (metadata?.seriesLimiting) {
+    const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
+    if (totalMetricsReceived > metricsStored) {
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
+    }
+  } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+    // Fallback: Series limiting happens here (for non-streaming queries)
     extras.limitNumberOfSeriesWarningMessage =
-      `Showing ${maxSeries} of ${totalSeries} series. Increase max_dashboard_series in settings to see more.`;
+      "Limiting the displayed series to ensure optimal performance";
   }
 
   // flag to check if the data is time seriesc
