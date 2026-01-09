@@ -108,13 +108,34 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
+/// A service node in the incident topology graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TopologyNode {
+    /// Service name
+    pub service_name: String,
+}
+
+/// An edge between services in the incident topology graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TopologyEdge {
+    /// Source service (caller)
+    pub from: String,
+    /// Target service (callee)
+    pub to: String,
+}
+
 /// Topology context from Service Graph (optional enrichment)
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
-    pub service: String,
-    pub upstream_services: Vec<String>,
-    pub downstream_services: Vec<String>,
+    /// Primary service for this incident
+    pub primary_service: String,
+    /// All services in the incident topology graph (N-hop expansion from alerts)
+    pub nodes: Vec<TopologyNode>,
+    /// Service dependencies (edges between services)
+    pub edges: Vec<TopologyEdge>,
+    /// Related incidents in dependent services
     pub related_incident_ids: Vec<String>,
+    /// AI-generated RCA analysis (markdown format)
     pub suggested_root_cause: Option<String>,
 }
 
@@ -275,9 +296,6 @@ pub struct IncidentStats {
 pub struct IncidentServiceGraph {
     /// Primary service from incident.stable_dimensions
     pub incident_service: String,
-    /// Root cause from incident.topology_context (if available)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub root_cause_service: Option<String>,
     /// All services involved in the incident
     pub nodes: Vec<IncidentServiceNode>,
     /// Service dependencies (edges between services)
@@ -293,10 +311,6 @@ pub struct IncidentServiceNode {
     pub service_name: String,
     /// Number of alerts for this service in the incident
     pub alert_count: u32,
-    /// Whether this service is the suspected root cause
-    pub is_root_cause: bool,
-    /// Whether this is the primary incident service
-    pub is_primary: bool,
 }
 
 /// An edge between services in the incident graph
@@ -451,9 +465,9 @@ mod tests {
     #[test]
     fn test_incident_topology_default() {
         let topology = IncidentTopology::default();
-        assert_eq!(topology.service, "");
-        assert!(topology.upstream_services.is_empty());
-        assert!(topology.downstream_services.is_empty());
+        assert_eq!(topology.primary_service, "");
+        assert!(topology.nodes.is_empty());
+        assert!(topology.edges.is_empty());
         assert!(topology.related_incident_ids.is_empty());
         assert!(topology.suggested_root_cause.is_none());
     }
@@ -492,16 +506,35 @@ mod tests {
     #[test]
     fn test_incident_topology_with_values() {
         let topology = IncidentTopology {
-            service: "api-gateway".to_string(),
-            upstream_services: vec!["frontend".to_string()],
-            downstream_services: vec!["database".to_string(), "cache".to_string()],
+            primary_service: "api-gateway".to_string(),
+            nodes: vec![
+                TopologyNode {
+                    service_name: "api-gateway".to_string(),
+                },
+                TopologyNode {
+                    service_name: "database".to_string(),
+                },
+                TopologyNode {
+                    service_name: "cache".to_string(),
+                },
+            ],
+            edges: vec![
+                TopologyEdge {
+                    from: "database".to_string(),
+                    to: "api-gateway".to_string(),
+                },
+                TopologyEdge {
+                    from: "cache".to_string(),
+                    to: "api-gateway".to_string(),
+                },
+            ],
             related_incident_ids: vec!["incident-1".to_string()],
             suggested_root_cause: Some("High memory usage".to_string()),
         };
 
-        assert_eq!(topology.service, "api-gateway");
-        assert_eq!(topology.upstream_services.len(), 1);
-        assert_eq!(topology.downstream_services.len(), 2);
+        assert_eq!(topology.primary_service, "api-gateway");
+        assert_eq!(topology.nodes.len(), 3);
+        assert_eq!(topology.edges.len(), 2);
         assert_eq!(topology.related_incident_ids.len(), 1);
         assert!(topology.suggested_root_cause.is_some());
     }
