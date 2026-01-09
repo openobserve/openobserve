@@ -1,0 +1,31 @@
+name: Claude Auto-Implement
+
+# Trigger on label or @claude_impl comment on issues
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-implement-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  # Call o2-enterprise reusable workflow
+  auto-implement:
+    if: |
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issues' && github.event.label.name == 'auto-implement') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
+      )
+
+    uses: openobserve/o2-enterprise/.github/workflows/claude-auto-implement-reusable.yml@main
+    with:
+      source_repo: openobserve
+      issue_number: ${{ github.event.issue.number }}
+      issue_title: ${{ github.event.issue.title }}
+      issue_body: ${{ github.event.issue.body }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      E2E_DEV_CI_TOKEN: ${{ secrets.E2E_DEV_CI_TOKEN }}

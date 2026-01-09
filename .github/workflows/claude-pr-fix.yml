@@ -1,0 +1,247 @@
+name: Claude Fix
+
+# Trigger on comments containing @claude_fix (works on both PRs and Issues)
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  # Determine context and prepare inputs for reusable workflow
+  prepare:
+    if: |
+      github.event.sender.type != 'Bot' &&
+      contains(github.event.comment.body, '@claude_fix')
+
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.context.outputs.mode }}
+      branch: ${{ steps.context.outputs.branch }}
+      number: ${{ steps.context.outputs.number }}
+      title: ${{ steps.context.outputs.title }}
+      issue_body: ${{ steps.context.outputs.issue_body }}
+      pr_number: ${{ steps.context.outputs.pr_number }}
+      trigger_comment: ${{ steps.context.outputs.trigger_comment }}
+      trigger_comment_id: ${{ steps.context.outputs.trigger_comment_id }}
+
+    steps:
+      - name: Determine Context (PR or Issue)
+        id: context
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const isPR = !!context.payload.issue.pull_request;
+
+            core.setOutput('trigger_comment', context.payload.comment.body);
+            core.setOutput('trigger_comment_id', context.payload.comment.id);
+
+            if (isPR) {
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+
+              core.setOutput('mode', 'pr_fix');
+              core.setOutput('branch', pr.head.ref);
+              core.setOutput('number', context.issue.number);
+              core.setOutput('title', pr.title);
+              core.setOutput('pr_number', context.issue.number);
+              core.setOutput('issue_body', pr.body || '');
+
+              console.log(`PR #${pr.number}: ${pr.title}`);
+              console.log(`Branch: ${pr.head.ref}`);
+            } else {
+              // Get Issue details
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              });
+
+              const branchName = `fix/issue-${issue.number}`;
+
+              core.setOutput('mode', 'issue_fix');
+              core.setOutput('branch', branchName);
+              core.setOutput('number', context.issue.number);
+              core.setOutput('title', issue.title);
+              core.setOutput('pr_number', '');
+              core.setOutput('issue_body', issue.body || '');
+
+              console.log(`Issue #${issue.number}: ${issue.title}`);
+              console.log(`Will create branch: ${branchName}`);
+            }
+
+  # Call the reusable workflow from o2-enterprise
+  fix:
+    needs: prepare
+    uses: openobserve/o2-enterprise/.github/workflows/claude-auto-implement-reusable.yml@main
+    with:
+      source_repo: openobserve
+      issue_number: ${{ needs.prepare.outputs.number }}
+      issue_title: ${{ needs.prepare.outputs.title }}
+      issue_body: ${{ needs.prepare.outputs.issue_body }}
+      mode: ${{ needs.prepare.outputs.mode }}
+      branch: ${{ needs.prepare.outputs.branch }}
+      pr_number: ${{ needs.prepare.outputs.pr_number }}
+      trigger_comment: ${{ needs.prepare.outputs.trigger_comment }}
+      trigger_comment_id: ${{ needs.prepare.outputs.trigger_comment_id }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      E2E_DEV_CI_TOKEN: ${{ secrets.E2E_DEV_CI_TOKEN }}
+
+  # Post-fix: Create PR if needed (issue_fix mode)
+  create-pr:
+    needs: [prepare, fix]
+    if: needs.prepare.outputs.mode == 'issue_fix' && success()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create PR if needed
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const branch = '${{ needs.prepare.outputs.branch }}';
+            const issueNumber = parseInt('${{ needs.prepare.outputs.number }}');
+            // Use JSON.parse to safely handle special characters in title
+            const rawTitle = ${{ toJSON(needs.prepare.outputs.title) }};
+            // Normalize title: lowercase, remove redundant prefixes
+            const title = rawTitle
+              .replace(/^(fix|feat|bug|feature|chore|refactor):\s*/i, '')
+              .toLowerCase()
+              .trim();
+
+            // Check if PR already exists
+            const { data: existingPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branch}`,
+              state: 'open'
+            });
+
+            if (existingPRs.length > 0) {
+              console.log(`PR already exists: #${existingPRs[0].number}`);
+              return;
+            }
+
+            // Check if branch has commits
+            try {
+              const { data: comparison } = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: 'main',
+                head: branch
+              });
+
+              if (comparison.ahead_by === 0) {
+                console.log('No commits to create PR');
+                return;
+              }
+
+              // Create PR
+              const prBody = [
+                `## Fix for Issue #${issueNumber}`,
+                '',
+                `Closes #${issueNumber}`,
+                '',
+                '---',
+                ':robot: Generated with [Claude Code](https://claude.com/claude-code)'
+              ].join('\n');
+
+              const { data: pr } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `fix: ${title}`,
+                head: branch,
+                base: 'main',
+                body: prBody
+              });
+
+              console.log(`Created PR #${pr.number}`);
+            } catch (error) {
+              console.log(`Error: ${error.message}`);
+            }
+
+  # Final status comment
+  status:
+    needs: [prepare, fix]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment Result
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const fixResult = '${{ needs.fix.result }}';
+            const isPR = '${{ needs.prepare.outputs.mode }}' === 'pr_fix';
+            const branch = '${{ needs.prepare.outputs.branch }}';
+            const triggerCommentId = '${{ needs.prepare.outputs.trigger_comment_id }}' || null;
+            const issueNumber = parseInt('${{ needs.prepare.outputs.number }}');
+            const workflowUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const commenter = '${{ github.event.comment.user.login }}';
+
+            // Add reaction (only if we have a valid comment ID)
+            if (triggerCommentId) {
+              const reaction = fixResult === 'success' ? 'rocket' : 'confused';
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: parseInt(triggerCommentId),
+                  content: reaction
+                });
+              } catch (e) {
+                console.log(`Could not add reaction: ${e.message}`);
+              }
+            }
+
+            // Build comment body
+            let body;
+            if (fixResult === 'success') {
+              if (isPR) {
+                body = [
+                  '## :white_check_mark: PR Fixes Applied!',
+                  '',
+                  "I've addressed the feedback and pushed fixes to this PR.",
+                  '',
+                  `**Branch:** \`${branch}\``,
+                  '',
+                  'Please review the new commits.',
+                  '',
+                  '---',
+                  `:robot: [Workflow Run](${workflowUrl})`
+                ].join('\n');
+              } else {
+                body = [
+                  '## :white_check_mark: Issue Fix Complete!',
+                  '',
+                  `I've implemented the fix and pushed to branch \`${branch}\`.`,
+                  '',
+                  '**Next:** Review the PR and merge when ready.',
+                  '',
+                  '---',
+                  `:robot: [Workflow Run](${workflowUrl})`
+                ].join('\n');
+              }
+            } else {
+              body = [
+                '## :x: Claude Fix Failed',
+                '',
+                'I encountered an error while trying to fix this.',
+                '',
+                `**Check the logs:** [Workflow Run](${workflowUrl})`,
+                '',
+                `cc: @${commenter}`
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body
+            });
