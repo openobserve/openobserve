@@ -292,7 +292,7 @@ test.describe("dashboard filter testcases", () => {
 
     await waitForDateTimeButtonToBeEnabled(page);
 
-    await pm.dashboardTimeRefresh.setRelative("6", "w");
+    await pm.dashboardTimeRefresh.setRelative("30", "d");
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -684,15 +684,15 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test.skip("should verify the custom value search from variable dropdown", async ({
+  test("should verify the custom value search from variable dropdown", async ({
     page,
   }) => {
     const valuesResponses = [];
 
-    // Listen for all responses to capture _values API calls
+    // Listen for all responses to capture _values_stream API calls (used with customValueSearch)
     page.on("response", async (response) => {
       const url = response.url();
-      if (url.includes("/_values?")) {
+      if (url.includes("/_values_stream")) {
         valuesResponses.push({
           url,
           status: response.status(),
