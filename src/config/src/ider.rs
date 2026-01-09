@@ -30,8 +30,20 @@ static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 
+/// Cached base timestamp in microseconds for UUID v7 validation.
+/// Initialized once on first use to avoid repeated syscalls.
+static BASE_TIMESTAMP_MICROS: LazyLock<i64> = LazyLock::new(|| {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as i64
+});
+// 10 years in microseconds: 10 * 365.25 * 24 * 60 * 60 * 1_000_000
+const TEN_YEARS_MICROS: i64 = 315_576_000_000_000;
+
 pub fn init() {
     _ = generate();
+    _ = BASE_TIMESTAMP_MICROS;
 }
 
 pub fn reload_machine_id() {
@@ -97,18 +109,11 @@ pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
                 let timestamp_micros = (seconds * 1_000_000 + nanoseconds as u64 / 1_000) as i64;
 
                 // Validate timestamp is reasonable:
-                // - Should be within +/- 10 years from current time
+                // - Should be within +/- 10 years from base time (when module was loaded)
                 // This allows for some clock skew and future-dated traces while rejecting clearly
                 // invalid timestamps
-                let now_micros = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_micros() as i64;
-
-                // 10 years in microseconds: 10 * 365.25 * 24 * 60 * 60 * 1_000_000
-                const TEN_YEARS_MICROS: i64 = 315_576_000_000_000;
-                let min_timestamp = now_micros - TEN_YEARS_MICROS;
-                let max_timestamp = now_micros + TEN_YEARS_MICROS;
+                let min_timestamp = BASE_TIMESTAMP_MICROS.saturating_sub(TEN_YEARS_MICROS);
+                let max_timestamp = BASE_TIMESTAMP_MICROS.saturating_add(TEN_YEARS_MICROS);
 
                 if timestamp_micros >= min_timestamp && timestamp_micros <= max_timestamp {
                     Some(timestamp_micros)
