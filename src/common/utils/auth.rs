@@ -1631,7 +1631,7 @@ mod tests {
     async fn test_check_permissions_non_enterprise() {
         // In non-enterprise mode, should always return false
         let result = check_permissions(
-            &"test_object",
+            "test_object",
             "test_org",
             "test_user",
             "dashboard",

@@ -7,6 +7,7 @@ import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
 import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
+import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scoped.js";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
@@ -59,6 +60,9 @@ import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 
+// ===== FUNCTIONS PAGE OBJECTS =====
+const FunctionsPage = require("./functionsPages/functionsPage.js");
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -75,6 +79,7 @@ class PageManager {
     this.dashboardPanelEdit = new DashboardPanel(page);
     this.dashboardSetting = new DashboardSetting(page);
     this.dashboardVariables = new DashboardVariables(page);
+    this.dashboardVariablesScoped = new DashboardVariablesScoped(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardFilter = new DashboardFilter(page);
@@ -130,6 +135,9 @@ class PageManager {
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
+
+    // ===== FUNCTIONS PAGE OBJECTS =====
+    this.functionsPage = new FunctionsPage(page);
   }
 }
 

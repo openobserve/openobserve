@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -82,7 +82,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result).toHaveLength(1);
@@ -110,7 +110,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result).toHaveLength(1);
@@ -149,7 +149,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result).toHaveLength(2);
@@ -182,7 +182,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result).toHaveLength(1);
@@ -209,7 +209,7 @@ describe("dataProcessor", () => {
       const processedResult = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(processedResult[0].series).toHaveLength(50);
@@ -235,7 +235,7 @@ describe("dataProcessor", () => {
       const processedResult = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(processedResult[0].series).toHaveLength(100);
@@ -269,14 +269,12 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].timestamps).toHaveLength(3);
       expect(result[0].timestamps.map(([ts]) => ts)).toEqual([
-        1609459200,
-        1609459260,
-        1609459320,
+        1609459200, 1609459260, 1609459320,
       ]);
     });
 
@@ -300,7 +298,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
@@ -327,7 +325,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
@@ -355,7 +353,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].series[0].data).toEqual({
@@ -384,7 +382,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].queryConfig).toEqual({});
@@ -405,7 +403,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].series[0].values).toEqual([[1609459200, "42"]]);
@@ -429,7 +427,7 @@ describe("dataProcessor", () => {
       const result = await processPromQLData(
         searchQueryData,
         mockPanelSchema,
-        mockStore
+        mockStore,
       );
 
       expect(result[0].series[0].values).toEqual([]);

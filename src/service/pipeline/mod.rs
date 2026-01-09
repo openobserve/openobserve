@@ -14,13 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{
-    pipeline::{Pipeline, components::PipelineSource},
+    pipeline::{
+        Pipeline,
+        components::{NodeData, PipelineSource},
+    },
     search::SearchEventType,
     stream::ListStreamParams,
     triggers::{Trigger, TriggerModule},
 };
 
 use super::db::{
+    functions as db_functions,
     pipeline::{self, PipelineError},
     scheduler,
 };
@@ -30,6 +34,34 @@ use crate::common::{
 };
 
 pub mod batch_execution;
+
+/// Validates that no JavaScript functions are used in the pipeline.
+/// JavaScript functions are restricted from pipelines in ALL organizations (including _meta).
+/// JavaScript functions in _meta org are for SSO claim parsing only, not pipeline execution.
+/// Pipelines can only use VRL functions for data transformation.
+async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), PipelineError> {
+    for node in &pipeline.nodes {
+        if let NodeData::Function(function_params) = &node.data {
+            // Load the function to check its trans_type
+            let function = db_functions::get(&pipeline.org, &function_params.name)
+                .await
+                .map_err(|e| {
+                    PipelineError::InvalidPipeline(format!(
+                        "Failed to load function '{}': {}",
+                        function_params.name, e
+                    ))
+                })?;
+
+            if function.is_js() {
+                return Err(PipelineError::InvalidPipeline(format!(
+                    "JavaScript functions cannot be used in pipelines. Function '{}' is a JavaScript function. Please use VRL functions instead.",
+                    function_params.name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
@@ -52,6 +84,9 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     if let Err(e) = pipeline.validate() {
         return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
+
+    // validate no JavaScript functions in pipeline
+    validate_no_javascript_functions(&pipeline).await?;
 
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
@@ -97,6 +132,9 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     pipeline
         .validate()
         .map_err(|e| PipelineError::InvalidPipeline(e.to_string()))?;
+
+    // validate no JavaScript functions in pipeline
+    validate_no_javascript_functions(&pipeline).await?;
 
     // additional checks when the source is changed
     let prev_source_stream = if existing_pipeline.source != pipeline.source {

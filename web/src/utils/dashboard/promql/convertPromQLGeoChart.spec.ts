@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -91,7 +91,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series).toBeDefined();
@@ -131,10 +131,10 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
-      expect(result.series[0].data).toEqual([[-74.0060, 40.7128, 50]]);
+      expect(result.series[0].data).toEqual([[-74.006, 40.7128, 50]]);
     });
 
     it("should use weight from metric label if available", () => {
@@ -167,7 +167,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0][2]).toBe(200);
@@ -206,7 +206,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0][2]).toBe(30);
@@ -241,7 +241,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0][2]).toBe(50);
@@ -274,7 +274,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0][2]).toBe(1);
@@ -306,7 +306,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.error).toBe(true);
@@ -340,7 +340,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.error).toBe(true);
@@ -384,16 +384,16 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toHaveLength(1);
-      expect(result.series[0].data[0]).toEqual([-74.0060, 40.7128, 1]);
+      expect(result.series[0].data[0]).toEqual([-74.006, 40.7128, 1]);
       expect(consoleSpy).toHaveBeenCalledWith(
         "GeoMap conversion warnings:",
         expect.arrayContaining([
           expect.stringContaining("missing geo coordinates"),
-        ])
+        ]),
       );
 
       consoleSpy.mockRestore();
@@ -432,7 +432,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.lmap.center).toEqual([-122.4194, 37.7749]);
@@ -466,7 +466,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.lmap.center).toEqual([0, 0]);
@@ -500,7 +500,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.lmap.roam).toBe(true);
@@ -548,7 +548,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.min).toBe(10);
@@ -585,7 +585,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.inRange.color).toEqual([
@@ -630,7 +630,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.tooltip.trigger).toBe("item");
@@ -668,7 +668,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formattedTooltip = result.tooltip.formatter({
@@ -705,7 +705,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.toolbox.show).toBe(true);
@@ -740,7 +740,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.legend.show).toBe(true);
@@ -778,7 +778,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].type).toBe("scatter");
@@ -813,7 +813,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].type).toBe("heatmap");
@@ -865,11 +865,11 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const symbolSize1 = result.series[0].symbolSize([-122.4194, 37.7749, 50]);
-      const symbolSize2 = result.series[0].symbolSize([-74.0060, 40.7128, 100]);
+      const symbolSize2 = result.series[0].symbolSize([-74.006, 40.7128, 100]);
 
       expect(symbolSize1).toBe(10);
       expect(symbolSize2).toBe(50);
@@ -917,11 +917,15 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
-      const symbolSizeMin = result.series[0].symbolSize([-122.4194, 37.7749, 10]);
-      const symbolSizeMax = result.series[0].symbolSize([-74.0060, 40.7128, 100]);
+      const symbolSizeMin = result.series[0].symbolSize([
+        -122.4194, 37.7749, 10,
+      ]);
+      const symbolSizeMax = result.series[0].symbolSize([
+        -74.006, 40.7128, 100,
+      ]);
 
       expect(symbolSizeMin).toBe(1);
       expect(symbolSizeMax).toBe(100);
@@ -959,7 +963,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const symbolSize = result.series[0].symbolSize([-122.4194, 37.7749, 100]);
@@ -998,7 +1002,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const symbolSize = result.series[0].symbolSize([-122.4194, 37.7749, 100]);
@@ -1033,7 +1037,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].itemStyle.color).toBe("#b02a02");
@@ -1066,7 +1070,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].encode.value).toBe(2);
@@ -1099,7 +1103,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].emphasis.label.show).toBe(true);
@@ -1146,7 +1150,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toHaveLength(2);
@@ -1185,7 +1189,7 @@ describe("GeoConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0][2]).toBe(30);
