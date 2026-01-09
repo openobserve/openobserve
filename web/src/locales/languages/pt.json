@@ -657,7 +657,14 @@
     "dataSource": "Fonte de dados",
     "uploadFile": "Carregar arquivo",
     "fromUrl": "Do URL",
-    "addFunction": "Adicionar função"
+    "addFunction": "Adicionar função",
+    "javascript": "JavaScript",
+    "transformType": "Tipo de transformação",
+    "vrlType": "VRL (linguagem de remapeamento vetorial)",
+    "jsType": "JavaScript (ES2023)",
+    "vrlfunction": "Função VRL",
+    "jsFunctionHint": "Use o objeto `row` para acessar e modificar os campos de registro. Exemplo: row.new_field = row.existing_field + 'processado';",
+    "vrlFunctionHint": "Use o `.` para representar o evento atual. Exemplo: .new_field = .existing_field + 'processado'"
   },
   "confirmDialog": {
     "cancel": "Cancelar",
