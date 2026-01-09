@@ -192,7 +192,15 @@ describe('AddEnrichmentTable.vue', () => {
     });
 
     it('should show append toggle in update mode', () => {
-      wrapper = createWrapper({ isUpdating: true });
+      wrapper = createWrapper({
+        isUpdating: true,
+        modelValue: {
+          name: 'test-table',
+          source: 'file',
+          file: '',
+          append: false,
+        }
+      });
       expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true);
     });
 
