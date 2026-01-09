@@ -186,6 +186,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
+        /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
         /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
       ],
