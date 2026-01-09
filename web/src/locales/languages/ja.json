@@ -105,7 +105,9 @@
     "lightMode": "ライトモード",
     "darkMode": "ダークモード",
     "manageTheme": "テーマを管理",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
+    "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。"
   },
   "search": {
     "metrics": "メトリクス",
@@ -368,7 +370,8 @@
     "sizekb": "サイズ（kb）",
     "viewURL": "ビューURL",
     "events": "イベント",
-    "location": "ロケーション"
+    "location": "ロケーション",
+    "frustrationCount": "フラストレーション"
   },
   "about": {
     "name": "OpenObserve",
@@ -1840,7 +1843,12 @@
     "logoTextUpdatedSuccessfully": "ロゴテキストは正常に更新されました。",
     "errorUpdatingImage": "画像の更新中にエラーが発生しました。",
     "fileFormatConstraint": "(.png、.jpg、.jpeg、.gif、.bmp 形式のみ、最大サイズ:150x30ピクセル)",
-    "filesValidationFailed": "{count} 個のファイルが検証制約に合格しませんでした"
+    "filesValidationFailed": "{count} 個のファイルが検証制約に合格しませんでした",
+    "maxSeriesPerQueryLabel": "クエリあたりの最大シリーズ数",
+    "maxSeriesPerQueryDescription": "1 つの PromQL クエリから返されるシリーズの最大数。結果セットが大きい場合に UI がフリーズするのを防ぐのに役立ちます。システムデフォルト (40,000) を使用するには空のままにします。",
+    "maxSeriesPerQueryTooltip": "「count (metric) by (label)」のようなPromQLクエリで返されるシリーズが多すぎると、UIがフリーズすることがあります。この制限によりそれが防止されます。システムデフォルトの場合は null に設定するか、1,000 ～ 1,000,000 の間の値を指定します。",
+    "maxSeriesPerQueryValidation": "値は1,000から1,000,000の間でなければなりません。デフォルトでは空白のままにしてください",
+    "systemDefault": "システムデフォルト"
   },
   "iam": {
     "users": "ユーザー",

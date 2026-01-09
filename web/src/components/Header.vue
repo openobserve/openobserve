@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon size="xs" name="language" class="padding-none" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="tw:max-w-[150px]">{{
+                <q-item-label class="tw:w-[180px]">{{
                   t("menu.language")
                 }}</q-item-label>
               </q-item-section>

@@ -105,7 +105,9 @@
     "lightMode": "Modalità luce",
     "darkMode": "Modalità oscura",
     "manageTheme": "Gestisci tema",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
+    "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare."
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -368,7 +370,8 @@
     "sizekb": "Dimensione (kb)",
     "viewURL": "Visualizza URL",
     "events": "Eventi",
-    "location": "Posizione"
+    "location": "Posizione",
+    "frustrationCount": "Frustrazioni"
   },
   "about": {
     "name": "Apri Observe",
@@ -1826,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Testo del logo aggiornato correttamente.",
     "errorUpdatingImage": "Errore durante l'aggiornamento dell'immagine.",
     "fileFormatConstraint": "(Solo formati .png, .jpg, .jpeg, .gif, .bmp e dimensione massima: 150x30px)",
-    "filesValidationFailed": "I file {count} non hanno superato i vincoli di convalida"
+    "filesValidationFailed": "I file {count} non hanno superato i vincoli di convalida",
+    "maxSeriesPerQueryLabel": "Serie massima per interrogazione",
+    "maxSeriesPerQueryDescription": "Numero massimo di serie che possono essere restituite da una singola query ProMQL. Aiuta a prevenire il blocco dell'interfaccia utente con set di risultati di grandi dimensioni. Lascia vuoto per utilizzare l'impostazione predefinita del sistema (40.000).",
+    "maxSeriesPerQueryTooltip": "Quando una query ProMQL come «count (metric) by (label)» restituisce troppe serie, può bloccare l'interfaccia utente. Questo limite lo impedisce. Imposta su null per l'impostazione predefinita del sistema o specifica un valore compreso tra 1.000 e 1.000.000.",
+    "maxSeriesPerQueryValidation": "Il valore deve essere compreso tra 1.000 e 1.000.000 o lasciare vuoto per impostazione predefinita",
+    "systemDefault": "impostazione predefinita del sistema"
   },
   "iam": {
     "users": "Utenti",

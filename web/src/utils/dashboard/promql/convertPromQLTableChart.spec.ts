@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -132,7 +132,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns).toHaveLength(2);
@@ -169,7 +169,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.columns[1].format(100);
@@ -177,9 +177,8 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings in single mode", async () => {
-      const { findFirstValidMappedValue } = await import(
-        "../convertDataIntoUnitValue"
-      );
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -210,7 +209,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.columns[1].format(100);
@@ -248,7 +247,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.rows).toHaveLength(2);
@@ -286,7 +285,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns[0].colorMode).toBe("auto");
@@ -324,7 +323,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns[1].colorMode).toBe("auto");
@@ -368,7 +367,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.columns[1].format(100);
@@ -403,7 +402,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns).toHaveLength(4); // timestamp, instance, job, value
@@ -438,11 +437,11 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const labelColumns = result.columns.filter(
-        (c: any) => c.name !== "timestamp" && c.name !== "value"
+        (c: any) => c.name !== "timestamp" && c.name !== "value",
       );
       expect(labelColumns).toHaveLength(1);
       expect(labelColumns[0].name).toBe("job");
@@ -475,11 +474,11 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const labelColumns = result.columns.filter(
-        (c: any) => c.name !== "timestamp" && c.name !== "value"
+        (c: any) => c.name !== "timestamp" && c.name !== "value",
       );
       expect(labelColumns.map((c: any) => c.name)).not.toContain("status");
     });
@@ -511,7 +510,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns[0].sticky).toBe(true);
@@ -545,7 +544,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
@@ -583,16 +582,15 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.rows).toHaveLength(2);
     });
 
     it("should apply value mappings to label columns in expanded_timeseries mode", async () => {
-      const { findFirstValidMappedValue } = await import(
-        "../convertDataIntoUnitValue"
-      );
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -623,7 +621,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const envColumn = result.columns.find((c: any) => c.name === "env");
@@ -663,7 +661,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns[0].colorMode).toBe("auto");
@@ -701,7 +699,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
@@ -740,7 +738,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -748,9 +746,8 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings in value column in expanded_timeseries mode", async () => {
-      const { findFirstValidMappedValue } = await import(
-        "../convertDataIntoUnitValue"
-      );
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -781,7 +778,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -827,7 +824,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -867,7 +864,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns.length).toBeGreaterThan(0);
@@ -906,11 +903,11 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumns = result.columns.filter((c: any) =>
-        c.name.startsWith("value_")
+        c.name.startsWith("value_"),
       );
       expect(valueColumns).toHaveLength(3);
       expect(result.rows[0].value_min).toBe(100);
@@ -944,11 +941,11 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const labelColumns = result.columns.filter(
-        (c: any) => !c.name.startsWith("value")
+        (c: any) => !c.name.startsWith("value"),
       );
       expect(labelColumns).toHaveLength(1);
       expect(labelColumns[0].name).toBe("job");
@@ -981,11 +978,11 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const labelColumns = result.columns.filter(
-        (c: any) => !c.name.startsWith("value")
+        (c: any) => !c.name.startsWith("value"),
       );
       expect(labelColumns.map((c: any) => c.name)).not.toContain("status");
     });
@@ -1017,7 +1014,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.columns[0].sticky).toBe(true);
@@ -1050,7 +1047,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
@@ -1096,7 +1093,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.rows).toHaveLength(2);
@@ -1129,7 +1126,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -1138,9 +1135,8 @@ describe("TableConverter", () => {
     });
 
     it("should apply value mappings to label columns in all mode", async () => {
-      const { findFirstValidMappedValue } = await import(
-        "../convertDataIntoUnitValue"
-      );
+      const { findFirstValidMappedValue } =
+        await import("../convertDataIntoUnitValue");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -1171,7 +1167,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const envColumn = result.columns.find((c: any) => c.name === "env");
@@ -1211,7 +1207,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const jobColumn = result.columns.find((c: any) => c.name === "job");
@@ -1250,7 +1246,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -1295,7 +1291,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const valueColumn = result.columns.find((c: any) => c.name === "value");
@@ -1329,7 +1325,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.rows).toHaveLength(1);
@@ -1360,7 +1356,7 @@ describe("TableConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series).toEqual([]);

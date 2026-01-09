@@ -496,4 +496,153 @@ describe("VideoPlayer Component", () => {
       expect(formatted).toBe("01:05");
     });
   });
+
+  describe("Frustration Signals - Timeline Markers", () => {
+    const mockEventsWithFrustrations = [
+      {
+        id: "1",
+        type: "action",
+        name: "click on Submit",
+        relativeTime: 45000,
+        frustration_types: ["rage_click"],
+      },
+      {
+        id: "2",
+        type: "error",
+        name: "TypeError",
+        relativeTime: 60000,
+        frustration_types: null,
+      },
+      {
+        id: "3",
+        type: "action",
+        name: "click on Nav",
+        relativeTime: 90000,
+        frustration_types: ["dead_click", "error_click"],
+      },
+    ];
+
+    beforeEach(async () => {
+      wrapper = mount(VideoPlayer, {
+        attachTo: "#app",
+        props: {
+          events: mockEventsWithFrustrations,
+          segments: [],
+          isLoading: false,
+        },
+        global: {
+          plugins: [i18n],
+          mocks: {
+            $store: store,
+          },
+        },
+      });
+      await flushPromises();
+    });
+
+    it("should have getEventMarkerClass method", () => {
+      expect(typeof wrapper.vm.getEventMarkerClass).toBe("function");
+    });
+
+    it("should return frustration class for events with frustrations", () => {
+      const frustratedEvent = mockEventsWithFrustrations[0];
+      const markerClass = wrapper.vm.getEventMarkerClass(frustratedEvent);
+      expect(markerClass).toBe("bg-frustration-marker");
+    });
+
+    it("should return error class for error events without frustrations", () => {
+      const errorEvent = mockEventsWithFrustrations[1];
+      const markerClass = wrapper.vm.getEventMarkerClass(errorEvent);
+      expect(markerClass).toBe("bg-red-5");
+    });
+
+    it("should return default class for normal events", () => {
+      const normalEvent = {
+        id: "4",
+        type: "view",
+        name: "Page load",
+        relativeTime: 0,
+        frustration_types: null,
+      };
+      const markerClass = wrapper.vm.getEventMarkerClass(normalEvent);
+      expect(markerClass).toBe("bg-secondary");
+    });
+
+    it("should have getEventTooltip method", () => {
+      expect(typeof wrapper.vm.getEventTooltip).toBe("function");
+    });
+
+    it("should format tooltip with frustration types", () => {
+      const frustratedEvent = mockEventsWithFrustrations[0];
+      const tooltip = wrapper.vm.getEventTooltip(frustratedEvent);
+      expect(tooltip).toContain("⚠️ FRUSTRATION:");
+      expect(tooltip).toContain("Rage Click");
+      expect(tooltip).toContain(frustratedEvent.name);
+    });
+
+    it("should format tooltip with multiple frustration types", () => {
+      const multiTypeFrustration = mockEventsWithFrustrations[2];
+      const tooltip = wrapper.vm.getEventTooltip(multiTypeFrustration);
+      expect(tooltip).toContain("⚠️ FRUSTRATION:");
+      expect(tooltip).toContain("Dead Click");
+      expect(tooltip).toContain("Error Click");
+    });
+
+    it("should return simple tooltip for non-frustrated events", () => {
+      const normalEvent = mockEventsWithFrustrations[1];
+      const tooltip = wrapper.vm.getEventTooltip(normalEvent);
+      expect(tooltip).not.toContain("⚠️ FRUSTRATION:");
+      expect(tooltip).toBe(normalEvent.name);
+    });
+
+    it("should truncate long event names in tooltip", () => {
+      const longNameEvent = {
+        id: "5",
+        type: "action",
+        name: "a".repeat(150), // Very long name
+        relativeTime: 100000,
+        frustration_types: null,
+      };
+      const tooltip = wrapper.vm.getEventTooltip(longNameEvent);
+      expect(tooltip.length).toBeLessThanOrEqual(104); // 100 chars + "..."
+      expect(tooltip).toContain("...");
+    });
+
+    it("should properly capitalize frustration type labels", () => {
+      const rageClickEvent = {
+        id: "6",
+        type: "action",
+        name: "click",
+        relativeTime: 50000,
+        frustration_types: ["rage_click"],
+      };
+      const tooltip = wrapper.vm.getEventTooltip(rageClickEvent);
+      expect(tooltip).toContain("Rage Click");
+      expect(tooltip).not.toContain("rage_click");
+    });
+
+    it("should handle empty frustration_types array", () => {
+      const emptyFrustrationEvent = {
+        id: "7",
+        type: "action",
+        name: "click",
+        relativeTime: 70000,
+        frustration_types: [],
+      };
+      const markerClass = wrapper.vm.getEventMarkerClass(emptyFrustrationEvent);
+      expect(markerClass).toBe("bg-secondary");
+    });
+
+    it("should prioritize frustration marker over error marker", () => {
+      const frustratedErrorEvent = {
+        id: "8",
+        type: "error",
+        name: "Error with frustration",
+        relativeTime: 80000,
+        frustration_types: ["error_click"],
+      };
+      const markerClass = wrapper.vm.getEventMarkerClass(frustratedErrorEvent);
+      expect(markerClass).toBe("bg-frustration-marker");
+    });
+  });
 });

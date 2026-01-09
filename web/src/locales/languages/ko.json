@@ -105,7 +105,9 @@
     "lightMode": "라이트 모드",
     "darkMode": "다크 모드",
     "manageTheme": "테마 관리",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
+    "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요."
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -368,7 +370,8 @@
     "sizekb": "크기 (킬로바이트)",
     "viewURL": "URL 보기",
     "events": "이벤트",
-    "location": "위치"
+    "location": "위치",
+    "frustrationCount": "좌절"
   },
   "about": {
     "name": "오픈 옵저브",
@@ -1826,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "로고 텍스트가 성공적으로 업데이트되었습니다.",
     "errorUpdatingImage": "이미지를 업데이트하는 중 오류가 발생했습니다.",
     "fileFormatConstraint": "(.png, .jpg, .jpeg, .gif, .bmp 형식 및 최대 크기: 150x30픽셀만 해당)",
-    "filesValidationFailed": "{count} 파일이 검증 제약 조건을 통과하지 못했습니다."
+    "filesValidationFailed": "{count} 파일이 검증 제약 조건을 통과하지 못했습니다.",
+    "maxSeriesPerQueryLabel": "쿼리당 최대 시리즈 수",
+    "maxSeriesPerQueryDescription": "단일 PromQL 쿼리에서 반환할 수 있는 최대 시리즈 수입니다.결과 집합이 클 때 UI가 멈추는 것을 방지하는 데 도움이 됩니다.시스템 기본값 (40,000) 을 사용하려면 비워 두십시오.",
+    "maxSeriesPerQueryTooltip": "'count (metric) by (label) '와 같은 PromQL 쿼리가 너무 많은 시리즈를 반환하면 UI가 정지될 수 있습니다.이 제한은 이러한 문제를 방지합니다.시스템 기본값인 경우 null로 설정하거나 1,000에서 1,000,000 사이의 값을 지정하십시오.",
+    "maxSeriesPerQueryValidation": "값은 1,000에서 1,000,000 사이여야 하며 기본값은 비워 두어야 합니다.",
+    "systemDefault": "시스템 기본값"
   },
   "iam": {
     "users": "유저",

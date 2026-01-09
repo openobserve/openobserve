@@ -138,6 +138,7 @@ export class LogsPage {
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
+        this.shareLinkTooltip = '[role="tooltip"], .q-tooltip';
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
@@ -146,6 +147,19 @@ export class LogsPage {
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
         this.expandOnFocusClass = '.expand-on-focus';
+
+        // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
+        this.logDetailDialogBox = '[data-test="dialog-box"]';
+        this.logDetailTitleText = '[data-test="log-detail-title-text"]';
+        this.logDetailJsonTab = '[data-test="log-detail-json-tab"]';
+        this.logDetailTableTab = '[data-test="log-detail-table-tab"]';
+        this.logDetailJsonContent = '[data-test="log-detail-json-content"]';
+        this.logDetailTableContent = '[data-test="log-detail-table-content"]';
+        this.logDetailTabContainer = '[data-test="log-detail-tab-container"]';
+        this.logDetailCloseButton = '[data-test="close-dialog"]';
+        this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
+        this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -1848,6 +1862,147 @@ export class LogsPage {
 
     async clickCloseDialog() {
         return await this.page.locator(this.closeDialog).click();
+    }
+
+    // ===== LOG DETAIL SIDEBAR METHODS (Bug #9724) =====
+    /**
+     * Opens the log detail sidebar by clicking on a log row
+     * @returns {Promise<void>}
+     */
+    async openLogDetailSidebar() {
+        await this.page.locator(this.logTableColumnSource).click();
+        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Log detail sidebar opened');
+    }
+
+    /**
+     * Verifies the log detail sidebar is visible
+     * @returns {Promise<void>}
+     */
+    async expectLogDetailSidebarVisible() {
+        await expect(this.page.locator(this.logDetailDialogBox)).toBeVisible();
+    }
+
+    /**
+     * Verifies the log detail sidebar is NOT visible
+     * @returns {Promise<void>}
+     */
+    async expectLogDetailSidebarNotVisible() {
+        await expect(this.page.locator(this.logDetailDialogBox)).not.toBeVisible();
+    }
+
+    /**
+     * Verifies that the JSON tab is selected by default (Bug #9724)
+     * Checks that JSON tab is visible AND JSON content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyJsonTabSelectedByDefault() {
+        // Verify JSON tab exists
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        await expect(jsonTab).toBeVisible();
+
+        // Check if JSON tab is selected (has 'q-tab--active' class)
+        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
+
+        // Verify JSON content is visible
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected by default (Bug #9724 verified)');
+    }
+
+    /**
+     * Verifies both JSON and Table tabs are visible in the sidebar
+     * @returns {Promise<void>}
+     */
+    async verifyLogDetailTabsVisible() {
+        await expect(this.page.locator(this.logDetailJsonTab)).toBeVisible();
+        await expect(this.page.locator(this.logDetailTableTab)).toBeVisible();
+        testLogger.info('✓ Both JSON and Table tabs are visible');
+    }
+
+    /**
+     * Clicks on the Table tab in the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async clickLogDetailTableTab() {
+        await this.page.locator(this.logDetailTableTab).click();
+        // Wait for table content to be visible
+        await this.page.locator(this.logDetailTableContent).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info('Clicked Table tab');
+    }
+
+    /**
+     * Clicks on the JSON tab in the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async clickLogDetailJsonTab() {
+        await this.page.locator(this.logDetailJsonTab).click();
+        // Wait for JSON content to be visible
+        await this.page.locator(this.logDetailJsonContent).waitFor({ state: 'visible', timeout: 5000 });
+        testLogger.info('Clicked JSON tab');
+    }
+
+    /**
+     * Verifies the Table tab is selected and table content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyTableTabSelected() {
+        const tableTab = this.page.locator(this.logDetailTableTab);
+        const isTableTabActive = await tableTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isTableTabActive, 'Table tab should be selected').toBe(true);
+        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
+        testLogger.info('✓ Table tab is selected and content is visible');
+    }
+
+    /**
+     * Verifies the JSON tab is selected and JSON content is visible
+     * @returns {Promise<void>}
+     */
+    async verifyJsonTabSelected() {
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        const isJsonTabActive = await jsonTab.evaluate(el => el.classList.contains('q-tab--active'));
+        expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected and content is visible');
+    }
+
+    /**
+     * Closes the log detail sidebar
+     * @returns {Promise<void>}
+     */
+    async closeLogDetailSidebar() {
+        await this.page.locator(this.logDetailCloseButton).click();
+        // Wait for sidebar to close
+        await this.page.locator(this.logDetailDialogBox).waitFor({ state: 'hidden', timeout: 5000 });
+        testLogger.info('Log detail sidebar closed');
+    }
+
+    /**
+     * Verifies the wrap toggle is visible when Table tab is selected
+     * @returns {Promise<void>}
+     */
+    async verifyWrapToggleVisibleInTableTab() {
+        await expect(this.page.locator(this.logDetailWrapToggle)).toBeVisible();
+        testLogger.info('✓ Wrap toggle is visible in Table tab');
+    }
+
+    /**
+     * Verifies the wrap toggle is NOT visible when JSON tab is selected
+     * @returns {Promise<void>}
+     */
+    async verifyWrapToggleNotVisibleInJsonTab() {
+        await expect(this.page.locator(this.logDetailWrapToggle)).not.toBeVisible();
+        testLogger.info('✓ Wrap toggle is not visible in JSON tab');
+    }
+
+    /**
+     * Verifies navigation buttons (Previous/Next) are visible in the sidebar
+     * @returns {Promise<void>}
+     */
+    async verifyNavigationButtonsVisible() {
+        await expect(this.page.locator(this.logDetailPreviousBtn)).toBeVisible();
+        await expect(this.page.locator(this.logDetailNextBtn)).toBeVisible();
+        testLogger.info('✓ Previous and Next navigation buttons are visible');
     }
 
     async clickSavedViewDialogSaveContent() {
@@ -3633,6 +3788,55 @@ export class LogsPage {
         expect(result.appeared).toBe(true);
         testLogger.info('Share link triggered notification', { text: result.text });
         return result;
+    }
+
+    /**
+     * Verify the share link button is disabled
+     */
+    async expectShareLinkButtonDisabled() {
+        await expect(this.page.locator(this.shareLinkButton)).toBeDisabled();
+        testLogger.info('Share link button is disabled');
+    }
+
+    /**
+     * Hover over the share link button to show tooltip
+     */
+    async hoverShareLinkButton() {
+        await this.page.locator(this.shareLinkButton).hover();
+        testLogger.info('Hovered over share link button');
+    }
+
+    /**
+     * Get the share link tooltip text
+     * @param {string} hasTextFilter - Optional regex filter for tooltip text
+     * @returns {Promise<string>} The tooltip text
+     */
+    async getShareLinkTooltipText(hasTextFilter = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (hasTextFilter) {
+            tooltip = tooltip.filter({ hasText: hasTextFilter });
+        }
+
+        await tooltip.first().waitFor({ state: 'visible', timeout: 5000 });
+        const text = await tooltip.first().textContent();
+        testLogger.info(`Share link tooltip text: "${text}"`);
+        return text;
+    }
+
+    /**
+     * Verify the share link tooltip is visible with specific text
+     * @param {string|RegExp} expectedText - Expected text or regex pattern
+     */
+    async expectShareLinkTooltipVisible(expectedText = null) {
+        let tooltip = this.page.locator(this.shareLinkTooltip);
+
+        if (expectedText) {
+            tooltip = tooltip.filter({ hasText: expectedText });
+        }
+
+        await expect(tooltip.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Share link tooltip is visible');
     }
 
     /**

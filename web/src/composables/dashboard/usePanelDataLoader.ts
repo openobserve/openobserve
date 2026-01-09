@@ -79,9 +79,9 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
 ) => {
   const log = (...args: any[]) => {
-    // if (true) {
-    //   console.log(panelSchema?.value?.title + ": ", ...args);
-    // }
+    if (false) {
+      console.log(panelSchema?.value?.title + ": ", ...args);
+    }
   };
   let runCount = 0;
 
@@ -274,25 +274,30 @@ export const usePanelDataLoader = (
   const waitForTheVariablesToLoad = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
       log("waitForTheVariablesToLoad: entering...");
-      // Immediately resolve if variables are already loaded
+
+      // PROGRESSIVE LOADING: Check if PANEL-SPECIFIC variables are ready
+      // This allows panels to load as soon as THEIR dependencies are ready
+      // instead of waiting for ALL dashboard variables to finish loading
       if (ifPanelVariablesCompletedLoading()) {
-        log("waitForTheVariablesToLoad: variables are already loaded");
+        log("waitForTheVariablesToLoad: panel variables are already loaded");
         resolve();
         return;
       }
 
-      // Watch for changes in isVisible
+      // Watch for changes in variables data
       const stopWatching = watch(
-        () => variablesData.value?.values,
+        () => variablesData.value,
         () => {
+          // Check if panel-specific variables are ready
           if (ifPanelVariablesCompletedLoading()) {
             log(
-              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+              "waitForTheVariablesToLoad: panel variables are loaded (inside watch)",
             );
             resolve();
-            stopWatching(); // Stop watching once isVisible is true
+            stopWatching(); // Stop watching once panel variables are ready
           }
         },
+        { deep: true }, // Watch nested properties
       );
 
       // Listen to the abort signal
@@ -756,6 +761,12 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    log(
+      "[usePanelDataLoader] " +
+        panelSchema?.value?.title +
+        ": loadData() PROCEEDING",
+    );
+
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
     if (runCount > 0 && !state.isOperationCancelled) {
       state.isPartialData = false;
@@ -973,6 +984,11 @@ export const usePanelDataLoader = (
               }
 
               const handlePromQLResponse = (data: any, res: any) => {
+                if (res.type === "event_progress") {
+                  state.loadingProgressPercentage = res?.content?.percent ?? 0;
+                  state.isPartialData = true;
+                  saveCurrentStateToCache();
+                }
                 if (res?.type === "promql_response") {
                   // Backend sends: { content: { results: { result_type/resultType, result }, trace_id } }
                   // result is the actual PromQL data (vector/matrix with values)
@@ -2004,13 +2020,34 @@ export const usePanelDataLoader = (
 
   const areDependentVariablesStillLoadingWith = (
     newDependentVariablesData: any,
-  ) =>
-    newDependentVariablesData?.some(
-      (it: any) =>
-        (it.value == null ||
-          (Array.isArray(it.value) && it.value.length === 0)) &&
-        (it.isLoading || it.isVariableLoadingPending),
-    );
+  ) => {
+    const result = newDependentVariablesData?.some((it: any) => {
+      const hasNullValue = it.value == null;
+      const hasEmptyArray = Array.isArray(it.value) && it.value.length === 0;
+
+      // CRITICAL FIX: Only block if variable has NEVER been loaded (isVariablePartialLoaded=false)
+      // If isVariablePartialLoaded=true but value=null, that's VALID (query returned no results)
+      // Don't check isLoading or isVariableLoadingPending - those flags can be stale in committed state
+      const hasNeverBeenLoaded = !it.isVariablePartialLoaded;
+
+      // Block only if: (null/empty value) AND (never been loaded)
+      const shouldBlock = (hasNullValue || hasEmptyArray) && hasNeverBeenLoaded;
+
+      log(`[areDependentVariablesStillLoading] Variable ${it.name}:`, {
+        value: it.value,
+        hasNullValue,
+        hasEmptyArray,
+        isVariablePartialLoaded: it.isVariablePartialLoaded,
+        hasNeverBeenLoaded,
+        shouldBlock,
+      });
+
+      return shouldBlock;
+    });
+
+    log(`[areDependentVariablesStillLoading] Final result: ${result}`);
+    return result;
+  };
 
   const getDependentVariablesData = () =>
     variablesData.value?.values

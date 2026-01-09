@@ -105,7 +105,9 @@
     "lightMode": "Işık Modu",
     "darkMode": "Karanlık Mod",
     "manageTheme": "Tema Yönet",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
+    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -368,7 +370,8 @@
     "sizekb": "Boyut (kb)",
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
-    "location": "Yer"
+    "location": "Yer",
+    "frustrationCount": "Hayal kırıklıkları"
   },
   "about": {
     "name": "Açık Gözlem",
@@ -1826,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Logo metni başarıyla güncellendi.",
     "errorUpdatingImage": "Görüntü güncellenirken hata oluştu.",
     "fileFormatConstraint": "(Sadece.png, .jpg, .jpeg, .gif, .bmp biçimleri ve Maksimum Boyut: 150x30px)",
-    "filesValidationFailed": "{count} dosya (lar) doğrulama kısıtlamalarını geçmedi"
+    "filesValidationFailed": "{count} dosya (lar) doğrulama kısıtlamalarını geçmedi",
+    "maxSeriesPerQueryLabel": "Sorgu Başına Maksimum Seri",
+    "maxSeriesPerQueryDescription": "Tek bir PromQL sorgusundan döndürülebilecek maksimum seri sayısı. Büyük sonuç kümeleriyle kullanıcı arayüzünün donmasını önlemeye yardımcı olur. Sistem varsayılanını kullanmak için boş bırakın (40.000).",
+    "maxSeriesPerQueryTooltip": "'count (metric) by (label) 'gibi bir PromQL sorgusu çok fazla seri döndürdüğünde kullanıcı arayüzünü dondurabilir. Bu sınır bunu engeller. Sistem varsayılanı için null değerine ayarlayın veya 1.000 ile 1.000.000 arasında bir değer belirtin.",
+    "maxSeriesPerQueryValidation": "Değer 1.000 ile 1.000.000 arasında olmalı veya varsayılan olarak boş bırakılmalıdır",
+    "systemDefault": "sistem varsayılan"
   },
   "iam": {
     "users": "Kullanıcılar",

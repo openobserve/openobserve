@@ -66,7 +66,7 @@ async-trait.workspace = true
 async-recursion.workspace = true
 async-fs = "2.2"
 async-walkdir.workspace = true
-awc = { version = "3.5", features = ["rustls-0_23"] }
+awc = { version = "3.8", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.9"
@@ -138,6 +138,7 @@ rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
+rquickjs.workspace = true
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
@@ -360,8 +361,12 @@ regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
+    "gzip",
+    "brotli",
+    "deflate",
 ] }
 roaring = "0.11.2"
+rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls-pemfile = "2"
 rustls = { version = "0.23.20", default-features = false, features = [
     "std",

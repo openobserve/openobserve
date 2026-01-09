@@ -20,7 +20,7 @@
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
         {{ t('function.addFunction') }}
       </div>
-      <q-form ref="addFunctionForm" class="o2-input">
+      <q-form ref="addFunctionForm" class="o2-input tw:flex tw:items-center tw:gap-6">
         <div class="tw:flex tw:items-center">
           <q-input
             data-test="add-function-name-input"
@@ -60,9 +60,42 @@
             </q-tooltip>
           </q-icon>
         </div>
+        <!-- Transform Type Radio Buttons -->
+        <div class="tw:flex tw:items-center tw:gap-4">
+          <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
+            <q-radio
+              v-model="selectedTransType"
+              val="0"
+              size="xs"
+              class="tw:mb-0"
+            />
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+          </div>
+          <!-- JavaScript option only shown in _meta organization -->
+          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+            <q-radio
+              v-model="selectedTransType"
+              val="1"
+              size="xs"
+              class="tw:mb-0"
+            />
+            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+          </div>
+          <!-- Info icon with tooltip -->
+          <q-icon
+            name="info_outline"
+            size="xs"
+            class="tw:cursor-pointer"
+          >
+            <q-tooltip class="bg-grey-8">
+              <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+              <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+            </q-tooltip>
+          </q-icon>
+        </div>
       </q-form>
     </div>
-    <div class="add-function-actions flex justify-center">
+    <div class="add-function-actions flex justify-center tw:gap-2">
       <q-btn
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             :ripple="false"
@@ -130,9 +163,9 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 const { t } = useI18n();
 
 const q = useQuasar();
@@ -154,9 +187,17 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  transType: {
+    type: String,
+    default: "0",
+  },
+  transformTypeOptions: {
+    type: Array,
+    default: () => [],
+  },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel", "open:chat", "update:transType"]);
 
 const addFunctionForm = ref(null);
 
@@ -179,6 +220,14 @@ const onUpdate = () => {
 const functionName = computed({
   get: () => props.name,
   set: (value) => emit("update:name", value),
+});
+
+const selectedTransType = computed({
+  get: () => {
+    // Ensure the value is always a string for radio button comparison
+    return String(props.transType || "0");
+  },
+  set: (value) => emit("update:transType", value),
 });
 
 const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))

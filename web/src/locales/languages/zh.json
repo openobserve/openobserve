@@ -105,7 +105,9 @@
     "lightMode": "灯光模式",
     "darkMode": "黑暗模式",
     "manageTheme": "管理主题",
-    "url": "网址"
+    "url": "网址",
+    "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
+    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -368,7 +370,8 @@
     "sizekb": "大小 (kb)",
     "viewURL": "查看网址",
     "events": "事件",
-    "location": "地点"
+    "location": "地点",
+    "frustrationCount": "挫折"
   },
   "about": {
     "name": "OpenObserve",
@@ -1822,7 +1825,12 @@
     "logoTextUpdatedSuccessfully": "徽标文本已成功更新。",
     "errorUpdatingImage": "更新图像时出错。",
     "fileFormatConstraint": "（仅限 .png、.jpg、.jpeg、.gif、.bmp 格式，最大大小：150x30px）",
-    "filesValidationFailed": "{count} 个文件未通过验证限制"
+    "filesValidationFailed": "{count} 个文件未通过验证限制",
+    "maxSeriesPerQueryLabel": "每个查询的最大序列数",
+    "maxSeriesPerQueryDescription": "单个 PromQL 查询可以返回的最大序列数。使用大型结果集有助于防止界面冻结。留空以使用系统默认值 (40,000)。",
+    "maxSeriesPerQueryTooltip": "当像 “按（标签）计数（指标）” 这样的 PromQL 查询返回的序列过多时，它可能会冻结用户界面。这个限制可以防止这种情况。将系统默认值设置为空，或指定一个介于 1,000 和 1,000,000 之间的值。",
+    "maxSeriesPerQueryValidation": "值必须介于 1,000 和 1,000,000 之间，或留空作为默认值",
+    "systemDefault": "系统默认"
   },
   "iam": {
     "users": "用户",

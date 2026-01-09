@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
         <div
@@ -82,7 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
 
@@ -432,6 +436,11 @@ export default defineComponent({
       required: true,
       type: Object,
     },
+    currentVariablesData: {
+      required: false,
+      type: Object,
+      default: null,
+    },
     forceLoad: {
       type: Boolean,
       default: false,
@@ -738,7 +747,6 @@ export default defineComponent({
       // Prepare panel data to pass to alert creation
       const query = panelSchema.value.queries?.[0];
       if (!query) {
-        console.error("No query found in panel");
         return;
       }
 
@@ -968,7 +976,6 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          console.error("error", error);
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1091,11 +1098,23 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
         resizeObserver = new ResizeObserver(() => {
-          handleWindowLayoutChanges();
+          // Debounce the resize handler to prevent "ResizeObserver loop" errors
+          // This error occurs when the callback takes longer than one animation frame
+          if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
+          }
+
+          resizeTimeout = window.setTimeout(() => {
+            // Use requestAnimationFrame to ensure DOM updates happen at the right time
+            requestAnimationFrame(() => {
+              handleWindowLayoutChanges();
+            });
+          }, 100); // 100ms debounce delay
         });
 
         resizeObserver.observe(chartPanelRef.value);
@@ -1106,6 +1125,10 @@ export default defineComponent({
       if (resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver = null;
+      }
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
       }
     });
 
@@ -1493,7 +1516,6 @@ export default defineComponent({
       const streamName = queryDetails?.queries[0]?.fields?.stream;
 
       if (!originalQuery || !streamName) {
-        console.error("Missing query or stream name.");
         return null;
       }
 
@@ -1521,7 +1543,6 @@ export default defineComponent({
       try {
         return parser.astify(originalQuery);
       } catch (error) {
-        console.error("Failed to parse query:", error);
         return null;
       }
     };
@@ -1681,7 +1702,6 @@ export default defineComponent({
         const navigateToLogs = async () => {
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
-            console.error("Panel schema is undefined.");
             return;
           }
 
@@ -1879,7 +1899,6 @@ export default defineComponent({
               });
             }
           } catch (error) {
-            console.error("Failed to navigate to logs:", error);
           }
         };
 
@@ -2008,7 +2027,6 @@ export default defineComponent({
           )?.folderId;
 
           if (!folderId) {
-            console.error(`Folder "${drilldownData.data.folder}" not found`);
             return;
           }
 
@@ -2030,9 +2048,6 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
-            console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
-            );
             return;
           }
 
@@ -2279,7 +2294,6 @@ export default defineComponent({
             showErrorNotification("Browser denied file download...");
           }
         } catch (error) {
-          console.error("Error downloading CSV:", error);
           showErrorNotification("Failed to download data as CSV");
         }
       }
@@ -2339,7 +2353,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error downloading JSON:", error);
         showErrorNotification("Failed to download data as JSON");
       }
     };

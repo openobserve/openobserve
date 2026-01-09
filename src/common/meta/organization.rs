@@ -34,6 +34,30 @@ pub struct Organization {
     pub name: String,
     #[serde(default)]
     pub org_type: String,
+    /// Optional service account email to add to the organization
+    /// When specified, only this service account will be added (not the API caller)
+    #[serde(default)]
+    pub service_account: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct ServiceAccountTokenInfo {
+    pub email: String,
+    /// Token is no longer returned directly for security reasons
+    /// Use the assume_service_account API to obtain temporary session tokens
+    #[serde(skip_serializing)]
+    pub token: String,
+    pub role: String,
+    /// Instructions for obtaining a temporary session token
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationCreationResponse {
+    #[serde(flatten)]
+    pub organization: Organization,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_account: Option<ServiceAccountTokenInfo>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
@@ -303,6 +327,8 @@ pub struct OrganizationSettingPayload {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_series_per_query: Option<usize>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -334,6 +360,8 @@ pub struct OrganizationSetting {
     pub light_mode_theme_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dark_mode_theme_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_series_per_query: Option<usize>,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -364,6 +392,7 @@ impl Default for OrganizationSetting {
             free_trial_expiry: None,
             light_mode_theme_color,
             dark_mode_theme_color,
+            max_series_per_query: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
         }
@@ -603,11 +632,13 @@ mod tests {
             identifier: Default::default(),
             name: "Test Org".to_string(),
             org_type: Default::default(),
+            service_account: None,
         };
 
         assert_eq!(org.identifier, "");
         assert_eq!(org.name, "Test Org");
         assert_eq!(org.org_type, "");
+        assert_eq!(org.service_account, None);
     }
 
     #[test]

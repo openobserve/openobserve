@@ -14,6 +14,7 @@ pub struct Model {
     pub rum_token: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    pub allow_static_token: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

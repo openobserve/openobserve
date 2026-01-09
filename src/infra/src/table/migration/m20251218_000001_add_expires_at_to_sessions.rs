@@ -35,7 +35,8 @@ impl MigrationTrait for Migration {
         // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
         // So we use add_column for MySQL and add_column_if_not_exists for others
         if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-            manager
+            // For MySQL, we need to check if column exists first to make migration idempotent
+            let result = manager
                 .alter_table(
                     Table::alter()
                         .table(Sessions::Table)
@@ -47,7 +48,15 @@ impl MigrationTrait for Migration {
                         )
                         .to_owned(),
                 )
-                .await?;
+                .await;
+
+            // Ignore "Duplicate column" error for idempotency (test retries)
+            if let Err(e) = result {
+                let err_msg = e.to_string();
+                if !err_msg.contains("Duplicate column") {
+                    return Err(e);
+                }
+            }
         } else {
             manager
                 .alter_table(
@@ -65,15 +74,28 @@ impl MigrationTrait for Migration {
         }
 
         // Create index on expires_at for efficient cleanup queries
-        manager
+        // Use if_not_exists for idempotency
+        let result = manager
             .create_index(
                 Index::create()
                     .name("idx_sessions_expires_at")
                     .table(Sessions::Table)
                     .col(Sessions::ExpiresAt)
+                    .if_not_exists()
                     .to_owned(),
             )
-            .await?;
+            .await;
+
+        // Ignore "Duplicate key" or "already exists" errors for idempotency (test retries)
+        if let Err(e) = result {
+            let err_msg = e.to_string();
+            if !err_msg.contains("Duplicate key")
+                && !err_msg.contains("already exists")
+                && !err_msg.contains("duplicate key value")
+            {
+                return Err(e);
+            }
+        }
 
         Ok(())
     }

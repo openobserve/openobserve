@@ -44,7 +44,7 @@ pub struct Transform {
     #[serde(default)]
     pub num_args: u8,
     #[serde(default = "default_trans_type")]
-    pub trans_type: Option<u8>, // 0=vrl 1=lua
+    pub trans_type: Option<u8>, // 0=vrl 1=js
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streams: Option<Vec<StreamOrder>>,
@@ -54,6 +54,11 @@ impl Transform {
     pub fn is_vrl(&self) -> bool {
         self.trans_type == Some(0)
     }
+
+    pub fn is_js(&self) -> bool {
+        self.trans_type == Some(1)
+    }
+
     pub fn is_result_array_vrl(&self) -> bool {
         self.is_vrl()
             && RESULT_ARRAY.is_match(&self.function)
@@ -62,12 +67,17 @@ impl Transform {
     pub fn is_result_array_skip_vrl(&self) -> bool {
         self.is_vrl() && RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
     }
+    pub fn is_result_array_js(&self) -> bool {
+        self.is_js() && RESULT_ARRAY.is_match(&self.function)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct TestVRLRequest {
-    pub function: String,         // VRL function as a string
+    pub function: String,         // Transform function as a string (VRL or JS)
     pub events: Vec<json::Value>, // List of events (JSON objects)
+    #[serde(default)]
+    pub trans_type: Option<u8>, // Optional: 0=vrl, 1=js. Auto-detected if not provided
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -156,9 +166,9 @@ mod tests {
     #[test]
     fn test_functions() {
         let trans = Transform {
-            function: "function jsconcat(a,b){return a+b}".to_string(),
+            function: "row.concatenated = row.a + row.b;".to_string(),
             name: "jsconcat".to_string(),
-            trans_type: Some(1),
+            trans_type: Some(1), // JS function
             params: "row".to_string(),
             num_args: 1,
             streams: Some(vec![StreamOrder {
@@ -171,9 +181,9 @@ mod tests {
         };
 
         let mod_trans = Transform {
-            function: "function jsconcat(a,b){return a+b}".to_string(),
+            function: "row.concatenated = row.a + row.b;".to_string(),
             name: "jsconcat".to_string(),
-            trans_type: Some(1),
+            trans_type: Some(1), // JS function
             params: "row".to_string(),
             num_args: 1,
             streams: None,
@@ -217,15 +227,15 @@ mod tests {
         };
         assert!(vrl_trans.is_vrl());
 
-        let lua_trans = Transform {
+        let js_trans = Transform {
             function: "function test() end".to_string(),
             name: "test".to_string(),
             params: "row".to_string(),
             num_args: 1,
-            trans_type: Some(1), // Lua
+            trans_type: Some(1), // JavaScript
             streams: None,
         };
-        assert!(!lua_trans.is_vrl());
+        assert!(!js_trans.is_vrl());
     }
 
     #[test]

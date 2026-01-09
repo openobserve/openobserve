@@ -105,7 +105,9 @@
     "lightMode": "Lichtmodus",
     "darkMode": "Donkere modus",
     "manageTheme": "Thema beheren",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
+    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -368,7 +370,8 @@
     "sizekb": "Grootte (kb)",
     "viewURL": "URL bekijken",
     "events": "Evenementen",
-    "location": "Locatie"
+    "location": "Locatie",
+    "frustrationCount": "Frustraties"
   },
   "about": {
     "name": "OpenObserve",
@@ -1826,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Logotekst succesvol bijgewerkt.",
     "errorUpdatingImage": "Fout tijdens het updaten van de afbeelding.",
     "fileFormatConstraint": "(Alleen .png-, .jpg-, .jpeg-, .gif-, .bmp-formaten en maximale grootte: 150x30px)",
-    "filesValidationFailed": "{count} bestand (en) hebben de validatiebeperkingen niet doorstaan"
+    "filesValidationFailed": "{count} bestand (en) hebben de validatiebeperkingen niet doorstaan",
+    "maxSeriesPerQueryLabel": "Max. aantal reeksen per zoekopdracht",
+    "maxSeriesPerQueryDescription": "Maximaal aantal series dat kan worden geretourneerd uit een enkele ProMQL-query. Helpt bij grote resultatensets te voorkomen dat de gebruikersinterface vastloopt. Laat dit veld leeg om de systeemstandaard te gebruiken (40.000).",
+    "maxSeriesPerQueryTooltip": "Wanneer een ProMQL-query zoals 'count (metric) by (label) 'te veel reeksen retourneert, kan de gebruikersinterface vastlopen. Deze limiet voorkomt dat. Stel de waarde in op null voor de systeemstandaard, of geef een waarde op tussen 1.000 en 1.000.000.",
+    "maxSeriesPerQueryValidation": "De waarde moet tussen 1.000 en 1.000.000 liggen, of als standaardwaarde leeg laten",
+    "systemDefault": "standaardinstelling van het systeem"
   },
   "iam": {
     "users": "Gebruikers",

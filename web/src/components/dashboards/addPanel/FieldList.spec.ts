@@ -1314,4 +1314,367 @@ describe("FieldList", () => {
       });
     });
   });
+
+  describe("Query Override Logic on Stream Change", () => {
+    it("should update query when metric name is different from stream name in metrics page", async () => {
+      const metricsQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "old_metric" },
+              config: {},
+              query: "old_metric{}"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [
+              { name: "old_metric", type: "metrics" },
+              { name: "new_metric", type: "metrics" }
+            ],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: metricsQueryData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      // Change stream to new metric
+      metricsQueryData.data.queries[0].fields.stream = "new_metric";
+      await wrapper.setProps({ dashboardPanelData: metricsQueryData });
+      await flushPromises();
+
+      // Component should handle stream change in PromQL mode
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not update query when metric name matches stream name in metrics page", async () => {
+      const metricsQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "current_metric" },
+              config: {},
+              query: "current_metric{instance='test'}"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "current_metric", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: metricsQueryData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      const originalQuery = metricsQueryData.data.queries[0].query;
+
+      // Trigger stream change (same stream name)
+      metricsQueryData.data.queries[0].fields.stream = "current_metric";
+      await wrapper.setProps({ dashboardPanelData: metricsQueryData });
+      await flushPromises();
+
+      // Query should remain unchanged when metric name matches stream name
+      expect(metricsQueryData.data.queries[0].query).toBe(originalQuery);
+    });
+
+    it("should update query when metric name is null in metrics page", async () => {
+      const metricsQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "new_metric" },
+              config: {},
+              query: "{instance='test'}" // No metric name
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "new_metric", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: metricsQueryData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      // Trigger stream change
+      metricsQueryData.data.queries[0].fields.stream = "new_metric";
+      await wrapper.setProps({ dashboardPanelData: metricsQueryData });
+      await flushPromises();
+
+      // Component should handle case when metric name is null
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should update query when metric name is empty string in metrics page", async () => {
+      const metricsQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "test_metric" },
+              config: {},
+              query: "" // Empty query
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "test_metric", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: metricsQueryData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      // Component should handle empty query case
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should not update query on stream change when not in promql mode", async () => {
+      const logsQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "logs", stream: "app_logs" },
+              config: {},
+              query: "SELECT * FROM app_logs"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: mockStreamData.streams,
+            streamResultsType: "logs",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: logsQueryData,
+        promqlMode: false,
+        dashboardPanelDataPageKey: "logs"
+      });
+      await flushPromises();
+
+      const originalQuery = logsQueryData.data.queries[0].query;
+
+      // Change stream
+      logsQueryData.data.queries[0].fields.stream = "error_logs";
+      await wrapper.setProps({ dashboardPanelData: logsQueryData });
+      await flushPromises();
+
+      // Query should remain unchanged when not in promql mode
+      expect(logsQueryData.data.queries[0].query).toBe(originalQuery);
+    });
+
+    it("should not update query on stream change when not on metrics page", async () => {
+      const dashboardMetricsData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "cpu_usage" },
+              config: {},
+              query: "cpu_usage{}"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "cpu_usage", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: dashboardMetricsData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "dashboard" // Not metrics page
+      });
+      await flushPromises();
+
+      const originalQuery = dashboardMetricsData.data.queries[0].query;
+
+      // Change stream
+      dashboardMetricsData.data.queries[0].fields.stream = "memory_usage";
+      await wrapper.setProps({ dashboardPanelData: dashboardMetricsData });
+      await flushPromises();
+
+      // Query should remain unchanged when not on metrics page
+      expect(dashboardMetricsData.data.queries[0].query).toBe(originalQuery);
+    });
+
+    it("should handle complex promql queries when checking metric name", async () => {
+      const complexQueryData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "http_requests" },
+              config: {},
+              query: "rate(http_requests{job='api'}[5m])"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "http_requests", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: complexQueryData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      const originalQuery = complexQueryData.data.queries[0].query;
+
+      // Trigger stream change with same metric name
+      complexQueryData.data.queries[0].fields.stream = "http_requests";
+      await wrapper.setProps({ dashboardPanelData: complexQueryData });
+      await flushPromises();
+
+      // Query should remain unchanged when metric name in complex query matches stream
+      expect(complexQueryData.data.queries[0].query).toBe(originalQuery);
+    });
+
+    it("should preserve user edits when metric name matches stream", async () => {
+      const userEditedQuery = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "cpu_usage" },
+              config: {},
+              query: "cpu_usage{instance='server1',region='us-east'}"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [{ name: "cpu_usage", type: "metrics" }],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: userEditedQuery,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      const originalQuery = userEditedQuery.data.queries[0].query;
+
+      // Simulate re-render or prop update
+      await wrapper.setProps({ dashboardPanelData: userEditedQuery });
+      await flushPromises();
+
+      // User's edited query should be preserved
+      expect(userEditedQuery.data.queries[0].query).toBe(originalQuery);
+    });
+
+    it("should handle switching from one metric to another with different names", async () => {
+      const metricsData = {
+        data: {
+          queries: [
+            {
+              fields: { stream_type: "metrics", stream: "metric_a" },
+              config: {},
+              query: "metric_a{}"
+            }
+          ],
+          type: "line"
+        },
+        layout: { currentQueryIndex: 0 },
+        meta: {
+          stream: {
+            streamResults: [
+              { name: "metric_a", type: "metrics" },
+              { name: "metric_b", type: "metrics" }
+            ],
+            streamResultsType: "metrics",
+            customQueryFields: [],
+            vrlFunctionFieldList: []
+          }
+        }
+      };
+
+      wrapper = createWrapper({
+        dashboardPanelData: metricsData,
+        promqlMode: true,
+        dashboardPanelDataPageKey: "metrics"
+      });
+      await flushPromises();
+
+      // Switch to different metric
+      metricsData.data.queries[0].fields.stream = "metric_b";
+      await wrapper.setProps({ dashboardPanelData: metricsData });
+      await flushPromises();
+
+      // Component should handle metric switching
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
 });

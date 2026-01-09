@@ -186,8 +186,8 @@ mod tests {
 
     #[test]
     fn test_value_floats() {
-        let float = Value::Float(3.14);
-        let double = Value::Double(3.14159265358979);
+        let float = Value::Float(1.23);
+        let double = Value::Double(1.23459265358979);
 
         assert!(matches!(float, Value::Float(_)));
         assert!(matches!(double, Value::Double(_)));

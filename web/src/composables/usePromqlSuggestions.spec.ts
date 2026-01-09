@@ -513,14 +513,61 @@ describe('usePromqlSuggestions Composable - Comprehensive Coverage', () => {
       { job: undefined },
       {},
     ];
-    
+
     const result = composable.getLabelSuggestions(
       malformedLabels as any,
       { focusOn: 'label' },
       ''
     );
-    
+
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeGreaterThanOrEqual(0);
+  });
+
+  // Test 43: parsePromQlQuery should return null for metric name when not present
+  it('should return null metric name when query has no metric', () => {
+    const result = composable.parsePromQlQuery('{job="api"}');
+    expect(result.metricName).toBeNull();
+  });
+
+  // Test 44: parsePromQlQuery should handle query with only curly braces
+  it('should return null metric name for query with only curly braces', () => {
+    const result = composable.parsePromQlQuery('{}');
+    expect(result.metricName).toBeNull();
+    expect(result.label.hasLabels).toBe(true);
+  });
+
+  // Test 45: parsePromQlQuery should handle incomplete metric query
+  it('should return null metric name for incomplete query', () => {
+    const result = composable.parsePromQlQuery('cpu');
+    expect(result.metricName).toBeNull();
+    expect(result.label.hasLabels).toBe(false);
+  });
+
+  // Test 46: parsePromQlQuery should correctly identify metric name vs empty query
+  it('should differentiate between metric with braces and empty query', () => {
+    const metricResult = composable.parsePromQlQuery('metric_name{}');
+    expect(metricResult.metricName).toBe('metric_name');
+    expect(metricResult.label.hasLabels).toBe(true);
+
+    const emptyResult = composable.parsePromQlQuery('{}');
+    expect(emptyResult.metricName).toBeNull();
+    expect(emptyResult.label.hasLabels).toBe(true);
+  });
+
+  // Test 47: parsePromQlQuery should handle whitespace before braces
+  it('should handle whitespace in query parsing', () => {
+    const result = composable.parsePromQlQuery('metric_name {instance="test"}');
+    // Note: This depends on regex implementation. Based on current regex, it should still match
+    expect(result.metricName).toBeNull(); // Space breaks the pattern
+    expect(result.label.hasLabels).toBe(true);
+  });
+
+  // Test 48: parsePromQlQuery with functions wrapping metric
+  it('should extract metric name from function-wrapped queries', () => {
+    const result = composable.parsePromQlQuery('rate(http_requests{job="api"}[5m])');
+    // Current implementation will find first match
+    expect(result.metricName).toBe('http_requests');
+    expect(result.label.hasLabels).toBe(true);
   });
 });

@@ -157,6 +157,19 @@ export default class DashboardSetting {
       .click();
   }
 
+  // Navigate to Variables tab after opening settings
+  async goToVariablesTab() {
+    // Wait for settings dialog to be fully visible
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .waitFor({ state: "visible", timeout: 10000 });
+
+    // Click on Variables tab
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .click();
+  }
+
   //Generate unique variable name
   variableName(prefix = "u") {
     return `${prefix}_${Date.now()}`;
@@ -165,9 +178,9 @@ export default class DashboardSetting {
   //variable type: Query Values
   async addVariable(type, variableName, streamType, Stream, field) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -315,9 +328,9 @@ export default class DashboardSetting {
 
   async selectConstantType(type, variableName, value) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -340,9 +353,9 @@ export default class DashboardSetting {
   //select Textbox type
   async selectTextType(type, variableName) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -359,9 +372,9 @@ export default class DashboardSetting {
   //select Custom type
   async selectCustomType(type, variableName, label, value) {
     await this.page
-      .locator('[data-test="dashboard-variable-add-btn"]')
+      .locator('[data-test="dashboard-add-variable-btn"]')
       .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="dashboard-variable-add-btn"]').click();
+    await this.page.locator('[data-test="dashboard-add-variable-btn"]').click();
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .waitFor({ state: "visible" });
@@ -443,9 +456,36 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    await this.page
-      .locator('[data-test="dashboard-settings-close-btn"]')
-      .click();
+    // Use multiple selectors to detect if settings dialog is open
+    const settingsDialog = this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog'));
+    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+
+    // First, check if the dialog exists and is visible
+    const dialogExists = await settingsDialog.isVisible().catch(() => false);
+
+    if (!dialogExists) {
+      // Dialog already closed, nothing to do
+      return;
+    }
+
+    // Dialog is open, try to close it
+    try {
+      // Wait for close button with a short timeout
+      await closeBtn.waitFor({ state: "visible", timeout: 2000 });
+      await closeBtn.click({ timeout: 2000 });
+
+      // Wait for dialog to actually disappear
+      await settingsDialog.waitFor({ state: "hidden", timeout: 5000 });
+    } catch (error) {
+      // If clicking fails, the dialog might have already closed
+      // Verify if dialog is actually closed
+      const stillVisible = await settingsDialog.isVisible().catch(() => false);
+      if (stillVisible) {
+        // Dialog is still open but we couldn't close it - this is a real error
+        throw error;
+      }
+      // Dialog closed on its own - this is fine
+    }
   }
 
   // Update tab name in edit tab options//

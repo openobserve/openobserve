@@ -118,6 +118,7 @@ pub async fn process_token(
             source_orgs.push(UserOrg {
                 role,
                 name: dex_cfg.default_org.clone(),
+                org_name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
@@ -132,7 +133,8 @@ pub async fn process_token(
                 } else {
                     source_orgs.push(UserOrg {
                         role: role_org.role,
-                        name: role_org.org,
+                        name: role_org.org.clone(),
+                        org_name: role_org.org,
                         token: Default::default(),
                         rum_token: Default::default(),
                     });
@@ -576,6 +578,7 @@ async fn map_group_to_custom_role(
                 organizations.push(UserOrg {
                     role: role.clone(),
                     name: org_name.clone(),
+                    org_name: org_name.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 });
@@ -585,6 +588,7 @@ async fn map_group_to_custom_role(
             organizations.push(UserOrg {
                 role: role.clone(),
                 name: dex_cfg.default_org.clone(),
+                org_name: dex_cfg.default_org.clone(),
                 token: Default::default(),
                 rum_token: Default::default(),
             });
@@ -664,6 +668,7 @@ async fn map_group_to_custom_role(
                 let new_org = UserOrg {
                     role: role.clone(),
                     name: org_name.clone(),
+                    org_name: org_name.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 };
@@ -833,6 +838,7 @@ pub async fn check_and_add_to_org(
                 identifier: ider::uuid(),
                 name: DEFAULT_ORG.to_string(),
                 org_type: USER_DEFAULT.to_owned(),
+                service_account: None,
             };
             match db::organization::save_org(&org).await {
                 Ok(_) => {
@@ -973,7 +979,7 @@ async fn process_custom_claim_parsing(
         let function_name = function_name.to_string();
         Box::pin(async move {
             match db::functions::get("_meta", &function_name).await {
-                Ok(func) => Ok(func.function),
+                Ok(func) => Ok(func), // Return full Transform object with trans_type
                 Err(e) => Err(anyhow::anyhow!(
                     "Failed to load function '{}' from _meta org: {}",
                     function_name,
@@ -982,7 +988,11 @@ async fn process_custom_claim_parsing(
             }
         })
             as std::pin::Pin<
-                Box<dyn std::future::Future<Output = Result<String, anyhow::Error>> + Send>,
+                Box<
+                    dyn std::future::Future<
+                            Output = Result<config::meta::function::Transform, anyhow::Error>,
+                        > + Send,
+                >,
             >
     };
 
@@ -1028,6 +1038,22 @@ async fn process_custom_claim_parsing(
         }
     };
 
+    let js_execute_fn = |function_content: &str, claims: Value| -> Result<Value, anyhow::Error> {
+        // Compile the JavaScript function
+        let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
+            .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;
+
+        // Execute JavaScript with claims as input
+        let (result, error) =
+            crate::service::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
+
+        if let Some(err) = error {
+            return Err(anyhow::anyhow!("JavaScript execution failed: {}", err));
+        }
+
+        Ok(result)
+    };
+
     let error_publish_fn =
         |error: o2_enterprise::enterprise::auth::claim_parser::ClaimParserError| {
             Box::pin(async move {
@@ -1064,6 +1090,7 @@ async fn process_custom_claim_parsing(
         function_loader_fn,
         vrl_compile_fn,
         vrl_execute_fn,
+        js_execute_fn,
         error_publish_fn,
     )
     .await
@@ -1090,6 +1117,7 @@ async fn process_custom_claim_parsing(
                 source_orgs.push(UserOrg {
                     role: UserRole::from_str(&dex_cfg.default_role).unwrap(),
                     name: assignment.org.clone(),
+                    org_name: assignment.org.clone(),
                     token: Default::default(),
                     rum_token: Default::default(),
                 });

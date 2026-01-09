@@ -1108,11 +1108,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:mt-1"
                     />
                   </span>
-                  <TenstackTable
+                  <div
+                    v-if="loading && expandState.output && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important"
-                    v-show="
+                    class="flex justify-center items-center"
+                  >
+                    <q-spinner-hourglass color="primary" size="lg" />
+                  </div>
+
+                  <TenstackTable
+                    v-else-if="
                       expandState.output && rows.length > 0 && tab == 'sql'
                     "
+                    style="height: calc(100vh - 190px) !important"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
@@ -1122,13 +1130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @copy="copyLogToClipboard"
                     @sendToAiChat="sendToAiChat"
                   />
-                  <div
-                    v-if="loading"
-                    style="height: calc(100vh - 190px) !important"
-                    class="flex justify-center items-center"
-                  >
-                    <q-spinner-hourglass color="primary" size="lg" />
-                  </div>
 
                   <div
                     v-else-if="
@@ -1164,7 +1165,7 @@ size="md" />
                     </h6>
                   </div>
 
-                  <div v-else-if="tab == 'promql'">
+                  <div v-else-if="tab == 'promql' && expandState.output">
                     <PreviewPromqlQuery
                       ref="previewPromqlQueryRef"
                       :query="query"
@@ -1189,6 +1190,7 @@ size="md" />
                     class="o2-secondary-button tw:h-[36px]"
                     flat
                     no-caps
+                    @mousedown.prevent
                     @click="$emit('delete:node')"
                   >
                     <q-icon name="delete" class="q-mr-xs" />
@@ -1201,6 +1203,7 @@ size="md" />
                     :label="t('alerts.cancel')"
                     flat
                     no-caps
+                    @mousedown.prevent
                     @click="$emit('cancel:form')"
                   />
                   <q-btn
@@ -1210,6 +1213,7 @@ size="md" />
                     "
                     class="no-border q-ml-md o2-primary-button tw:h-[36px]"
                     no-caps
+                    @mousedown.prevent
                     @click.prevent="$emit('submit:form')"
                     :disable="validatingSqlQuery"
                   />
@@ -1414,13 +1418,13 @@ const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
 
-const query = ref(props.sql);
+const tab = ref(props.query_type || "custom");
+
+const query = ref(tab.value === "promql" ? props.promql : props.sql);
 
 const promqlQuery = ref(props.promql);
 
 const delayCondition = ref(props.delay);
-
-const tab = ref(props.query_type || "custom");
 const stream_type = ref(props.streamType || "logs");
 const collapseFields = ref(false);
 
@@ -1498,9 +1502,39 @@ watch(
 watch(
   () => selectedStreamName.value,
   (val) => {
-    searchObj.data.stream.pipelineQueryStream = [val];
+    if (searchObj?.data?.stream) {
+      searchObj.data.stream.pipelineQueryStream = [val];
+    }
   },
 );
+
+// Watch for stream name changes and auto-generate query
+// Fix for issue #9658: Auto-generate SELECT * query when stream changes
+watch(
+  () => selectedStreamName.value,
+  (newStreamName, oldStreamName) => {
+    if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
+      // Stream changed: Generate new SELECT * query for the new stream
+      if (tab.value === "sql") {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql") {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
+      }
+    } else if (!oldStreamName && newStreamName) {
+      // Initial stream selection: Generate default query
+      if (tab.value === "sql" && !query.value.trim()) {
+        query.value = `SELECT * FROM "${newStreamName}"`;
+        updateQueryValue(query.value);
+      } else if (tab.value === "promql" && !query.value.trim()) {
+        query.value = `${newStreamName}{}`;
+        updateQueryValue(query.value);
+      }
+    }
+  }
+);
+
 watch(
   () => triggerData.value.frequency_type,
   (val) => {
@@ -1529,6 +1563,14 @@ onMounted(async () => {
       selectedStreamName.value = parsedQuery?.ast.from[0].table;
 
       getStreamFields();
+    } else if (tab.value === "promql" && query.value != "") {
+      // Extract stream name from PromQL query
+      // PromQL query format: stream_name{} or stream_name{label="value"}
+      const match = query.value.match(/^([a-zA-Z0-9_-]+)/);
+      if (match) {
+        selectedStreamName.value = match[1];
+        getStreamFields();
+      }
     }
   }, 200);
 
@@ -2053,13 +2095,9 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        // Only set default query if query is empty
-        // Don't overwrite user's custom query when they change streams
-        if (tab.value === "sql" && !query.value.trim()) {
-          query.value = `SELECT * FROM "${selectedStreamName.value}"`;
-        } else if (tab.value === "promql" && !query.value.trim()) {
-          query.value = `${selectedStreamName.value}{}`;
-        }
+        // Note: Default query generation removed
+        // Query is now cleared when stream changes (see watch on selectedStreamName)
+        // Initial query generation happens in onMounted
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);
@@ -2175,7 +2213,7 @@ const updateDateChange = (date: any) => {
 
 const runQuery = async () => {
   notificationMsgValue.value = "";
-  //check if datetime is present or not 
+  //check if datetime is present or not
   //else show the error message
   if(!dateTime.value.startTime) {
     notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
@@ -2224,7 +2262,11 @@ const runQuery = async () => {
         loading.value = false;
       });
   } else if (tab.value == "promql") {
-    previewPromqlQueryRef.value.refreshData();
+    // Wait for next tick to ensure PreviewPromqlQuery component is mounted
+    await nextTick();
+    if (previewPromqlQueryRef.value) {
+      previewPromqlQueryRef.value.refreshData();
+    }
   }
 };
 

@@ -40,8 +40,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
                 ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgDetails, OrgRenameBody,
-                OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, THRESHOLD,
+                OrgUser, Organization, OrganizationCreationResponse, OrganizationResponse,
+                PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -481,13 +481,13 @@ async fn create_user_rumtoken(
     tag = "Organizations",
     operation_id = "CreateOrganization",
     summary = "Create new organization",
-    description = "Creates a new organization with the specified configuration and settings. The authenticated user will be automatically added as an owner of the newly created organization and can then invite other users and configure the organization.",
+    description = "Creates a new organization with the specified configuration and settings. The authenticated user will be automatically added as an owner of the newly created organization and can then invite other users and configure the organization. If the creator is a service account, the response will include the service account's token for the newly created organization, enabling automated workflows to immediately access the new organization without additional token retrieval steps.",
     security(
         ("Authorization"= [])
     ),
     request_body(content = inline(Organization), description = "Organization data", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationCreationResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
@@ -503,7 +503,14 @@ async fn create_org(
 
     let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(org)),
+        Ok((created_org, service_account_info)) => {
+            use crate::common::meta::organization::OrganizationCreationResponse;
+            let response = OrganizationCreationResponse {
+                organization: created_org,
+                service_account: service_account_info,
+            };
+            Ok(HttpResponse::Ok().json(response))
+        }
         Err(err) => Ok(HttpResponse::BadRequest()
             .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }

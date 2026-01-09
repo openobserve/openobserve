@@ -724,7 +724,7 @@ import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import type { PromVisualQuery } from "@/components/promql/types";
-import usePromlqSuggestions from "@/composables/usePromqlSuggestions";
+import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -783,7 +783,7 @@ export default defineComponent({
       fetchPromQLLabels
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-    const { parsePromQlQuery } = usePromlqSuggestions();
+    const { parsePromQlQuery } = usePromqlSuggestions();
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
     const initializeTreatAsNonTimestamp = () => {
@@ -1341,7 +1341,6 @@ export default defineComponent({
           const query = promQueryModeller.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
         } catch (error) {
-          console.error("Error generating PromQL query:", error);
         }
       },
       { deep: true }

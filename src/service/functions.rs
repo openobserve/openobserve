@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,20 +54,48 @@ pub enum FunctionDeleteError {
 }
 
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
+    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST,
+            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
+        )));
+    }
+
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST,
             FN_ALREADY_EXIST,
         )))
     } else {
-        if !func.function.ends_with('.') {
+        // Only append "." for VRL functions, not JS
+        if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
-        if func.trans_type.unwrap() == 0
-            && let Err(e) = compile_vrl_function(func.function.as_str(), &org_id)
-        {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+        // Validate function based on type
+        match func.trans_type.unwrap() {
+            0 => {
+                // VRL function
+                if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
+                    return Ok(HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                }
+            }
+            1 => {
+                // JS function
+                if let Err(e) =
+                    crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id)
+                {
+                    return Ok(HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                }
+            }
+            _ => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST,
+                    "Invalid transform type. Use 0 for VRL or 1 for JS.",
+                )));
+            }
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -83,8 +111,50 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     }
 }
 
-#[tracing::instrument(skip(org_id, function))]
+#[tracing::instrument(skip(org_id, function, trans_type))]
 pub async fn test_run_function(
+    org_id: &str,
+    function: String,
+    events: Vec<Value>,
+    trans_type: Option<u8>,
+) -> Result<HttpResponse, anyhow::Error> {
+    // Auto-detect transform type if not provided
+    let trans_type = trans_type
+        .or_else(|| {
+            // Simple heuristic: if function contains VRL-specific syntax, assume VRL
+            // Otherwise, assume JS
+            if function.contains('!')
+                || function.trim().starts_with('.')
+                || function.contains("parse_")
+                || RESULT_ARRAY.is_match(&function)
+            {
+                Some(0) // VRL
+            } else {
+                Some(1) // JS
+            }
+        })
+        .unwrap_or(0); // Default to VRL for backward compatibility
+
+    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
+    if trans_type == 1 && org_id != "_meta" {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST,
+            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
+        )));
+    }
+
+    match trans_type {
+        0 => test_run_vrl_function(org_id, function, events).await,
+        1 => test_run_js_function(org_id, function, events).await,
+        _ => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST,
+            "Invalid transform type. Use 0 for VRL or 1 for JS.",
+        ))),
+    }
+}
+
+#[tracing::instrument(skip(org_id, function))]
+async fn test_run_vrl_function(
     org_id: &str,
     mut function: String,
     events: Vec<Value>,
@@ -187,6 +257,87 @@ pub async fn test_run_function(
     Ok(HttpResponse::Ok().json(results))
 }
 
+#[tracing::instrument(skip(org_id, function))]
+async fn test_run_js_function(
+    org_id: &str,
+    function: String,
+    events: Vec<Value>,
+) -> Result<HttpResponse, anyhow::Error> {
+    // Check if function uses #ResultArray# marker
+    let apply_over_array = RESULT_ARRAY.is_match(&function);
+
+    // Compile the JS function
+    let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
+        Ok(config) => config,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest()
+                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+        }
+    };
+
+    let mut transformed_events = vec![];
+
+    if apply_over_array {
+        // #ResultArray# mode: apply function once over entire array
+        let (ret_val, err) = crate::service::ingestion::apply_js_fn(
+            &js_config,
+            Value::Array(events),
+            org_id,
+            &[String::new()],
+        );
+
+        if let Some(err) = err {
+            transformed_events.push(VRLResult::new(&err, Value::Null));
+        } else if ret_val.is_array() {
+            // Result is an array - flatten each element
+            let result_array = ret_val.as_array().unwrap();
+            for item in result_array {
+                let transform = if item.is_object() {
+                    config::utils::flatten::flatten(item.clone()).unwrap_or("".into())
+                } else {
+                    item.clone()
+                };
+                transformed_events.push(VRLResult::new("", transform));
+            }
+        } else {
+            // Result is not an array - return as single result
+            let transform = if ret_val.is_object() {
+                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
+            } else {
+                ret_val
+            };
+            transformed_events.push(VRLResult::new("", transform));
+        }
+    } else {
+        // Normal mode: apply function to each event
+        for event in events {
+            let (ret_val, err) = crate::service::ingestion::apply_js_fn(
+                &js_config,
+                event.clone(),
+                org_id,
+                &[String::new()],
+            );
+
+            if let Some(err) = err {
+                transformed_events.push(VRLResult::new(&err, event));
+            } else {
+                let transform = if !ret_val.is_null() && ret_val.is_object() {
+                    config::utils::flatten::flatten(ret_val).unwrap_or("".into())
+                } else {
+                    "".into()
+                };
+                transformed_events.push(VRLResult::new("", transform));
+            }
+        }
+    }
+
+    let results = TestVRLResponse {
+        results: transformed_events,
+    };
+
+    Ok(HttpResponse::Ok().json(results))
+}
+
 #[tracing::instrument(skip(func))]
 pub async fn update_function(
     org_id: &str,
@@ -204,15 +355,32 @@ pub async fn update_function(
         return Ok(HttpResponse::Ok().json(func));
     }
 
-    if !func.function.ends_with('.') {
+    // Only append "." for VRL functions, not JS
+    if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
-    if func.trans_type.unwrap() == 0
-        && let Err(e) = compile_vrl_function(&func.function, org_id)
-    {
-        return Ok(
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e))
-        );
+    // Validate function based on type
+    match func.trans_type.unwrap() {
+        0 => {
+            // VRL function
+            if let Err(e) = compile_vrl_function(&func.function, org_id) {
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            }
+        }
+        1 => {
+            // JS function
+            if let Err(e) = crate::service::ingestion::compile_js_function(&func.function, org_id) {
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            }
+        }
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST,
+                "Invalid transform type. Use 0 for VRL or 1 for JS.",
+            )));
+        }
     }
     extract_num_args(&mut func);
 
@@ -342,19 +510,17 @@ async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependen
 }
 
 fn extract_num_args(func: &mut Transform) {
-    if func.trans_type.unwrap() == 1 {
-        let src: String = func.function.to_owned();
-        let start_stream = src.find('(').unwrap();
-        let end_stream = src.find(')').unwrap();
-        let args = &src[start_stream + 1..end_stream].trim();
-        if args.is_empty() {
-            func.num_args = 0;
-        } else {
-            func.num_args = args.split(',').collect::<Vec<&str>>().len() as u8;
-        }
+    // For both VRL (0) and JS (1), extract from params field
+    // JS doesn't use Lua-style function(args) syntax
+    let params = func.params.to_owned();
+    if params.trim().is_empty() {
+        func.num_args = 0;
     } else {
-        let params = func.params.to_owned();
-        func.num_args = params.split(',').collect::<Vec<&str>>().len() as u8;
+        func.num_args = params
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .count() as u8;
     }
 }
 
@@ -371,20 +537,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_functions() {
+        // Test JavaScript function in _meta org (only org where JS is allowed)
         let mut trans = Transform {
-            function: "function(row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
-                .to_owned(),
+            function: "row.square = row.Year * row.Year;".to_owned(),
             name: "dummyfn".to_owned(),
             params: "row".to_owned(),
             streams: None,
             num_args: 0,
-            trans_type: Some(1),
+            trans_type: Some(1), // JS function
         };
 
         let mut vrl_trans = Transform {
             name: "vrl_trans".to_owned(),
             function: ". = parse_aws_vpc_flow_log!(row.message) \n .".to_owned(),
-            trans_type: Some(1),
+            trans_type: Some(0), // VRL function
             params: "row".to_owned(),
             num_args: 0,
             streams: Some(vec![StreamOrder {
@@ -403,13 +569,14 @@ mod tests {
 
         assert_eq!(trans.num_args, 1);
 
-        let res = save_function("nexus".to_string(), trans).await;
+        // Use _meta org for JavaScript function (restriction)
+        let res = save_function("_meta".to_string(), trans).await;
         assert!(res.is_ok());
 
-        let list_resp = list_functions("nexus".to_string(), None).await;
+        let list_resp = list_functions("_meta".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus", "dummyfn").await.is_ok());
+        assert!(delete_function("_meta", "dummyfn").await.is_ok());
     }
 
     #[tokio::test]
@@ -432,7 +599,9 @@ mod tests {
             "original_field": "original_value"
         })];
 
-        let response = test_run_function(org_id, function, events).await.unwrap();
+        let response = test_run_function(org_id, function, events, Some(0))
+            .await
+            .unwrap(); // VRL function
         assert_eq!(response.status(), http::StatusCode::OK);
 
         let body: TestVRLResponse =
@@ -445,5 +614,120 @@ mod tests {
             body.results[0].event,
             json! {{"nested_key":42,"new_field":"new_value"}}
         );
+    }
+
+    #[tokio::test]
+    async fn test_js_function_allowed_in_meta_org() {
+        use serde_json::json;
+
+        let org_id = "_meta";
+        let function = "function transform(row) { row.processed = true; return row; }".to_string();
+        let events = vec![json!({"field": "value"})];
+        let trans_type = Some(1); // JavaScript
+
+        let response = test_run_function(org_id, function, events, trans_type)
+            .await
+            .unwrap();
+
+        // JavaScript functions should be allowed in _meta org
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_js_function_blocked_in_regular_org() {
+        use serde_json::json;
+
+        let org_id = "default";
+        let function = "function transform(row) { row.processed = true; return row; }".to_string();
+        let events = vec![json!({"field": "value"})];
+        let trans_type = Some(1); // JavaScript
+
+        let response = test_run_function(org_id, function, events, trans_type)
+            .await
+            .unwrap();
+
+        // JavaScript functions should be blocked in non-_meta orgs
+        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+
+        // Verify error message
+        let body_bytes = to_bytes(response.into_body()).await.unwrap();
+        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+        assert!(
+            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_save_js_function_allowed_in_meta_org() {
+        let org_id = "_meta";
+        let function = Transform {
+            name: "test_js_fn".to_owned(),
+            function: "function transform(row) { return row; }".to_owned(),
+            params: "row".to_owned(),
+            trans_type: Some(1), // JavaScript
+            num_args: 1,
+            streams: None,
+        };
+
+        let response = save_function(org_id.to_string(), function).await;
+
+        // JavaScript functions should be allowed in _meta org
+        assert!(response.is_ok());
+        let resp = response.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        // Clean up
+        let _ = delete_function(org_id, "test_js_fn").await;
+    }
+
+    #[tokio::test]
+    async fn test_save_js_function_blocked_in_regular_org() {
+        let org_id = "default";
+        let function = Transform {
+            name: "test_js_fn_blocked".to_owned(),
+            function: "function transform(row) { return row; }".to_owned(),
+            params: "row".to_owned(),
+            trans_type: Some(1), // JavaScript
+            num_args: 1,
+            streams: None,
+        };
+
+        let response = save_function(org_id.to_string(), function).await;
+
+        // JavaScript functions should be blocked in non-_meta orgs
+        assert!(response.is_ok());
+        let resp = response.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+
+        // Verify error message
+        let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+        assert!(
+            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_vrl_function_allowed_in_all_orgs() {
+        use serde_json::json;
+
+        // Test VRL in regular org
+        let org_id = "default";
+        let function = ". = {\"processed\": true}".to_string();
+        let events = vec![json!({"field": "value"})];
+        let trans_type = Some(0); // VRL
+
+        let response = test_run_function(org_id, function.clone(), events.clone(), trans_type)
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        // Test VRL in _meta org
+        let meta_response = test_run_function("_meta", function, events, trans_type)
+            .await
+            .unwrap();
+
+        assert_eq!(meta_response.status(), http::StatusCode::OK);
     }
 }

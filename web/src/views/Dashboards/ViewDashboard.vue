@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode q-ml-sm"
-              style="padding-left: 0px; padding-right: 0px;"
+              style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
             <q-btn
@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
         @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
+        @variablesManagerReady="onVariablesManagerReady"
         :initialVariableValues="initialVariableValues"
         :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
@@ -426,6 +427,10 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
+    // Variables manager will be initialized by RenderDashboardCharts
+    // and we'll receive a reference to it via the @variablesManagerReady event
+    const variablesManager = ref(null);
+
     let moment: any = () => {};
 
     const folderNameFromFolderId = computed(() => {
@@ -558,45 +563,35 @@ export default defineComponent({
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
+      // ONLY update the live variables data - DO NOT update URL
+      // URL updates should happen ONLY after commitAll() is called (on refresh button click)
+      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values?.forEach((variable) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
+
+      // NOTE: URL sync has been moved to refreshData() after commitAll()
+      // This ensures URL only reflects COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
       Object.assign(refreshedVariablesData, variablesData);
     };
+
+    // Handler for when variables manager is ready from RenderDashboardCharts
+    const onVariablesManagerReady = (manager: any) => {
+      variablesManager.value = manager;
+    };
+
     const isVariablesChanged = computed(() => {
-      // Convert both objects to a consistent format for comparison
+      // If using variables manager, access hasUncommittedChanges directly from the manager
+      // Explicitly dereference to ensure Vue tracks the dependency
+      const manager = variablesManager.value;
+
+      if (manager && 'hasUncommittedChanges' in manager) {
+        // Access the value (Vue auto-unwraps computed refs in composable returns)
+        const hasChanges = manager.hasUncommittedChanges;
+        return hasChanges;
+      }
+      // Legacy mode: Convert both objects to a consistent format for comparison
       const normalizeVariables = (obj) => {
         const normalized = JSON.parse(JSON.stringify(obj));
         // Sort arrays to ensure consistent ordering
@@ -676,37 +671,35 @@ export default defineComponent({
           return;
         }
       }
-      currentDashboardData.data = await getDashboard(
+      const dashboard = await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default",
       );
 
       if (
-        !currentDashboardData?.data ||
-        typeof currentDashboardData.data !== "object" ||
-        !Object.keys(currentDashboardData.data).length
+        !dashboard ||
+        typeof dashboard !== "object" ||
+        !Object.keys(dashboard).length
       ) {
         goBackToDashboardList();
         return;
       }
 
+      // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
+      currentDashboardData.data = dashboard;
+
       // set selected tab from query params
-      const selectedTab = currentDashboardData?.data?.tabs?.find(
+      const selectedTab = dashboard?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
       );
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
-        : currentDashboardData?.data?.tabs?.[0]?.tabId;
+        : dashboard?.tabs?.[0]?.tabId;
 
       // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
+      if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
         refreshedVariablesData.isVariablesLoading = false;
@@ -822,6 +815,10 @@ export default defineComponent({
     };
 
     const getQueryParamsForDuration = (data: any) => {
+      if (!data) {
+        return {};
+      }
+
       if (data.relativeTimePeriod) {
         return {
           period: data.relativeTimePeriod,
@@ -868,12 +865,17 @@ export default defineComponent({
         const allPanelIds = [];
         currentDashboardData.data.tabs?.forEach((tab: any) => {
           tab.panels?.forEach((panel: any) => {
-            if(panel.id){
+            if (panel.id) {
               allPanelIds.push(panel?.id);
               shouldRefreshWithoutCachePerPanel.value[panel.id] = false;
             }
           });
         });
+
+        // CRITICAL: Commit all live variable changes to committed state
+        // This is the key mechanism that prevents premature API calls
+        // Call commitAllVariables via the RenderDashboardCharts ref
+        renderDashboardChartsRef.value?.commitAllVariables();
 
         // Refresh the dashboard
         dateTimePicker.value.refresh();
@@ -961,23 +963,68 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
+    // Get current variable params from manager (uses new centralized getUrlParams method)
+    const getVariableParamsFromManager = (): Record<string, any> => {
+      if (renderDashboardChartsRef.value?.getUrlParams) {
+        return renderDashboardChartsRef.value.getUrlParams({ useLive: false });
+      }
+      return {};
+    };
+
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate, selectedTabId], () => {
-      generateNewDashboardRunId();
-      router.replace({
-        query: {
-          ...route.query, // used to keep current variables data as is
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: selectedTabId.value,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          print: store.state.printMode,
-          searchtype: route.query.searchtype,
-        },
-      });
-    });
+    // Note: We're removing the variablesManager.committedVariablesData watch
+    // because URL updates should only happen when user clicks refresh (handled in refreshData)
+    // This watch is just for time/tab/refresh interval changes
+    watch(
+      [
+        refreshInterval,
+        selectedDate,
+        selectedTabId,
+      ],
+      () => {
+        generateNewDashboardRunId();
+
+        // Build variable params - prefer manager if available, otherwise use route.query
+        let variableParams: Record<string, any> = {};
+
+        if (variablesManager.value) {
+          // Get from manager
+          variableParams = getVariableParamsFromManager();
+
+          // If manager returns empty but route.query has variables, use route.query
+          // This handles the case where page just loaded and manager hasn't committed yet
+          if (Object.keys(variableParams).length === 0) {
+            Object.keys(route.query).forEach((key) => {
+              if (key.startsWith("var-")) {
+                variableParams[key] = route.query[key];
+              }
+            });
+          }
+        } else {
+          // No manager, use route.query
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              variableParams[key] = route.query[key];
+            }
+          });
+        }
+
+        router.replace({
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: route.query.dashboard,
+            folder: route.query.folder,
+            tab: selectedTabId.value,
+            refresh: generateDurationLabel(refreshInterval.value),
+            ...getQueryParamsForDuration(selectedDate.value),
+            ...variableParams, // Use variables from manager or route
+            print: store.state.printMode,
+            searchtype: route.query.searchtype,
+          },
+        });
+      },
+      { deep: true },
+    );
 
     const onDeletePanel = async (panelId: any) => {
       try {
@@ -1044,6 +1091,8 @@ export default defineComponent({
      * Converts relative time periods to absolute times for sharing
      */
     const dashboardShareURL = computed(() => {
+      // Establish reactive dependency on route.fullPath to recompute when URL changes
+      void route.fullPath;
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
 
@@ -1284,6 +1333,7 @@ export default defineComponent({
       saveJsonDashboard,
       setTimeForVariables,
       runId,
+      onVariablesManagerReady,
     };
   },
 });

@@ -105,7 +105,9 @@
     "lightMode": "Licht-Modus",
     "darkMode": "Dunkler Modus",
     "manageTheme": "Theme verwalten",
-    "url": "URL"
+    "url": "URL",
+    "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
+    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -368,7 +370,8 @@
     "sizekb": "Größe (kb)",
     "viewURL": "URL anzeigen",
     "events": "Ereignisse",
-    "location": "Standort"
+    "location": "Standort",
+    "frustrationCount": "Frustrationen"
   },
   "about": {
     "name": "Observe öffnen",
@@ -1826,7 +1829,12 @@
     "logoTextUpdatedSuccessfully": "Der Logotext wurde erfolgreich aktualisiert.",
     "errorUpdatingImage": "Fehler beim Aktualisieren des Images.",
     "fileFormatConstraint": "(Nur die Formate PNG, JPG, JPEG, GIF, BMP und maximale Größe: 150 x 30 Pixel)",
-    "filesValidationFailed": "{count} Datei (en) hat die Validierungsbeschränkungen nicht bestanden"
+    "filesValidationFailed": "{count} Datei (en) hat die Validierungsbeschränkungen nicht bestanden",
+    "maxSeriesPerQueryLabel": "Max. Serien pro Abfrage",
+    "maxSeriesPerQueryDescription": "Maximale Anzahl von Serien, die von einer einzelnen PromQL-Abfrage zurückgegeben werden können. Hilft, das Einfrieren der Benutzeroberfläche bei großen Ergebnismengen zu verhindern. Lassen Sie das Feld leer, um den Systemstandard (40.000) zu verwenden.",
+    "maxSeriesPerQueryTooltip": "Wenn eine PromQL-Abfrage wie 'count (metric) by (label) 'zu viele Serien zurückgibt, kann sie die Benutzeroberfläche einfrieren. Dieses Limit verhindert das. Legen Sie den Systemstandard auf Null fest, oder geben Sie einen Wert zwischen 1.000 und 1.000.000 an.",
+    "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
+    "systemDefault": "Systemstandard"
   },
   "iam": {
     "users": "Nutzer",

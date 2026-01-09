@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="true"
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
-          @variablesData="variablesDataUpdated"
           searchType="RUM"
+          @variablesManagerReady="onVariablesManagerReady"
         />
       </div>
     </div>
@@ -88,7 +88,8 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  setup(props) {
+  emits: ["variablesManagerReady"],
+  setup(props, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -110,11 +111,9 @@ export default defineComponent({
     const topCount = 10;
     const isLoading: Ref<boolean[]> = ref([]);
 
-    // variables data
-    const variablesDataUpdated = (data: any) => {
-      if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
-
-      variablesData.value = data;
+    // Variables manager event handler - pass through to parent
+    const onVariablesManagerReady = (manager: any) => {
+      emit("variablesManagerReady", manager);
     };
 
     onMounted(async () => {
@@ -309,7 +308,7 @@ export default defineComponent({
       viewOnly,
       eventLog,
       variablesData,
-      variablesDataUpdated,
+      onVariablesManagerReady,
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
