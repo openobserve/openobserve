@@ -157,6 +157,14 @@ pub struct EnrichmentTableUrlRequest {
     /// - Should return CSV content-type (not enforced but recommended)
     /// - File can be any size - streaming handles large files efficiently
     pub url: String,
+
+    /// Replace only the failed job's URL (optional, default: false)
+    ///
+    /// When true, only updates the failed job with the new URL while keeping
+    /// all successful jobs unchanged. Useful for fixing typos or broken URLs
+    /// without re-downloading working data sources.
+    #[serde(default)]
+    pub replace_failed: bool,
 }
 
 /// CreateEnrichmentTableFromUrl
@@ -226,6 +234,9 @@ pub async fn save_enrichment_table_from_url(
         Some(retry_str) => retry_str.parse::<bool>().unwrap_or(false),
         None => false,
     };
+
+    // Extract replace_failed from request body
+    let replace_failed = request_body.replace_failed;
 
     // ===== INPUT VALIDATION =====
     // We validate all inputs before doing any database operations to fail fast
@@ -334,11 +345,12 @@ pub async fn save_enrichment_table_from_url(
         )));
     }
 
-    // RULE 2: Block APPEND if any job has failed
+    // RULE 2: Block APPEND (adding new URL) if any job has failed
     // Reason: Failed jobs indicate data integrity issues; user should resolve them first
-    if append_data && has_failed {
+    // Allow: retry (reload all), replace_failed (fix failed URL), or replace mode (start fresh)
+    if append_data && has_failed && !retry && !replace_failed {
         return Ok(MetaHttpResponse::bad_request(format!(
-            "Cannot append: table {}/{} has failed jobs. Please retry or delete the failed jobs, or use replace mode (append=false) to start fresh.",
+            "Cannot add new URL: table {}/{} has failed jobs. Please reload, replace the failed URL, or use replace mode to start fresh.",
             org_id, table_name
         )));
     }
@@ -416,8 +428,41 @@ pub async fn save_enrichment_table_from_url(
                 job
             })
             .collect()
+    } else if replace_failed {
+        // ===== SCENARIO 3: REPLACE FAILED URL ONLY =====
+        // Replace only the failed job's URL while keeping successful jobs
+        log::info!(
+            "[ENRICHMENT::URL] Replace failed mode: updating failed job URL for {}/{}",
+            org_id,
+            table_name
+        );
+
+        // Find the failed job
+        let failed_job = existing_jobs
+            .iter()
+            .find(|j| j.status == EnrichmentTableStatus::Failed)
+            .cloned();
+
+        if let Some(mut job) = failed_job {
+            // Update the failed job with new URL and reset its state
+            job.url = request_body.url.clone();
+            job.status = EnrichmentTableStatus::Pending;
+            job.last_byte_position = 0;
+            job.total_bytes_fetched = 0;
+            job.total_records_processed = 0;
+            job.retry_count = 0;
+            job.error_message = None;
+            job.updated_at = chrono::Utc::now().timestamp_micros();
+            // Keep append_data as-is to maintain the original job order behavior
+
+            vec![job]
+        } else {
+            return Ok(MetaHttpResponse::bad_request(
+                "No failed job found to replace",
+            ));
+        }
     } else {
-        // ===== SCENARIO 3: UPDATE MODE =====
+        // ===== SCENARIO 4: UPDATE MODE =====
         // Replace all existing jobs with this new URL
         log::info!(
             "[ENRICHMENT::URL] Update mode: replacing all jobs with new URL for {}/{}",

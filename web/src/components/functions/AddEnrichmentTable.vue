@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
                 'tw:bg-blue-50': formData.updateMode === 'reload',
                 'tw:bg-green-50': formData.updateMode === 'append',
+                'tw:bg-yellow-50': formData.updateMode === 'replace_failed',
                 'tw:bg-orange-50': formData.updateMode === 'replace'
               }">
                 <template v-if="formData.updateMode === 'reload'">
@@ -157,14 +158,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ⚠️ <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
                   </div>
                 </template>
+                <template v-else-if="formData.updateMode === 'replace_failed'">
+                  <strong>🔧 Replace Failed URL:</strong> Replace only the failed URL with a new one. All successful URLs and their data will be kept. Use this to fix typos or broken URLs.
+                </template>
                 <template v-else-if="formData.updateMode === 'replace'">
                   <strong>⚠️ Replace Mode:</strong> Delete all existing URLs and data, then use only the new URL you provide below.
                 </template>
               </div>
             </div>
 
-            <!-- URL input field for append or replace mode (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace')" class="col-12">
+            <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
+            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="col-12">
               <q-input
                 v-model="formData.url"
                 :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
@@ -259,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -311,11 +315,28 @@ export default defineComponent({
       { label: t('function.fromUrl'), value: 'url' }
     ];
 
-    const updateModeOptions = [
-      { label: 'Reload existing URLs', value: 'reload' },
-      { label: 'Add new URL', value: 'append' },
-      { label: 'Replace all URLs', value: 'replace' }
-    ];
+    // Computed: Dynamically change options based on failed job status
+    const hasFailedJob = computed(() => {
+      return formData.value.urlJobs?.some((job: any) => job.status === 'failed') || false;
+    });
+
+    const updateModeOptions = computed(() => {
+      if (hasFailedJob.value) {
+        // When there's a failed job, only allow: reload, replace failed, or replace all
+        return [
+          { label: 'Reload existing URLs', value: 'reload' },
+          { label: 'Replace failed URL only', value: 'replace_failed' },
+          { label: 'Replace all URLs', value: 'replace' }
+        ];
+      } else {
+        // Normal mode: reload, append, or replace
+        return [
+          { label: 'Reload existing URLs', value: 'reload' },
+          { label: 'Add new URL', value: 'append' },
+          { label: 'Replace all URLs', value: 'replace' }
+        ];
+      }
+    });
 
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
@@ -330,9 +351,10 @@ export default defineComponent({
 
       // Handle URL-based enrichment table creation
       if (formData.value.source === 'url') {
-        // Determine the append flag and retry flag based on update mode
+        // Determine the flags based on update mode
         let appendFlag = false;
         let retryFlag = false;
+        let replaceFailedFlag = false;
         let urlToSend = formData.value.url;
 
         if (props.isUpdating) {
@@ -342,19 +364,28 @@ export default defineComponent({
             urlToSend = '';
             appendFlag = false;
             retryFlag = true;
+            replaceFailedFlag = false;
           } else if (formData.value.updateMode === 'append') {
             // Append: Add new URL to existing ones
             appendFlag = true;
             retryFlag = false;
+            replaceFailedFlag = false;
+          } else if (formData.value.updateMode === 'replace_failed') {
+            // Replace failed URL only
+            appendFlag = false;
+            retryFlag = false;
+            replaceFailedFlag = true;
           } else if (formData.value.updateMode === 'replace') {
             // Replace: Delete all and use new URL
             appendFlag = false;
             retryFlag = false;
+            replaceFailedFlag = false;
           }
         } else {
           // Create mode: just use the URL as-is
           appendFlag = false;
           retryFlag = false;
+          replaceFailedFlag = false;
         }
 
         jsTransformService
@@ -364,7 +395,8 @@ export default defineComponent({
             urlToSend,
             appendFlag,
             false, // resume
-            retryFlag
+            retryFlag,
+            replaceFailedFlag
           )
           .then(() => {
             formData.value = { ...defaultValue() };
