@@ -657,7 +657,14 @@
     "dataSource": "Source de données",
     "uploadFile": "Télécharger un fichier",
     "fromUrl": "À partir de l'URL",
-    "addFunction": "Ajouter une fonction"
+    "addFunction": "Ajouter une fonction",
+    "javascript": "JavaScript",
+    "transformType": "Type de transformation",
+    "vrlType": "VRL (langage de remappage vectoriel)",
+    "jsType": "JavaScript (ES 2023)",
+    "vrlfunction": "Fonction VRL",
+    "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
+    "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »"
   },
   "confirmDialog": {
     "cancel": "Annuler",
