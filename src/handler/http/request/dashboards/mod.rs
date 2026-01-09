@@ -108,7 +108,7 @@ impl From<DashboardError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new dashboard"}))
+        ("x-o2-mcp" = json!({"description": "Create a new dashboard", "category": "dashboards"}))
     )
 )]
 #[post("/{org_id}/dashboards")]
@@ -155,7 +155,7 @@ pub async fn create_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an existing dashboard"}))
+        ("x-o2-mcp" = json!({"description": "Update an existing dashboard", "category": "dashboards"}))
     )
 )]
 #[put("/{org_id}/dashboards/{dashboard_id}")]
@@ -203,7 +203,7 @@ async fn update_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all dashboards in organization"}))
+        ("x-o2-mcp" = json!({"description": "List all dashboards in organization", "category": "dashboards"}))
     )
 )]
 #[get("/{org_id}/dashboards")]
@@ -244,7 +244,7 @@ async fn list_dashboards(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID", "category": "dashboards"}))
     )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
@@ -278,7 +278,7 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON"}))
+        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON", "category": "dashboards"}))
     )
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}/export")]
@@ -313,7 +313,7 @@ pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Respond
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards"}))
     )
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
@@ -433,7 +433,7 @@ async fn delete_dashboard_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder"}))
+        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder", "category": "dashboards"}))
     )
 )]
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
@@ -482,7 +482,7 @@ async fn move_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder"}))
+        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder", "category": "dashboards"}))
     )
 )]
 #[patch("/{org_id}/dashboards/move")]

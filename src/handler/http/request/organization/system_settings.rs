@@ -50,7 +50,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get resolved system setting"}))
+        ("x-o2-mcp" = json!({"description": "Get resolved system setting", "category": "system"}))
     )
 )]
 #[get("/{org_id}/settings/v2/{key}")]
@@ -89,7 +89,7 @@ async fn get_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List resolved system settings"}))
+        ("x-o2-mcp" = json!({"description": "List resolved system settings", "category": "system"}))
     )
 )]
 #[get("/{org_id}/settings/v2")]
@@ -128,7 +128,7 @@ async fn list_settings(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Set org-level system setting"}))
+        ("x-o2-mcp" = json!({"description": "Set org-level system setting", "category": "system"}))
     )
 )]
 #[post("/{org_id}/settings/v2")]
@@ -175,7 +175,7 @@ async fn set_org_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Set user-level system setting"}))
+        ("x-o2-mcp" = json!({"description": "Set user-level system setting", "category": "system"}))
     )
 )]
 #[post("/{org_id}/settings/v2/user/{user_id}")]
@@ -227,7 +227,7 @@ async fn set_user_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete org system setting"}))
+        ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system"}))
     )
 )]
 #[delete("/{org_id}/settings/v2/{key}")]
@@ -264,7 +264,7 @@ async fn delete_org_setting(path: web::Path<(String, String)>) -> Result<HttpRes
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete user system setting"}))
+        ("x-o2-mcp" = json!({"description": "Delete user system setting", "category": "system"}))
     )
 )]
 #[delete("/{org_id}/settings/v2/user/{user_id}/{key}")]

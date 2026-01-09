@@ -132,7 +132,7 @@ pub async fn remote_write(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Execute PromQL instant query"}))
+        ("x-o2-mcp" = json!({"description": "Execute PromQL instant query", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query")]
@@ -321,7 +321,7 @@ async fn query(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Execute PromQL range query"}))
+        ("x-o2-mcp" = json!({"description": "Execute PromQL range query", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/query_range")]
@@ -670,7 +670,7 @@ async fn query_range(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus metadata"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus metadata", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/metadata")]
@@ -739,7 +739,7 @@ pub async fn metadata(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus series"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/series")]
@@ -912,7 +912,7 @@ async fn series(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus label names"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label names", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/labels")]
@@ -1003,7 +1003,7 @@ async fn labels(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus label values"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label values", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
@@ -1125,7 +1125,7 @@ fn validate_metadata_params(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Format PromQL query"}))
+        ("x-o2-mcp" = json!({"description": "Format PromQL query", "category": "metrics"}))
     )
 )]
 #[get("/{org_id}/prometheus/api/v1/format_query")]
