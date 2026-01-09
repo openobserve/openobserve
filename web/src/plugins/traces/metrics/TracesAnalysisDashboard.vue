@@ -163,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="true"
           :allowAlertCreation="false"
           searchType="dashboards"
-          @variablesData="handleVariablesDataChange"
-          @refreshedVariablesDataUpdated="handleVariablesDataChange"
+          @variablesManagerReady="onVariablesManagerReady"
         />
       </q-card-section>
     </q-card>
@@ -302,6 +301,10 @@ const { t } = useI18n();
 const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
 
+// Variables manager will be initialized by RenderDashboardCharts
+// and we'll receive a reference to it via the @variablesManagerReady event
+const variablesManager = ref(null);
+
 const isOpen = ref(true);
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
@@ -309,14 +312,25 @@ const showDimensionSelector = ref(false);
 const dashboardRenderKey = ref(0); // Only increment on full reload to avoid re-rendering on panel append
 const dimensionSearchText = ref('');
 
-// Percentile change tracking - default to P95
-const initialPercentile = ref<string | null>("0.95");
-const currentPercentile = ref<string | null>("0.95");
+// Percentile change tracking - use variables manager's hasUncommittedChanges
+// This matches the pattern used in ViewDashboard
 const showRefreshButton = computed(() => {
-  return activeAnalysisType.value === 'latency' &&
-         initialPercentile.value !== null &&
-         currentPercentile.value !== null &&
-         initialPercentile.value !== currentPercentile.value;
+  if (activeAnalysisType.value !== 'latency') {
+    return false;
+  }
+
+  // Use variables manager to check for uncommitted changes (same as ViewDashboard)
+  const manager = variablesManager.value;
+  // Use optional chaining for safer property access
+  if (manager?.hasUncommittedChanges !== undefined) {
+    // Access the value if it's a ref, otherwise use directly
+    const hasChanges = typeof manager.hasUncommittedChanges === 'object' && 'value' in manager.hasUncommittedChanges
+      ? manager.hasUncommittedChanges.value
+      : manager.hasUncommittedChanges;
+    return hasChanges;
+  }
+
+  return false;
 });
 
 // Detect custom SQL mode
@@ -473,7 +487,7 @@ const loadAnalysis = async () => {
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
       analysisType: activeAnalysisType.value,
-      percentile: currentPercentile.value || undefined,
+      percentile: getCurrentPercentile() || undefined,
     };
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
@@ -501,28 +515,37 @@ const loadAnalysis = async () => {
   }
 };
 
-const handleVariablesDataChange = (variablesData: any) => {
-  if (activeAnalysisType.value !== 'latency') {
-    return;
-  }
+// Handler for when variables manager is ready from RenderDashboardCharts
+const onVariablesManagerReady = (manager: any) => {
+  variablesManager.value = manager;
 
-  // Extract percentile from the values array
-  const percentileVar = variablesData?.values?.find((v: any) => v.name === 'percentile');
-  const percentileValue = percentileVar?.value;
-
-
-  if (percentileValue !== undefined) {
-    // Set initial percentile on first load
-    if (initialPercentile.value === null) {
-      initialPercentile.value = percentileValue;
-    }
-    currentPercentile.value = percentileValue;
+  // Load analysis immediately when manager is ready to populate dashboard
+  // This ensures the dashboard shows data on initial load instead of remaining blank
+  if (activeAnalysisType.value === 'latency' && !dashboardData.value) {
+    loadAnalysis();
   }
 };
 
+// Helper to get current percentile from variables manager
+const getCurrentPercentile = (): string => {
+  const manager = variablesManager.value;
+  if (manager && manager.committedVariablesData) {
+    // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
+    // Percentile is likely a global variable
+    const percentileVar = manager.committedVariablesData.global?.find((v: any) => v.name === 'percentile');
+    if (percentileVar && percentileVar.value !== undefined) {
+      return percentileVar.value;
+    }
+  }
+  return "0.95"; // Default to P95
+};
+
 const refreshAfterPercentileChange = () => {
-  // Update initial percentile to current to hide refresh button
-  initialPercentile.value = currentPercentile.value;
+  // Commit all variable changes before reloading (same as ViewDashboard's refreshData)
+  if (dashboardChartsRef.value?.commitAllVariables) {
+    dashboardChartsRef.value.commitAllVariables();
+  }
+
   // Reload the analysis with new percentile
   loadAnalysis();
 };
