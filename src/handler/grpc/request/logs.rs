@@ -45,6 +45,12 @@ impl LogsService for LogsServer {
         if org_id.is_none() {
             return Err(Status::invalid_argument(msg));
         }
+
+        // Extract org_id as string, returning error if it can't be converted
+        let org_id_str = org_id
+            .and_then(|id| id.to_str().ok())
+            .ok_or_else(|| Status::invalid_argument("Invalid org_id in metadata"))?;
+
         let stream_name = metadata.get(&cfg.grpc.stream_header_key);
         let in_stream_name: Option<&str> = stream_name.and_then(|s| s.to_str().ok());
 
@@ -53,7 +59,7 @@ impl LogsService for LogsServer {
 
         match crate::service::logs::otlp::handle_request(
             0,
-            org_id.unwrap().to_str().unwrap(),
+            org_id_str,
             in_req,
             in_stream_name,
             user_email,

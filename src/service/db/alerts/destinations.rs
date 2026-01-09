@@ -246,6 +246,10 @@ pub(super) fn parse_event_key<'a>(
 }
 
 /// Validates URL to prevent SSRF attacks
+///
+/// NOTE: This validation occurs at save time. For complete SSRF protection,
+/// additional validation should be performed at request time to prevent
+/// DNS rebinding attacks (where a domain resolves to different IPs over time).
 pub fn validate_url(url_str: &str) -> Result<(), DestinationError> {
     // Parse URL
     let url = url::Url::parse(url_str)
@@ -287,42 +291,66 @@ pub fn validate_url(url_str: &str) -> Result<(), DestinationError> {
 
     // Try to parse as IP address
     if let Ok(ip) = host.parse::<IpAddr>() {
-        // Check for private IP ranges
-        if is_private_ip(&ip) {
+        // Check for restricted IP addresses
+        if is_restricted_ip(&ip) {
             return Err(DestinationError::RestrictedUrl(format!(
-                "Private IP address not allowed: {}",
+                "Restricted IP address not allowed: {}",
                 ip
             )));
+        }
+    } else {
+        // For domain names, perform basic DNS resolution to check if it resolves to a private IP
+        // This helps prevent attackers from using domains that point to internal addresses
+        if let Ok(addrs) = std::net::ToSocketAddrs::to_socket_addrs(&format!("{}:80", host)) {
+            for addr in addrs {
+                let ip = addr.ip();
+                if is_restricted_ip(&ip) {
+                    return Err(DestinationError::RestrictedUrl(format!(
+                        "Domain '{}' resolves to restricted IP address: {}",
+                        host, ip
+                    )));
+                }
+            }
         }
     }
 
     Ok(())
 }
 
-/// Checks if an IP address is private
-fn is_private_ip(ip: &IpAddr) -> bool {
+/// Checks if an IP address is restricted (private, reserved, or special-purpose)
+fn is_restricted_ip(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(ipv4) => {
             let octets = ipv4.octets();
-            // 10.0.0.0/8
-            octets[0] == 10
-            // 172.16.0.0/12
-            || (octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31))
-            // 192.168.0.0/16
-            || (octets[0] == 192 && octets[1] == 168)
-            // 169.254.0.0/16 (link-local)
-            || (octets[0] == 169 && octets[1] == 254)
+            // 0.0.0.0/8 (this network)
+            octets[0] == 0
+            // 10.0.0.0/8 (private)
+            || octets[0] == 10
             // 127.0.0.0/8 (loopback)
             || octets[0] == 127
+            // 169.254.0.0/16 (link-local)
+            || (octets[0] == 169 && octets[1] == 254)
+            // 172.16.0.0/12 (private)
+            || (octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31))
+            // 192.168.0.0/16 (private)
+            || (octets[0] == 192 && octets[1] == 168)
+            // 224.0.0.0/4 (multicast)
+            || (octets[0] >= 224 && octets[0] <= 239)
+            // 240.0.0.0/4 (reserved) and 255.255.255.255 (broadcast)
+            || octets[0] >= 240
         }
         IpAddr::V6(ipv6) => {
             let segments = ipv6.segments();
             // ::1 (loopback)
             ipv6.is_loopback()
+            // :: (unspecified)
+            || ipv6.is_unspecified()
             // fe80::/10 (link-local)
             || (segments[0] & 0xffc0) == 0xfe80
             // fc00::/7 (unique local)
             || (segments[0] & 0xfe00) == 0xfc00
+            // ff00::/8 (multicast)
+            || (segments[0] & 0xff00) == 0xff00
         }
     }
 }
