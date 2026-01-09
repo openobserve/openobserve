@@ -21,15 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body2 tw:mb-4">
         {{ t("settings.correlation.discoveredServicesDescription") }}
       </div>
-      <q-btn
-        data-test="refresh-discovered-services-btn"
-        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        flat
-        :label="t('common.refresh')"
-        @click="loadServices"
-        :loading="loading"
-      />
     </div>
 
     <!-- Loading State -->
@@ -58,6 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
+      <q-btn
+        data-test="refresh-discovered-services-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
+        :label="t('common.refresh')"
+        @click="loadServices"
+        :loading="loading"
+      />
     </div>
 
     <!-- Services List -->
@@ -101,6 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-tooltip>{{ t("settings.correlation.clickToViewSuggestions") }}</q-tooltip>
           </q-btn>
+          <q-btn
+            data-test="refresh-discovered-services-btn"
+            class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            flat
+            :label="t('common.refresh')"
+            @click="loadServices"
+            :loading="loading"
+          />
         </div>
       </div>
 
@@ -324,9 +333,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- View: By Stream -->
       <q-list v-else-if="viewMode === 'stream'" separator class="tw:rounded-lg tw:border">
-        <template v-for="(streamGroup, streamType) in filteredStreamGroups" :key="streamType">
+        <template v-for="(streamType) in ['logs', 'traces', 'metrics']" :key="streamType">
           <q-expansion-item
-            v-if="Object.keys(streamGroup).length > 0"
+            v-if="paginatedStreamGroups[streamType].totalStreams > 0"
             default-opened
           >
             <template #header>
@@ -340,15 +349,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item-section>
                 <q-item-label class="tw:font-semibold tw:capitalize">{{ streamType }}</q-item-label>
                 <q-item-label caption>
-                  {{ Object.keys(streamGroup).length }} stream(s)
+                  {{ paginatedStreamGroups[streamType].totalStreams }} stream(s)
                 </q-item-label>
               </q-item-section>
-              <q-item-section side>
+              <q-item-section side class="tw:flex tw:flex-row tw:items-center tw:gap-3">
+                <q-pagination
+                  v-if="paginatedStreamGroups[streamType].totalPages > 1"
+                  v-model="streamPagination[streamType].page"
+                  :max="paginatedStreamGroups[streamType].totalPages"
+                  :max-pages="3"
+                  direction-links
+                  boundary-links
+                  size="sm"
+                  @update:model-value="(newPage) => onStreamPageChange(streamType as 'logs' | 'traces' | 'metrics', newPage)"
+                  @click.stop
+                />
+              </q-item-section>
+              <q-item-section side class="tw:flex tw:flex-row tw:items-center tw:gap-3">
                 <q-badge
                   :color="getStreamTypeColor(streamType as string)"
                   text-color="white"
+                  class="tw:position-relative tw:top-[-3px]"
                 >
-                  {{ Object.values(streamGroup).flat().length }} services
+                  {{ Object.values(filteredStreamGroups[streamType]).flat().length }} services
                 </q-badge>
               </q-item-section>
             </template>
@@ -356,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Streams within type -->
             <q-list class="tw:ml-8">
               <q-expansion-item
-                v-for="(services, streamName) in streamGroup"
+                v-for="(services, streamName) in paginatedStreamGroups[streamType].streams"
                 :key="streamName"
                 dense
               >
@@ -607,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService, {
@@ -657,6 +680,13 @@ const servicesDialog = ref(false);
 const showSuggestionsDialog = ref(false);
 const selectedService = ref<ServiceInGroup | FlatService | null>(null);
 const selectedFqnGroup = ref<ServiceFqnGroup | null>(null);
+
+// Pagination state for stream view
+const streamPagination = ref({
+  logs: { page: 1, rowsPerPage: 10 },
+  traces: { page: 1, rowsPerPage: 10 },
+  metrics: { page: 1, rowsPerPage: 10 },
+});
 
 const viewModeOptions = computed(() => [
   { label: t("settings.correlation.byFqn"), value: "fqn", icon: "hub" },
@@ -992,6 +1022,59 @@ const filteredStreamGroups = computed((): StreamGroups => {
 
   return filtered;
 });
+
+// Reset pagination when search query changes
+const resetStreamPagination = () => {
+  streamPagination.value.logs.page = 1;
+  streamPagination.value.traces.page = 1;
+  streamPagination.value.metrics.page = 1;
+};
+
+// Watch for search query changes to reset pagination
+watch(searchQuery, () => {
+  resetStreamPagination();
+});
+
+// Paginated stream groups for each stream type
+const paginatedStreamGroups = computed(() => {
+  const result: Record<string, { streams: Record<string, FlatService[]>; totalStreams: number; totalPages: number }> = {};
+
+  const streamTypes = ['logs', 'traces', 'metrics'] as const;
+
+  for (const streamType of streamTypes) {
+    const streamGroup = filteredStreamGroups.value[streamType];
+    const streamNames = Object.keys(streamGroup);
+    const pagination = streamPagination.value[streamType];
+
+    // Calculate pagination
+    const totalStreams = streamNames.length;
+    const totalPages = Math.ceil(totalStreams / pagination.rowsPerPage);
+    const startIndex = (pagination.page - 1) * pagination.rowsPerPage;
+    const endIndex = startIndex + pagination.rowsPerPage;
+
+    // Get paginated stream names
+    const paginatedStreamNames = streamNames.slice(startIndex, endIndex);
+
+    // Build paginated streams object
+    const paginatedStreams: Record<string, FlatService[]> = {};
+    for (const streamName of paginatedStreamNames) {
+      paginatedStreams[streamName] = streamGroup[streamName];
+    }
+
+    result[streamType] = {
+      streams: paginatedStreams,
+      totalStreams,
+      totalPages,
+    };
+  }
+
+  return result;
+});
+
+// Pagination handlers
+const onStreamPageChange = (streamType: 'logs' | 'traces' | 'metrics', newPage: number) => {
+  streamPagination.value[streamType].page = newPage;
+};
 
 const loadServices = async () => {
   loading.value = true;
