@@ -39,7 +39,7 @@ impl Metrics for MetricsQuerier {
     type DataStream =
         Pin<Box<dyn Stream<Item = Result<MetricsQueryResponse, Status>> + Send + 'static>>;
 
-    #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(otel.kind = "server", org_id = req.get_ref().org_id))]
     async fn query(
         &self,
         req: Request<MetricsQueryRequest>,

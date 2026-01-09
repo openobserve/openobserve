@@ -47,6 +47,7 @@ impl Event for Eventer {
         let parent_cx =
             global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
         let _ = tracing::Span::current().set_parent(parent_cx);
+        infra::tracing::set_span_kind_server();
 
         let req = req.get_ref();
         let grpc_addr = req.node_addr.clone();

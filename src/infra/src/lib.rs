@@ -31,6 +31,7 @@ pub mod scheduler;
 pub mod schema;
 pub mod storage;
 pub mod table;
+pub mod tracing;
 
 pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
     let db = db::get_db().await;

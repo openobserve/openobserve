@@ -141,7 +141,7 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:search", skip_all)]
+    #[tracing::instrument(name = "grpc:search:search", skip_all, fields(otel.kind = "server"))]
     async fn search(
         &self,
         req: Request<SearchRequest>,
@@ -184,7 +184,7 @@ impl Search for Searcher {
         }
     }
 
-    #[tracing::instrument(name = "grpc:search:search_multi", skip_all)]
+    #[tracing::instrument(name = "grpc:search:search_multi", skip_all, fields(otel.kind = "server"))]
     async fn search_multi(
         &self,
         req: Request<SearchRequest>,
