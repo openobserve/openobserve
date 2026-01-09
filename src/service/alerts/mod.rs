@@ -1100,10 +1100,35 @@ pub async fn build_sql(
     if let Some(group) = agg.group_by.as_ref()
         && !group.is_empty()
     {
+        // Validate and quote all GROUP BY columns to prevent SQL injection
+        let validated_columns: Result<Vec<String>, anyhow::Error> = group
+            .iter()
+            .map(|col| {
+                // Check if column exists in schema
+                if schema.field_with_name(col).is_err() {
+                    return Err(anyhow::anyhow!(
+                        "GROUP BY column '{}' not found in schema for stream {stream_name}",
+                        col
+                    ));
+                }
+                // Validate column name contains only safe characters
+                if !col
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+                {
+                    return Err(anyhow::anyhow!(
+                        "GROUP BY column '{}' contains invalid characters",
+                        col
+                    ));
+                }
+                Ok(format!("\"{}\"", col))
+            })
+            .collect();
+        let validated_columns = validated_columns?;
         sql = format!(
             "SELECT {}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"{where_sql} GROUP BY {} HAVING {having_expr}",
-            group.join(", "),
-            group.join(", "),
+            validated_columns.join(", "),
+            validated_columns.join(", "),
         );
     }
     if sql.is_empty() {
@@ -1131,18 +1156,20 @@ fn build_expr(
             } else {
                 cond.value.to_string()
             };
+            // Escape single quotes to prevent SQL injection
+            let escaped_val = val.replace('\'', "''");
             match cond.operator {
-                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
-                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
-                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
+                Operator::EqualTo => format!("\"{field_alias}\" = '{escaped_val}'"),
+                Operator::NotEqualTo => format!("\"{field_alias}\" != '{escaped_val}'"),
+                Operator::GreaterThan => format!("\"{field_alias}\" > '{escaped_val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{field_alias}\" >= '{val}'")
+                    format!("\"{field_alias}\" >= '{escaped_val}'")
                 }
-                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
-                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
+                Operator::LessThan => format!("\"{field_alias}\" < '{escaped_val}'"),
+                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{escaped_val}'"),
+                Operator::Contains => format!("str_match(\"{field_alias}\", '{escaped_val}')"),
                 Operator::NotContains => {
-                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
+                    format!("\"{field_alias}\" NOT LIKE '%{escaped_val}%'")
                 }
             }
         }
