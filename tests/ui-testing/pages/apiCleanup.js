@@ -713,16 +713,31 @@ class APICleanup {
     async cleanupDashboards() {
         testLogger.info('Starting dashboard cleanup', { owner: this.email });
 
+        // Name patterns to clean up regardless of owner
+        const namePatterns = [
+            /^Dashboard_Joins_/,    // Dashboard joins parallel test dashboards
+        ];
+
         try {
             // Fetch dashboards from default folder
             const dashboards = await this.fetchDashboardsInFolder('default');
             testLogger.info('Fetched dashboards', { total: dashboards.length });
 
-            // Filter dashboards owned by automation user
-            const ownedDashboards = dashboards.filter(d => d.owner === this.email);
-            testLogger.info('Found dashboards owned by automation user', { count: ownedDashboards.length });
+            // Filter dashboards: owned by automation user OR matching name patterns
+            const dashboardsToDelete = dashboards.filter(d => {
+                // Check if owned by automation user
+                if (d.owner === this.email) return true;
+                // Check if name matches any pattern
+                const title = d.title || '';
+                return namePatterns.some(pattern => pattern.test(title));
+            });
+            testLogger.info('Found dashboards to clean up', {
+                count: dashboardsToDelete.length,
+                byOwner: dashboards.filter(d => d.owner === this.email).length,
+                byPattern: dashboards.filter(d => namePatterns.some(p => p.test(d.title || ''))).length
+            });
 
-            if (ownedDashboards.length === 0) {
+            if (dashboardsToDelete.length === 0) {
                 testLogger.info('No dashboards to clean up');
                 return;
             }
@@ -731,7 +746,7 @@ class APICleanup {
             let deletedCount = 0;
             let failedCount = 0;
 
-            for (const dashboard of ownedDashboards) {
+            for (const dashboard of dashboardsToDelete) {
                 const result = await this.deleteDashboard(dashboard.dashboard_id, dashboard.folder_id);
 
                 if (result.code === 200) {
@@ -751,7 +766,7 @@ class APICleanup {
             }
 
             testLogger.info('Dashboard cleanup completed', {
-                total: ownedDashboards.length,
+                total: dashboardsToDelete.length,
                 deleted: deletedCount,
                 failed: failedCount
             });
