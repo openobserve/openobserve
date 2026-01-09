@@ -29,7 +29,6 @@
 
 use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, TransactionTrait};
 use sea_orm_migration::prelude::*;
-use svix_ksuid::KsuidLike;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -166,13 +165,19 @@ mod legacy_enrichment_table_urls {
 
         while let Some(jobs) = pages.fetch_and_next().await? {
             for job in jobs {
-                // Generate KSUID - each record gets a fresh KSUID
-                // Note: We generate fresh KSUIDs rather than using org+name hash
-                // to ensure uniqueness when we later support multiple URLs per table
-                let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
+                // Generate deterministic KSUID from org + name hash
+                // This ensures all super cluster regions get the same ID for the same job
+                // We use org+name (not org+name+url) because before migration there was
+                // a unique constraint on (org, name), so only one job per table existed
+                let ksuid = enrichment_job_ksuid_from_hash(&job.org, &job.name);
+                log::debug!(
+                    "[ENRICHMENT::URL] enrichment_table_url job {}/{} deterministic ksuid: {}",
+                    job.org,
+                    job.name,
+                    ksuid
+                );
                 let mut am = job.into_active_model();
-                log::debug!("[ENRICHMENT::URL] enrichment_table_url job ksuid: {ksuid}");
-                am.ksuid = Set(Some(ksuid));
+                am.ksuid = Set(Some(ksuid.to_string()));
                 am.update(conn).await?;
             }
         }
@@ -183,6 +188,28 @@ mod legacy_enrichment_table_urls {
     /// Drop legacy table
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
+    }
+
+    /// Generates a KSUID from a hash of the enrichment job's `org` and `name`.
+    ///
+    /// To generate a KSUID this function generates the 160-bit SHA-1 hash of the job's `org` and
+    /// `name` and interprets that 160-bit hash as a 160-bit KSUID. Therefore two KSUIDs generated
+    /// in this manner will always be equal if the jobs have the same `org` and `name`.
+    ///
+    /// This is used during migration to ensure all super cluster regions generate the same ID
+    /// for the same enrichment table job.
+    ///
+    /// It is important to note that KSUIDs generated in this manner will have timestamp bits which are
+    /// effectively random, meaning that the timestamp in any KSUID generated with this function will be
+    /// random.
+    fn enrichment_job_ksuid_from_hash(org: &str, name: &str) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        use svix_ksuid::KsuidLike;
+        let mut hasher = Sha1::new();
+        hasher.update(org);
+        hasher.update(name);
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
     }
 }
 
