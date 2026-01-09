@@ -102,8 +102,8 @@ jobs:
               console.log(`Detected Issue #${num}`);
             }
 
-  # Call o2-enterprise reusable workflow
-  auto-implement:
+  # Dispatch to o2-enterprise workflow
+  dispatch:
     needs: [check-permission, prepare-auto]
     if: |
       needs.check-permission.outputs.authorized == 'true' &&
@@ -111,16 +111,22 @@ jobs:
         (github.event_name == 'issues' && github.event.label.name == 'auto-implement') ||
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
       )
+    runs-on: ubuntu-latest
 
-    uses: ./.github/workflows/claude-auto-implement-reusable.yml
-    with:
-      source_repo: openobserve
-      issue_number: ${{ github.event.issue.number }}
-      issue_title: ${{ github.event.issue.title }}
-      issue_body: ${{ github.event.issue.body }}
-      mode: ${{ needs.prepare-auto.outputs.mode }}
-      branch: ${{ needs.prepare-auto.outputs.branch }}
-      pr_number: ${{ needs.prepare-auto.outputs.pr_number }}
-    secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      E2E_DEV_CI_TOKEN: ${{ secrets.E2E_DEV_CI_TOKEN }}
+    steps:
+      - name: Dispatch Claude Implement Event to o2-enterprise
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          repository: openobserve/o2-enterprise
+          event-type: claude-impl-requested
+          client-payload: |-
+            {
+              "source_repo": "openobserve",
+              "issue_number": "${{ github.event.issue.number }}",
+              "issue_title": ${{ toJSON(github.event.issue.title) }},
+              "issue_body": ${{ toJSON(github.event.issue.body) }},
+              "mode": "${{ needs.prepare-auto.outputs.mode }}",
+              "branch": "${{ needs.prepare-auto.outputs.branch }}",
+              "pr_number": "${{ needs.prepare-auto.outputs.pr_number }}"
+            }
