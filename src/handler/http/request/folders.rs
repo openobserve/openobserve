@@ -86,7 +86,7 @@ impl From<FolderError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new folder"}))
+        ("x-o2-mcp" = json!({"description": "Create a new folder", "category": "folders"}))
     ),
 )]
 #[post("/v2/{org_id}/folders/{folder_type}")]
@@ -134,7 +134,7 @@ pub async fn create_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update folder properties"}))
+        ("x-o2-mcp" = json!({"description": "Update folder properties", "category": "folders"}))
     ),
 )]
 #[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -169,7 +169,7 @@ pub async fn update_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all folders"}))
+        ("x-o2-mcp" = json!({"description": "List all folders", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}")]
@@ -216,7 +216,7 @@ pub async fn list_folders(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get folder details by ID", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
@@ -252,7 +252,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder by name"}))
+        ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
 #[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
@@ -289,7 +289,7 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a folder by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders"}))
     ),
 )]
 #[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]

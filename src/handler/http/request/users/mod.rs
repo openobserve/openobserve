@@ -81,7 +81,7 @@ pub mod service_accounts;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all users"}))
+        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
     )
 )]
 #[get("/{org_id}/users")]
@@ -147,7 +147,7 @@ pub async fn list(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new user"}))
+        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
     )
 )]
 #[post("/{org_id}/users")]
@@ -209,7 +209,7 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update user details"}))
+        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
     )
 )]
 #[put("/{org_id}/users/{email_id}")]
@@ -283,7 +283,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Add user to organization"}))
+        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
     )
 )]
 #[post("/{org_id}/users/{email_id}")]
@@ -340,7 +340,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove user from organization"}))
+        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users"}))
     )
 )]
 #[delete("/{org_id}/users/{email_id}")]

@@ -66,7 +66,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get user organizations"}))
+        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
     )
 )]
 #[get("/organizations")]

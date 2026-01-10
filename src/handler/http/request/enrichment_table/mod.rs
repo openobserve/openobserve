@@ -48,7 +48,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create/update enrichment table"}))
+        ("x-o2-mcp" = json!({"description": "Create/update enrichment table", "category": "enrichment"}))
     )
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}")]
@@ -186,7 +186,7 @@ pub struct EnrichmentTableUrlRequest {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create table from URL"}))
+        ("x-o2-mcp" = json!({"description": "Create table from URL", "category": "enrichment"}))
     )
 )]
 #[post("/{org_id}/enrichment_tables/{table_name}/url")]

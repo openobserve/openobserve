@@ -66,7 +66,7 @@ impl From<PipelineError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline", "category": "pipelines"}))
     )
 )]
 #[post("/{org_id}/pipelines")]
@@ -114,7 +114,7 @@ pub async fn save_pipeline(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List all pipelines", "category": "pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines")]
@@ -208,7 +208,7 @@ async fn list_pipelines(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines", "category": "pipelines"}))
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
@@ -241,7 +241,7 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines"}))
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
@@ -341,7 +341,7 @@ async fn delete_pipeline_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Update a pipeline", "category": "pipelines"}))
     )
 )]
 #[put("/{org_id}/pipelines")]
@@ -378,7 +378,7 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpRespo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline", "category": "pipelines"}))
     )
 )]
 #[put("/{org_id}/pipelines/{pipeline_id}/enable")]

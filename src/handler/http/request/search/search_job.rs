@@ -87,7 +87,7 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Submit async search job"}))
+        ("x-o2-mcp" = json!({"description": "Submit async search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs")]
@@ -254,7 +254,7 @@ pub async fn submit_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all search jobs"}))
+        ("x-o2-mcp" = json!({"description": "List all search jobs", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs")]
@@ -314,7 +314,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get search job status"}))
+        ("x-o2-mcp" = json!({"description": "Get search job status", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/status")]
@@ -373,7 +373,7 @@ pub async fn get_status(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Cancel a running search job"}))
+        ("x-o2-mcp" = json!({"description": "Cancel a running search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/cancel")]
@@ -434,7 +434,7 @@ pub async fn cancel_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get search job results"}))
+        ("x-o2-mcp" = json!({"description": "Get search job results", "category": "search"}))
     )
 )]
 #[get("/{org_id}/search_jobs/{job_id}/result")]
@@ -519,7 +519,7 @@ pub async fn get_job_result(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a search job"}))
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search"}))
     )
 )]
 #[delete("/{org_id}/search_jobs/{job_id}")]
@@ -588,7 +588,7 @@ pub async fn delete_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Retry a failed search job"}))
+        ("x-o2-mcp" = json!({"description": "Retry a failed search job", "category": "search"}))
     )
 )]
 #[post("/{org_id}/search_jobs/{job_id}/retry")]

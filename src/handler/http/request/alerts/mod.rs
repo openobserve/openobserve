@@ -131,7 +131,7 @@ impl From<AlertError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule", "category": "alerts"}))
     )
 )]
 #[post("/v2/{org_id}/alerts")]
@@ -185,7 +185,7 @@ pub async fn create_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get alert details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}")]
@@ -227,7 +227,7 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export alert as JSON"}))
+        ("x-o2-mcp" = json!({"description": "Export alert as JSON", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts/{alert_id}/export")]
@@ -270,7 +270,7 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an existing alert"}))
+        ("x-o2-mcp" = json!({"description": "Update an existing alert", "category": "alerts"}))
     )
 )]
 #[put("/v2/{org_id}/alerts/{alert_id}")]
@@ -314,7 +314,7 @@ pub async fn update_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete an alert by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
     )
 )]
 #[delete("/v2/{org_id}/alerts/{alert_id}")]
@@ -428,7 +428,7 @@ async fn delete_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alerts"}))
+        ("x-o2-mcp" = json!({"description": "List all alerts", "category": "alerts"}))
     )
 )]
 #[get("/v2/{org_id}/alerts")]
@@ -498,7 +498,7 @@ async fn list_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable an alert"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable an alert", "category": "alerts"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
@@ -616,7 +616,7 @@ async fn enable_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Manually trigger an alert"}))
+        ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
@@ -652,7 +652,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move alerts to another folder"}))
+        ("x-o2-mcp" = json!({"description": "Move alerts to another folder", "category": "alerts"}))
     )
 )]
 #[patch("/v2/{org_id}/alerts/move")]
@@ -707,7 +707,7 @@ async fn move_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
-        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language"}))
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts"}))
     )
 )]
 #[post("/v2/{org_id}/alerts/generate_sql")]

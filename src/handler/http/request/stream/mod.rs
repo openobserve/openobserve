@@ -71,7 +71,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get stream schema"}))
+        ("x-o2-mcp" = json!({"description": "Get stream schema", "category": "streams"}))
     )
 )]
 #[get("/{org_id}/streams/{stream_name}/schema")]
@@ -159,7 +159,7 @@ async fn schema(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new stream"}))
+        ("x-o2-mcp" = json!({"description": "Create a new stream", "category": "streams"}))
     )
 )]
 #[post("/{org_id}/streams/{stream_name}")]
@@ -210,7 +210,7 @@ async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update stream settings"}))
+        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams"}))
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/settings")]
@@ -371,7 +371,7 @@ async fn delete_fields(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a stream"}))
+        ("x-o2-mcp" = json!({"description": "Delete a stream", "category": "streams"}))
     )
 )]
 #[delete("/{org_id}/streams/{stream_name}")]
@@ -420,7 +420,7 @@ async fn delete(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all streams"}))
+        ("x-o2-mcp" = json!({"description": "List all streams", "category": "streams"}))
     )
 )]
 #[get("/{org_id}/streams")]

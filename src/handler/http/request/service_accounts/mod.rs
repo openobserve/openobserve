@@ -63,7 +63,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List service accounts"}))
+        ("x-o2-mcp" = json!({"description": "List service accounts", "category": "users"}))
     )
 )]
 #[get("/{org_id}/service_accounts")]
@@ -130,7 +130,7 @@ pub async fn list(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create service account"}))
+        ("x-o2-mcp" = json!({"description": "Create service account", "category": "users"}))
     )
 )]
 #[post("/{org_id}/service_accounts")]
@@ -181,7 +181,7 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update service account"}))
+        ("x-o2-mcp" = json!({"description": "Update service account", "category": "users"}))
     )
 )]
 #[put("/{org_id}/service_accounts/{email_id}")]
@@ -270,7 +270,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete service account"}))
+        ("x-o2-mcp" = json!({"description": "Delete service account", "category": "users"}))
     )
 )]
 #[delete("/{org_id}/service_accounts/{email_id}")]
@@ -389,7 +389,7 @@ pub async fn delete_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get service account token"}))
+        ("x-o2-mcp" = json!({"description": "Get service account token", "category": "users"}))
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
