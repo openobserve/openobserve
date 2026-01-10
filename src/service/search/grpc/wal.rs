@@ -120,9 +120,8 @@ pub async fn search_parquet(
                 return file;
             }
             drop(r);
-            let meta = read_metadata_from_file(&source_file.into())
-                .await
-                .unwrap_or_default();
+            let path = source_file.into();
+            let meta = read_metadata_from_file(&path).await.unwrap_or_default();
             file.meta = meta;
             file
         })
@@ -212,7 +211,7 @@ pub async fn search_parquet(
         target_partitions: cfg.limit.cpu_num,
     };
 
-    let table = match TableBuilder::new()
+    let tables = match TableBuilder::new()
         .sorted_by_time(sorted_by_time)
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
@@ -224,7 +223,7 @@ pub async fn search_parquet(
         )
         .await
     {
-        Ok(v) => v,
+        Ok(tables) => tables,
         Err(e) => {
             // release all files
             wal::release_files(&lock_files);
@@ -251,7 +250,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -526,12 +525,7 @@ async fn get_file_list(
         let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
         // Skip count is the number of segments in the cannonicalised path before
         // <YY>/<MM>/<DD>/<HH>/<file> appear
-        let filter = create_wal_dir_datetime_filter(
-            start_time,
-            end_time,
-            "parquet".to_string(),
-            skip_count + 1,
-        );
+        let filter = create_wal_dir_datetime_filter(start_time, end_time, skip_count + 1);
 
         scan_files_filtered(&pattern, filter, None).await?
     } else {

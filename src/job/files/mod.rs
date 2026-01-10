@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    FILE_EXT_PARQUET,
     cluster::{LOCAL_NODE, is_offline},
     ider,
     meta::stream::StreamType,
@@ -77,5 +76,6 @@ pub fn generate_storage_file_name(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+    let file_format = config::get_config().common.file_format.extension();
+    format!("files/{stream_key}/{file_date}/{file_name}{file_format}")
 }
