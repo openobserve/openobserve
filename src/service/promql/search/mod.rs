@@ -40,10 +40,12 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::WorkGroup;
+use o2_enterprise::enterprise::search::{TaskStatus, WorkGroup};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 use crate::service::{
     promql::{
         DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
@@ -122,6 +124,26 @@ async fn search_in_cluster(
         query,
     );
 
+    // Register query in query manager for tracking and cancellation (Enterprise only)
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER
+        .insert(
+            trace_id.to_string(),
+            TaskStatus::new_leader(
+                vec![],
+                true,
+                Some(user_email.to_string()),
+                Some(req.org_id.clone()),
+                Some("metrics".to_string()),
+                Some(query.clone()),
+                Some(start),
+                Some(end),
+                None, // search_type
+                None, // search_event_context
+            ),
+        )
+        .await;
+
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
     let _lock = crate::service::search::work_group::check_work_group(
@@ -148,6 +170,12 @@ async fn search_in_cluster(
     .await
     .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
+    // Track work group assignment (Enterprise only)
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER
+        .add_work_group(trace_id, Some(WorkGroup::Short))
+        .await;
+
     // get querier nodes from cluster
     let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -158,6 +186,8 @@ async fn search_in_cluster(
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
     if nodes.is_empty() {
+        #[cfg(feature = "enterprise")]
+        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
             "no querier node found".to_string(),
         )));
@@ -205,6 +235,10 @@ async fn search_in_cluster(
             merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
+        // Remove query from query manager on early return (Enterprise only)
+        #[cfg(feature = "enterprise")]
+        SEARCH_SERVER.remove(trace_id, false).await;
+
         return Ok(values);
     }
 
@@ -214,6 +248,8 @@ async fn search_in_cluster(
         DEFAULT_MAX_POINTS_PER_SERIES
     };
     if (end - start) / step > max_points as i64 {
+        #[cfg(feature = "enterprise")]
+        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
             "too many points per series must be returned on the given, you can change the limit by ZO_METRICS_MAX_POINTS_PER_SERIES".to_string(),
         )));
@@ -232,6 +268,20 @@ async fn search_in_cluster(
         stage: 0,
         partition: 0,
     };
+
+    // Create abort sender/receiver for cancellation support (Enterprise only)
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel::<()>();
+    #[cfg(feature = "enterprise")]
+    if SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender, true)
+        .await
+        .is_err()
+    {
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] promql->search: query cancelled before execution"
+        ))));
+    }
 
     // make cluster request
     let mut tasks = Vec::with_capacity(nodes.len());
@@ -305,6 +355,53 @@ async fn search_in_cluster(
     }
 
     let mut results = Vec::with_capacity(tasks.len());
+
+    // Execute tasks with cancellation and timeout support (Enterprise)
+    #[cfg(feature = "enterprise")]
+    let task_results = {
+        // Wrap all tasks in a single spawned task so we can abort it
+        let query_task = tokio::spawn(async move { try_join_all(tasks).await });
+        tokio::pin!(query_task);
+
+        tokio::select! {
+            ret = &mut query_task => {
+                match ret {
+                    Ok(Ok(res)) => res,
+                    Ok(Err(err)) => {
+                        SEARCH_SERVER.remove(trace_id, false).await;
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            err.to_string(),
+                        )));
+                    }
+                    Err(err) => {
+                        SEARCH_SERVER.remove(trace_id, false).await;
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            format!("task join error: {err}"),
+                        )));
+                    }
+                }
+            },
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
+                query_task.abort();
+                log::error!("[trace_id {trace_id}] promql->search: query timeout after {timeout}s");
+                SEARCH_SERVER.remove(trace_id, false).await;
+                return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(
+                    format!("[trace_id {trace_id}] promql->search: query timeout"),
+                )));
+            },
+            _ = abort_receiver => {
+                query_task.abort();
+                log::info!("[trace_id {trace_id}] promql->search: query cancelled");
+                SEARCH_SERVER.remove(trace_id, false).await;
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(
+                    format!("[trace_id {trace_id}] promql->search: query cancelled"),
+                )));
+            }
+        }
+    };
+
+    // Execute tasks without cancellation support (OSS)
+    #[cfg(not(feature = "enterprise"))]
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
@@ -313,10 +410,13 @@ async fn search_in_cluster(
             )));
         }
     };
+
     for res in task_results {
         match res {
             Ok(response) => results.push(response),
             Err(err) => {
+                #[cfg(feature = "enterprise")]
+                SEARCH_SERVER.remove(trace_id, false).await;
                 return Err(err);
             }
         }
@@ -357,6 +457,8 @@ async fn search_in_cluster(
     } else if result_type == "exemplars" {
         merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
+        #[cfg(feature = "enterprise")]
+        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(server_internal_error(format!(
             "invalid result type: {result_type}"
         )));
@@ -414,6 +516,10 @@ async fn search_in_cluster(
         "[trace_id {trace_id}] promql->search search finished {}",
         stop_watch.get_summary()
     );
+
+    // Remove query from query manager on successful completion (Enterprise only)
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER.remove(trace_id, false).await;
 
     Ok(values)
 }
