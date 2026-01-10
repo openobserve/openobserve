@@ -51,9 +51,9 @@ vi.mock("echarts/renderers", () => ({
 }));
 
 // Mock ECharts GL (async import)
-vi.mock("echarts-gl", () => ({
-  default: {},
-}));
+// vi.mock("echarts-gl", () => ({
+//   default: {},
+// }));
 
 // Mock DOMPurify
 vi.mock("dompurify", () => ({
