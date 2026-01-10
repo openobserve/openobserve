@@ -533,6 +533,13 @@ export default {
     // The actual metric availability check happens when the button is clicked (in SearchResult.vue)
     onMounted(async () => {
       try {
+        // Gate correlation feature behind enterprise check to avoid 403 errors
+        if (config.isEnterprise !== "true") {
+          console.log("[JsonPreview] Correlation feature requires enterprise license");
+          showViewRelatedBtn.value = false;
+          return;
+        }
+
         const available = await isCorrelationAvailable();
         console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
 
