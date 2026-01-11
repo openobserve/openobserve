@@ -103,6 +103,15 @@ export const getAlertPayload = (
 
   if (getSelectedTab.value === "promql") {
     payload.query_condition.sql = "";
+
+    // Ensure promql_condition has a default value for PromQL queries
+    if (!payload.query_condition.promql_condition) {
+      payload.query_condition.promql_condition = {
+        column: "value",
+        operator: ">=",
+        value: 0,
+      };
+    }
   }
 
   if (formData.query_condition.vrl_function) {

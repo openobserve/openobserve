@@ -1588,6 +1588,15 @@ export default defineComponent({
     const updateTab = (tab: string) => {
       // Save to formData so it persists when navigating between steps
       formData.value.query_condition.type = tab;
+
+      // Initialize promql_condition when switching to PromQL tab
+      if (tab === 'promql' && !formData.value.query_condition.promql_condition) {
+        formData.value.query_condition.promql_condition = {
+          column: 'value',
+          operator: '>=',
+          value: 0,
+        };
+      }
     }
 
     const handleGoToSqlEditor = () => {
