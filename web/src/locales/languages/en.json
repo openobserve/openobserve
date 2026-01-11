@@ -874,7 +874,7 @@
     "dimensionsButton": "Fields ({count})",
     "dimensionsTooltip": "Add or remove dimensions to analyze",
     "selectDimensions": "Select Fields",
-    "analyzeButtonLabel": "Analyze",
+    "analyzeButtonLabel": "Insights",
     "refreshTooltip": "Refresh analysis with updated percentile",
     "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
     "timeRangeSelected": "Time Range Selected"

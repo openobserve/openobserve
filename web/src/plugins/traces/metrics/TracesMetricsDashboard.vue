@@ -79,9 +79,8 @@ class="tw:mx-1 tw:text-red-500" />
         />
       </div>
 
-      <!-- Unified Analyze Dimensions Button (only shown when brush selection exists) -->
+      <!-- Unified Insights Button (always visible) -->
       <q-btn
-        v-if="hasAnyBrushSelection"
         outline
         dense
         no-caps
@@ -612,59 +611,91 @@ const openErrorAnalysisDashboard = () => {
 
 // Unified function to open analysis dashboard with all filters populated
 const openUnifiedAnalysisDashboard = () => {
-  // Populate all filter types from range filters
-  let durationStart = null, durationEnd = null, durationTimeStart = null, durationTimeEnd = null;
-  let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
-  let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
-  let latestFilterType = null;
+  // Check if there are any brush selections
+  const hasBrushSelection = hasAnyBrushSelection.value;
 
-  rangeFilters.value.forEach((filter) => {
+  // When no brush selection, only perform analysis for baseline time range
+  // When brush selection exists, use current behavior with selected and baseline comparison
+  if (!hasBrushSelection) {
+    // No brush selection - analyze only baseline time range (current full time range)
+    analysisDurationFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: undefined,
+      timeEnd: undefined,
+    };
 
-    if (filter.panelTitle === "Duration") {
-      durationStart = filter.start;
-      durationEnd = filter.end;
-      durationTimeStart = filter.timeStart;
-      durationTimeEnd = filter.timeEnd;
-      latestFilterType = "latency";
-    } else if (filter.panelTitle === "Rate") {
-      rateStart = filter.start;
-      rateEnd = filter.end;
-      rateTimeStart = filter.timeStart;
-      rateTimeEnd = filter.timeEnd;
-      latestFilterType = "volume";
-    } else if (filter.panelTitle === "Errors") {
-      errorStart = filter.start;
-      errorEnd = filter.end;
-      errorTimeStart = filter.timeStart;
-      errorTimeEnd = filter.timeEnd;
-      latestFilterType = "error";
-    }
-  });
+    analysisRateFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: undefined,
+      timeEnd: undefined,
+    };
 
-  // Set all filters
-  analysisDurationFilter.value = {
-    start: durationStart || 0,
-    end: durationEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: durationTimeStart || undefined,
-    timeEnd: durationTimeEnd || undefined,
-  };
+    analysisErrorFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: undefined,
+      timeEnd: undefined,
+    };
 
-  analysisRateFilter.value = {
-    start: rateStart || 0,
-    end: rateEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: rateTimeStart || undefined,
-    timeEnd: rateTimeEnd || undefined,
-  };
+    // Default to volume analysis when no selection
+    defaultAnalysisTab.value = "volume";
+  } else {
+    // Brush selection exists - use current behavior with selected vs baseline comparison
+    // Populate all filter types from range filters
+    let durationStart = null, durationEnd = null, durationTimeStart = null, durationTimeEnd = null;
+    let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
+    let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
+    let latestFilterType = null;
 
-  analysisErrorFilter.value = {
-    start: errorStart || 0,
-    end: errorEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: errorTimeStart || undefined,
-    timeEnd: errorTimeEnd || undefined,
-  };
+    rangeFilters.value.forEach((filter) => {
+      if (filter.panelTitle === "Duration") {
+        durationStart = filter.start;
+        durationEnd = filter.end;
+        durationTimeStart = filter.timeStart;
+        durationTimeEnd = filter.timeEnd;
+        latestFilterType = "latency";
+      } else if (filter.panelTitle === "Rate") {
+        rateStart = filter.start;
+        rateEnd = filter.end;
+        rateTimeStart = filter.timeStart;
+        rateTimeEnd = filter.timeEnd;
+        latestFilterType = "volume";
+      } else if (filter.panelTitle === "Errors") {
+        errorStart = filter.start;
+        errorEnd = filter.end;
+        errorTimeStart = filter.timeStart;
+        errorTimeEnd = filter.timeEnd;
+        latestFilterType = "error";
+      }
+    });
 
-  // Set default tab based on most recent selection, or volume if no selection
-  defaultAnalysisTab.value = latestFilterType || "volume";
+    // Set all filters with brush selection data
+    analysisDurationFilter.value = {
+      start: durationStart || 0,
+      end: durationEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: durationTimeStart || undefined,
+      timeEnd: durationTimeEnd || undefined,
+    };
+
+    analysisRateFilter.value = {
+      start: rateStart || 0,
+      end: rateEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: rateTimeStart || undefined,
+      timeEnd: rateTimeEnd || undefined,
+    };
+
+    analysisErrorFilter.value = {
+      start: errorStart || 0,
+      end: errorEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: errorTimeStart || undefined,
+      timeEnd: errorTimeEnd || undefined,
+    };
+
+    // Set default tab based on most recent selection
+    defaultAnalysisTab.value = latestFilterType || "volume";
+  }
 
   showAnalysisDashboard.value = true;
 };
