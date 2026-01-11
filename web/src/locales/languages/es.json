@@ -2311,7 +2311,7 @@
     "dimensionsButton": "Campos ({count})",
     "dimensionsTooltip": "Agregar o eliminar dimensiones para analizar",
     "selectDimensions": "Seleccione campos",
-    "analyzeButtonLabel": "Analiza",
+    "analyzeButtonLabel": "Perspectivas",
     "refreshTooltip": "Actualice el análisis con un percentil actualizado",
     "customSQLFieldsDisabled": "La selección de campos no está disponible para las consultas SQL personalizadas. Las dimensiones se extraen de los resultados de la consulta.",
     "timeRangeSelected": "Intervalo de tiempo seleccionado"

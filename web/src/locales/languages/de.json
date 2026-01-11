@@ -2311,7 +2311,7 @@
     "dimensionsButton": "Felder ({count})",
     "dimensionsTooltip": "Zu analysierende Dimensionen hinzufügen oder entfernen",
     "selectDimensions": "Wählen Sie Felder",
-    "analyzeButtonLabel": "Analysieren",
+    "analyzeButtonLabel": "Einblicke",
     "refreshTooltip": "Analyse mit aktualisiertem Perzentil aktualisieren",
     "customSQLFieldsDisabled": "Die Feldauswahl ist für benutzerdefinierte SQL-Abfragen nicht verfügbar. Dimensionen werden aus Ihren Abfrageergebnissen extrahiert.",
     "timeRangeSelected": "Ausgewählter Zeitbereich"

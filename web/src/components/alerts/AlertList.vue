@@ -1139,7 +1139,9 @@ export default defineComponent({
 
     // Initialize viewMode from URL query parameter
     const viewMode = ref(
-      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
+      (router.currentRoute.value.query.view as string) === "incidents" && config.isEnterprise === "true"
+        ? "incidents"
+        : "alerts"
     );
 
     // Initialize activeTab from URL query parameter, default to "all"
@@ -1151,16 +1153,24 @@ export default defineComponent({
     const incidentSearchQuery = ref("");
 
     // View mode tabs (Alerts / Incidents)
-    const viewTabs = computed(() => [
-      {
-        label: t('alerts.header'),
-        value: 'alerts',
-      },
-      {
-        label: t('alerts.incidents.title'),
-        value: 'incidents',
+    const viewTabs = computed(() => {
+      const tabs = [
+        {
+          label: t('alerts.header'),
+          value: 'alerts',
+        }
+      ];
+
+      // Only add incidents tab for enterprise builds
+      if (config.isEnterprise === "true") {
+        tabs.push({
+          label: t('alerts.incidents.title'),
+          value: 'incidents',
+        });
       }
-    ]);
+
+      return tabs;
+    });
 
     // Tabs for alerts view only (removed incidents tab)
     const alertTabs = reactive([

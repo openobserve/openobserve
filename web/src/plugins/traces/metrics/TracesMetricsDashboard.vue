@@ -79,9 +79,8 @@ class="tw:mx-1 tw:text-red-500" />
         />
       </div>
 
-      <!-- Unified Analyze Dimensions Button (only shown when brush selection exists) -->
+      <!-- Unified Insights Button (always visible) -->
       <q-btn
-        v-if="hasAnyBrushSelection"
         outline
         dense
         no-caps
@@ -617,8 +616,10 @@ const openUnifiedAnalysisDashboard = () => {
   let rateStart = null, rateEnd = null, rateTimeStart = null, rateTimeEnd = null;
   let errorStart = null, errorEnd = null, errorTimeStart = null, errorTimeEnd = null;
   let latestFilterType = null;
+  let hasAnySelection = false;
 
   rangeFilters.value.forEach((filter) => {
+    hasAnySelection = true;
 
     if (filter.panelTitle === "Duration") {
       durationStart = filter.start;
@@ -641,27 +642,54 @@ const openUnifiedAnalysisDashboard = () => {
     }
   });
 
-  // Set all filters
-  analysisDurationFilter.value = {
-    start: durationStart || 0,
-    end: durationEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: durationTimeStart || undefined,
-    timeEnd: durationTimeEnd || undefined,
-  };
+  // If no brush selection exists, use baseline time range for all filters
+  if (!hasAnySelection) {
+    const baselineTimeStart = props.timeRange.startTime;
+    const baselineTimeEnd = props.timeRange.endTime;
 
-  analysisRateFilter.value = {
-    start: rateStart || 0,
-    end: rateEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: rateTimeStart || undefined,
-    timeEnd: rateTimeEnd || undefined,
-  };
+    analysisDurationFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: baselineTimeStart,
+      timeEnd: baselineTimeEnd,
+    };
 
-  analysisErrorFilter.value = {
-    start: errorStart || 0,
-    end: errorEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: errorTimeStart || undefined,
-    timeEnd: errorTimeEnd || undefined,
-  };
+    analysisRateFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: baselineTimeStart,
+      timeEnd: baselineTimeEnd,
+    };
+
+    analysisErrorFilter.value = {
+      start: 0,
+      end: Number.MAX_SAFE_INTEGER,
+      timeStart: baselineTimeStart,
+      timeEnd: baselineTimeEnd,
+    };
+  } else {
+    // Set all filters based on brush selections
+    analysisDurationFilter.value = {
+      start: durationStart || 0,
+      end: durationEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: durationTimeStart || undefined,
+      timeEnd: durationTimeEnd || undefined,
+    };
+
+    analysisRateFilter.value = {
+      start: rateStart || 0,
+      end: rateEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: rateTimeStart || undefined,
+      timeEnd: rateTimeEnd || undefined,
+    };
+
+    analysisErrorFilter.value = {
+      start: errorStart || 0,
+      end: errorEnd || Number.MAX_SAFE_INTEGER,
+      timeStart: errorTimeStart || undefined,
+      timeEnd: errorTimeEnd || undefined,
+    };
+  }
 
   // Set default tab based on most recent selection, or volume if no selection
   defaultAnalysisTab.value = latestFilterType || "volume";

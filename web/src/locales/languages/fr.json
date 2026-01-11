@@ -2311,7 +2311,7 @@
     "dimensionsButton": "Champs ({count})",
     "dimensionsTooltip": "Ajouter ou supprimer des dimensions à analyser",
     "selectDimensions": "Sélectionnez les champs",
-    "analyzeButtonLabel": "Analyser",
+    "analyzeButtonLabel": "Aperçus",
     "refreshTooltip": "Actualiser l'analyse avec un percentile mis à jour",
     "customSQLFieldsDisabled": "La sélection de champs n'est pas disponible pour les requêtes SQL personnalisées. Les dimensions sont extraites des résultats de votre requête.",
     "timeRangeSelected": "Plage de temps sélectionnée"
