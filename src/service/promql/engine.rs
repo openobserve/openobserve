@@ -1198,6 +1198,7 @@ async fn selector_load_data_from_datafusion(
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => {
             if config::get_config().limit.metrics_data_load_window_enabled
+                && start != end
                 && step > 0
                 && step > lookback
             {
