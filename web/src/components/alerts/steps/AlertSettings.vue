@@ -276,7 +276,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Threshold -->
+        <!-- PromQL Trigger Condition (for promql queries only) -->
+        <div v-if="queryType === 'promql' && formData.query_condition.promql_condition" class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+            Trigger if the value is *
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Defines when the alert should trigger based on the PromQL query result value.<br />
+                  Example: If set to ">= 100", the alert triggers when the query result is greater than or equal to 100.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div style="width: calc(100% - 190px)">
+            <div class="flex justify-start items-start">
+              <div class="tw:flex tw:flex-col">
+                <q-select
+                  v-model="formData.query_condition.promql_condition.operator"
+                  :options="triggerOperators"
+                  class="showLabelOnTop no-case q-py-none"
+                  borderless
+                  dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :style="{
+                    width: (formData.query_condition.promql_condition.operator === 'Contains' || formData.query_condition.promql_condition.operator === 'NotContains')
+                      ? '124px'
+                      : '88px',
+                    minWidth: '88px'
+                  }"
+                  @update:model-value="emitPromqlConditionUpdate"
+                />
+                <div
+                  v-if="!formData.query_condition.promql_condition.operator"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+              <div class="flex items-start tw:flex-col" style="border-left: none">
+                <div class="tw:flex tw:items-center">
+                  <div style="width: 179px; margin-left: 0 !important">
+                    <q-input
+                      v-model.number="formData.query_condition.promql_condition.value"
+                      type="number"
+                      dense
+                      borderless
+                      style="background: none"
+                      debounce="300"
+                      @update:model-value="emitPromqlConditionUpdate"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-if="formData.query_condition.promql_condition.value === undefined || formData.query_condition.promql_condition.value === null || formData.query_condition.promql_condition.value === ''"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Threshold (for custom and sql queries, always shown for promql) -->
         <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
@@ -295,8 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div style="width: calc(100% - 190px)">
-            <!-- With Aggregation -->
-            <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
+            <!-- With Aggregation (only for custom queries with aggregation enabled) -->
+            <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation && queryType === 'custom'">
               <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:gap-2">
                 <div class="tw:flex tw:items-center">
                   <div class="q-mr-xs">
@@ -369,8 +442,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <!-- Without Aggregation -->
-            <template v-else>
+            <!-- Without Aggregation (for custom without aggregation, sql, and promql queries) -->
+            <template v-if="!localIsAggregationEnabled || queryType !== 'custom'">
               <div ref="thresholdFieldRef" class="flex justify-start items-start">
                 <div class="tw:flex tw:flex-col">
                   <q-select
@@ -844,6 +917,7 @@ export default defineComponent({
     "update:aggregation",
     "update:isAggregationEnabled",
     "update:destinations",
+    "update:promqlCondition",
     "refresh:destinations",
   ],
   setup(props, { emit }) {
@@ -1176,6 +1250,10 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
+    const emitPromqlConditionUpdate = () => {
+      emit("update:promqlCondition", props.formData.query_condition.promql_condition);
+    };
+
     const routeToCreateDestination = () => {
       const url = router.resolve({
         name: "alertDestinations",
@@ -1218,8 +1296,33 @@ export default defineComponent({
       }
 
       // For Scheduled Alerts
-      // Check if aggregation is enabled
-      if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+      // Check if query type is PromQL - validate both promql_condition AND threshold
+      if (queryType.value === 'promql') {
+        // Validate PromQL condition
+        if (!props.formData.query_condition.promql_condition) {
+          return { valid: false, message: 'PromQL condition is required' };
+        }
+        if (!props.formData.query_condition.promql_condition.operator) {
+          return { valid: false, message: null };
+        }
+        if (
+          props.formData.query_condition.promql_condition.value === undefined ||
+          props.formData.query_condition.promql_condition.value === null ||
+          props.formData.query_condition.promql_condition.value === ''
+        ) {
+          return { valid: false, message: null };
+        }
+
+        // Also validate threshold for PromQL
+        if (!props.formData.trigger_condition.operator) {
+          return { valid: false, message: null };
+        }
+        const threshold = Number(props.formData.trigger_condition.threshold);
+        if (isNaN(threshold) || threshold < 1) {
+          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+        }
+      } else if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+        // Check if aggregation is enabled
         // Validate group by fields (if any are added, they must not be empty)
         const groupByFields = props.formData.query_condition.aggregation.group_by;
         if (groupByFields && groupByFields.length > 0) {
@@ -1307,6 +1410,7 @@ export default defineComponent({
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,
+      emitPromqlConditionUpdate,
       routeToCreateDestination,
       handleFrequencyTypeChange,
       handlePeriodChange,
