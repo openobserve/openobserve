@@ -474,7 +474,7 @@ impl Engine {
         };
 
         let start = std::time::Instant::now();
-        let values = values
+        let mut values = values
             .into_par_iter()
             .map(|rv| RangeValue {
                 labels: rv.labels,
@@ -490,18 +490,8 @@ impl Engine {
             start.elapsed()
         );
 
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
-
+        // apply offset to samples
+        let offset_modifier = get_offset_modifier(selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
@@ -570,21 +560,10 @@ impl Engine {
     ) -> Result<HashMap<u64, RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
-        let mut end = self.ctx.end; // 30 minutes + 5m = 35m
-
-        if let Some(offset) = selector.offset.clone() {
-            match offset {
-                Offset::Pos(offset) => {
-                    start -= micros(offset);
-                    end -= micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    start += micros(offset);
-                    end += micros(offset);
-                }
-            }
-        }
+        let offset_modifier = get_offset_modifier(selector.offset.clone());
+        let start =
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) + offset_modifier;
+        let end = self.ctx.end + offset_modifier; // 30 minutes + 5m = 35m
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -672,23 +651,10 @@ impl Engine {
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         // Calculate step and lookback for the optimization
-        let mut start = self.eval_ctx.start;
-        let mut end = self.eval_ctx.end;
+        let start = self.eval_ctx.start + offset_modifier;
+        let end = self.eval_ctx.end + offset_modifier;
         let step = self.eval_ctx.step;
         let lookback = range.map_or(self.ctx.lookback_delta, micros);
-
-        if let Some(offset) = selector.offset.clone() {
-            match offset {
-                Offset::Pos(offset) => {
-                    start -= micros(offset);
-                    end -= micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    start += micros(offset);
-                    end += micros(offset);
-                }
-            }
-        }
 
         let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats, keep_filters) in ctxs {
@@ -1212,7 +1178,7 @@ impl Engine {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
     query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
@@ -1690,6 +1656,18 @@ async fn load_exemplars_from_datafusion(
 
     Ok((metrics, all_unique_timestamps))
 }
+
+fn get_offset_modifier(offset: Option<Offset>) -> i64 {
+    if let Some(offset) = offset {
+        match offset {
+            Offset::Pos(offset) => micros(offset),
+            Offset::Neg(offset) => -micros(offset),
+        }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
