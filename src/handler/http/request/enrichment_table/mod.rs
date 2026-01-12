@@ -157,6 +157,14 @@ pub struct EnrichmentTableUrlRequest {
     /// - Should return CSV content-type (not enforced but recommended)
     /// - File can be any size - streaming handles large files efficiently
     pub url: String,
+
+    /// Replace only the failed job's URL (optional, default: false)
+    ///
+    /// When true, only updates the failed job with the new URL while keeping
+    /// all successful jobs unchanged. Useful for fixing typos or broken URLs
+    /// without re-downloading working data sources.
+    #[serde(default)]
+    pub replace_failed: bool,
 }
 
 /// CreateEnrichmentTableFromUrl
@@ -227,6 +235,9 @@ pub async fn save_enrichment_table_from_url(
         None => false,
     };
 
+    // Extract replace_failed from request body
+    let replace_failed = request_body.replace_failed;
+
     // ===== INPUT VALIDATION =====
     // We validate all inputs before doing any database operations to fail fast
     // and provide clear error messages to users.
@@ -241,63 +252,9 @@ pub async fn save_enrichment_table_from_url(
     }
 
     // URL validation: Skip if retry mode (we're just reprocessing existing URLs)
-    if !retry {
-        if request_body.url.trim().is_empty() {
-            return Ok(MetaHttpResponse::bad_request("URL cannot be empty"));
-        }
-
-        // Validate URL scheme to prevent potential security issues.
-        // We only support http/https, not file://, ftp://, etc.
-        // This prevents:
-        // - Local file access via file:// URLs
-        // - SSRF attacks via internal network protocols
-        // - Confusion with non-HTTP transports
-        if !request_body.url.starts_with("http://") && !request_body.url.starts_with("https://") {
-            return Ok(MetaHttpResponse::bad_request(
-                "URL must start with http:// or https://",
-            ));
-        }
-    }
-
-    // SSRF protection: Block internal IPs and localhost (skip in retry mode)
-    if !retry
-        && let Ok(parsed_url) = url::Url::parse(&request_body.url)
-        && let Some(host) = parsed_url.host_str()
-    {
-        // Block localhost
-        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-            return Ok(MetaHttpResponse::bad_request(
-                "Cannot access localhost URLs",
-            ));
-        }
-
-        // Block private IP ranges and AWS metadata endpoint
-        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-            match ip {
-                std::net::IpAddr::V4(v4) => {
-                    let octets = v4.octets();
-                    // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-                    // AWS metadata: 169.254.169.254
-                    if octets[0] == 10
-                        || (octets[0] == 172 && (16..=31).contains(&octets[1]))
-                        || (octets[0] == 192 && octets[1] == 168)
-                        || (octets[0] == 169 && octets[1] == 254)
-                    {
-                        return Ok(MetaHttpResponse::bad_request(
-                            "Cannot access private IP addresses",
-                        ));
-                    }
-                }
-                std::net::IpAddr::V6(v6) => {
-                    // Block IPv6 localhost and private ranges
-                    if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
-                        return Ok(MetaHttpResponse::bad_request(
-                            "Cannot access private IP addresses",
-                        ));
-                    }
-                }
-            }
-        }
+    // Apply validation for normal updates and replace_failed mode
+    if !retry && let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+        return Ok(MetaHttpResponse::bad_request(err_msg));
     }
 
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
@@ -334,11 +291,12 @@ pub async fn save_enrichment_table_from_url(
         )));
     }
 
-    // RULE 2: Block APPEND if any job has failed
+    // RULE 2: Block APPEND (adding new URL) if any job has failed
     // Reason: Failed jobs indicate data integrity issues; user should resolve them first
-    if append_data && has_failed {
+    // Allow: retry (reload all), replace_failed (fix failed URL), or replace mode (start fresh)
+    if append_data && has_failed && !retry && !replace_failed {
         return Ok(MetaHttpResponse::bad_request(format!(
-            "Cannot append: table {}/{} has failed jobs. Please retry or delete the failed jobs, or use replace mode (append=false) to start fresh.",
+            "Cannot add new URL: table {}/{} has failed jobs. Please reload, replace the failed URL, or use replace mode to start fresh.",
             org_id, table_name
         )));
     }
@@ -416,8 +374,44 @@ pub async fn save_enrichment_table_from_url(
                 job
             })
             .collect()
+    } else if replace_failed {
+        // ===== SCENARIO 3: REPLACE FAILED URL ONLY =====
+        // Replace only the failed job's URL while keeping successful jobs
+        log::info!(
+            "[ENRICHMENT::URL] Replace failed mode: updating failed job URL for {}/{}",
+            org_id,
+            table_name
+        );
+
+        // Find the failed job
+        // Note: We block adding new URLs when a job has failed (see RULE 2 validation above),
+        // so there should ideally be only one failed job at any given time. We find the first
+        // failed job if multiple exist (which shouldn't happen in normal operation).
+        let failed_job = existing_jobs
+            .iter()
+            .find(|j| j.status == EnrichmentTableStatus::Failed)
+            .cloned();
+
+        if let Some(mut job) = failed_job {
+            // Update the failed job with new URL and reset its state
+            job.url = request_body.url.clone();
+            job.status = EnrichmentTableStatus::Pending;
+            job.last_byte_position = 0;
+            job.total_bytes_fetched = 0;
+            job.total_records_processed = 0;
+            job.retry_count = 0;
+            job.error_message = None;
+            job.updated_at = chrono::Utc::now().timestamp_micros();
+            // Keep append_data as-is to maintain the original job order behavior
+
+            vec![job]
+        } else {
+            return Ok(MetaHttpResponse::bad_request(
+                "No failed job found to replace",
+            ));
+        }
     } else {
-        // ===== SCENARIO 3: UPDATE MODE =====
+        // ===== SCENARIO 4: UPDATE MODE =====
         // Replace all existing jobs with this new URL
         log::info!(
             "[ENRICHMENT::URL] Update mode: replacing all jobs with new URL for {}/{}",
@@ -664,5 +658,169 @@ pub async fn get_all_enrichment_table_statuses(
                 "Failed to retrieve enrichment table statuses",
             ))
         }
+    }
+}
+
+/// Validates a URL for enrichment table ingestion
+///
+/// Performs security checks including:
+/// - Non-empty URL
+/// - HTTP/HTTPS scheme only
+/// - SSRF protection (blocks localhost and private IPs)
+///
+/// # Returns
+/// - `Ok(())` if validation passes
+/// - `Err(String)` with error message if validation fails
+fn validate_enrichment_url(url: &str) -> Result<(), String> {
+    // Check for empty URL
+    if url.trim().is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+
+    // Validate URL scheme
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("URL must start with http:// or https://".to_string());
+    }
+
+    // Parse URL for SSRF protection
+    let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+    let host = parsed_url
+        .host_str()
+        .ok_or_else(|| "URL must have a valid host".to_string())?;
+
+    // Block localhost
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        return Err("Cannot access localhost URLs".to_string());
+    }
+
+    // Block private IP ranges
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                let octets = v4.octets();
+                // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+                // AWS metadata: 169.254.169.254
+                if octets[0] == 10
+                    || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                    || (octets[0] == 192 && octets[1] == 168)
+                    || (octets[0] == 169 && octets[1] == 254)
+                {
+                    return Err("Cannot access private IP addresses".to_string());
+                }
+            }
+            std::net::IpAddr::V6(v6) => {
+                // Block IPv6 localhost and private ranges
+                if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                    return Err("Cannot access private IP addresses".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_enrichment_url_valid_http() {
+        assert!(validate_enrichment_url("http://example.com/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_valid_https() {
+        assert!(validate_enrichment_url("https://example.com/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_empty() {
+        let result = validate_enrichment_url("");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "URL cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_whitespace() {
+        let result = validate_enrichment_url("   ");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "URL cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_invalid_scheme() {
+        let result = validate_enrichment_url("ftp://example.com/data.csv");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_file_scheme() {
+        let result = validate_enrichment_url("file:///etc/passwd");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_localhost() {
+        let result = validate_enrichment_url("http://localhost/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_127_0_0_1() {
+        let result = validate_enrichment_url("http://127.0.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_10() {
+        let result = validate_enrichment_url("http://10.0.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_192_168() {
+        let result = validate_enrichment_url("http://192.168.1.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_172() {
+        let result = validate_enrichment_url("http://172.16.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_aws_metadata() {
+        let result = validate_enrichment_url("http://169.254.169.254/latest/meta-data/");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_public_ip() {
+        assert!(validate_enrichment_url("http://8.8.8.8/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_github() {
+        assert!(
+            validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
+                .is_ok()
+        );
     }
 }
