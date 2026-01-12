@@ -31,10 +31,11 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
+    logical_expr::utils::disjunction,
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
     },
-    prelude::{DataFrame, SessionContext, col, lit},
+    prelude::{DataFrame, Expr, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::{HashMap, HashSet};
@@ -686,6 +687,25 @@ impl Engine {
         let mut label_selector = self.label_selector.clone();
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
+        // Calculate step and lookback for the optimization
+        let mut start = self.eval_ctx.start;
+        let mut end = self.eval_ctx.end;
+        let step = self.eval_ctx.step;
+        let lookback = range.map_or(self.ctx.lookback_delta, micros);
+
+        if let Some(offset) = selector.offset.clone() {
+            match offset {
+                Offset::Pos(offset) => {
+                    start -= micros(offset);
+                    end -= micros(offset);
+                }
+                Offset::Neg(offset) => {
+                    start += micros(offset);
+                    end += micros(offset);
+                }
+            }
+        }
+
         let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats, keep_filters) in ctxs {
             let query_ctx = self.ctx.query_ctx.clone();
@@ -705,6 +725,8 @@ impl Engine {
                         label_selector,
                         start,
                         end,
+                        step,
+                        lookback,
                     )
                     .await
                 },
@@ -1206,6 +1228,7 @@ impl Engine {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn selector_load_data_from_datafusion(
     query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
@@ -1214,15 +1237,46 @@ async fn selector_load_data_from_datafusion(
     label_selector: HashSet<String>,
     start: i64,
     end: i64,
+    step: i64,
+    lookback: i64,
 ) -> Result<HashMap<u64, RangeValue>> {
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
+
+    // Optimization: When step > lookback, we don't need to load all data in [start, end]
+    // Instead, we only need to load data windows around each evaluation point
     let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => v.filter(
-            col(TIMESTAMP_COL_NAME)
-                .gt(lit(start))
-                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
-        )?,
+        Ok(v) => {
+            if config::get_config().limit.metrics_data_load_window_enabled
+                && step > 0
+                && step > lookback
+            {
+                let num_steps = ((end - start) / step) + 1;
+                let eval_timestamps: Vec<i64> =
+                    (0..num_steps).map(|i| start + (step * i)).collect();
+
+                let mut conditions: Vec<Expr> = Vec::new();
+                for &eval_ts in &eval_timestamps {
+                    let window_start = eval_ts - lookback;
+                    let window_end = eval_ts;
+
+                    conditions.push(
+                        col(TIMESTAMP_COL_NAME)
+                            .gt_eq(lit(window_start))
+                            .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+                    );
+                }
+
+                let filters = disjunction(conditions).unwrap();
+                v.filter(filters)?
+            } else {
+                v.filter(
+                    col(TIMESTAMP_COL_NAME)
+                        .gt_eq(lit(start))
+                        .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+                )?
+            }
+        }
         Err(_) => {
             return Ok(HashMap::default());
         }
