@@ -1486,13 +1486,57 @@ export default defineComponent({
         display: block;
         max-width: 100%;
         overflow-x: auto;
-        
+
         code {
           padding: 8px;
           margin: 0;
           display: block;
           max-width: 100%;
         }
+      }
+
+      // Heading styles - appropriately sized for chat interface
+      // Only applies within message-blocks, not globally
+      :deep(h1) {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        margin: 16px 0 8px 0 !important;
+        line-height: 1.3 !important;
+      }
+
+      :deep(h2) {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        margin: 14px 0 7px 0 !important;
+        line-height: 1.3 !important;
+      }
+
+      :deep(h3) {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        margin: 12px 0 6px 0 !important;
+        line-height: 1.3 !important;
+      }
+
+      :deep(h4) {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        margin: 10px 0 5px 0 !important;
+        line-height: 1.3 !important;
+      }
+
+      :deep(h5) {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
+      }
+
+      :deep(h6) {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
       }
 
       // Table styling to prevent horizontal overflow
