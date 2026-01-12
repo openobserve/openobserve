@@ -559,15 +559,25 @@ export default defineComponent({
             // Check if there's a second argument (the interval)
             if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
               const intervalArg = histogramFields.value[i].args[1];
-              const intervalValue = intervalArg?.value || intervalArg;
 
-              // Set the histogram interval - ensure it's a string
-              if (typeof intervalValue === 'string') {
+              // Extract interval value with explicit type checking
+              let intervalValue: string | null = null;
+
+              if (typeof intervalArg === 'string') {
+                // Direct string value
+                intervalValue = intervalArg;
+              } else if (typeof intervalArg === 'object' && intervalArg !== null) {
+                // Object with value property
+                if ('value' in intervalArg && typeof intervalArg.value === 'string') {
+                  intervalValue = intervalArg.value;
+                }
+              }
+
+              // Set the histogram interval only if we have a valid non-empty string
+              if (intervalValue && intervalValue.trim() !== '') {
                 histogramInterval.value = intervalValue;
-              } else if (typeof intervalValue === 'object' && intervalValue?.value) {
-                histogramInterval.value = intervalValue.value;
               } else {
-                // Fallback for Auto mode
+                // No valid interval - use Auto mode
                 histogramInterval.value = null;
               }
               break;
