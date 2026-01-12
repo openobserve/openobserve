@@ -2759,6 +2759,151 @@ describe("AddAlert Component", () => {
       expect(payload.query_condition.conditions).toEqual([]);
       expect(payload.query_condition.promql_condition).toBeDefined();
     });
+
+    it('should add column field to legacy promql_condition on load (backward compatibility)', async () => {
+      // Simulate loading a legacy alert without the column field
+      const legacyAlert = {
+        name: 'Legacy Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            // No column field - this is a legacy alert
+            operator: '>',
+            value: 100,
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      // Mount with isUpdated=true to simulate editing an existing alert
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: legacyAlert,
+          isUpdated: true,
+        }
+      });
+
+      await nextTick();
+
+      // The column field should be automatically added during created() lifecycle
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(100);
+    });
+
+    it('should initialize all missing fields in malformed promql_condition', async () => {
+      // Simulate a severely malformed alert missing multiple fields
+      const malformedAlert = {
+        name: 'Malformed Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            // Missing column, operator, and value
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: malformedAlert,
+          isUpdated: true,
+        }
+      });
+
+      await nextTick();
+
+      // All missing fields should be initialized with defaults
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(1);
+    });
+
+    it('should preserve existing values and only add missing column field', async () => {
+      // Alert with operator and value, but missing column
+      const partialAlert = {
+        name: 'Partial Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            operator: '<',
+            value: 50,
+            // Missing column only
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        },
+        props: {
+          modelValue: partialAlert,
+          isUpdated: true,
+        }
+      });
+
+      await nextTick();
+
+      // Should add column but preserve existing operator and value
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('<');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(50);
+    });
   });
 
 });
