@@ -127,7 +127,31 @@ pub async fn token_validator(
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
-                                users::get_user(Some("_meta"), user_id).await
+                                // for get license, as long as user is part of o2, it is fine
+                                if req.method().as_str() == "GET" {
+                                    if let Ok(v) = db::user::get_user_record(user_id).await {
+                                        Some(config::meta::user::User {
+                                            email: v.email,
+                                            first_name: v.first_name,
+                                            last_name: v.last_name,
+                                            password: v.password,
+                                            salt: v.salt,
+                                            token: "".into(),
+                                            rum_token: None,
+                                            role: config::meta::user::UserRole::User,
+                                            org: "".into(),
+                                            is_external: v.user_type
+                                                == config::meta::user::UserType::External,
+                                            password_ext: v.password_ext,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    // for anything else, which will mostly be PUT/POST calls, 
+                                    // the user must be in _meta org
+                                    users::get_user(Some("_meta"), user_id).await
+                                }
                             } else {
                                 users::get_user(None, user_id).await
                             }
