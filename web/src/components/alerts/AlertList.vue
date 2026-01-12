@@ -761,7 +761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="to-be-clone-alert-name"
                 v-model="toBeCloneAlertName"
                 label="Alert Name"
-                class="showLabelOnTop q-mb-sm"
+                class="showLabelOnTop"
                 stack-label
                 hide-bottom-space
                 borderless
@@ -775,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="updateStreams()"
                 borderless
                 dense
-                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+                class="showLabelOnTop no-case tw:mt-[1px]"
               />
               <q-select
                 data-test="to-be-clone-stream-name"
@@ -808,14 +808,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="o2-secondary-button tw:h-[36px]"
                   :label="t('alerts.cancel')"
                   text-color="light-text"
-                  padding="sm md"
                   no-caps
                 />
                 <q-btn
                   data-test="clone-alert-submit-btn"
                   :label="t('alerts.save')"
                   class="o2-primary-button tw:h-[36px] q-ml-md"
-                  padding="sm xl"
                   type="submit"
                   :disable="isSubmitting"
                   no-caps
