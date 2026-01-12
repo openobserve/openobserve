@@ -253,10 +253,8 @@ pub async fn save_enrichment_table_from_url(
 
     // URL validation: Skip if retry mode (we're just reprocessing existing URLs)
     // Apply validation for normal updates and replace_failed mode
-    if !retry {
-        if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
-            return Ok(MetaHttpResponse::bad_request(err_msg));
-        }
+    if !retry && let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+        return Ok(MetaHttpResponse::bad_request(err_msg));
     }
 
     // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
@@ -755,14 +753,20 @@ mod tests {
     fn test_validate_enrichment_url_invalid_scheme() {
         let result = validate_enrichment_url("ftp://example.com/data.csv");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "URL must start with http:// or https://");
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
     }
 
     #[test]
     fn test_validate_enrichment_url_file_scheme() {
         let result = validate_enrichment_url("file:///etc/passwd");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "URL must start with http:// or https://");
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
     }
 
     #[test]
@@ -814,9 +818,9 @@ mod tests {
 
     #[test]
     fn test_validate_enrichment_url_github() {
-        assert!(validate_enrichment_url(
-            "https://raw.githubusercontent.com/user/repo/main/data.csv"
-        )
-        .is_ok());
+        assert!(
+            validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
+                .is_ok()
+        );
     }
 }
