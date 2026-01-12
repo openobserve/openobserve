@@ -87,7 +87,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(BASIC_HTML_SNIPPET);
 
     await expect(
@@ -145,7 +145,7 @@ test.describe("HTML chart dashboard", () => {
 
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(VARIABLE_HTML_SNIPPET);
 
     await expect(
@@ -188,7 +188,7 @@ test.describe("HTML chart dashboard", () => {
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(XSS_HTML_SNIPPET);
 
     await expect(page.getByRole("heading", { name: "XSS Test" })).toBeVisible();
@@ -222,7 +222,7 @@ test.describe("HTML chart dashboard", () => {
       .click();
     await page
       .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(UNDEFINED_VARIABLE_HTML_SNIPPET);
 
     await expect(

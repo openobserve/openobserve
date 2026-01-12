@@ -207,7 +207,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(
         'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
       );
@@ -726,7 +726,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();    
     await page.locator(".view-line").first().click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
       .fill(
         'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
       );
@@ -780,7 +780,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();    
     await page.locator(".view-line").first().click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
       .fill(
         'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
       );
@@ -878,7 +878,7 @@ test.describe("dashboard UI testcases", () => {
     
     await page.locator(".view-line").first().click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .inputarea')
+      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
       .fill(
         `SELECT histogram(_timestamp, '5 minute') AS "_time",
        COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
