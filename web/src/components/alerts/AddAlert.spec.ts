@@ -2509,4 +2509,256 @@ describe("AddAlert Component", () => {
     });
   });
 
+  describe('PromQL Condition Handling', () => {
+    let w: any;
+
+    beforeEach(async () => {
+      vi.clearAllMocks();
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+      await nextTick();
+    });
+
+    afterEach(() => {
+      w.unmount();
+    });
+
+    it('should initialize promql_condition with column field when switching to promql tab', async () => {
+      // Initially promql_condition should be null
+      expect(w.vm.formData.query_condition.promql_condition).toBeNull();
+
+      // Switch to promql mode
+      w.vm.formData.query_condition.type = 'promql';
+      await nextTick();
+      await flushPromises();
+
+      // promql_condition should be initialized with all required fields
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(1);
+    });
+
+    it('should not reinitialize promql_condition if it already exists', async () => {
+      // Set up existing promql_condition
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>',
+        value: 50,
+      };
+
+      // Switch to promql mode
+      w.vm.formData.query_condition.type = 'promql';
+      await nextTick();
+      await flushPromises();
+
+      // Should preserve existing values
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(50);
+    });
+
+    it('should include column field in promql_condition payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeDefined();
+      expect(payload.query_condition.promql_condition.column).toBe('value');
+      expect(payload.query_condition.promql_condition.operator).toBe('>=');
+      expect(payload.query_condition.promql_condition.value).toBe(10);
+    });
+
+    it('should set promql_condition to null when switching from promql to sql', () => {
+      // Start with promql
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      // Switch to sql
+      w.vm.formData.query_condition.type = 'sql';
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeNull();
+    });
+
+    it('should set promql_condition to null when switching from promql to custom', () => {
+      // Start with promql
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 10,
+      };
+
+      // Switch to custom
+      w.vm.formData.query_condition.type = 'custom';
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.promql_condition).toBeNull();
+    });
+
+    it('should initialize promql_condition when loading from dashboard panel with promql query', async () => {
+      const panelData = {
+        queryType: 'promql',
+        queries: [{
+          query: 'up{job="test"}',
+          customQuery: true
+        }],
+        threshold: 75,
+        condition: 'above',
+      };
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+      await flushPromises();
+
+      // Should have promql_condition with column field
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition).not.toBeNull();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(75);
+    });
+
+    it('should use <= operator when panel condition is below', async () => {
+      const panelData = {
+        queryType: 'promql',
+        queries: [{
+          query: 'up{job="test"}',
+          customQuery: true
+        }],
+        threshold: 25,
+        condition: 'below',
+      };
+      const encodedData = encodeURIComponent(JSON.stringify(panelData));
+
+      router.currentRoute.value.query = {
+        fromPanel: 'true',
+        panelData: encodedData
+      };
+
+      w = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router]
+        }
+      });
+
+      await w.vm.loadPanelDataIfPresent();
+      await nextTick();
+      await flushPromises();
+
+      expect(w.vm.formData.query_condition.promql_condition).not.toBeNull();
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('<=');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(25);
+    });
+
+    it('should preserve promql_condition when editing existing alert', async () => {
+      const existingAlert = {
+        name: 'Test Alert',
+        stream_type: 'metrics',
+        stream_name: 'test_stream',
+        is_real_time: false,
+        query_condition: {
+          type: 'promql',
+          promql: 'up{job="test"}',
+          promql_condition: {
+            column: 'value',
+            operator: '>',
+            value: 100,
+          },
+          conditions: null,
+          sql: null,
+          aggregation: null,
+        },
+        trigger_condition: {
+          period: 10,
+          operator: '>=',
+          threshold: 1,
+          frequency: 10,
+          silence: 10,
+        },
+        destinations: ['test-dest'],
+      };
+
+      w.vm.formData = { ...w.vm.formData, ...existingAlert };
+      await nextTick();
+
+      // promql_condition should be preserved with all fields
+      expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
+      expect(w.vm.formData.query_condition.promql_condition.column).toBe('value');
+      expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');
+      expect(w.vm.formData.query_condition.promql_condition.value).toBe(100);
+    });
+
+    it('should clear sql when query type is promql in payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.sql = 'SELECT * FROM test';
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 1,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.type).toBe('promql');
+      expect(payload.query_condition.promql).toBe('up{job="test"}');
+      expect(payload.query_condition.sql).toBe('');
+      expect(payload.query_condition.promql_condition).toBeDefined();
+    });
+
+    it('should clear conditions array when query type is promql in payload', () => {
+      w.vm.formData.query_condition.type = 'promql';
+      w.vm.formData.query_condition.promql = 'up{job="test"}';
+      w.vm.formData.query_condition.conditions = {
+        version: 2,
+        conditions: {
+          filterType: 'group',
+          logicalOperator: 'AND',
+          groupId: 'test',
+          conditions: [{ column: 'test', operator: '=', value: '1' }]
+        }
+      };
+      w.vm.formData.query_condition.promql_condition = {
+        column: 'value',
+        operator: '>=',
+        value: 1,
+      };
+
+      const payload = w.vm.getAlertPayload();
+
+      expect(payload.query_condition.type).toBe('promql');
+      expect(payload.query_condition.conditions).toEqual([]);
+      expect(payload.query_condition.promql_condition).toBeDefined();
+    });
+  });
+
 });
