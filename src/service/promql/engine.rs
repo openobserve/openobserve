@@ -502,28 +502,12 @@ impl Engine {
             }
         };
 
-        // TODO: optimize this part
         if offset_modifier != 0 {
-            let adjusted_values = values
-                .into_iter()
-                .map(|rv| {
-                    let adjusted_samples = rv
-                        .samples
-                        .into_iter()
-                        .map(|s| Sample {
-                            timestamp: s.timestamp + offset_modifier,
-                            value: s.value,
-                        })
-                        .collect();
-                    RangeValue {
-                        labels: rv.labels,
-                        samples: adjusted_samples,
-                        exemplars: rv.exemplars,
-                        time_window: rv.time_window,
-                    }
-                })
-                .collect();
-            return Ok(adjusted_values);
+            values.par_iter_mut().for_each(|rv| {
+                rv.samples
+                    .iter_mut()
+                    .for_each(|s| s.timestamp += offset_modifier);
+            });
         }
 
         Ok(values)
