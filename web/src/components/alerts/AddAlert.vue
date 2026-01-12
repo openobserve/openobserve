@@ -270,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:trigger="(val) => formData.trigger_condition = val"
                   @update:aggregation="(val) => formData.query_condition.aggregation = val"
                   @update:isAggregationEnabled="(val) => isAggregationEnabled = val"
+                  @update:promqlCondition="(val) => formData.query_condition.promql_condition = val"
                   @update:destinations="updateDestinations"
                   @refresh:destinations="refreshDestinations"
                 />
@@ -1178,6 +1179,14 @@ export default defineComponent({
       } else if (newType === 'promql') {
         previewQuery.value = formData.value.query_condition?.promql ? formData.value.query_condition.promql.trim() : '';
         isUsingBackendSql.value = false;
+        // Initialize promql_condition if it doesn't exist
+        if (!formData.value.query_condition.promql_condition) {
+          formData.value.query_condition.promql_condition = {
+            column: 'value',
+            operator: '>=',
+            value: 1,
+          };
+        }
       } else if (newType === 'custom') {
         // Start with local SQL, backend SQL will update it when ready
         previewQuery.value = generateSqlQueryLocal();
@@ -1866,6 +1875,7 @@ export default defineComponent({
                 // For PromQL: Set up promql_condition with the threshold
                 if (!formData.value.query_condition.promql_condition) {
                   formData.value.query_condition.promql_condition = {
+                    column: 'value',
                     operator: '>=',
                     value: 1,
                   };
