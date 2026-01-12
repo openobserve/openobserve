@@ -346,7 +346,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
+      .locator(".ime-text-area")
       .fill(
         'SELECT kubernetes_namespace_name as "xAxis", count(kubernetes_namespace_name) as "y_axis_1"  FROM "e2e_automate"  GROUP BY "xAxis"'
       );

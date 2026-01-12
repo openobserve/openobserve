@@ -232,7 +232,7 @@ test.describe("Logs Page testcases", () => {
     testLogger.info('Testing VRL toggle field visibility');
 
     // Check initial state of VRL editor
-    const fnEditorInput = page.locator('#fnEditor').locator('.inputarea');
+    const fnEditorInput = page.locator('#fnEditor').locator('.ime-text-area');
     const isInitiallyVisible = await fnEditorInput.isVisible().catch(() => false);
 
     if (isInitiallyVisible) {
