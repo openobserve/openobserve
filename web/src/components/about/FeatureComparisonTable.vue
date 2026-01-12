@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
           <q-icon name="compare_arrows" size="24px" />
         </div>
-        <h3 class="feature-title">{{ t("about.feature_comparision_lbl") }}</h3>
+        <h3 class="feature-title">{{ t("about.feature_comparison_lbl") }}</h3>
       </div>
       <div class="feature-subtitle-wrapper">
         <p
