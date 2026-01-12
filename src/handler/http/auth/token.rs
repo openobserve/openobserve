@@ -148,7 +148,7 @@ pub async fn token_validator(
                                         None
                                     }
                                 } else {
-                                    // for anything else, which will mostly be PUT/POST calls, 
+                                    // for anything else, which will mostly be PUT/POST calls,
                                     // the user must be in _meta org
                                     users::get_user(Some("_meta"), user_id).await
                                 }
