@@ -24,6 +24,26 @@ use crate::models::{self, ReportType};
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<BrowserConfigBuilder> =
     tokio::sync::OnceCell::const_new();
 
+/// URL-encode a string to prevent injection attacks
+/// Encodes all characters except alphanumeric, '-', '_', '.', and '~'
+fn url_encode(input: &str) -> String {
+    input
+        .bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric()
+                || byte == b'-'
+                || byte == b'_'
+                || byte == b'.'
+                || byte == b'~'
+            {
+                (byte as char).to_string()
+            } else {
+                format!("%{:02X}", byte)
+            }
+        })
+        .collect()
+}
+
 pub async fn get_chrome_launch_options() -> &'static BrowserConfigBuilder {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
@@ -155,7 +175,10 @@ pub async fn generate_report(
 
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        // URL-encode both key and value to prevent injection attacks
+        let encoded_key = url_encode(&variable.key);
+        let encoded_value = url_encode(&variable.value);
+        dashb_vars = format!("{}&var-{}={}", dashb_vars, encoded_key, encoded_value);
     }
 
     if dashboard.tabs.is_empty() {
@@ -700,7 +723,10 @@ mod tests {
 
         let mut dashb_vars = "".to_string();
         for variable in variables.iter() {
-            dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+            // URL-encode both key and value to prevent injection attacks
+            let encoded_key = url_encode(&variable.key);
+            let encoded_value = url_encode(&variable.value);
+            dashb_vars = format!("{}&var-{}={}", dashb_vars, encoded_key, encoded_value);
         }
 
         assert_eq!(dashb_vars, "&var-env=prod&var-region=us-west");
