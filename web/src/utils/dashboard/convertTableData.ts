@@ -89,6 +89,50 @@ const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
 };
 
 /**
+ * Parses a potential timestamp value (string, number, or Date) and returns a formatted string.
+ * This handles 16-digit microseconds (string or number), ISO strings, and standard milliseconds.
+ * 
+ * @param value - The value to parse
+ * @param timezone - The target timezone for conversion
+ * @returns Formatted timestamp string or null
+ */
+const parseTimestampValue = (value: any, timezone: string) => {
+  if (value === undefined || value === null || value === "") return null;
+
+  let timestamp: number;
+
+  // Handle 16-digit microseconds (string or number)
+  // This is the key fix for the "year 50002" issue where numeric micros were treated as millis
+  if (
+    (typeof value === "number" || typeof value === "string") &&
+    /^\d{16}$/.test(value.toString())
+  ) {
+    timestamp = parseInt(value.toString()) / 1000;
+  } else if (typeof value === "string") {
+    // Regular ISO string - treat as UTC timestamp
+    // Append 'Z' to naive strings to force UTC interpretation, aligning with other charts
+    const isoString = value.endsWith("Z") ? value : `${value}Z`;
+    timestamp = new Date(isoString).getTime();
+
+    // Fallback if the 'Z' trick failed (already has an offset or is invalid)
+    if (isNaN(timestamp)) {
+      timestamp = new Date(value).getTime();
+    }
+  } else if (typeof value === "number") {
+    // Numeric timestamp - assume it's already in milliseconds
+    timestamp = value;
+  } else if (value instanceof Date) {
+    timestamp = value.getTime();
+  } else {
+    timestamp = new Date(value)?.getTime();
+  }
+
+  if (isNaN(timestamp)) return null;
+
+  return formatDate(toZonedTime(timestamp, timezone));
+};
+
+/**
  * Converts table data based on the panel schema and search query data.
  *
  * @param {any} panelSchema - The panel schema containing queries and fields.
@@ -356,16 +400,7 @@ export const convertTableData = (
           }
 
           // Parse and format the base date part
-          const parsedDate =
-            typeof baseVal === "string"
-              ? new Date(`${baseVal}Z`)
-              : new Date(baseVal);
-
-          if (!isNaN(parsedDate.getTime())) {
-            formattedDate = formatDate(
-              toZonedTime(parsedDate, store.state.timezone),
-            );
-          }
+          formattedDate = parseTimestampValue(baseVal, store.state.timezone);
 
           // Append the underscore part (if it exists) back to the formatted date
           formattedDate = formattedDate
@@ -473,29 +508,7 @@ export const convertTableData = (
           const value =
             getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
           acc[curr] = isHistogramField
-            ? (() => {
-                // Handle different timestamp formats
-                let timestamp: number;
-                if (typeof value === "string" && /^\d{16}$/.test(value)) {
-                  // 16-digit string represents microseconds, convert to milliseconds
-                  timestamp = parseInt(value) / 1000;
-                } else if (typeof value === "string") {
-                  // Regular ISO string - treat as UTC timestamp
-                  const isoString = value.endsWith("Z") ? value : `${value}Z`;
-                  timestamp = new Date(isoString).getTime();
-                } else if (typeof value === "number") {
-                  // Numeric timestamp - assume it's already in milliseconds
-                  timestamp = value;
-                } else if (value instanceof Date) {
-                  // Date object
-                  timestamp = value.getTime();
-                } else {
-                  // Fallback
-                  timestamp = new Date(value)?.getTime();
-                }
-
-                return formatDate(toZonedTime(timestamp, timezone));
-              })()
+            ? parseTimestampValue(value, timezone)
             : value;
           return acc;
         },
@@ -516,32 +529,11 @@ export const convertTableData = (
       histogramFields.forEach((fieldAlias: string) => {
         const fieldValue = getDataValue(row, fieldAlias);
         if (fieldValue != null) {
-          // Handle different timestamp formats
-          let timestamp: number;
-          if (typeof fieldValue === "string" && /^\d{16}$/.test(fieldValue)) {
-            // 16-digit string represents microseconds, convert to milliseconds
-            timestamp = parseInt(fieldValue) / 1000;
-          } else if (typeof fieldValue === "string") {
-            // Regular ISO string - treat as UTC timestamp
-            const isoString = fieldValue.endsWith("Z") ? fieldValue : `${fieldValue}Z`;
-            timestamp = new Date(isoString).getTime();
-          } else if (typeof fieldValue === "number") {
-            // Numeric timestamp - assume it's already in milliseconds
-            timestamp = fieldValue;
-          } else if (fieldValue instanceof Date) {
-            // Date object
-            timestamp = fieldValue.getTime();
-          } else {
-            // Fallback
-            timestamp = new Date(fieldValue)?.getTime();
-          }
-
-          // Format and store back in the row
-          // Find the actual field name (case-insensitive)
+          // Use unified parser to format and store back in the row
           const actualField = Object.keys(row).find(
             (key) => key.toLowerCase() === fieldAlias.toLowerCase()
           ) || fieldAlias;
-          formattedRow[actualField] = formatDate(toZonedTime(timestamp, timezone));
+          formattedRow[actualField] = parseTimestampValue(fieldValue, timezone);
         }
       });
       return formattedRow;
