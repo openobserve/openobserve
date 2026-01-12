@@ -136,7 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pending Activation State -->
       <div v-else-if="state === 'pending_activation'" class="text-center">
         <h5 class="q-mb-lg">Waiting for AWS Confirmation</h5>
-        <q-spinner-gears size="80px" color="primary" />
+        <div class="flex justify-center">
+          <q-spinner-gears size="80px" color="primary" />
+        </div>
         <p class="text-grey-7 q-mt-lg">
           Please wait while we confirm activation with AWS and set up your account.
         </p>
