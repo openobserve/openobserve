@@ -103,7 +103,7 @@ pub struct View {
 /// Rum data ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/v1/{org_id}/rum",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "RumIngestionMulti",
@@ -154,7 +154,7 @@ pub async fn data(
 /// Rum log ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/v1/{org_id}/logs",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "LogIngestionJson",
@@ -205,7 +205,7 @@ pub async fn log(
 /// Rum session-replay ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/v1/{org_id}/replay",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "ReplayIngestionJson",

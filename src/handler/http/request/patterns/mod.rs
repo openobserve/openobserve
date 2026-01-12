@@ -36,7 +36,7 @@ use crate::{
 /// POST /api/{org_id}/streams/{stream_name}/patterns/extract
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/streams/{stream_name}/patterns/extract",
     context_path = "/api",
     tag = "Patterns",
     operation_id = "ExtractPatterns",

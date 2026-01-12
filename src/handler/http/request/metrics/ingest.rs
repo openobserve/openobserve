@@ -16,7 +16,7 @@
 use axum::{
     body::Bytes,
     extract::Path,
-    http::{HeaderMap, StatusCode, header::HeaderName},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 #[cfg(feature = "cloud")]
@@ -31,26 +31,17 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        request::{
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HEADER_O2_PROCESS_TIME, get_process_time,
+        },
     },
     service::metrics,
 };
 
-const HEADER_O2_PROCESS_TIME: HeaderName = HeaderName::from_static("o2_process_time");
-
-/// Returns the current time, accounting for `ZO_ACTIX_SLOW_LOG_THRESHOLD` env
-fn get_process_time() -> i64 {
-    if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    }
-}
-
 /// _json ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/ingest/metrics/_json",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "MetricsIngestionJson",

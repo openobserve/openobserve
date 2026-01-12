@@ -111,7 +111,7 @@ impl From<AlertError> for Response {
 /// CreateAlert
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateAlert",
@@ -163,7 +163,7 @@ pub async fn create_alert(
 /// GetAlert
 #[utoipa::path(
     get,
-    path = "/{org_id}/{alert_id}",
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlert",
@@ -204,7 +204,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Respo
 /// ExportAlert
 #[utoipa::path(
     post,
-    path = "/{org_id}/{alert_id}",
+    path = "/v2/{org_id}/alerts/{alert_id}/export",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ExportAlert",
@@ -245,7 +245,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Re
 /// UpdateAlert
 #[utoipa::path(
     put,
-    path = "/{org_id}/{alert_id}",
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateAlert",
@@ -288,7 +288,7 @@ pub async fn update_alert(
 /// DeleteAlert
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{alert_id}",
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlert",
@@ -322,7 +322,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Re
 /// DeleteAlertBulk
 #[utoipa::path(
     delete,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/bulk",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertBulk",
@@ -402,7 +402,7 @@ pub async fn delete_alert_bulk(
 /// ListAlerts
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListAlerts",
@@ -463,8 +463,8 @@ pub async fn list_alerts(
 
 /// EnableAlert
 #[utoipa::path(
-    put,
-    path = "/{org_id}/{alert_id}",
+    patch,
+    path = "/v2/{org_id}/alerts/{alert_id}/enable",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlert",
@@ -508,8 +508,8 @@ pub async fn enable_alert(
 
 /// EnableAlertBulk
 #[utoipa::path(
-    put,
-    path = "/{org_id}/alerts",
+    post,
+    path = "/v2/{org_id}/alerts/bulk/enable",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlertBulk",
@@ -578,8 +578,8 @@ pub async fn enable_alert_bulk(
 
 /// TriggerAlert
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{alert_id}",
+    patch,
+    path = "/v2/{org_id}/alerts/{alert_id}/trigger",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "TriggerAlert",
@@ -613,8 +613,8 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> R
 
 /// MoveAlerts
 #[utoipa::path(
-    post,
-    path = "/{org_id}/alerts",
+    patch,
+    path = "/v2/{org_id}/alerts/move",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "MoveAlerts",
@@ -668,7 +668,7 @@ pub async fn move_alerts(
 /// GenerateSql
 #[utoipa::path(
     post,
-    path = "/{org_id}/alerts",
+    path = "/v2/{org_id}/alerts/generate_sql",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GenerateSql",

@@ -29,6 +29,7 @@ use crate::{
 /// HandleUserAttributionEvent
 #[utoipa::path(
     post,
+    path = "/{org_id}/billings/new_user_attribution",
     context_path = "/api",
     tag = "Marketing",
     operation_id = "HandleUserAttributionEvent",

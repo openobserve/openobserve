@@ -37,10 +37,10 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PatternCreateRequest {
-    pub name: String,
-    pub description: String,
-    pub pattern: String,
+struct PatternCreateRequest {
+    name: String,
+    description: String,
+    pattern: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -91,15 +91,15 @@ impl From<PatternEntry> for PatternInfo {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternListResponse {
-    pub patterns: Vec<PatternInfo>,
+    patterns: Vec<PatternInfo>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PatternTestRequest {
-    pub pattern: String,
-    pub test_records: Vec<String>,
+struct PatternTestRequest {
+    pattern: String,
+    test_records: Vec<String>,
     #[serde(default)]
-    pub policy: Option<String>,
+    policy: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternTestResponse {
@@ -108,23 +108,23 @@ struct PatternTestResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct BuiltInPatternsResponse {
-    pub patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
-    pub last_updated: i64,
-    pub source_url: String,
+    patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
+    last_updated: i64,
+    source_url: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct BuiltInPatternsQuery {
+struct BuiltInPatternsQuery {
     #[serde(default)]
-    pub search: String,
+    search: String,
     #[serde(default)]
-    pub tags: Vec<String>,
+    tags: Vec<String>,
 }
 
 /// Store a re_pattern in db
 #[utoipa::path(
     post,
-    path = "/{id}",
+    path = "/{org_id}/re_patterns",
     context_path = "/api",
     summary = "Create a new regex pattern",
     description = "Stores a new regular expression pattern for log processing and data extraction",
@@ -194,7 +194,7 @@ pub async fn save(
 /// get pattern with given id if present
 #[utoipa::path(
     get,
-    path = "/{id}",
+    path = "/{org_id}/re_patterns/{id}",
     context_path = "/api",
     summary = "Get regex pattern by ID",
     description = "Retrieves a specific regex pattern using its unique identifier",
@@ -235,7 +235,7 @@ pub async fn get(Path((_org_id, id)): Path<(String, String)>) -> Response {
 /// list all patterns for given org
 #[utoipa::path(
     get,
-    path = "/{id}",
+    path = "/{org_id}/re_patterns",
     context_path = "/api",
     summary = "List all regex patterns for organization",
     description = "Lists all regex patterns available within the specified organization",
@@ -272,7 +272,7 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
 /// delete pattern with given id
 #[utoipa::path(
     delete,
-    path = "/{id}",
+    path = "/{org_id}/re_patterns/{id}",
     context_path = "/api",
     summary = "Delete regex pattern by ID",
     description = "Removes a regex pattern from the system using its identifier",
@@ -336,7 +336,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/re_patterns/bulk",
     context_path = "/api",
     summary = "Delete regex pattern in bulk",
     description = "Removes multiple regex patterns from the system using its identifiers",
@@ -433,7 +433,7 @@ pub async fn delete_bulk(
 /// update the pattern for given id
 #[utoipa::path(
     put,
-    path = "/{id}",
+    path = "/{org_id}/re_patterns/{id}",
     context_path = "/api",
     summary = "Update regex pattern by ID",
     description = "Modifies an existing regex pattern's configuration and rules",
@@ -500,7 +500,7 @@ pub async fn update(
 /// Store a re_pattern in db
 #[utoipa::path(
     post,
-    path = "/re_pattern/test",
+    path = "/{org_id}/re_patterns/test",
     context_path = "/api",
     summary = "Test regex pattern against sample data",
     description = "Tests a regex pattern against sample input strings to validate pattern matching",
@@ -558,7 +558,7 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
 /// Get built-in patterns from GitHub (pyWhat)
 #[utoipa::path(
     get,
-    path = "/re_pattern/builtin",
+    path = "/{org_id}/re_patterns/built-in",
     context_path = "/api",
     summary = "Get built-in regex patterns from GitHub",
     description = "Fetches curated regex patterns from the pyWhat project on GitHub. Supports search and tag filtering. Uses frontend caching only.",

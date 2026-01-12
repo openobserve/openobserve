@@ -61,7 +61,7 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/search_jobs",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "SubmitSearchJob",
@@ -98,7 +98,7 @@ pub async fn submit_job(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     Headers(_user_email): Headers<UserEmail>,
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     Json(req): Json<Request>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -227,7 +227,7 @@ pub async fn submit_job(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/search_jobs",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "ListSearchJobs",
@@ -289,7 +289,7 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/search_jobs/{job_id}/status",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobStatus",
@@ -361,7 +361,7 @@ pub async fn get_status(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/search_jobs/{job_id}/cancel",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "CancelSearchJob",
@@ -416,7 +416,7 @@ pub async fn cancel_job(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/search_jobs/{job_id}/result",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobResult",
@@ -507,7 +507,7 @@ pub async fn get_job_result(
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/search_jobs/{job_id}",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "DeleteSearchJob",
@@ -572,7 +572,7 @@ pub async fn delete_job(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/search_jobs/{job_id}/retry",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "RetrySearchJob",

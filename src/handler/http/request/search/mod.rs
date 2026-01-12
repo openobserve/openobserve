@@ -169,7 +169,7 @@ async fn can_use_distinct_stream(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_search",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQL",
@@ -506,8 +506,8 @@ pub async fn search(
 /// SearchAround
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{stream_name}",
+    get,
+    path = "/{org_id}/{stream_name}/_around",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAround",
@@ -619,7 +619,7 @@ pub async fn around_v1(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_around",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundV2",
@@ -740,8 +740,8 @@ pub async fn around_v2(
 /// SearchTopNValues
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{stream_name}",
+    get,
+    path = "/{org_id}/{stream_name}/_values",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchValues",
@@ -1408,7 +1408,7 @@ async fn values_v1(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_search_partition",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartition",
@@ -1571,7 +1571,7 @@ pub async fn search_partition(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_search_history",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchHistory",
@@ -1767,7 +1767,7 @@ pub async fn search_history(
 /// GetResultSchema
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/result_schema",
     context_path = "/api",
     tag = "Search",
     operation_id = "ResultSchema",

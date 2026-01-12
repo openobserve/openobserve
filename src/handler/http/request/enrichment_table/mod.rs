@@ -249,7 +249,7 @@ pub struct EnrichmentTableUrlRequest {
 /// CreateEnrichmentTableFromUrl
 #[utoipa::path(
     post,
-    path = "/{org_id}/enrichment_tables/{table_name}",
+    path = "/{org_id}/enrichment_tables/{table_name}/url",
     context_path = "/api",
     tag = "Functions",
     operation_id = "CreateEnrichmentTableFromUrl",
@@ -573,7 +573,7 @@ pub async fn save_enrichment_table_from_url(
 /// GetAllEnrichmentTableStatuses
 #[utoipa::path(
     get,
-    path = "/{org_id}/enrichment_tables",
+    path = "/{org_id}/enrichment_tables/status",
     context_path = "/api",
     tag = "Functions",
     operation_id = "GetAllEnrichmentTableStatuses",

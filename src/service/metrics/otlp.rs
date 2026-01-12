@@ -58,7 +58,7 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
@@ -587,8 +587,13 @@ pub async fn handle_otlp_request(
         }
 
         // write to file
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metrics.as_str(),
+            &stream_name,
+        )
+        .await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;

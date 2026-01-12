@@ -39,9 +39,9 @@ struct LicenseResponse {
     ingestion_exceeded: u8,
 }
 
-pub struct SaveLicenseRequest {
-    pub key: License,
-    pub raw_key: String,
+struct SaveLicenseRequest {
+    key: License,
+    raw_key: String,
 }
 
 impl<'de> Deserialize<'de> for SaveLicenseRequest {

@@ -49,7 +49,7 @@ impl From<PipelineError> for Response {
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/pipelines",
     context_path = "/api",
     tag = "Pipeline",
     operation_id = "createPipeline",
@@ -98,8 +98,8 @@ pub async fn save_pipeline(
 /// ListPipelines
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/pipelines",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "listPipelines",
@@ -191,8 +191,8 @@ pub async fn list_pipelines(
 /// GetStreamsWithPipeline
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/pipelines/streams",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "getStreamsWithPipeline",
@@ -222,8 +222,8 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
 /// DeletePipeline
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{pipeline_id}",
+    delete,
+    path = "/{org_id}/pipelines/{pipeline_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipeline",
@@ -258,8 +258,8 @@ pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)
 /// DeletePipelineBulk
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    delete,
+    path = "/{org_id}/pipelines/bulk",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipelineBulk",
@@ -321,8 +321,8 @@ pub async fn delete_pipeline_bulk(
 /// UpdatePipeline
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    put,
+    path = "/{org_id}/pipelines",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "updatePipeline",
@@ -357,8 +357,8 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Response {
 /// EnablePipeline
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{pipeline_id}",
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipeline",
@@ -411,7 +411,7 @@ pub async fn enable_pipeline(
 /// EnablePipelineBulk
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/pipelines/bulk/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipelineBulk",

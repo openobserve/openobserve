@@ -48,7 +48,7 @@ pub struct BackfillResponse {
 /// Creates a new backfill job to fill gaps in summary streams.
 #[utoipa::path(
     post,
-    path = "/{org_id}/{pipeline_id}",
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "CreateBackfillJob",
@@ -126,7 +126,7 @@ pub async fn create_backfill(
 /// Returns a list of all backfill jobs in the specified organization.
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/pipelines/backfill",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "ListBackfillJobs",
@@ -165,7 +165,7 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
 /// Returns the status of a specific backfill job.
 #[utoipa::path(
     get,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/pipelines/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "GetBackfillJob",
@@ -207,7 +207,7 @@ pub async fn get_backfill(Path((org_id, job_id)): Path<(String, String)>) -> Res
 /// Enables (resumes) or disables (pauses) a backfill job.
 #[utoipa::path(
     put,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/pipelines/backfill/{job_id}/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "EnableBackfillJob",
@@ -273,7 +273,7 @@ pub async fn enable_backfill(
 /// Deletes a backfill job permanently.
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/pipelines/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "DeleteBackfillJob",
@@ -321,7 +321,7 @@ pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> 
 /// Update an existing backfill job
 #[utoipa::path(
     put,
-    path = "/{org_id}/{job_id}",
+    path = "/{org_id}/pipelines/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "UpdateBackfillJob",

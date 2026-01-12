@@ -16,7 +16,7 @@
 use axum::{
     body::Body,
     extract::{Path, Query},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -43,7 +43,7 @@ use crate::{
 /// prometheus remote-write endpoint for metrics
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/prometheus/api/v1/write",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRemoteWrite",
@@ -67,7 +67,7 @@ use crate::{
 pub async fn remote_write(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
     let user = IngestUser::from_user_email(&user_email.user_id);
@@ -89,8 +89,8 @@ pub async fn remote_write(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQuery",
@@ -141,7 +141,7 @@ pub async fn query_get(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Response {
     query(&org_id, req, &user_email.user_id, &headers).await
 }
@@ -150,7 +150,7 @@ pub async fn query_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     axum::Form(form): axum::Form<config::meta::promql::RequestQuery>,
 ) -> Response {
     let req = if form.query.is_some() { form } else { req };
@@ -161,7 +161,7 @@ async fn query(
     org_id: &str,
     req: config::meta::promql::RequestQuery,
     user_email: &str,
-    headers: &axum::http::HeaderMap,
+    headers: &HeaderMap,
 ) -> Response {
     let cfg = config::get_config();
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
@@ -258,8 +258,8 @@ async fn query(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query_range",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusRangeQuery",
@@ -320,7 +320,7 @@ pub async fn query_range_get(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Response {
     query_range(&org_id, req, &user_email.user_id, &headers, false).await
 }
@@ -329,7 +329,7 @@ pub async fn query_range_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     axum::Form(form): axum::Form<config::meta::promql::RequestRangeQuery>,
 ) -> Response {
     let req = if form.query.is_some() { form } else { req };
@@ -340,8 +340,8 @@ pub async fn query_range_post(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/query_exemplars",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusQueryExemplars",
@@ -413,7 +413,7 @@ pub async fn query_exemplars_get(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Response {
     query_range(&org_id, req, &user_email.user_id, &headers, true).await
 }
@@ -422,7 +422,7 @@ pub async fn query_exemplars_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
     Headers(user_email): Headers<UserEmail>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
     axum::Form(form): axum::Form<config::meta::promql::RequestRangeQuery>,
 ) -> Response {
     let req = if form.query.is_some() { form } else { req };
@@ -433,7 +433,7 @@ async fn query_range(
     org_id: &str,
     req: config::meta::promql::RequestRangeQuery,
     user_email: &str,
-    headers: &axum::http::HeaderMap,
+    headers: &HeaderMap,
     query_exemplars: bool,
 ) -> Response {
     let cfg = config::get_config();
@@ -592,8 +592,8 @@ async fn query_range(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/metadata",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
@@ -667,8 +667,8 @@ pub async fn metadata(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/series",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusSeries",
@@ -832,8 +832,8 @@ async fn series(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/labels",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabels",
@@ -944,8 +944,8 @@ async fn labels(org_id: &str, req: config::meta::promql::RequestLabels) -> Respo
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{label_name}",
+    get,
+    path = "/{org_id}/prometheus/api/v1/label/{label_name}/values",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
@@ -1079,8 +1079,8 @@ fn validate_metadata_params(
 
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
 #[utoipa::path(
-    post,
-    path = "/prometheus/format_query",
+    get,
+    path = "/{org_id}/prometheus/api/v1/format_query",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PrometheusFormatQuery",

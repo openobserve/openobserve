@@ -46,7 +46,7 @@ fn mcp_only_in_enterprise() -> Response {
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequest",
@@ -136,7 +136,7 @@ pub async fn handle_mcp_post(
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequestStream",
@@ -228,7 +228,7 @@ pub async fn handle_mcp_get(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequest",
@@ -254,7 +254,7 @@ pub async fn handle_mcp_post(Path(_org_id): Path<String>, _body: Bytes) -> Respo
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequestStream",

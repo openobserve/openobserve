@@ -77,7 +77,7 @@ use crate::{
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/streams",
+    path = "/{org_id}/_search_stream",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamHttp2",
@@ -636,7 +636,7 @@ pub async fn report_to_audit(
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/streams",
+    path = "/{org_id}/_values_stream",
     context_path = "/api",
     tag = "Search",
     operation_id = "ValuesStreamHttp2",

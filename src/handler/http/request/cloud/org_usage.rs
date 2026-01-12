@@ -29,6 +29,7 @@ use crate::{
 /// GetUsageData
 #[utoipa::path(
     get,
+    path = "/{org_id}/billings/data_usage/{usage_date}",
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetUsageData",

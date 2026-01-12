@@ -52,8 +52,8 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_write_partition_key,
-            write_file,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+            get_write_partition_key, write_file,
         },
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
@@ -495,8 +495,13 @@ pub async fn ingest(
             continue;
         }
 
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metrics.as_str(),
+            &stream_name,
+        )
+        .await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;

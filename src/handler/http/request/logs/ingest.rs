@@ -17,7 +17,7 @@ use axum::{
     Json,
     body::Bytes,
     extract::Path,
-    http::{HeaderMap, StatusCode, header::HeaderName},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::meta::otlp::OtlpRequestType;
@@ -41,34 +41,20 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        request::{
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
+        },
     },
-    service::logs::{self, otlp::handle_request},
+    service::{
+        ingestion::get_thread_id,
+        logs::{self, otlp::handle_request},
+    },
 };
-
-const HEADER_O2_PROCESS_TIME: HeaderName = HeaderName::from_static("o2_process_time");
-
-/// Returns the current time, accounting for `ZO_ACTIX_SLOW_LOG_THRESHOLD` env
-fn get_process_time() -> i64 {
-    if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    }
-}
-
-fn insert_process_time_header(time: i64, headers: &mut axum::http::HeaderMap) {
-    if time > 0
-        && let Ok(value) = axum::http::HeaderValue::from_str(&time.to_string())
-    {
-        headers.insert(HEADER_O2_PROCESS_TIME.clone(), value);
-    }
-}
 
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_bulk",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionBulk",
@@ -97,7 +83,7 @@ pub async fn bulk(
     body: Bytes,
 ) -> Response {
     let user_email = &user_email.user_id;
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -149,7 +135,7 @@ pub async fn bulk(
 /// _multi ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_multi",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionMulti",
@@ -179,7 +165,7 @@ pub async fn multi(
     body: Bytes,
 ) -> Response {
     let user_email = &user_email.user_id;
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -237,7 +223,7 @@ pub async fn multi(
 /// _json ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_json",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionJson",
@@ -264,7 +250,7 @@ pub async fn json(
     body: Bytes,
 ) -> Response {
     let user_email = &user_email.user_id;
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -318,7 +304,7 @@ pub async fn json(
 /// _kinesis_firehose ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_name}",
+    path = "/{org_id}/{stream_name}/_kinesis_firehose",
     context_path = "/api",
     tag = "Logs",
     operation_id = "AWSLogsIngestion",
@@ -349,7 +335,7 @@ pub async fn handle_kinesis_request(
 ) -> Response {
     let user_email = &user_email.user_id;
     let request_id = post_data.request_id.clone();
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -416,7 +402,7 @@ pub async fn handle_gcp_request(
     Json(post_data): Json<GCPIngestionRequest>,
 ) -> Response {
     let user_email = &user_email.user_id;
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -495,7 +481,7 @@ pub async fn otlp_logs_write(
     let in_stream_name = headers
         .get(&config::get_config().grpc.stream_header_key)
         .and_then(|v| v.to_str().ok());
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {
@@ -580,7 +566,7 @@ pub async fn otlp_logs_write(
 /// HEC format compatible ingestion API
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_hec",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionHec",
@@ -609,7 +595,7 @@ pub async fn hec(
     body: Bytes,
 ) -> Response {
     let user_email = &user_email.user_id;
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let thread_id = get_thread_id();
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Logs, None).await {

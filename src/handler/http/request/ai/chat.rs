@@ -92,9 +92,9 @@ pub async fn chat(
         Span::none()
     };
 
-    // Execute within the span context
-    async move {
-        if config.ai.enabled {
+    let _guard = span.enter();
+
+    if config.ai.enabled {
         let response = agent::service::chat(
             agent::meta::AiServerRequest::new(body.messages, body.model, body.context),
             trace_id.clone(),
@@ -116,20 +116,18 @@ pub async fn chat(
                             "error": error_msg,
                             "code": 429
                         })),
-                    ).into_response();
+                    )
+                        .into_response();
                 }
 
                 // All other errors (4XX except 429, and 5XX) are internal server errors
                 // as they indicate misconfiguration or provider issues
                 MetaHttpResponse::internal_error(error_msg)
             }
-            }
-        } else {
-            MetaHttpResponse::bad_request("AI is not enabled")
         }
+    } else {
+        MetaHttpResponse::bad_request("AI is not enabled")
     }
-    .instrument(span)
-    .await
 }
 
 #[derive(Debug, Deserialize)]
@@ -248,11 +246,12 @@ pub async fn chat_stream(
         Span::none()
     };
 
-    async move {
-        let mut code = StatusCode::OK.as_u16();
-        let body_bytes_str = serde_json::to_string(&body).unwrap();
+    let _guard = span.enter();
 
-        if !config.ai.enabled {
+    let mut code = StatusCode::OK.as_u16();
+    let body_bytes_str = serde_json::to_string(&body).unwrap();
+
+    if !config.ai.enabled {
         let error_message = Some("AI is not enabled".to_string());
         code = StatusCode::BAD_REQUEST.as_u16();
         report_to_audit(
@@ -308,7 +307,8 @@ pub async fn chat_stream(
                         "error": error_msg,
                         "code": 429
                     })),
-                ).into_response();
+                )
+                    .into_response();
             }
 
             // All other errors (4XX except 429, and 5XX) are internal server errors
@@ -331,25 +331,25 @@ pub async fn chat_stream(
         }
     };
 
-        report_to_audit(
-            user_id,
-            org_id.clone(),
-            trace_id,
-            code,
-            None,
-            "POST".to_string(),
-            format!("/api/{}/ai/chat_stream", org_id),
-            String::new(),
-            body_bytes_str,
-        )
-        .await;
+    report_to_audit(
+        user_id,
+        org_id.clone(),
+        trace_id,
+        code,
+        None,
+        "POST".to_string(),
+        format!("/api/{}/ai/chat_stream", org_id),
+        String::new(),
+        body_bytes_str,
+    )
+    .await;
 
-        axum::http::Response::builder()
-            .status(StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, mime::TEXT_EVENT_STREAM.as_ref())
-            .body(Body::from_stream(stream))
-            .unwrap_or_else(|_| Response::new(Body::empty()))
-    }
-    .instrument(span)
-    .await
+    axum::http::Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            mime::TEXT_EVENT_STREAM.as_ref(),
+        )
+        .body(Body::from_stream(stream))
+        .unwrap_or_else(|_| Response::new(Body::empty()))
 }

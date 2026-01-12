@@ -40,7 +40,7 @@ pub struct DedupSummaryResponse {
 /// Get deduplication summary statistics for an organization
 #[utoipa::path(
     get,
-    path = "/{org_id}/alerts",
+    path = "/{org_id}/alerts/dedup/summary",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDedupSummary",

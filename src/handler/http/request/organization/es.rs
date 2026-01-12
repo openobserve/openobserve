@@ -16,11 +16,11 @@
 use axum::{
     body::Body,
     extract::Path,
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
 
-pub async fn org_index(Path(_org_id): Path<String>, headers: axum::http::HeaderMap) -> Response {
+pub async fn org_index(Path(_org_id): Path<String>, headers: HeaderMap) -> Response {
     // eg.1: User-Agent:[elastic-transport-ruby/8.0.1 (RUBY_VERSION: 3.1.2; linux
     // x86_64; Faraday v1.10.0)] eg.2: Elastic-filebeat/7.17.1 (linux; arm64;
     // 1d05ba86138cfc9a5ae5c0acc64a57b8d81678ff; 2022-02-24 01:00:19 +0000 UTC)

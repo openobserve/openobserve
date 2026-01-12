@@ -18,7 +18,7 @@ use std::io::Read;
 use axum::{
     body::Bytes,
     extract::Path,
-    http::{HeaderMap, StatusCode, header::HeaderName},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use flate2::read::GzDecoder;
@@ -27,13 +27,15 @@ use proto::loki_rpc;
 
 use crate::{
     common::meta::loki::{LokiError, LokiPushRequest},
-    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::logs,
+    handler::http::request::{
+        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
+    },
+    service::{ingestion::get_thread_id, logs},
 };
 
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/loki/api/v1/push",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionLoki",
@@ -68,13 +70,8 @@ use crate::{
 )]
 pub async fn loki_push(Path(org_id): Path<String>, headers: HeaderMap, body: Bytes) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
-
-    let thread_id = 0; // In axum, we use a constant thread_id
+    let process_time = get_process_time();
+    let thread_id = get_thread_id();
 
     let content_type = headers
         .get("Content-Type")
@@ -126,12 +123,7 @@ pub async fn loki_push(Path(org_id): Path<String>, headers: HeaderMap, body: Byt
         }
     };
 
-    if process_time > 0
-        && let Ok(value) = axum::http::HeaderValue::from_str(&process_time.to_string())
-    {
-        resp.headers_mut()
-            .insert(HeaderName::from_static("o2_process_time"), value);
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
     resp
 }

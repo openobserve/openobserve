@@ -75,7 +75,7 @@ use crate::{
 /// SearchStreamData
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_search_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQLMultiStream",
@@ -684,7 +684,7 @@ pub async fn search_multi(
 /// SearchMultiStreamPartition
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_search_partition_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
@@ -856,7 +856,7 @@ pub async fn _search_partition_multi(
 /// SearchAround
 #[utoipa::path(
     post,
-    path = "/{org_id}/{stream_names}",
+    path = "/{org_id}/{stream_names}/_around_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundMulti",
@@ -1085,7 +1085,7 @@ const fn default_size() -> i64 {
 /// SearchStreamMulti HTTP2 streaming endpoint
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/_multi_search_stream",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamMultiHttp2",

@@ -40,7 +40,8 @@ use tokio::sync::{RwLock, mpsc};
 use crate::{
     common::meta::stream::SchemaRecords,
     service::{
-        db, ingestion,
+        db,
+        ingestion::{self, get_thread_id},
         metadata::{Metadata, MetadataItem},
         schema::get_schema_changes,
     },
@@ -296,7 +297,7 @@ impl Metadata for DistinctValues {
             }
 
             let writer = ingester::get_writer(
-                0,
+                get_thread_id(),
                 &org_id,
                 StreamType::Metadata.as_str(),
                 &distinct_stream_name,

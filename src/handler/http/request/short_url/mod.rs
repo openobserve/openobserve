@@ -16,20 +16,21 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    http::{StatusCode, header},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
 use serde::Deserialize;
 
 use crate::{
+    common::utils::redirect_response::RedirectResponseBuilder,
     handler::http::request::search::error_utils::map_error_to_http_response, service::short_url,
 };
 
 /// Shorten a URL
 #[utoipa::path(
     post,
-    path = "/{short_id}",
+    path = "/{org_id}/short",
     context_path = "/api",
     operation_id = "createShortUrl",
     summary = "Create short URL",
@@ -85,7 +86,7 @@ pub struct RetrieveQuery {
 /// Retrieve the original URL from a short_id
 #[utoipa::path(
     get,
-    path = "/{short_id}",
+    path = "/{org_id}/short/{short_id}",
     context_path = "/short",
     operation_id = "resolveShortUrl",
     summary = "Resolve short URL",
@@ -134,48 +135,12 @@ pub async fn retrieve(
     // TODO: Remove this once we are sure there is no more legacy short urls
     if original_url.is_some() {
         let redirect_url = short_url::construct_short_url(&org_id, &short_id);
-        build_redirect_response(&redirect_url)
+        RedirectResponseBuilder::new(&redirect_url)
+            .build()
+            .redirect_http()
     } else {
-        let default_redirect_url = "/web/";
-        log::error!(
-            "Short URL not found, redirecting to {}",
-            default_redirect_url
-        );
-        build_redirect_response(default_redirect_url)
-    }
-}
-
-/// Build a redirect response, handling long URLs with HTML meta refresh
-fn build_redirect_response(redirect_url: &str) -> Response {
-    let redirect_url = redirect_url.trim_matches('"');
-    if redirect_url.len() < 1024 {
-        Response::builder()
-            .status(StatusCode::FOUND)
-            .header(header::LOCATION, redirect_url)
-            .body(axum::body::Body::empty())
-            .unwrap()
-            .into_response()
-    } else {
-        // if the URL is too long, we send the original URL and let FE handle the redirect.
-        let html = format!(
-            r#"
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <meta http-equiv="refresh" content="0;url={redirect_url}">
-                <title>OpenObserve Redirecting...</title>
-            </head>
-            <body>
-                Redirecting to <a href="{redirect_url}">click here</a>
-            </body>
-            </html>"#
-        );
-        Response::builder()
-            .status(StatusCode::FOUND)
-            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-            .body(axum::body::Body::from(html))
-            .unwrap()
-            .into_response()
+        let redirect = RedirectResponseBuilder::default().build();
+        log::error!("Short URL not found, {}", &redirect);
+        redirect.redirect_http()
     }
 }

@@ -105,7 +105,7 @@ pub struct PipelineHistoryResponse {
 /// authentication.
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/pipelines/history",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "GetPipelineHistory",

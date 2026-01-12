@@ -49,8 +49,8 @@ use crate::{
 
 /// GetSchema
 #[utoipa::path(
-    post,
-    path = "/{org_id}/streams/{stream_name}",
+    get,
+    path = "/{org_id}/streams/{stream_name}/schema",
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamSchema",
@@ -198,7 +198,7 @@ pub async fn create(
 
 #[utoipa::path(
     put,
-    path = "/{org_id}/streams/{stream_name}",
+    path = "/{org_id}/streams/{stream_name}/settings",
     context_path = "/api",
     tag = "Streams",
     operation_id = "UpdateStreamSettings",
@@ -263,7 +263,7 @@ pub async fn update_settings(
 /// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"update"}#
 #[utoipa::path(
     put,
-    path = "/{org_id}/streams/{stream_name}",
+    path = "/{org_id}/streams/{stream_name}/update_fields",
     context_path = "/api",
     tag = "Streams",
     operation_id = "UpdateStreamFields",
@@ -325,8 +325,8 @@ pub async fn update_fields(
 /// DeleteStreamFields
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/streams/{stream_name}",
+    put,
+    path = "/{org_id}/streams/{stream_name}/delete_fields",
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteFields",
@@ -378,7 +378,7 @@ pub async fn delete_fields(
 /// DeleteStream
 
 #[utoipa::path(
-    post,
+    delete,
     path = "/{org_id}/streams/{stream_name}",
     context_path = "/api",
     tag = "Streams",
@@ -428,7 +428,7 @@ pub async fn delete(
 /// ListStreams
 
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/streams",
     context_path = "/api",
     tag = "Streams",
@@ -608,8 +608,8 @@ fn stream_comparator(
 /// StreamDeleteCache
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/streams/{stream_name}",
+    delete,
+    path = "/{org_id}/streams/{stream_name}/cache/results",
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteCache",
@@ -683,8 +683,8 @@ pub async fn delete_stream_cache(
 /// StreamDeleteDataByTimeRange
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/streams/{stream_name}",
+    delete,
+    path = "/{org_id}/streams/{stream_name}/data_by_time_range",
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteDataByTimeRange",
@@ -770,8 +770,8 @@ pub async fn delete_stream_data_by_time_range(
 /// StreamDeleteDataByTimeRangeJobStatus
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/streams/{stream_name}",
+    get,
+    path = "/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}",
     context_path = "/api",
     tag = "Streams",
     operation_id = "StreamDeleteDataByTimeRangeJobStatus",

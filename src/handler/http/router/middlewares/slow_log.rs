@@ -25,6 +25,8 @@ use config::utils::time::now_micros;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
+use crate::handler::http::request::HEADER_O2_PROCESS_TIME;
+
 /// Layer that logs slow requests
 #[derive(Clone)]
 pub struct SlowLogLayer {
@@ -144,7 +146,7 @@ where
                     // Get the process time from the response if available
                     let wait_time_str = if let Ok(ref resp) = result {
                         resp.headers()
-                            .get("o2_process_time")
+                            .get(HEADER_O2_PROCESS_TIME)
                             .and_then(|v| v.to_str().ok())
                             .and_then(|s| s.parse::<i64>().ok())
                             .filter(|&v| v > 0)

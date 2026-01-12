@@ -46,6 +46,7 @@ use crate::{
 /// GetSubscriptionUrl
 #[utoipa::path(
     get,
+    path = "/{org_id}/billings/hosted_subscription_url",
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetSubscriptionUrl",
@@ -127,6 +128,7 @@ pub async fn create_checkout_session(
 /// ProcessSessionDetail
 #[utoipa::path(
     get,
+    path = "/{org_id}/billings/checkout_session_detail",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ProcessSessionDetail",
@@ -219,7 +221,8 @@ pub async fn process_session_detail(
 
 /// Unsubscribe
 #[utoipa::path(
-    delete,
+    get,
+    path = "/{org_id}/billings/unsubscribe",
     context_path = "/api",
     tag = "Billings",
     operation_id = "Unsubscribe",
@@ -278,6 +281,7 @@ pub async fn unsubscribe(
 /// ListInvoices
 #[utoipa::path(
     get,
+    path = "/{org_id}/billings/invoices",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListInvoices",
@@ -320,6 +324,7 @@ pub async fn list_invoices(
 /// ListSubscription
 #[utoipa::path(
     get,
+    path = "/{org_id}/billings/list_subscription",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListSubscription",
@@ -356,7 +361,8 @@ pub async fn list_subscription(
 
 /// CreateBillingPortalSession
 #[utoipa::path(
-    post,
+    get,
+    path = "/{org_id}/billings/billing_portal",
     context_path = "/api",
     tag = "Billings",
     operation_id = "CreateBillingPortalSession",
@@ -401,6 +407,7 @@ pub async fn create_billing_portal_session(
 /// StripeWebhookEvent
 #[utoipa::path(
     post,
+    path = "/stripe",
     context_path = "/webhook",
     tag = "Billings",
     summary = "Handle Stripe webhook events",

@@ -18,9 +18,10 @@ use std::{collections::HashMap, sync::Arc};
 use axum::{
     body::Body,
     extract::{Path, Query},
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::{
     Config, get_config,
     meta::user::UserRole,
@@ -199,7 +200,7 @@ pub async fn save(
 
 /// UpdateUser
 #[utoipa::path(
-    post,
+    put,
     path = "/{org_id}/users/{email_id}",
     context_path = "/api",
     tag = "Users",
@@ -325,30 +326,25 @@ pub async fn add_user_to_org(
     }
 }
 
-fn _prepare_cookie<T: Serialize + ?Sized, E: Into<axum_extra::extract::cookie::Expiration>>(
+fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
     conf: &Arc<Config>,
-    cookie_name: &str,
+    cookie_name: &'a str,
     token_struct: &T,
-    _cookie_expiry: E,
-) -> String {
+    cookie_expiry: E,
+) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
-    format!(
-        "{}={}; Path=/; HttpOnly{}{}; Max-Age={}",
-        cookie_name,
-        tokens,
-        if conf.auth.cookie_secure_only {
-            "; Secure"
-        } else {
-            ""
-        },
-        if conf.auth.cookie_same_site_lax {
-            "; SameSite=Lax"
-        } else {
-            "; SameSite=None"
-        },
-        conf.auth.cookie_max_age
-    )
+    let mut auth_cookie = Cookie::new(cookie_name, tokens);
+    auth_cookie.set_expires(cookie_expiry.into());
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+    auth_cookie
 }
 
 /// RemoveUserFromOrganization
@@ -391,8 +387,8 @@ pub async fn delete(
 
 /// BulkRemoveUserFromOrganization
 #[utoipa::path(
-    post,
-    path = "/{org_id}/users/{email_id}",
+    delete,
+    path = "/{org_id}/users/bulk",
     context_path = "/api",
     tag = "Users",
     operation_id = "BulkRemoveUserFromOrg",
@@ -468,7 +464,7 @@ pub async fn delete_bulk(
 /// AuthenticateUser
 #[utoipa::path(
 post,
-path = "/{org_id}/users",
+path = "/login",
 context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
@@ -487,7 +483,7 @@ context_path = "/auth",
     )
 )]
 pub async fn authentication(
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
     auth: Option<axum::Json<SignInUser>>,
 ) -> Response {
@@ -605,32 +601,27 @@ pub async fn authentication(
         .unwrap();
 
         let tokens = base64::encode(&tokens);
-        let cookie_value = format!(
-            "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
-            tokens,
-            if cfg.auth.cookie_secure_only {
-                "; Secure"
-            } else {
-                ""
-            },
-            if cfg.auth.cookie_same_site_lax {
-                "; SameSite=Lax"
-            } else {
-                "; SameSite=None"
-            },
-            cfg.auth.cookie_max_age
+        let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+        auth_cookie.set_expires(
+            time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
         );
-
+        auth_cookie.set_http_only(true);
+        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+        auth_cookie.set_path("/");
+        if cfg.auth.cookie_same_site_lax {
+            auth_cookie.set_same_site(SameSite::Lax);
+        } else {
+            auth_cookie.set_same_site(SameSite::None);
+        }
         // audit the successful login
         #[cfg(feature = "enterprise")]
         audit(audit_message).await;
-
-        Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
-            .header(header::SET_COOKIE, cookie_value)
-            .body(Body::from(serde_json::to_string(&resp).unwrap()))
-            .unwrap()
+        (
+            StatusCode::OK,
+            [(header::SET_COOKIE, auth_cookie.to_string())],
+            axum::Json(resp),
+        )
+            .into_response()
     } else {
         #[cfg(feature = "enterprise")]
         audit_unauthorized_error(audit_message).await;
@@ -654,8 +645,8 @@ const fn default_exp_in() -> u32 {
 }
 
 pub async fn get_presigned_url(
-    #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
-    headers: axum::http::HeaderMap,
+    Query(_query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
     Query(params): Query<PresignedURLGenerator>,
 ) -> Response {
     // Extract basic auth from Authorization header
@@ -704,7 +695,7 @@ pub async fn get_presigned_url(
     let payload = PresignedURLGeneratorResponse { url };
     #[cfg(feature = "enterprise")]
     {
-        let query_string = query
+        let query_string = _query
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect::<Vec<_>>()
@@ -734,7 +725,7 @@ pub async fn get_presigned_url(
 }
 
 pub async fn get_auth(
-    _headers: axum::http::HeaderMap,
+    _headers: HeaderMap,
     Query(_query): Query<HashMap<String, String>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -878,22 +869,7 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                format!(
-                    "{}={}; Path=/; HttpOnly{}{}; Max-Age={}",
-                    cookie_name,
-                    base64::encode(&json::to_string(&tokens).unwrap()),
-                    if cfg.auth.cookie_secure_only {
-                        "; Secure"
-                    } else {
-                        ""
-                    },
-                    if cfg.auth.cookie_same_site_lax {
-                        "; SameSite=Lax"
-                    } else {
-                        "; SameSite=None"
-                    },
-                    cfg.auth.cookie_max_age
-                )
+                _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
                 let auth_ext = format!(
@@ -910,22 +886,7 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                format!(
-                    "{}={}; Path=/; HttpOnly{}{}; Max-Age={}",
-                    cookie_name,
-                    base64::encode(&json::to_string(&tokens).unwrap()),
-                    if cfg.auth.cookie_secure_only {
-                        "; Secure"
-                    } else {
-                        ""
-                    },
-                    if cfg.auth.cookie_same_site_lax {
-                        "; SameSite=Lax"
-                    } else {
-                        "; SameSite=None"
-                    },
-                    req_ts
-                )
+                _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
             let url = format!(
@@ -962,8 +923,8 @@ pub async fn get_auth(
 
 /// ListUserRoles
 #[utoipa::path(
-    post,
-    path = "/{org_id}/users",
+    get,
+    path = "/{org_id}/users/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserRoles",
@@ -1032,7 +993,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 /// ListUserInvitations
 #[cfg(feature = "cloud")]
 #[utoipa::path(
-    post,
+    get,
+    path = "/invites",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",

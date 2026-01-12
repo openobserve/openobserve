@@ -44,7 +44,7 @@ use crate::{
 /// ListServiceAccounts
 
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/service_accounts",
     context_path = "/api",
     tag = "ServiceAccounts",
@@ -160,8 +160,8 @@ pub async fn save(
 /// UpdateServiceAccount
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/service_accounts",
+    put,
+    path = "/{org_id}/service_accounts/{email_id}",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "ServiceAccountUpdate",
@@ -253,7 +253,7 @@ pub async fn update(
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/service_accounts",
+    path = "/{org_id}/service_accounts/{email_id}",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "RemoveServiceAccount",
@@ -289,7 +289,7 @@ pub async fn delete(
 /// RemoveServiceAccountBulk
 #[utoipa::path(
     delete,
-    path = "/{org_id}/service_accounts",
+    path = "/{org_id}/service_accounts/bulk",
     context_path = "/api",
     tag = "ServiceAccounts",
     operation_id = "RemoveServiceAccountBulk",
@@ -370,7 +370,7 @@ pub async fn delete_bulk(
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/service_accounts",
+    path = "/{org_id}/service_accounts/{email_id}",
     context_path = "/api",
      tag = "ServiceAccounts",
     operation_id = "GetServiceAccountToken",

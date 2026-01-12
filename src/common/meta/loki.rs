@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 
+use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -110,7 +111,7 @@ pub enum LokiError {
     },
 }
 
-impl axum::response::IntoResponse for LokiError {
+impl IntoResponse for LokiError {
     fn into_response(self) -> axum::response::Response {
         use axum::http::{StatusCode, header};
 
@@ -179,8 +180,6 @@ mod tests {
 
     #[test]
     fn test_error_to_http_response() {
-        use axum::response::IntoResponse;
-
         let error = LokiError::InvalidTimestamp {
             message: "bad timestamp".to_string(),
         };
@@ -194,8 +193,6 @@ mod tests {
 
     #[test]
     fn test_client_vs_server_errors() {
-        use axum::response::IntoResponse;
-
         let client_errors = vec![
             LokiError::InvalidTimestamp {
                 message: "test".to_string(),
@@ -226,8 +223,6 @@ mod tests {
 
     #[test]
     fn test_protobuf_decode_error() {
-        use axum::response::IntoResponse;
-
         let decode_error = prost::DecodeError::new("test decode error");
         let loki_error: LokiError = decode_error.into();
         assert!(matches!(loki_error, LokiError::ProtobufDecode { .. }));

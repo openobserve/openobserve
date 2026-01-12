@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{
-    body::Bytes,
-    extract::Path,
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
-};
+use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{search::default_use_cache, stream::StreamType},
@@ -26,7 +21,6 @@ use config::{
     utils::json,
 };
 use hashbrown::HashMap;
-use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -44,7 +38,10 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        request::{
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
+            search::error_utils::map_error_to_http_response,
+        },
     },
     service::{search as SearchService, traces},
 };
@@ -52,7 +49,7 @@ use crate::{
 /// TracesIngest
 #[utoipa::path(
     post,
-    path = "/{org_id}/traces",
+    path = "/{org_id}/v1/traces",
     context_path = "/api",
     tag = "Traces",
     operation_id = "PostTraces",
@@ -95,11 +92,7 @@ async fn handle_req(
     body: Bytes,
 ) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
     let user = crate::common::meta::ingestion::IngestUser::from_user_email(&user_email.user_id);
 
@@ -129,12 +122,7 @@ async fn handle_req(
 
     match result {
         Ok(mut resp) => {
-            if process_time > 0 {
-                resp.headers_mut().insert(
-                    axum::http::header::HeaderName::from_static("o2_process_time"),
-                    axum::http::header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-                );
-            }
+            insert_process_time_header(process_time, resp.headers_mut());
             resp
         }
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -599,61 +587,6 @@ pub async fn get_latest_traces(
         resp.insert("function_error", json::Value::String(range_error));
     }
     MetaHttpResponse::json(resp)
-}
-
-/// Helper function to map errors to HTTP responses (axum version)
-fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
-    match err {
-        errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    axum::Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-                )
-                    .into_response()
-            }
-            errors::ErrorCodes::SearchTimeout(_) => (
-                StatusCode::REQUEST_TIMEOUT,
-                axum::Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::InvalidParams(_)
-            | errors::ErrorCodes::SearchSQLExecuteError(_)
-            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
-            | errors::ErrorCodes::SearchFunctionNotDefined(_)
-            | errors::ErrorCodes::FullTextSearchFieldNotFound
-            | errors::ErrorCodes::SearchFieldNotFound(_)
-            | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_)
-            | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
-                StatusCode::BAD_REQUEST,
-                axum::Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-        },
-        errors::Error::ResourceError(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            axum::Json(MetaHttpResponse::error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                err,
-            )),
-        )
-            .into_response(),
-        _ => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            axum::Json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                err,
-            )),
-        )
-            .into_response(),
-    }
 }
 
 #[derive(Debug, Serialize)]

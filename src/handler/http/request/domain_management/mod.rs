@@ -33,7 +33,7 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
 /// Get domain management configuration
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/domain_management",
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "GetDomainManagementConfig",
@@ -80,7 +80,7 @@ pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Respons
 /// Set domain management configuration
 #[utoipa::path(
     put,
-    path = "/{org_id}",
+    path = "/{org_id}/domain_management",
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "SetDomainManagementConfig",

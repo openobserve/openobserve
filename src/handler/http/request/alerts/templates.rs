@@ -254,7 +254,7 @@ pub async fn delete_template(Path((org_id, name)): Path<(String, String)>) -> Re
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/alerts/templates",
+    path = "/{org_id}/alerts/templates/bulk",
     context_path = "/api",
     tag = "Templates",
     operation_id = "DeleteAlertTemplateBulk",

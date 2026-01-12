@@ -18,7 +18,7 @@ use std::{collections::HashMap as StdHashMap, sync::OnceLock};
 use axum::{
     body::{Body, Bytes},
     extract::Request,
-    http::{Method, StatusCode, header},
+    http::{HeaderMap, Method, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -517,10 +517,7 @@ const SKIP_RESPONSE_HEADERS_NORMAL: &[&str] =
     &["content-encoding", "transfer-encoding", "content-length"];
 
 /// Builds request headers for the upstream request.
-fn build_request_headers(
-    headers: &axum::http::HeaderMap,
-    is_streaming: bool,
-) -> reqwest::header::HeaderMap {
+fn build_request_headers(headers: &HeaderMap, is_streaming: bool) -> reqwest::header::HeaderMap {
     let mut req_headers = reqwest::header::HeaderMap::new();
 
     for (key, value) in headers {

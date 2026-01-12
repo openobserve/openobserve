@@ -16,7 +16,10 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     io::Write,
-    sync::{Arc, atomic::Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use chrono::{Duration, TimeZone, Utc};
@@ -67,6 +70,22 @@ pub mod grpc;
 pub mod ingestion_service;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
+
+/// Global atomic counter for round-robin distribution of requests across memory table buckets.
+/// This ensures even distribution of ingestion load across multiple buckets in axum.
+static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// Get the next thread_id using round-robin distribution.
+/// This replaces the thread-local approach from actix-web with a request-level distribution.
+///
+/// The counter will wrap around safely when it reaches usize::MAX:
+/// - On 64-bit systems: ~5.8 million years at 100k req/s
+/// - On 32-bit systems: wraps after ~12 hours at 100k req/s, but continues working correctly
+pub fn get_thread_id() -> usize {
+    let cfg = config::get_config();
+    // Use wrapping modulo to ensure even distribution across worker threads/buckets
+    REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) % cfg.limit.http_worker_num
+}
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {

@@ -22,6 +22,10 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
+use axum_extra::extract::{
+    CookieJar,
+    cookie::{Cookie, SameSite},
+};
 use config::{
     Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
@@ -49,7 +53,6 @@ use {
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    axum_extra::extract::CookieJar,
     config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
@@ -185,7 +188,7 @@ struct Rum {
 
 /// Healthz
 #[utoipa::path(
-    post,
+    get,
     path = "/healthz",
     tag = "Meta",
     operation_id = "HealthCheck",
@@ -214,7 +217,7 @@ pub async fn healthz_head() -> impl IntoResponse {
 
 /// Healthz of the node for scheduled status
 #[utoipa::path(
-    post,
+    get,
     path = "/schedulez",
     tag = "Meta",
     operation_id = "SchedulerHealthCheck",
@@ -855,32 +858,27 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             let cfg = get_config();
             let tokens = base64::encode(&tokens);
 
-            let cookie_value = format!(
-                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
-                tokens,
-                if cfg.auth.cookie_secure_only {
-                    "; Secure"
-                } else {
-                    ""
-                },
-                if cfg.auth.cookie_same_site_lax {
-                    "; SameSite=Lax"
-                } else {
-                    "; SameSite=None"
-                },
-                cfg.auth.cookie_max_age
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
             );
-
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if cfg.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
             log::info!("Redirecting user after processing token");
 
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Response::builder()
-                .status(StatusCode::FOUND)
-                .header(header::LOCATION, login_url)
-                .header(header::SET_COOKIE, cookie_value)
-                .body(Body::empty())
-                .unwrap()
+            Ok(HttpResponse::Found()
+                .append_header((header::LOCATION, login_url))
+                .cookie(auth_cookie)
+                .finish())
         }
         Err(e) => {
             audit_message.response_meta.http_response_code = 400;
@@ -983,107 +981,80 @@ pub async fn refresh_token_with_dex(
             let conf = get_config();
             let tokens = base64::encode(&tokens);
 
-            let cookie_value = format!(
-                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
-                tokens,
-                if conf.auth.cookie_secure_only {
-                    "; Secure"
-                } else {
-                    ""
-                },
-                if conf.auth.cookie_same_site_lax {
-                    "; SameSite=Lax"
-                } else {
-                    "; SameSite=None"
-                },
-                conf.auth.cookie_max_age
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
             );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(conf.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if conf.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
 
-            Response::builder()
-                .status(StatusCode::OK)
-                .header(header::SET_COOKIE, cookie_value)
-                .body(Body::empty())
-                .unwrap()
+            HttpResponse::Ok().cookie(auth_cookie).finish()
         }
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
             let tokens = base64::encode(&tokens);
 
-            let cookie_value = format!(
-                "auth_tokens={}; Path=/; HttpOnly{}{}; Max-Age={}",
-                tokens,
-                if conf.auth.cookie_secure_only {
-                    "; Secure"
-                } else {
-                    ""
-                },
-                if conf.auth.cookie_same_site_lax {
-                    "; SameSite=Lax"
-                } else {
-                    "; SameSite=None"
-                },
-                conf.auth.cookie_max_age
+            let mut auth_cookie = Cookie::new("auth_tokens", tokens);
+            auth_cookie.set_expires(
+                time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
             );
+            auth_cookie.set_http_only(true);
+            auth_cookie.set_secure(conf.auth.cookie_secure_only);
+            auth_cookie.set_path("/");
+            if conf.auth.cookie_same_site_lax {
+                auth_cookie.set_same_site(SameSite::Lax);
+            } else {
+                auth_cookie.set_same_site(SameSite::None);
+            }
 
-            Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .header(header::LOCATION, "/")
-                .header(header::SET_COOKIE, cookie_value)
-                .body(Body::empty())
-                .unwrap()
+            HttpResponse::Unauthorized()
+                .append_header((header::LOCATION, "/"))
+                .cookie(auth_cookie)
+                .finish()
         }
     }
 }
 
-fn prepare_empty_cookie<T: Serialize + ?Sized>(
-    cookie_name: &str,
+fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
+    cookie_name: &'a str,
     token_struct: &T,
     conf: &Arc<Config>,
-) -> String {
+) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
-    format!(
-        "{}={}; Path=/; HttpOnly{}{}; Max-Age={}",
-        cookie_name,
-        tokens,
-        if conf.auth.cookie_secure_only {
-            "; Secure"
-        } else {
-            ""
-        },
-        if conf.auth.cookie_same_site_lax {
-            "; SameSite=Lax"
-        } else {
-            "; SameSite=None"
-        },
-        conf.auth.cookie_max_age
-    )
+    let mut auth_cookie = Cookie::new(cookie_name, tokens);
+    auth_cookie.set_expires(
+        time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if conf.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(SameSite::Lax);
+    } else {
+        auth_cookie.set_same_site(SameSite::None);
+    }
+    auth_cookie
 }
 
 pub async fn logout(
-    cookies: axum_extra::extract::CookieJar,
-    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    cookies: CookieJar,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
 ) -> Response {
     // remove the session
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = {
-        // Extract auth string from headers or cookies
-        headers
-            .get(header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
-            .or_else(|| {
-                cookies.get("auth_tokens").map(|c| {
-                    let decoded = config::utils::base64::decode(c.value()).unwrap_or_default();
-                    let tokens: AuthTokens = json::from_str(&decoded).unwrap_or_default();
-                    tokens.access_token
-                })
-            })
-            .unwrap_or_default()
-    };
+    let auth_str = extract_auth_str(&req).await;
 
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]
@@ -1126,8 +1097,8 @@ pub async fn logout(
     Response::builder()
         .status(StatusCode::OK)
         .header(header::LOCATION, "/")
-        .header(header::SET_COOKIE, auth_cookie)
-        .header(header::SET_COOKIE, auth_ext_cookie)
+        .header(header::SET_COOKIE, auth_cookie.to_string())
+        .header(header::SET_COOKIE, auth_ext_cookie.to_string())
         .body(Body::empty())
         .unwrap()
 }
@@ -1489,10 +1460,11 @@ mod tests {
 
         let config = Arc::new(Config::default());
         let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie_str = cookie.to_string();
 
-        assert!(cookie.starts_with("test_cookie="));
-        assert!(cookie.contains("Path=/"));
-        assert!(cookie.contains("HttpOnly"));
+        assert!(cookie_str.starts_with("test_cookie="));
+        assert!(cookie_str.contains("Path=/"));
+        assert!(cookie_str.contains("HttpOnly"));
     }
 
     #[test]
@@ -1507,10 +1479,11 @@ mod tests {
         let empty_token = EmptyToken {};
         let config = Arc::new(Config::default());
         let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie_str = cookie.to_string();
 
-        assert!(cookie.contains("HttpOnly"));
-        assert!(cookie.contains("Path=/"));
-        assert!(cookie.contains("Max-Age="));
+        assert!(cookie_str.contains("HttpOnly"));
+        assert!(cookie_str.contains("Path=/"));
+        assert!(cookie_str.contains("Max-Age="));
     }
 
     #[test]
@@ -1529,9 +1502,11 @@ mod tests {
 
         let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
         let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1_str = cookie1.to_string();
+        let cookie2_str = cookie2.to_string();
 
-        assert!(cookie1.starts_with("cookie1="));
-        assert!(cookie2.starts_with("cookie2="));
+        assert!(cookie1_str.starts_with("cookie1="));
+        assert!(cookie2_str.starts_with("cookie2="));
     }
 
     #[tokio::test]
@@ -1610,6 +1585,51 @@ mod tests {
     }
 
     #[test]
+    fn test_prepare_empty_cookie_with_complex_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ComplexData {
+            nested: NestedData,
+            array: Vec<String>,
+            flag: bool,
+        }
+
+        #[derive(Serialize)]
+        struct NestedData {
+            id: u64,
+            name: String,
+        }
+
+        let complex_data = ComplexData {
+            nested: NestedData {
+                id: 12345,
+                name: "test_nested".to_string(),
+            },
+            array: vec!["item1".to_string(), "item2".to_string()],
+            flag: true,
+        };
+
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+
+        assert_eq!(cookie.name(), "complex_cookie");
+        assert!(!cookie.value().is_empty());
+
+        // Verify the cookie value is base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(parsed["nested"]["id"], 12345);
+        assert_eq!(parsed["nested"]["name"], "test_nested");
+        assert_eq!(parsed["flag"], true);
+        assert_eq!(parsed["array"][0], "item1");
+    }
+
+    #[test]
     fn test_rum_with_unicode_characters() {
         let rum = Rum {
             enabled: true,
@@ -1664,6 +1684,52 @@ mod tests {
         assert!(json.contains("\"enabled\":false"));
         assert!(json.contains("\"client_token\":\"\""));
         assert!(json.contains("\"insecure_http\":false"));
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_with_empty_data() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct EmptyStruct;
+
+        let empty_data = EmptyStruct;
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+
+        assert_eq!(cookie.name(), "empty_cookie");
+        assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
+
+        // Verify it's valid base64 encoded JSON
+        let decoded_str = base64::decode(cookie.value()).unwrap();
+        let json_str = decoded_str;
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        // Empty structs serialize as null in serde, not as objects
+        assert!(parsed.is_null() || parsed.is_object());
+    }
+
+    #[test]
+    fn test_prepare_empty_cookie_serialization_error_handling() {
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
+        #[derive(Serialize)]
+        struct ValidData {
+            value: String,
+        }
+
+        let valid_data = ValidData {
+            value: "test".to_string(),
+        };
+        let config = Arc::new(Config::default());
+        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+
+        // Should not panic and should produce valid cookie
+        assert_eq!(cookie.name(), "valid_cookie");
+        assert!(!cookie.value().is_empty());
     }
 
     #[tokio::test]

@@ -66,7 +66,8 @@ use crate::{
         alerts::alert::AlertExt,
         format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+            grpc::get_val, write_file,
         },
         logs::O2IngestJsonData,
         metadata::{
@@ -990,7 +991,13 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
+    let writer = ingester::get_writer(
+        get_thread_id(),
+        org_id,
+        StreamType::Traces.as_str(),
+        stream_name,
+    )
+    .await;
     let req_stats = write_file(
         &writer,
         org_id,

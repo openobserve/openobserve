@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{Path, Request},
+    extract::{FromRequestParts, Path, Request},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
@@ -47,8 +47,8 @@ use crate::{
     },
     handler::http::{
         auth::validator::{
-            AuthError, RequestData, oo_validator, validator_aws, validator_gcp,
-            validator_proxy_url, validator_rum,
+            RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
+            validator_rum,
         },
         router::middlewares::blocked_orgs_middleware,
     },
@@ -84,7 +84,7 @@ pub fn cors_layer() -> CorsLayer {
 }
 
 /// Authentication middleware for API routes
-pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
+pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
     // This ensures the future is Send because RequestData is Send + Sync
     let req_data = RequestData {
@@ -94,32 +94,31 @@ pub async fn auth_middleware(mut request: Request, next: Next) -> Response {
     };
 
     // Extract auth info from request (synchronous now, no await)
-    let auth_info = match AuthExtractor::extract_from_request_sync(&request) {
+    let (mut parts, body) = request.into_parts();
+    let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
-        Err(e) => return AuthError::Unauthorized(e).into_response(),
+        Err(e) => return e.into_response(),
     };
 
     // Validate authentication using extracted data
     match oo_validator(&req_data, &auth_info).await {
         Ok(result) => {
             // Insert user_id into request headers for downstream handlers
-            request.headers_mut().insert(
+            parts.headers.insert(
                 header::HeaderName::from_static("user_id"),
                 header::HeaderValue::from_str(&result.user_email)
                     .unwrap_or_else(|_| header::HeaderValue::from_static("")),
             );
 
             // Handle Prometheus POST hack - add content-type if missing
-            if request.method() == Method::POST
-                && !request.headers().contains_key(header::CONTENT_TYPE)
-            {
-                request.headers_mut().insert(
+            if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
+                parts.headers.insert(
                     header::CONTENT_TYPE,
                     header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                 );
             }
 
-            next.run(request).await
+            next.run(Request::from_parts(parts, body)).await
         }
         Err(e) => e.into_response(),
     }
@@ -192,7 +191,7 @@ pub async fn rum_auth_middleware(mut request: Request, next: Next) -> Response {
 }
 
 /// Authentication middleware for proxy routes
-pub async fn proxy_auth_middleware(mut request: Request, next: Next) -> Response {
+pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
     let req_data = RequestData {
         uri: request.uri().clone(),
@@ -200,19 +199,20 @@ pub async fn proxy_auth_middleware(mut request: Request, next: Next) -> Response
         headers: request.headers().clone(),
     };
 
-    let auth_info = match AuthExtractor::extract_from_request_sync(&request) {
+    let (mut parts, body) = request.into_parts();
+    let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
-        Err(e) => return AuthError::Unauthorized(e).into_response(),
+        Err(e) => return e.into_response(),
     };
 
     match validator_proxy_url(&req_data, &auth_info).await {
         Ok(result) => {
-            request.headers_mut().insert(
+            parts.headers.insert(
                 header::HeaderName::from_static("user_id"),
                 header::HeaderValue::from_str(&result.user_email)
                     .unwrap_or_else(|_| header::HeaderValue::from_static("")),
             );
-            next.run(request).await
+            next.run(Request::from_parts(parts, body)).await
         }
         Err(e) => e.into_response(),
     }

@@ -16,6 +16,7 @@
 use std::{collections::HashMap, fmt};
 
 use axum::{
+    body::Body,
     http::{
         StatusCode,
         header::{CONTENT_TYPE, LOCATION},
@@ -58,10 +59,10 @@ impl RedirectResponse {
         let mut redirect_uri = self.build_full_redirect_uri();
         redirect_uri = redirect_uri.trim_matches('"').to_string();
         if redirect_uri.len() < 1024 {
-            axum::response::Response::builder()
+            Response::builder()
                 .status(StatusCode::FOUND)
                 .header(LOCATION, redirect_uri)
-                .body(axum::body::Body::empty())
+                .body(Body::empty())
                 .unwrap()
         } else {
             // if the URL is too long, we send the original URL and let FE handle the redirect.
@@ -79,10 +80,10 @@ impl RedirectResponse {
                 </body>
                 </html>"#
             );
-            axum::response::Response::builder()
+            Response::builder()
                 .status(StatusCode::FOUND)
                 .header(CONTENT_TYPE, "text/html")
-                .body(axum::body::Body::from(html))
+                .body(Body::from(html))
                 .unwrap()
         }
     }

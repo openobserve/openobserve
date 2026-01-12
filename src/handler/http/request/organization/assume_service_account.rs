@@ -57,7 +57,7 @@ use crate::{
 /// ```
 #[utoipa::path(
     post,
-    path = "/{org_id}/organizations/{target_org_id}/assume",
+    path = "/{org_id}/organizations/assume_service_account",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "AssumeServiceAccount",
@@ -208,7 +208,7 @@ pub async fn assume_service_account(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
-    path = "/{org_id}/organizations/{target_org_id}/assume",
+    path = "/{org_id}/organizations/assume_service_account",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "AssumeServiceAccount",

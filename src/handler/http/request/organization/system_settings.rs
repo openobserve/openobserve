@@ -32,8 +32,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
 
 /// Get a specific system setting with resolution (user -> org -> system)
 #[utoipa::path(
-    post,
-    path = "/system_settings",
+    get,
+    path = "/{org_id}/settings/v2/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingGetResolved",
@@ -72,8 +72,8 @@ pub async fn get_setting(
 
 /// List all resolved settings for an organization/user
 #[utoipa::path(
-    post,
-    path = "/system_settings",
+    get,
+    path = "/{org_id}/settings/v2",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingListResolved",
@@ -113,7 +113,7 @@ pub async fn list_settings(
 /// Create or update a setting at org level
 #[utoipa::path(
     post,
-    path = "/system_settings",
+    path = "/{org_id}/settings/v2",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingSetOrg",
@@ -157,7 +157,7 @@ pub async fn set_org_setting(
 /// Create or update a setting at user level
 #[utoipa::path(
     post,
-    path = "/system_settings",
+    path = "/{org_id}/settings/v2/user/{user_id}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingSetUser",
@@ -206,8 +206,8 @@ pub async fn set_user_setting(
 
 /// Delete an organization-level setting
 #[utoipa::path(
-    post,
-    path = "/system_settings",
+    delete,
+    path = "/{org_id}/settings/v2/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingDeleteOrg",
@@ -241,8 +241,8 @@ pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> 
 
 /// Delete a user-level setting
 #[utoipa::path(
-    post,
-    path = "/system_settings",
+    delete,
+    path = "/{org_id}/settings/v2/user/{user_id}/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingDeleteUser",

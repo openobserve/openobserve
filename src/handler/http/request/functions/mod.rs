@@ -35,7 +35,7 @@ use crate::{
 /// CreateFunction
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/functions",
     context_path = "/api",
     tag = "Functions",
     operation_id = "createFunction",
@@ -73,8 +73,8 @@ pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transfor
 /// ListFunctions
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    get,
+    path = "/{org_id}/functions",
     context_path = "/api",
     tag = "Functions",
     operation_id = "listFunctions",
@@ -132,8 +132,8 @@ pub async fn list_functions(
 /// DeleteFunction
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{name}",
+    delete,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunction",
@@ -194,8 +194,8 @@ pub async fn delete_function(Path((org_id, name)): Path<(String, String)>) -> Re
 
 /// DeleteFunctionBulk
 #[utoipa::path(
-    post,
-    path = "/{org_id}",
+    delete,
+    path = "/{org_id}/functions/bulk",
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunctionBulk",
@@ -261,8 +261,8 @@ pub async fn delete_function_bulk(
 /// UpdateFunction
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{name}",
+    put,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "updateFunction",
@@ -305,8 +305,8 @@ pub async fn update_function(
 /// FunctionPipelineDependency
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{name}",
+    get,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "functionPipelineDependency",
@@ -344,7 +344,7 @@ pub async fn list_pipeline_dependencies(
 /// Test a Function
 #[utoipa::path(
     post,
-    path = "/{org_id}",
+    path = "/{org_id}/functions/test",
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",

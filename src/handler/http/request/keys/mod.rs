@@ -37,7 +37,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 /// Store a key credential in db
 #[utoipa::path(
     post,
-    path = "/{org_id}/keys",
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "CreateCipherKey",
     summary = "Create encryption key",
@@ -120,7 +120,7 @@ pub async fn save(
 /// Store a key credential in db
 #[utoipa::path(
     post,
-    path = "/{org_id}/keys",
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "CreateCipherKey",
     summary = "Create encryption key",
@@ -144,7 +144,7 @@ pub async fn save(Path(_org_id): Path<String>) -> Response {
 /// get key with given name if present
 #[utoipa::path(
     get,
-    path = "/{key_name}",
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "GetCipherKey",
     summary = "Get encryption key details",
@@ -207,7 +207,7 @@ pub async fn get(Path(path): Path<(String, String)>) -> Response {
 /// list all keys for given org
 #[utoipa::path(
     get,
-    path = "/{key_name}",
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "ListCipherKeys",
     summary = "List encryption keys",
@@ -267,7 +267,7 @@ pub async fn list(Path(path): Path<String>) -> Response {
 /// delete key credentials for given key name
 #[utoipa::path(
     delete,
-    path = "/{key_name}",
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "DeleteCipherKey",
     summary = "Delete encryption key",
@@ -327,7 +327,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
-    path = "/{org_id}",
+    path = "/{org_id}/cipher_keys/bulk",
     context_path = "/api",
     operation_id = "DeleteCipherKeysBulk",
     summary = "Delete multiple encryption key",
@@ -397,8 +397,8 @@ pub async fn delete_bulk(
 #[cfg(feature = "enterprise")]
 /// update the credentials for given key
 #[utoipa::path(
-    post,
-    path = "/{org_id}/{key_name}",
+    put,
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "UpdateCipherKey",
     summary = "Update encryption key",
@@ -506,7 +506,7 @@ pub async fn update(
 /// update the credentials for given key
 #[utoipa::path(
     put,
-    path = "/{org_id}/keys/{key_name}",
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "UpdateCipherKey",
     summary = "Update encryption key",

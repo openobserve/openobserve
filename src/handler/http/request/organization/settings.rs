@@ -37,7 +37,7 @@ use crate::{
 
 #[utoipa::path(
     post,
-    path = "/{org_id}/organizations/settings",
+    path = "/{org_id}/settings",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingCreate",
@@ -145,8 +145,8 @@ pub async fn create(
 /// Retrieve organization specific settings
 
 #[utoipa::path(
-    post,
-    path = "/{org_id}/organizations/settings",
+    get,
+    path = "/{org_id}/settings",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingGet",

@@ -15,6 +15,7 @@
 
 use axum::{
     extract::{Path, Query},
+    http::HeaderMap,
     response::Response,
 };
 use config::meta::dashboards::Dashboard;
@@ -210,7 +211,7 @@ pub async fn update_dashboard(
 pub async fn list_dashboards(
     Path(org_id): Path<String>,
     Query(query): Query<ListDashboardsQuery>,
-    headers: axum::http::HeaderMap,
+    headers: HeaderMap,
 ) -> Response {
     let params = query.into(&org_id);
     let Some(user_id) = get_user_id(&headers) else {
@@ -260,8 +261,8 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
 
 /// ExportDashboard
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards/{dashboard_id}",
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}/export",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "ExportDashboard",
@@ -328,7 +329,7 @@ pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String
 /// DeleteDashboardBulk
 #[utoipa::path(
     delete,
-    path = "/{org_id}/dashboards",
+    path = "/{org_id}/dashboards/bulk",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "DeleteDashboardBulk",
@@ -403,8 +404,8 @@ pub async fn delete_dashboard_bulk(
 
 /// MoveDashboard
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards/{dashboard_id}",
+    put,
+    path = "/{org_id}/folders/dashboards/{dashboard_id}",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboard",
@@ -456,8 +457,8 @@ pub async fn move_dashboard(
 
 /// MoveDashboards
 #[utoipa::path(
-    post,
-    path = "/{org_id}/dashboards",
+    patch,
+    path = "/{org_id}/dashboards/move",
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "MoveDashboards",
@@ -526,7 +527,7 @@ pub fn is_overwrite(query_str: &str) -> bool {
 }
 
 /// Tries to get the user ID from the request headers.
-fn get_user_id(headers: &axum::http::HeaderMap) -> Option<String> {
+fn get_user_id(headers: &HeaderMap) -> Option<String> {
     headers
         .get("user_id")
         .and_then(|v| v.to_str().ok())

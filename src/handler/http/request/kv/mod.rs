@@ -27,7 +27,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/{key}",
+    path = "/{org_id}/kv/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "GetKVValue",
@@ -71,8 +71,8 @@ pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
 /// SetValue
 
 #[utoipa::path(
-    put,
-    path = "/{org_id}/{key}",
+    post,
+    path = "/{org_id}/kv/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "SetKVValue",
@@ -122,7 +122,7 @@ pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Re
 
 #[utoipa::path(
     delete,
-    path = "/{org_id}/{key}",
+    path = "/{org_id}/kv/{key}",
     context_path = "/api",
     tag = "KV",
     operation_id = "RemoveKVValue",
@@ -167,7 +167,7 @@ pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}",
+    path = "/{org_id}/kv",
     context_path = "/api",
     tag = "KV",
     operation_id = "ListKVKeys",
