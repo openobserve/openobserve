@@ -1193,7 +1193,7 @@ async fn selector_load_data_from_datafusion(
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
 
-    // Optimization: When step > lookback, we don't need to load all data in [start, end]
+    // Optimization: When step > lookback, we don't need to load all data in [start-lookback, end]
     // Instead, we only need to load data windows around each evaluation point
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => {
@@ -1221,9 +1221,11 @@ async fn selector_load_data_from_datafusion(
                 let filters = disjunction(conditions).unwrap();
                 v.filter(filters)?
             } else {
+                // Need to include lookback window before start for the first evaluation point
+                let query_start = start - lookback;
                 v.filter(
                     col(TIMESTAMP_COL_NAME)
-                        .gt_eq(lit(start))
+                        .gt_eq(lit(query_start))
                         .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
                 )?
             }
