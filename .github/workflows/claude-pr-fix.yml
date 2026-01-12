@@ -1,0 +1,146 @@
+name: Claude Fix
+
+# Trigger on comments containing @claude_fix (works on both PRs and Issues)
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  # Security: Check if user is a member of argocd-dev team
+  check-permission:
+    if: |
+      github.event.sender.type != 'Bot' &&
+      contains(github.event.comment.body, '@claude_fix')
+    runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.check.outputs.authorized }}
+    steps:
+      - name: Check team membership
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const team = 'argocd-dev';
+            const org = 'openobserve';
+            const username = context.actor;
+
+            try {
+              // Check if user is a member of the team
+              await github.rest.teams.getMembershipForUserInOrg({
+                org: org,
+                team_slug: team,
+                username: username
+              });
+              console.log(`✅ ${username} is a member of ${org}/${team}`);
+              core.setOutput('authorized', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ ${username} is NOT a member of ${org}/${team}`);
+                core.setOutput('authorized', 'false');
+
+                // Post a comment explaining why the workflow didn't run
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `⚠️ @${username} You don't have permission to trigger \`@claude_fix\`. Only members of the [argocd-dev](https://github.com/orgs/openobserve/teams/argocd-dev) team can use this command.`
+                });
+              } else {
+                throw error;
+              }
+            }
+
+  # Determine context and prepare inputs for reusable workflow
+  prepare:
+    needs: check-permission
+    if: |
+      needs.check-permission.outputs.authorized == 'true' &&
+      github.event.sender.type != 'Bot' &&
+      contains(github.event.comment.body, '@claude_fix')
+
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.context.outputs.mode }}
+      branch: ${{ steps.context.outputs.branch }}
+      number: ${{ steps.context.outputs.number }}
+      title: ${{ steps.context.outputs.title }}
+      issue_body: ${{ steps.context.outputs.issue_body }}
+      pr_number: ${{ steps.context.outputs.pr_number }}
+      trigger_comment: ${{ steps.context.outputs.trigger_comment }}
+      trigger_comment_id: ${{ steps.context.outputs.trigger_comment_id }}
+
+    steps:
+      - name: Determine Context (PR or Issue)
+        id: context
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const isPR = !!context.payload.issue.pull_request;
+
+            core.setOutput('trigger_comment', context.payload.comment.body);
+            core.setOutput('trigger_comment_id', context.payload.comment.id);
+
+            if (isPR) {
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+
+              core.setOutput('mode', 'pr_fix');
+              core.setOutput('branch', pr.head.ref);
+              core.setOutput('number', context.issue.number);
+              core.setOutput('title', pr.title);
+              core.setOutput('pr_number', context.issue.number);
+              core.setOutput('issue_body', pr.body || '');
+
+              console.log(`PR #${pr.number}: ${pr.title}`);
+              console.log(`Branch: ${pr.head.ref}`);
+            } else {
+              // Get Issue details
+              const { data: issue } = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              });
+
+              const branchName = `fix/issue-${issue.number}`;
+
+              core.setOutput('mode', 'issue_fix');
+              core.setOutput('branch', branchName);
+              core.setOutput('number', context.issue.number);
+              core.setOutput('title', issue.title);
+              core.setOutput('pr_number', '');
+              core.setOutput('issue_body', issue.body || '');
+
+              console.log(`Issue #${issue.number}: ${issue.title}`);
+              console.log(`Will create branch: ${branchName}`);
+            }
+
+  # Dispatch to o2-enterprise workflow (similar to dispatch-event-enterprise.yml pattern)
+  dispatch:
+    needs: [check-permission, prepare]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dispatch Claude Fix Event to o2-enterprise
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          repository: openobserve/o2-enterprise
+          event-type: claude-fix-requested
+          client-payload: |-
+            {
+              "source_repo": "openobserve",
+              "issue_number": "${{ needs.prepare.outputs.number }}",
+              "issue_title": ${{ toJSON(needs.prepare.outputs.title) }},
+              "issue_body": ${{ toJSON(needs.prepare.outputs.issue_body) }},
+              "mode": "${{ needs.prepare.outputs.mode }}",
+              "branch": "${{ needs.prepare.outputs.branch }}",
+              "pr_number": "${{ needs.prepare.outputs.pr_number }}",
+              "trigger_comment": ${{ toJSON(needs.prepare.outputs.trigger_comment) }},
+              "trigger_comment_id": "${{ needs.prepare.outputs.trigger_comment_id }}"
+            }

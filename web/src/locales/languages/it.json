@@ -107,7 +107,8 @@
     "manageTheme": "Gestisci tema",
     "url": "URL",
     "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
-    "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare."
+    "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
+    "id": "ID"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "Nessuna traccia correlata trovata",
     "noTracesDescription": "Nessuna traccia trovata per service {service} nell'intervallo di tempo selezionato",
     "openTraceInNewWindow": "Apri traccia in una nuova finestra",
-    "filters": "Filtri"
+    "filters": "Filtri",
+    "semanticFieldGroupsTitle": "Mappature dei campi",
+    "semanticFieldGroupsCaption": "Definire le mappature dei nomi dei campi per la correlazione e la deduplicazione (ad esempio, host, hostname, node → gruppo 'host')",
+    "groupsLabel": "gruppi",
+    "importFromJson": "Importa da JSON",
+    "addCustomGroup": "Aggiungi gruppo personalizzato",
+    "actionNormalize": "Valori minuscoli e tagliati per la corrispondenza",
+    "removeSemanticGroup": "Rimuovi gruppo semantico",
+    "fieldNamePlaceholder": "Nomi dei campi (separati da virgole)",
+    "category": "Categoria",
+    "categoryHint": "Filtra i gruppi per categoria",
+    "noSemanticGroupMessage": "Nessun gruppo semantico in questa categoria. Seleziona una categoria diversa o aggiungi un gruppo personalizzato.",
+    "showingGroups": "Visualizzazione del {filterGroupLength} dei gruppi totali di {localGroupLength}",
+    "deduplicateFields": "Campi di deduplicazione",
+    "deduplicateFieldTooltip": "Seleziona le mappature dei campi da utilizzare per la deduplicazione delle impronte digitali",
+    "alertDeduplicationMessage": "Gli avvisi con gli stessi valori per questi campi verranno deduplicati (ad esempio, stessa impronta digitale = stessi valori di campo)",
+    "atLeastOneDeduplicationField": "È richiesta almeno una mappatura dei campi per la deduplicazione"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

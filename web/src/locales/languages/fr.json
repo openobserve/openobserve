@@ -107,7 +107,8 @@
     "manageTheme": "Gérer le thème",
     "url": "URL",
     "chunkLoadError": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
-    "chunkLoadErrorMsg": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer."
+    "chunkLoadErrorMsg": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
+    "id": "IDENTIFIANT"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "Aucune trace corrélée n'a été trouvée",
     "noTracesDescription": "Aucune trace n'a été trouvée pour le service {service} dans la plage de temps sélectionnée",
     "openTraceInNewWindow": "Ouvrir la trace dans une nouvelle fenêtre",
-    "filters": "Filtres"
+    "filters": "Filtres",
+    "semanticFieldGroupsTitle": "Cartographies de champs",
+    "semanticFieldGroupsCaption": "Définissez des mappages de noms de champs pour la corrélation et la déduplication (par exemple, hôte, nom d'hôte, nœud → groupe « hôte »)",
+    "groupsLabel": "groupes",
+    "importFromJson": "Importer depuis JSON",
+    "addCustomGroup": "Ajouter un groupe personnalisé",
+    "actionNormalize": "Minuscules et valeurs de découpage pour la correspondance",
+    "removeSemanticGroup": "Supprimer le groupe sémantique",
+    "fieldNamePlaceholder": "Noms de champs (séparés par des virgules)",
+    "category": "Catégorie",
+    "categoryHint": "Filtrer les groupes par catégorie",
+    "noSemanticGroupMessage": "Aucun groupe sémantique dans cette catégorie. Sélectionnez une autre catégorie ou ajoutez un groupe personnalisé.",
+    "showingGroups": "Affichage de {FilterGroupLength} sur le total des groupes {LocalGroupLength}",
+    "deduplicateFields": "Champs de déduplication",
+    "deduplicateFieldTooltip": "Sélectionnez les mappages de champs à utiliser pour la prise d'empreintes digitales de déduplication",
+    "alertDeduplicationMessage": "Les alertes avec les mêmes valeurs pour ces champs seront dédupliquées (par exemple, même empreinte digitale = mêmes valeurs de champs)",
+    "atLeastOneDeduplicationField": "Au moins un mappage de champs est requis pour la déduplication"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

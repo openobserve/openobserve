@@ -152,16 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="text-transform: capitalize"
       data-test="trace-details-sidebar-tabs-attributes"
     />
-    <!-- Correlation Tabs (only visible when service streams enabled) -->
+    <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
     <q-tab
-      v-if="serviceStreamsEnabled"
+      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
       name="correlated-logs"
       :label="t('correlation.correlatedLogs')"
       style="text-transform: capitalize"
       data-test="trace-details-sidebar-tabs-correlated-logs"
     />
     <q-tab
-      v-if="serviceStreamsEnabled"
+      v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
       name="correlated-metrics"
       :label="t('correlation.correlatedMetrics')"
       style="text-transform: capitalize"
@@ -304,7 +304,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="expandedEvents[props.rowIndex.toString()]">
             <q-td colspan="2">
               <pre
-                v-once
                 class="log_json_content"
                 v-html="highlightedJSON(props.row)"
               />
@@ -553,6 +552,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1095,6 +1095,13 @@ export default defineComponent({
         return;
       }
 
+      // Gate correlation feature behind enterprise check to avoid 403 errors
+      if (config.isEnterprise !== "true") {
+        console.log("[TraceDetailsSidebar] Correlation feature requires enterprise license");
+        correlationError.value = "Correlation feature requires enterprise license";
+        return;
+      }
+
       if (!props.span || !props.streamName) {
         console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
         correlationError.value = "Missing span or stream name";
@@ -1248,6 +1255,7 @@ export default defineComponent({
       correlationLoading,
       correlationError,
       correlationProps,
+      config,
     };
   },
 });

@@ -106,7 +106,8 @@
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
     "status": "Status",
-    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue."
+    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue.",
+    "id": "ID"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -2030,7 +2031,7 @@
       "fqnPriorityTitle": "FQN Priority Dimensions",
       "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service FQN for correlation. First dimension with a value wins. Reorder to match your infrastructure.",
       "fqnPriorityDescription": "Drag to reorder or use arrow buttons. First matching dimension determines Service FQN.",
-      "resetToDefaults": "Reset to Defaults",
+      "resetToDefaults": "Reset to defaults",
       "noDimensionsConfigured": "No dimensions configured. Click \"Reset to Defaults\" or add dimensions below.",
       "addDimensionLabel": "Add dimension to priority list",
       "addDimensionHint": "Select a semantic group to add to the priority list.",
@@ -2056,7 +2057,8 @@
       "traces": "Traces",
       "metrics": "Metrics",
       "retry": "Retry",
-      "filters": "Filters"
+      "filters": "Filters",
+      "availableDimensions": "Available Dimensions"
     }
   },
   "reports": {
@@ -2284,7 +2286,23 @@
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
     "noTracesDescription": "No traces found for service {service} in the selected time range",
-    "filters": "Filters"
+    "filters": "Filters",
+    "semanticFieldGroupsTitle": "Field Mappings",
+    "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",
+    "groupsLabel": "groups",
+    "importFromJson": "Import from JSON",
+    "addCustomGroup": "Add Custom Group",
+    "actionNormalize": "Lowercase and trim values for matching",
+    "removeSemanticGroup": "Remove Semantic Group",
+    "fieldNamePlaceholder": "Field names (comma-separated)",
+    "category": "Category",
+    "categoryHint": "Filter groups by category",
+    "noSemanticGroupMessage": "No semantic groups in this category. Select a different category or add a custom group.",
+    "showingGroups": "Showing {filterGroupLength} of {localGroupLength} total groups",
+    "deduplicateFields": "Deduplication Fields",
+    "deduplicateFieldTooltip": "Select which field mappings to use for deduplication fingerprinting",
+    "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
+    "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
