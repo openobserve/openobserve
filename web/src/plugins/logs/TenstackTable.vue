@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <span
                   v-if="
-                    processedResults[`${cell.column.id}_{virtualRow.index}`]
+                    processedResults[`${cell.column.id}_${virtualRow.index}`]
                   "
                   :key="`${cell.column.id}_${virtualRow.index}`"
                   :class="store.state.theme === 'dark' ? 'dark' : ''"
@@ -758,7 +758,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 50, // Reduced from 100 to 5 - only pre-render 5 rows above/below viewport
+    overscan: 100, // Reduced from 100 to 5 - only pre-render 5 rows above/below viewport
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
