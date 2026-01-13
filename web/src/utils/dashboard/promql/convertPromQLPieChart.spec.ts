@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,9 @@ import type { ProcessedPromQLData } from "./shared/types";
 vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values, aggregation) => {
     if (!values || values.length === 0) return 0;
-    const numericValues = values.map((v: any) => (Array.isArray(v) ? parseFloat(v[1]) : v));
+    const numericValues = values.map((v: any) =>
+      Array.isArray(v) ? parseFloat(v[1]) : v,
+    );
     if (aggregation === "last") return numericValues[numericValues.length - 1];
     if (aggregation === "first") return numericValues[0];
     if (aggregation === "min") return Math.min(...numericValues);
@@ -30,7 +32,8 @@ vi.mock("./shared/dataProcessor", () => ({
       const sum = numericValues.reduce((a: number, b: number) => a + b, 0);
       return sum / numericValues.length;
     }
-    if (aggregation === "sum") return numericValues.reduce((a: number, b: number) => a + b, 0);
+    if (aggregation === "sum")
+      return numericValues.reduce((a: number, b: number) => a + b, 0);
     return numericValues[numericValues.length - 1];
   }),
 }));
@@ -51,15 +54,17 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
-  getSeriesColor: vi.fn((colorConfig, name, values, min, max, theme, colorBySeries) => {
-    // Simple mock that returns colors based on name
-    const colors: Record<string, string> = {
-      series1: "#FF0000",
-      series2: "#00FF00",
-      series3: "#0000FF",
-    };
-    return colors[name] || "#CCCCCC";
-  }),
+  getSeriesColor: vi.fn(
+    (colorConfig, name, values, min, max, theme, colorBySeries) => {
+      // Simple mock that returns colors based on name
+      const colors: Record<string, string> = {
+        series1: "#FF0000",
+        series2: "#00FF00",
+        series3: "#0000FF",
+      };
+      return colors[name] || "#CCCCCC";
+    },
+  ),
 }));
 
 vi.mock("../convertDataIntoUnitValue", () => ({
@@ -135,7 +140,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].type).toBe("pie");
@@ -194,7 +204,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].value).toBe(30);
     });
@@ -224,7 +239,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].value).toBe(60);
     });
@@ -256,7 +276,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].name).toBe("large");
       expect(result.series[0].data[1].name).toBe("medium");
@@ -288,7 +313,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].name).toBe("first");
       expect(result.series[0].data[1].name).toBe("second");
@@ -313,7 +343,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].itemStyle).toBeDefined();
       expect(result.series[0].data[0].itemStyle.color).toBe("#FF0000");
@@ -342,7 +377,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data).toBeDefined();
     });
@@ -366,7 +406,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].radius).toEqual(["40%", "70%"]);
     });
@@ -390,7 +435,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].radius).toBe("70%");
     });
@@ -414,7 +464,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.show).toBe(true);
     });
@@ -440,7 +495,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.show).toBe(false);
     });
@@ -464,7 +524,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].labelLine.show).toBe(true);
     });
@@ -490,7 +555,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].labelLine.show).toBe(false);
     });
@@ -516,7 +586,12 @@ describe("PieConverter", () => {
         },
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.fontSize).toBe(18);
     });
@@ -540,7 +615,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].label.fontSize).toBe(12);
     });
@@ -565,7 +645,12 @@ describe("PieConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+        const result = converter.convert(
+          processedData,
+          panelSchema,
+          mockStore,
+          mockExtras,
+        );
 
         const params = {
           name: "series1",
@@ -599,7 +684,12 @@ describe("PieConverter", () => {
           },
         };
 
-        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+        const result = converter.convert(
+          processedData,
+          panelSchema,
+          mockStore,
+          mockExtras,
+        );
 
         const params = {
           name: "series1",
@@ -634,7 +724,12 @@ describe("PieConverter", () => {
           },
         };
 
-        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+        const result = converter.convert(
+          processedData,
+          panelSchema,
+          mockStore,
+          mockExtras,
+        );
 
         const params = {
           name: "memory",
@@ -671,7 +766,12 @@ describe("PieConverter", () => {
           },
         };
 
-        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+        const result = converter.convert(
+          processedData,
+          panelSchema,
+          mockStore,
+          mockExtras,
+        );
 
         const params = {
           name: "requests",
@@ -704,7 +804,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.tooltip.trigger).toBe("item");
     });
@@ -728,12 +833,19 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].emphasis).toBeDefined();
       expect(result.series[0].emphasis.itemStyle.shadowBlur).toBe(10);
       expect(result.series[0].emphasis.itemStyle.shadowOffsetX).toBe(0);
-      expect(result.series[0].emphasis.itemStyle.shadowColor).toBe("rgba(0, 0, 0, 0.5)");
+      expect(result.series[0].emphasis.itemStyle.shadowColor).toBe(
+        "rgba(0, 0, 0, 0.5)",
+      );
     });
 
     it("should handle multiple queries", () => {
@@ -765,7 +877,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data).toHaveLength(2);
     });
@@ -798,7 +915,12 @@ describe("PieConverter", () => {
       };
 
       // Min should be 10, max should be 1000
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data).toHaveLength(3);
     });
@@ -811,7 +933,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data).toEqual([]);
     });
@@ -830,7 +957,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data).toEqual([]);
     });
@@ -854,14 +986,16 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const mockChartPanelRef = { value: { clientWidth: 500, clientHeight: 400 } };
+      const mockChartPanelRef = {
+        value: { clientWidth: 500, clientHeight: 400 },
+      };
 
       const result = converter.convert(
         processedData,
         panelSchema,
         mockStore,
         mockExtras,
-        mockChartPanelRef
+        mockChartPanelRef,
       );
 
       expect(result).toBeDefined();
@@ -886,7 +1020,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].center).toEqual(["50%", "50%"]);
     });
@@ -909,7 +1048,12 @@ describe("PieConverter", () => {
         type: "pie",
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result).toBeDefined();
       expect(result.series[0].data).toHaveLength(1);
@@ -937,7 +1081,12 @@ describe("PieConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
+      const result = converter.convert(
+        processedData,
+        panelSchema,
+        mockStore,
+        mockExtras,
+      );
 
       expect(result.series[0].data[0].itemStyle).toBeUndefined();
     });

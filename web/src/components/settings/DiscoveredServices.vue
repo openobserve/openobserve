@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full discovered-services">
-    <div class="tw:mb-6">
-      <div class="text-h6 tw:mb-2">{{ t("settings.correlation.discoveredServicesTitle") }}</div>
-      <div class="text-body2 text-grey-7">
+  <div class="tw:w-full discovered-services q-mt-sm">
+    <div>
+      <GroupHeader :title="t('settings.correlation.discoveredServicesTitle')" :showIcon="false" class="tw:mb-2" />
+      <div class="text-body2 tw:mb-4">
         {{ t("settings.correlation.discoveredServicesDescription") }}
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-dots color="primary" size="2.5rem" />
+      <q-spinner-hourglass color="primary" size="30px" />
     </div>
 
     <!-- Error State -->
@@ -33,21 +33,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
       <div class="text-body1 text-negative">{{ error }}</div>
       <q-btn
+        data-test="retry-discovered-services-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         flat
-        color="primary"
         :label="t('settings.correlation.retry')"
         @click="loadServices"
-        class="tw:mt-4"
       />
     </div>
 
     <!-- Empty State -->
     <div v-else-if="groupedServices.groups.length === 0" class="tw:text-center tw:py-8">
       <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
-      <div class="text-body1 text-grey-7">{{ t("settings.correlation.noServicesYet") }}</div>
+      <div class="text-body1">{{ t("settings.correlation.noServicesYet") }}</div>
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
+      <q-btn
+        data-test="refresh-discovered-services-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
+        :label="t('common.refresh')"
+        @click="loadServices"
+        :loading="loading"
+      />
     </div>
 
     <!-- Services List -->
@@ -59,12 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon name="hub" size="1.25rem" color="primary" />
             <span class="tw:font-semibold text-primary">{{ groupedServices.total_fqns }}</span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.fqns") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.fqns") }}</span>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon name="miscellaneous_services" size="1.25rem" color="primary" />
             <span class="tw:font-semibold text-primary">{{ groupedServices.total_services }}</span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.services") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.services") }}</span>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon
@@ -75,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:font-semibold" :class="fullCorrelationCount > 0 ? 'text-positive' : 'text-warning'">
               {{ fullCorrelationCount }}
             </span>
-            <span class="text-caption text-grey-7">{{ t("settings.correlation.fullyCorrelated") }}</span>
+            <span class="text-caption">{{ t("settings.correlation.fullyCorrelated") }}</span>
           </div>
         </div>
 
@@ -91,6 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-tooltip>{{ t("settings.correlation.clickToViewSuggestions") }}</q-tooltip>
           </q-btn>
+          <q-btn
+            data-test="refresh-discovered-services-btn"
+            class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            flat
+            :label="t('common.refresh')"
+            @click="loadServices"
+            :loading="loading"
+          />
         </div>
       </div>
 
@@ -128,223 +147,248 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- View: By FQN (default) - Compact table view -->
-      <q-table
-        v-if="viewMode === 'fqn'"
-        :rows="filteredGroups"
-        :columns="fqnViewColumns"
-        row-key="fqn"
-        flat
-        dense
-        class="tw:rounded-lg tw:border"
-        :pagination="{ rowsPerPage: 20 }"
-      >
-        <template #body-cell-status="props">
-          <q-td :props="props">
-            <q-icon
-              :name="props.row.stream_summary.has_full_correlation ? 'check_circle' : 'warning'"
-              :color="props.row.stream_summary.has_full_correlation ? 'positive' : 'warning'"
-              size="1.25rem"
-            />
-          </q-td>
-        </template>
-        <template #body-cell-fqn="props">
-          <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.fqn }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-correlation_key="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:flex-col tw:gap-1">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-chip
-                  size="sm"
-                  :color="getDerivedFromColor(getCorrelationSource(props.row))"
-                  text-color="white"
-                  dense
-                >
-                  {{ formatDerivedFrom(getCorrelationSource(props.row)) }}
-                </q-chip>
-                <span class="tw:font-mono tw:text-xs text-grey-7">
-                  {{ getCorrelationDimensionValue(props.row) }}
-                </span>
+      <div class="app-table-container" v-if="viewMode === 'fqn'">
+        <q-table
+          
+          :rows="filteredGroups"
+          :columns="fqnViewColumns"
+          row-key="fqn"
+          flat
+          dense
+          class="tw:rounded-lg tw:border"
+          :pagination="{ rowsPerPage: 20 }"
+        >
+          <template #body-cell-status="props">
+            <q-td :props="props">
+              <q-icon
+                :name="props.row.stream_summary.has_full_correlation ? 'check_circle' : 'warning'"
+                :color="props.row.stream_summary.has_full_correlation ? 'positive' : 'warning'"
+                size="1.25rem"
+              />
+            </q-td>
+          </template>
+          <template #body-cell-fqn="props">
+            <q-td :props="props">
+              <span>{{ props.row.fqn }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-correlation_key="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:flex-col tw:gap-1">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <q-chip
+                    size="12px"
+                    :color="getDerivedFromColor(getCorrelationSource(props.row))"
+                    text-color="white"
+                    dense
+                  >
+                    {{ formatDerivedFrom(getCorrelationSource(props.row)) }}
+                  </q-chip>
+                  <span>
+                    {{ getCorrelationDimensionValue(props.row) }}
+                  </span>
+                </div>
               </div>
-            </div>
-          </q-td>
-        </template>
-        <template #body-cell-services="props">
-          <q-td :props="props">
-            <q-btn
-              flat
-              dense
-              size="sm"
-              :label="`${props.row.services.length} ${t('settings.correlation.services').toLowerCase()}`"
-              @click="showServicesDialog(props.row)"
-            >
-              <q-tooltip>{{ t("settings.correlation.viewServices") }}</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
-        <template #body-cell-telemetry="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
-              <q-badge
-                v-if="props.row.stream_summary.logs_count > 0"
-                color="blue"
-                text-color="white"
+            </q-td>
+          </template>
+          <template #body-cell-services="props">
+            <q-td :props="props">
+              <q-btn
+                flat
+                dense
+                size="13px"
+                :label="`${props.row.services.length} ${t('settings.correlation.services').toLowerCase()}`"
+                @click="showServicesDialog(props.row)"
               >
-                {{ props.row.stream_summary.logs_count }} {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.stream_summary.traces_count > 0"
-                color="orange"
-                text-color="white"
-              >
-                {{ props.row.stream_summary.traces_count }} {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.stream_summary.metrics_count > 0"
-                color="green"
-                text-color="white"
-              >
-                {{ props.row.stream_summary.metrics_count }} {{ t("settings.correlation.metrics") }}
-              </q-badge>
-              <q-badge
-                v-else
-                color="grey-4"
-                text-color="grey-7"
-              >
-                0 {{ t("settings.correlation.metrics") }}
-              </q-badge>
-            </div>
-          </q-td>
-        </template>
-      </q-table>
+                <q-tooltip>{{ t("settings.correlation.viewServices") }}</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+          <template #body-cell-telemetry="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:gap-1">
+                <q-badge
+                  v-if="props.row.stream_summary.logs_count > 0"
+                  color="blue"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.logs_count }} {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.stream_summary.traces_count > 0"
+                  color="orange"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.traces_count }} {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.stream_summary.metrics_count > 0"
+                  color="green"
+                  text-color="white"
+                >
+                  {{ props.row.stream_summary.metrics_count }} {{ t("settings.correlation.metrics") }}
+                </q-badge>
+                <q-badge
+                  v-else
+                  color="grey-8"
+                  text-color="grey-1"
+                >
+                  0 {{ t("settings.correlation.metrics") }}
+                </q-badge>
+              </div>
+            </q-td>
+          </template>
+        </q-table>
+      </div>
 
       <!-- View: By Service Name -->
-      <q-table
-        v-else-if="viewMode === 'service'"
-        :rows="filteredServicesList"
-        :columns="serviceNameViewColumns"
-        row-key="uniqueKey"
-        flat
-        dense
-        class="tw:rounded-lg tw:border"
-        :pagination="{ rowsPerPage: 20 }"
-      >
-        <template #body-cell-service_name="props">
-          <q-td :props="props">
-            <span class="tw:font-semibold">{{ props.row.service_name }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-fqn="props">
-          <q-td :props="props">
-            <span class="tw:font-mono tw:text-sm">{{ props.row.fqn }}</span>
-          </q-td>
-        </template>
-        <template #body-cell-stream_types="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:gap-1">
-              <q-badge
-                v-if="props.row.streams.logs?.length"
-                color="blue"
+      <div class="app-table-container" v-else-if="viewMode === 'service'">
+        <q-table
+          :rows="filteredServicesList"
+          :columns="serviceNameViewColumns"
+          row-key="uniqueKey"
+          flat
+          dense
+          class="tw:rounded-lg tw:border"
+          :pagination="{ rowsPerPage: 20 }"
+        >
+          <template #body-cell-service_name="props">
+            <q-td :props="props">
+              <span>{{ props.row.service_name }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-fqn="props">
+            <q-td :props="props">
+              <span>{{ props.row.fqn }}</span>
+            </q-td>
+          </template>
+          <template #body-cell-stream_types="props">
+            <q-td :props="props">
+              <div class="tw:flex tw:gap-1">
+                <q-badge
+                  v-if="props.row.streams.logs?.length"
+                  color="blue"
+                  text-color="white"
+                >
+                  {{ props.row.streams.logs.length }} {{ t("settings.correlation.logs") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.streams.traces?.length"
+                  color="orange"
+                  text-color="white"
+                >
+                  {{ props.row.streams.traces.length }} {{ t("settings.correlation.traces") }}
+                </q-badge>
+                <q-badge
+                  v-if="props.row.streams.metrics?.length"
+                  color="green"
+                  text-color="white"
+                >
+                  {{ props.row.streams.metrics.length }} {{ t("settings.correlation.metrics") }}
+                </q-badge>
+              </div>
+            </q-td>
+          </template>
+          <template #body-cell-derived_from="props">
+            <q-td :props="props">
+              <q-chip
+                size="sm"
+                :color="getDerivedFromColor(props.row.derived_from)"
                 text-color="white"
+                dense
               >
-                {{ props.row.streams.logs.length }} {{ t("settings.correlation.logs") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.streams.traces?.length"
-                color="orange"
-                text-color="white"
+                {{ formatDerivedFrom(props.row.derived_from) }}
+              </q-chip>
+            </q-td>
+          </template>
+          <template #body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="visibility"
+                @click="showDimensionsDialog(props.row)"
               >
-                {{ props.row.streams.traces.length }} {{ t("settings.correlation.traces") }}
-              </q-badge>
-              <q-badge
-                v-if="props.row.streams.metrics?.length"
-                color="green"
-                text-color="white"
-              >
-                {{ props.row.streams.metrics.length }} {{ t("settings.correlation.metrics") }}
-              </q-badge>
-            </div>
-          </q-td>
-        </template>
-        <template #body-cell-derived_from="props">
-          <q-td :props="props">
-            <q-chip
-              size="sm"
-              :color="getDerivedFromColor(props.row.derived_from)"
-              text-color="white"
-              dense
-            >
-              {{ formatDerivedFrom(props.row.derived_from) }}
-            </q-chip>
-          </q-td>
-        </template>
-        <template #body-cell-actions="props">
-          <q-td :props="props">
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="visibility"
-              @click="showDimensionsDialog(props.row)"
-            >
-              <q-tooltip>{{ t("settings.correlation.viewDimensions") }}</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
-      </q-table>
+                <q-tooltip>{{ t("settings.correlation.viewDimensions") }}</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </div>
 
       <!-- View: By Stream -->
-      <q-list v-else-if="viewMode === 'stream'" separator class="tw:rounded-lg tw:border">
-        <template v-for="(streamGroup, streamType) in filteredStreamGroups" :key="streamType">
+      <div v-else-if="viewMode === 'stream'">
+        <!-- Loading state for view switch -->
+        <div v-if="viewModeLoading" class="tw:flex tw:justify-center tw:items-center tw:py-12 tw:rounded-lg tw:border">
+          <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
+            <q-spinner-hourglass color="primary" size="30px" />
+            <div class="text-body2">Loading stream view...</div>
+          </div>
+        </div>
+
+        <q-list v-else separator class="tw:rounded-lg tw:border">
+          <template v-for="(streamType) in ['logs', 'traces', 'metrics']" :key="streamType">
           <q-expansion-item
-            v-if="Object.keys(streamGroup).length > 0"
+            v-if="paginatedStreamGroups[streamType].totalStreams > 0"
             default-opened
+            class="stream-type-section"
           >
             <template #header>
-              <q-item-section avatar>
-                <q-icon
-                  :name="getStreamTypeIcon(streamType as string)"
-                  :color="getStreamTypeColor(streamType as string)"
-                  size="1.5rem"
-                />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="tw:font-semibold tw:capitalize">{{ streamType }}</q-item-label>
-                <q-item-label caption>
-                  {{ Object.keys(streamGroup).length }} stream(s)
+              <q-item-section class="tw:pl-4 tw:py-3">
+                <q-item-label class="tw:capitalize" style="font-weight: 700; font-size: 1rem;">
+                  {{ streamType }} ({{ paginatedStreamGroups[streamType].totalStreams }} stream{{ paginatedStreamGroups[streamType].totalStreams !== 1 ? 's' : '' }})
                 </q-item-label>
               </q-item-section>
-              <q-item-section side>
+              <q-item-section side class="tw:flex tw:flex-row tw:items-center tw:gap-3">
+                <q-pagination
+                  v-if="paginatedStreamGroups[streamType].totalPages > 1"
+                  v-model="streamPagination[streamType].page"
+                  :max="paginatedStreamGroups[streamType].totalPages"
+                  :max-pages="3"
+                  direction-links
+                  boundary-links
+                  size="sm"
+                  @update:model-value="(newPage) => onStreamPageChange(streamType as 'logs' | 'traces' | 'metrics', newPage)"
+                  @click.stop
+                />
+              </q-item-section>
+              <q-item-section side class="tw:flex tw:flex-row tw:items-center tw:gap-3">
                 <q-badge
                   :color="getStreamTypeColor(streamType as string)"
                   text-color="white"
+                  class="tw:position-relative tw:top-[-3px]"
                 >
-                  {{ Object.values(streamGroup).flat().length }} services
+                  {{ Object.values(filteredStreamGroups[streamType]).flat().length }} services
                 </q-badge>
               </q-item-section>
             </template>
 
             <!-- Streams within type -->
             <q-list class="tw:ml-8">
+              <!-- Loading indicator -->
+              <div v-if="paginationLoading[streamType]" class="tw:flex tw:justify-center tw:py-4">
+                <q-spinner-hourglass color="primary" size="30px" />
+              </div>
+
               <q-expansion-item
-                v-for="(services, streamName) in streamGroup"
-                :key="streamName"
+                v-else
+                v-for="(services, streamName) in paginatedStreamGroups[streamType].streams"
+                :key="`${streamType}-${streamName}-${streamPagination[streamType].page}`"
                 dense
               >
                 <template #header>
@@ -383,7 +427,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-expansion-item>
         </template>
-      </q-list>
+        </q-list>
+      </div>
 
       <!-- Dimensions Dialog -->
       <q-dialog v-model="dimensionsDialog">
@@ -594,7 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService, {
@@ -602,6 +647,7 @@ import serviceStreamsService, {
   type ServiceFqnGroup,
   type ServiceInGroup,
 } from "@/services/service_streams";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 
 const { t } = useI18n();
 
@@ -638,11 +684,26 @@ const groupedServices = ref<GroupedServicesResponse>({
 const searchQuery = ref("");
 const filterStatus = ref("all");
 const viewMode = ref<"fqn" | "service" | "stream">("fqn");
+const viewModeLoading = ref(false);
 const dimensionsDialog = ref(false);
 const servicesDialog = ref(false);
 const showSuggestionsDialog = ref(false);
 const selectedService = ref<ServiceInGroup | FlatService | null>(null);
 const selectedFqnGroup = ref<ServiceFqnGroup | null>(null);
+
+// Pagination state for stream view
+const streamPagination = ref({
+  logs: { page: 1, rowsPerPage: 10 },
+  traces: { page: 1, rowsPerPage: 10 },
+  metrics: { page: 1, rowsPerPage: 10 },
+});
+
+// Loading state for pagination
+const paginationLoading = ref({
+  logs: false,
+  traces: false,
+  metrics: false,
+});
 
 const viewModeOptions = computed(() => [
   { label: t("settings.correlation.byFqn"), value: "fqn", icon: "hub" },
@@ -979,6 +1040,93 @@ const filteredStreamGroups = computed((): StreamGroups => {
   return filtered;
 });
 
+// Reset pagination when search query changes
+const resetStreamPagination = () => {
+  streamPagination.value.logs.page = 1;
+  streamPagination.value.traces.page = 1;
+  streamPagination.value.metrics.page = 1;
+};
+
+// Watch for search query changes to reset pagination
+watch(searchQuery, () => {
+  resetStreamPagination();
+});
+
+// Watch for view mode changes to show loading state
+watch(viewMode, async (newMode, oldMode) => {
+  if (newMode === 'stream' && oldMode !== 'stream') {
+    viewModeLoading.value = true;
+
+    // Use requestAnimationFrame twice to ensure spinner animates
+    // First frame: render the spinner
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    // Second frame: allow spinner animation to start
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    // Use setTimeout to defer heavy computation
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    viewModeLoading.value = false;
+  } else {
+    viewModeLoading.value = false;
+  }
+});
+
+// Helper function to paginate a stream type
+const getPaginatedStreamType = (streamType: 'logs' | 'traces' | 'metrics') => {
+  const streamGroup = filteredStreamGroups.value[streamType];
+  const streamNames = Object.keys(streamGroup);
+  const pagination = streamPagination.value[streamType];
+
+  // Calculate pagination
+  const totalStreams = streamNames.length;
+  const totalPages = Math.ceil(totalStreams / pagination.rowsPerPage);
+  const startIndex = (pagination.page - 1) * pagination.rowsPerPage;
+  const endIndex = startIndex + pagination.rowsPerPage;
+
+  // Get paginated stream names
+  const paginatedStreamNames = streamNames.slice(startIndex, endIndex);
+
+  // Build paginated streams object
+  const paginatedStreams: Record<string, FlatService[]> = {};
+  for (const streamName of paginatedStreamNames) {
+    paginatedStreams[streamName] = streamGroup[streamName];
+  }
+
+  return {
+    streams: paginatedStreams,
+    totalStreams,
+    totalPages,
+  };
+};
+
+// Separate computed properties for each stream type for better performance
+const paginatedLogs = computed(() => getPaginatedStreamType('logs'));
+const paginatedTraces = computed(() => getPaginatedStreamType('traces'));
+const paginatedMetrics = computed(() => getPaginatedStreamType('metrics'));
+
+// Combined object for template access
+const paginatedStreamGroups = computed(() => ({
+  logs: paginatedLogs.value,
+  traces: paginatedTraces.value,
+  metrics: paginatedMetrics.value,
+}));
+
+// Pagination handlers
+const onStreamPageChange = async (streamType: 'logs' | 'traces' | 'metrics', newPage: number) => {
+  paginationLoading.value[streamType] = true;
+
+  // Use requestAnimationFrame for smoother UI updates
+  requestAnimationFrame(() => {
+    streamPagination.value[streamType].page = newPage;
+
+    // Reset loading after next tick
+    nextTick(() => {
+      paginationLoading.value[streamType] = false;
+    });
+  });
+};
+
 const loadServices = async () => {
   loading.value = true;
   error.value = null;
@@ -1039,19 +1187,6 @@ const formatDerivedFrom = (derivedFrom: string) => {
       return t("settings.correlation.service");
     default:
       return derivedFrom;
-  }
-};
-
-const getStreamTypeIcon = (streamType: string) => {
-  switch (streamType) {
-    case "logs":
-      return "article";
-    case "traces":
-      return "timeline";
-    case "metrics":
-      return "show_chart";
-    default:
-      return "storage";
   }
 };
 
@@ -1164,5 +1299,19 @@ onMounted(() => {
 .suggestions-dialog-card {
   min-width: 43.75rem;
   max-width: 56.25rem;
+}
+
+.stream-type-section {
+  :deep(.q-item) {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    background-color: #f5f5f5;
+  }
+}
+
+body.body--dark .stream-type-section {
+  :deep(.q-item) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 }
 </style>

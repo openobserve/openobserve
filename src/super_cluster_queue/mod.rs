@@ -24,6 +24,7 @@ mod distinct_values;
 mod domain_management;
 mod enrichment_table;
 mod folders;
+mod incidents;
 mod kv;
 mod meta;
 mod org_user;
@@ -35,6 +36,8 @@ mod reports;
 mod scheduler;
 mod schemas;
 mod search_job;
+mod semantic_groups;
+mod service_streams;
 mod short_urls;
 mod templates;
 mod user;
@@ -66,6 +69,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_compactor_manual_job_msg: compactor_manual_jobs::process,
         on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
         on_kv_msg: kv::process,
+        on_service_streams_msg: service_streams::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
@@ -73,6 +77,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let alerts_queue = AlertsQueue {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
+        on_semantic_groups_msg: semantic_groups::process,
+        on_incident_msg: incidents::process,
     };
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,

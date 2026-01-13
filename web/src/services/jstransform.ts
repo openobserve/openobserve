@@ -115,10 +115,12 @@ const jstransform = {
     url: string,
     append_data: boolean,
     resume: boolean = false,
+    retry: boolean = false,
+    replace_failed: boolean = false,
   ) => {
     return http().post(
-      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}`,
-      { url },
+      `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=${resume}&retry=${retry}`,
+      { url, replace_failed },
     );
   },
   get_all_enrichment_table_statuses: (

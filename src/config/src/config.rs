@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 23;
+pub const DB_SCHEMA_VERSION: u64 = 25;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1392,14 +1392,20 @@ pub struct Limit {
     pub traces_file_retention: String,
     #[env_config(name = "ZO_METRICS_FILE_RETENTION", default = "hourly")]
     pub metrics_file_retention: String,
+    #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
+    pub metrics_query_retention: String,
     #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
+    pub metrics_max_series_response: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
+    #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
+    pub metrics_inlist_filter_enabled: bool,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -2985,11 +2991,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.compact.batch_size < 1 {
-        if cfg.common.local_mode {
-            cfg.compact.batch_size = 100;
-        } else {
-            cfg.compact.batch_size = cfg.limit.cpu_num as i64 * 4;
-        }
+        cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;

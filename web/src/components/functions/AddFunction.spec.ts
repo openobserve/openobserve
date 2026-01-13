@@ -309,7 +309,7 @@ describe('AddFunction.vue Branch Coverage', () => {
       expect(vm.suffixCode).toBe('');
     });
 
-    it('should handle Lua function type (transType 1)', async () => {
+    it('should handle JavaScript function type (transType 1)', async () => {
       const wrapper = mount(AddFunction, {
         props: defaultProps,
         global: {
@@ -329,16 +329,17 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       const vm = wrapper.vm as any;
-      
-      // Branch: transType == "1" (line 321-324)
+
+      // Branch: transType == "1" (JavaScript - no prefix/suffix)
       vm.formData.transType = '1';
       vm.updateEditorContent();
-      
-      expect(vm.prefixCode).toBe('function(row)');
-      expect(vm.suffixCode).toContain('end');
+
+      // JavaScript functions don't get prefix/suffix - written as-is
+      expect(vm.prefixCode).toBe('');
+      expect(vm.suffixCode).toBe('');
     });
 
-    it('should clear params for Lua functions during submission', async () => {
+    it('should clear params for JavaScript functions during submission', async () => {
       const wrapper = mount(AddFunction, {
         props: {
           ...defaultProps,
@@ -363,11 +364,11 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       const vm = wrapper.vm as any;
-      
-      // Branch: transType == 1 (line 359-361)
+
+      // Branch: transType == 1 (JavaScript)
       vm.formData = {
-        name: 'testLuaFunction',
-        function: 'test lua code',
+        name: 'testJavaScriptFunction',
+        function: 'function transform(row) { return row; }',
         params: 'row,data',
         transType: 1,
       };

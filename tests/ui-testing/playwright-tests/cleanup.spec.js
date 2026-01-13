@@ -114,9 +114,10 @@ test.describe("Pre-Test Cleanup", () => {
         /^or-root-test-\d+$/,
         /^manual-debug-pipeline-/,
         /^manual-verify-pipeline-/,
-        /^scheurl\d+$/,       // scheurl556, scheurl149, scheurl56, etc.
-        /^schefile\d+$/,      // schefile399, schefile971, schefile123, etc.
-        /^realurl\d+$/        // realurl822, etc.
+        /^scheurl\d+$/,       // scheurl556, scheurl149, etc. (pipelineImport.spec.js)
+        /^schefile\d+$/,      // schefile399, schefile971, etc. (pipelineImport.spec.js)
+        /^realurl\d+$/,       // realurl822, etc. (pipelineImport.spec.js)
+        /^realfile\d+$/       // realfile123, etc. (pipelineImport.spec.js) - was missing!
       ]
     );
 
@@ -126,13 +127,56 @@ test.describe("Pre-Test Cleanup", () => {
     ]);
 
     // Clean up functions matching test patterns
-    await pm.apiCleanup.cleanupFunctions([
+    // Patterns from sanity/pipeline tests (default org only)
+    const sanityFunctionPatterns = [
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
       /^sanitytest_/,                // sanitytest_a3f2, etc.
       /^e2eautomatefunctions_/       // e2eautomatefunctions_x9y2, etc.
-    ]);
+    ];
+
+    // Patterns from Functions folder tests (js-transform-type.spec.js)
+    const jsFunctionPatterns = [
+      /^test_js_fn_/,                // JS function creation tests
+      /^test_js_validate_/,          // JS validation tests
+      /^test_js_exec_/,              // JS execution tests
+      /^test_js_error_/,             // JS error handling tests
+      /^test_js_syntax_err_/,        // JS syntax error tests
+      /^test_js_empty_/,             // JS empty function tests
+      /^meta_js_fn_/,                // Meta org JS function tests
+      /^default_vrl_fn_/             // Default org VRL function tests
+    ];
+
+    // Patterns from Functions folder tests (row-expansion.spec.js)
+    const rowExpansionPatterns = [
+      /^vrl_row_expand_/,            // VRL row expansion tests
+      /^js_row_expand_/,             // JS row expansion tests
+      /^vrl_empty_expand_/,          // VRL empty expansion tests
+      /^js_empty_expand_/,           // JS empty expansion tests
+      /^vrl_single_expand_/,         // VRL single element tests
+      /^js_single_expand_/,          // JS single element tests
+      /^js_complex_expand_/,         // JS complex transformation tests
+      /^vrl_compare_/,               // VRL comparison tests
+      /^js_compare_/,                // JS comparison tests
+      /^pipeline_expand_fn_/,        // Pipeline integration tests
+      /^invalid_expand_/             // Invalid expansion tests
+    ];
+
+    // Clean up functions in default org (sanity tests + VRL functions from Functions folder)
+    const defaultOrgPatterns = [
+      ...sanityFunctionPatterns,
+      ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
+      ...rowExpansionPatterns        // vrl_* patterns created in default org
+    ];
+    await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
+
+    // Clean up functions in _meta org (JS functions only work there)
+    const metaOrgFunctionPatterns = [
+      ...jsFunctionPatterns,         // test_js_*, meta_js_fn_* created in _meta org
+      ...rowExpansionPatterns        // js_* patterns created in _meta org
+    ];
+    await pm.apiCleanup.cleanupFunctionsInOrg('_meta', metaOrgFunctionPatterns);
 
     // Clean up enrichment tables matching test patterns
     await pm.apiCleanup.cleanupEnrichmentTables([
@@ -185,11 +229,19 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
-        /^incident_e2e_/                               // Incident e2e test streams (incident_e2e_*)
+        /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
+        /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
+        /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
+        /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
     );
+
+    // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
+    // are created by pipeline-regression.spec.js for Issue #9901 regression tests.
+    // Custom traces stream uses "stream-name" header (ZO_GRPC_STREAM_HEADER_KEY config).
+    // Since streams are re-used with fresh timestamps each test run, cleanup is not strictly required.
 
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();

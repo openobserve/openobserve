@@ -15,15 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full org-dedup-settings">
+  <div class="tw:w-full org-dedup-settings q-mt-sm">
     <div class="tw:mb-6">
-      <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
+      <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
       <div class="text-body2 text-grey-7">
         {{ t('alerts.correlation.description') }}
       </div>
       <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
         {{ t('alerts.correlation.semanticFieldNote') }}
       </div>
+      <q-btn
+        data-test="dedup-settings-refresh-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        flat
+        dense
+        color="primary"
+        :label="t('common.refresh')"
+        @click="loadConfig"
+      />
     </div>
 
     <q-separator class="tw:mb-6" />
@@ -31,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Enable Deduplication -->
     <div class="tw:mb-6">
       <q-checkbox
+        data-test="organization-deduplication-enable-checkbox"
         v-model="localConfig.enabled"
         :label="t('alerts.correlation.enableOrgLevel')"
         dense
@@ -45,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cross-Alert Deduplication -->
     <div class="tw:mb-6" v-if="localConfig.enabled">
       <q-checkbox
+        data-test="organizationdeduplication-enable-cross-alert-checkbox"
         v-model="localConfig.alert_dedup_enabled"
         :label="t('alerts.correlation.enableCrossAlert')"
         dense
@@ -82,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-col tw:gap-2">
         <q-checkbox
           v-for="group in localSemanticGroups"
+          :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
           :key="group.id"
           :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
           @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
@@ -121,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('alerts.correlation.defaultWindowDescription') }}
       </div>
       <q-input
+        data-test="orgnaizationdeduplication-default-window-input"
         v-model.number="localConfig.time_window_minutes"
         type="number"
         dense
@@ -156,6 +170,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 
 const store = useStore();
 const $q = useQuasar();
@@ -275,7 +290,6 @@ const loadConfig = async () => {
       // Try to get existing config
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
       const config = response.data;
-      console.log("Loaded dedup config:", config);
       localConfig.value = {
         enabled: config.enabled ?? true,
         alert_dedup_enabled: config.alert_dedup_enabled ?? true,
@@ -286,13 +300,10 @@ const loadConfig = async () => {
       };
       localSemanticGroups.value = config.semantic_field_groups ?? [];
     } catch (error) {
-      console.log("No existing config, loading default semantic groups from backend", error);
-
       // Load default semantic groups from backend
       try {
         const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
         const defaultGroups = semanticGroupsResponse.data;
-        console.log(`Loaded ${defaultGroups.length} default semantic groups from backend`);
 
         localConfig.value = {
           enabled: true,
@@ -309,8 +320,6 @@ const loadConfig = async () => {
         localSemanticGroups.value = [];
       }
     }
-  } else {
-    console.log("Using config from props:", props.config);
   }
 };
 
@@ -322,7 +331,6 @@ watch(
   () => props.config,
   (newVal) => {
     if (newVal) {
-      console.log("Config changed from props:", newVal);
       localConfig.value = {
         enabled: newVal.enabled ?? true,
         alert_dedup_enabled: newVal.alert_dedup_enabled ?? true,
@@ -332,8 +340,6 @@ watch(
         fqn_priority_dimensions: newVal.fqn_priority_dimensions,
       };
       localSemanticGroups.value = newVal.semantic_field_groups ?? [];
-      console.log("Updated localConfig:", localConfig.value);
-      console.log("Updated localSemanticGroups:", localSemanticGroups.value);
     }
   },
   { deep: true, immediate: true },

@@ -200,9 +200,9 @@ async fn search_in_cluster(
     if start > end && !cached_values.is_empty() {
         log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
         let values = if query_exemplars {
-            merge_exemplars_query(&cached_values)
+            merge_exemplars_query(&cached_values, &req.org_id).await?
         } else {
-            merge_matrix_query(&cached_values)
+            merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
         return Ok(values);
@@ -349,15 +349,17 @@ async fn search_in_cluster(
 
     // merge result
     let values = if result_type == "matrix" {
-        merge_matrix_query(&series_data)
+        merge_matrix_query(&series_data, &req.org_id).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data)
+        merge_vector_query(&series_data, &req.org_id).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
-        merge_exemplars_query(&series_data)
+        merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
-        return Err(server_internal_error("invalid result type"));
+        return Err(server_internal_error(format!(
+            "invalid result type: {result_type}"
+        )));
     };
     let result_time = stop_watch.record_split("result").as_secs_f64();
     log::info!(
@@ -416,7 +418,7 @@ async fn search_in_cluster(
     Ok(values)
 }
 
-fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -433,7 +435,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
         });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
             let mut samples = samples
@@ -447,12 +449,19 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
             RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
         })
         .collect::<Vec<_>>();
+
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
+
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
-fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -467,7 +476,7 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
             merged_metrics.insert(signature(&labels), labels);
         }
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
@@ -475,9 +484,15 @@ fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
         })
         .collect::<Vec<_>>();
 
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
+
     let mut value = Value::Vector(merged_data);
     value.sort();
-    value
+    Ok(value)
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
@@ -492,7 +507,7 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
     Value::Sample(sample)
 }
 
-fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
+async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
@@ -514,7 +529,7 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
             });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, exemplars)| {
             let mut exemplars: Vec<Arc<Exemplar>> = exemplars
@@ -524,9 +539,118 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
             exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Check series limit and truncate if necessary
+    let max_limit = get_max_series_limit(org_id).await;
+    if should_truncate_series(merged_data.len(), max_limit) {
+        merged_data.truncate(max_limit);
+    }
 
     let mut value = Value::Matrix(merged_data);
     value.sort();
-    value
+    Ok(value)
+}
+
+/// Get the maximum series limit for the organization.
+///
+/// Fetches the org-specific setting if available, otherwise falls back
+/// to the system-wide ENV configuration default (ZO_METRICS_MAX_SERIES_RESPONSE).
+///
+/// # Arguments
+/// * `org_id` - The organization identifier
+///
+/// # Returns
+/// Maximum number of series allowed per PromQL query
+///
+/// # Note
+/// This function is called for every PromQL query. Consider caching org settings
+/// with a TTL to reduce database load in high-throughput scenarios.
+async fn get_max_series_limit(org_id: &str) -> usize {
+    match crate::service::db::organization::get_org_setting(org_id).await {
+        Ok(settings) => settings.max_series_per_query.unwrap_or_else(|| {
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }),
+        Err(err) => {
+            log::warn!(
+                "Failed to fetch org settings for {}, using default limit: {:?}",
+                org_id,
+                err
+            );
+            let cfg = get_config();
+            cfg.limit.metrics_max_series_response
+        }
+    }
+}
+
+/// Check if series count exceeds the limit and log a warning if truncation is needed.
+///
+/// This function does not return an error. Instead, it logs a warning when the series
+/// count exceeds the limit, allowing the caller to truncate the results.
+///
+/// # Arguments
+/// * `series_count` - The actual number of series in the result
+/// * `max_limit` - The maximum allowed series limit
+///
+/// # Returns
+/// `true` if series count exceeds limit (truncation needed), `false` otherwise
+fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
+    if series_count > max_limit {
+        log::warn!(
+            "Query result exceeds maximum allowed series limit. Returning first {} series out of {}. \
+             You can increase this limit via organization settings or ZO_METRICS_MAX_SERIES_RESPONSE environment variable.",
+            max_limit,
+            series_count
+        );
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_truncate_series_within_limit() {
+        // Test series count within limit - should not truncate
+        assert!(!should_truncate_series(1000, 10000));
+
+        // Test series count exactly at limit - should not truncate
+        assert!(!should_truncate_series(10000, 10000));
+    }
+
+    #[test]
+    fn test_should_truncate_series_exceeds_limit() {
+        // Test series count exceeds limit - should truncate
+        assert!(should_truncate_series(10001, 10000));
+        assert!(should_truncate_series(50000, 10000));
+    }
+
+    #[test]
+    fn test_should_truncate_series_edge_cases() {
+        // Test zero series - should not truncate
+        assert!(!should_truncate_series(0, 1000));
+
+        // Test with limit of 1
+        assert!(!should_truncate_series(0, 1));
+        assert!(!should_truncate_series(1, 1));
+        assert!(should_truncate_series(2, 1));
+    }
+
+    #[tokio::test]
+    async fn test_get_max_series_limit_fallback_to_env_default() {
+        // Test that get_max_series_limit falls back to ENV default
+        // when org settings cannot be fetched (e.g., org doesn't exist)
+        let limit = get_max_series_limit("nonexistent_test_org_123456").await;
+
+        // Should return the default from config
+        let expected_default = get_config().limit.metrics_max_series_response;
+        assert_eq!(limit, expected_default);
+
+        // Verify the default is the expected value (40,000)
+        assert_eq!(expected_default, 40_000);
+    }
 }

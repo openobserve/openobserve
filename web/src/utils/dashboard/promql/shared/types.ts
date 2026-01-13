@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,8 @@
 /**
  * Shared tooltip overflow CSS style for chart tooltips
  */
-export const TOOLTIP_SCROLL_STYLE = "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;";
+export const TOOLTIP_SCROLL_STYLE =
+  "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;";
 
 /**
  * PromQL result item structure
@@ -70,7 +71,7 @@ export interface PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ): {
     series: any[];
     xAxis?: any;
@@ -123,7 +124,15 @@ export interface TableColumnConfig {
   align: "left" | "center" | "right";
   sortable: boolean;
   format?: (val: any) => string;
-  type?: "string" | "number" | "timestamp" | "duration" | "bytes" | "boolean" | "link" | "json";
+  type?:
+    | "string"
+    | "number"
+    | "timestamp"
+    | "duration"
+    | "bytes"
+    | "boolean"
+    | "link"
+    | "json";
 }
 
 /**

@@ -23,7 +23,7 @@ use config::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt, util::DISTINCT_STREAM_PREFIX},
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -65,11 +65,8 @@ use super::{
     storage::file_list, table_provider::uniontable::NewUnionTable,
     udf::transform_udf::get_all_transform,
 };
-use crate::service::{
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-    search::{
-        datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
-    },
+use crate::service::search::{
+    datafusion::table_provider::listing_adapter::ListingTableAdapter, index::IndexCondition,
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB

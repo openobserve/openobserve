@@ -819,27 +819,27 @@ where
                     || path.contains("/reports/bulk"));
 
             if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
-                || (method.eq("POST")
-                    && url_len > 1
-                    && path_columns[1].starts_with("result_schema"))
-                || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
-                || path.contains("/prometheus/api/v1/query")
-                || path.contains("/resources")
-                || path.contains("/format_query")
-                || path.contains("/prometheus/api/v1/series")
-                || path.contains("/traces/latest")
-                || path.contains("clusters")
-                || path.contains("query_manager")
-                || path.contains("/short")
-                || path.contains("/ws")
-                || path.contains("/_values_stream")
-                // bulk enable of pipelines and alerts
-                || path_is_bulk_operation
-                // for license the function itself with do a perm check
-                || (url_len == 1 && path.contains("license"))
-                // service_streams APIs are org-level, not stream-specific
-                || path.contains("/service_streams/_analytics")
-                || path.contains("/service_streams/_correlate")
+            || (method.eq("POST")
+                && url_len > 1
+                && path_columns[1].starts_with("result_schema"))
+            || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
+            || path.contains("/prometheus/api/v1/query")
+            || path.contains("/resources")
+            || path.contains("/format_query")
+            || path.contains("/prometheus/api/v1/series")
+            || path.contains("/traces/latest")
+            || path.contains("clusters")
+            || path.contains("query_manager")
+            || path.contains("/short")
+            || path.contains("/ws")
+            || path.contains("/_values_stream")
+            // bulk enable of pipelines and alerts
+            || path_is_bulk_operation
+            // for license the function itself with do a perm check
+            || (url_len == 1 && path.contains("license"))
+            // service_streams APIs are org-level, not stream-specific
+            || path.contains("/service_streams/_analytics")
+            || path.contains("/service_streams/_correlate")
             {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

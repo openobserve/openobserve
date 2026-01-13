@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,7 @@ import {
 export function buildDynamicGrid(
   panelSchema: any,
   chartPanelRef: any,
-  seriesData: any[] = []
+  seriesData: any[] = [],
 ): any {
   const config = panelSchema.config || {};
   const legendPosition = config.legends_position || "bottom";
@@ -65,7 +65,7 @@ export function buildDynamicGrid(
           seriesData.length,
           chartWidth,
           seriesData,
-          chartHeight
+          chartHeight,
         );
         grid.bottom = bottomHeight;
         break;
@@ -80,7 +80,7 @@ export function buildDynamicGrid(
           chartWidth,
           chartHeight,
           seriesData,
-          isScrollable
+          isScrollable,
         );
         grid.right = rightWidth;
         break;
@@ -115,7 +115,7 @@ export function buildDynamicGrid(
 export function buildLegendConfig(
   panelSchema: any,
   chartPanelRef: any,
-  seriesData: any[] = []
+  seriesData: any[] = [],
 ): any {
   const config = panelSchema.config || {};
   const legendPosition = config.legends_position || "bottom";
@@ -134,7 +134,10 @@ export function buildLegendConfig(
   const legend: any = {
     show: true,
     type: legendType,
-    orient: legendPosition === "bottom" || legendPosition === "top" ? "horizontal" : "vertical",
+    orient:
+      legendPosition === "bottom" || legendPosition === "top"
+        ? "horizontal"
+        : "vertical",
     padding: [10, 20, 10, 10],
     textStyle: {
       width: 150, // Same as line charts
@@ -165,7 +168,7 @@ export function buildLegendConfig(
         chartWidth,
         chartHeight,
         seriesData,
-        true
+        true,
       );
       legend.width = rightWidth - 20;
     }
@@ -192,7 +195,7 @@ export function buildPieChartConfig(
   panelSchema: any,
   chartPanelRef: any,
   seriesData: any[] = [],
-  isDonut: boolean = false
+  isDonut: boolean = false,
 ): { radius: any; center: [string, string] } {
   const config = panelSchema.config || {};
   const chartAlign = config.chart_align;
@@ -205,7 +208,7 @@ export function buildPieChartConfig(
     panelSchema,
     dimensions.chartWidth,
     dimensions.chartHeight,
-    seriesData
+    seriesData,
   );
 
   // Calculate dynamic radius
@@ -214,7 +217,7 @@ export function buildPieChartConfig(
     chartDimensions.availableWidth,
     chartDimensions.availableHeight,
     dimensions.chartWidth,
-    dimensions.chartHeight
+    dimensions.chartHeight,
   );
 
   // Set radius based on chart type

@@ -10,8 +10,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  claude:
+  # Security: Check if user is a member of argocd-dev team
+  check-permission:
     if: |
+      github.event.sender.type != 'Bot' && (
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))))
+    runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.check.outputs.authorized }}
+    steps:
+      - name: Check team membership
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const team = 'argocd-dev';
+            const org = 'openobserve';
+            const username = context.actor;
+
+            try {
+              // Check if user is a member of the team
+              await github.rest.teams.getMembershipForUserInOrg({
+                org: org,
+                team_slug: team,
+                username: username
+              });
+              console.log(`✅ ${username} is a member of ${org}/${team}`);
+              core.setOutput('authorized', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ ${username} is NOT a member of ${org}/${team}`);
+                core.setOutput('authorized', 'false');
+
+                // Get the issue/PR number for commenting
+                const issueNumber = context.issue?.number || context.payload.pull_request?.number;
+                if (issueNumber) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    body: `⚠️ @${username} You don't have permission to trigger \`@claude\`. Only members of the [argocd-dev](https://github.com/orgs/openobserve/teams/argocd-dev) team can use this command.`
+                  });
+                }
+              } else {
+                throw error;
+              }
+            }
+
+  claude:
+    needs: check-permission
+    if: |
+      needs.check-permission.outputs.authorized == 'true' &&
       github.event.sender.type != 'Bot' && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||

@@ -25,56 +25,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="tw:mx-4">
-      <q-tabs
-        v-model="activeTab"
-        dense
-        class="text-grey"
-        active-color="primary"
-        indicator-color="primary"
-        align="left"
-        narrow-indicator
-      >
-        <q-tab name="identity" :label="t('settings.correlation.serviceIdentityTab')" icon="fingerprint" />
-        <q-tab name="services" :label="t('settings.correlation.discoveredServicesTab')" icon="hub" />
-        <q-tab name="alert-correlation" :label="t('settings.correlation.alertCorrelationTab')" icon="link" />
-      </q-tabs>
+    <div class="tw:px-4">
+      <app-tabs
+        :tabs="tabs"
+        v-model:active-tab="activeTab"
+        @update:active-tab="onTabChange"
+      />
 
-      <q-separator />
+      <div class="tw:overflow-hidden">
+        <ServiceIdentityConfig
+          v-if="activeTab === 'identity'"
+          :org-id="store.state.selectedOrganization.identifier"
+          :config="store.state.organizationSettings?.deduplication_config"
+          @saved="onCorrelationSettingsSaved"
+        />
 
-      <q-tab-panels v-model="activeTab" animated class="tw:mt-4 tw:overflow-hidden tw:bg-transparent">
-        <q-tab-panel name="identity" class="tw:p-0 tw:overflow-hidden">
-          <ServiceIdentityConfig
-            :org-id="store.state.selectedOrganization.identifier"
-            :config="store.state.organizationSettings?.deduplication_config"
-            @saved="onCorrelationSettingsSaved"
-          />
-        </q-tab-panel>
+        <DiscoveredServices v-if="activeTab === 'services'" />
 
-        <q-tab-panel name="services" class="tw:p-0 tw:overflow-hidden">
-          <DiscoveredServices />
-        </q-tab-panel>
-
-        <q-tab-panel name="alert-correlation" class="tw:p-0 tw:overflow-hidden">
-          <OrganizationDeduplicationSettings
-            :org-id="store.state.selectedOrganization.identifier"
-            :config="store.state.organizationSettings?.deduplication_config"
-            @saved="onCorrelationSettingsSaved"
-          />
-        </q-tab-panel>
-      </q-tab-panels>
+        <OrganizationDeduplicationSettings
+          v-if="activeTab === 'alert-correlation'"
+          :org-id="store.state.selectedOrganization.identifier"
+          :config="store.state.organizationSettings?.deduplication_config"
+          @saved="onCorrelationSettingsSaved"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentityConfig from "@/components/settings/ServiceIdentityConfig.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 export default defineComponent({
   name: "CorrelationSettings",
@@ -82,12 +69,32 @@ export default defineComponent({
     OrganizationDeduplicationSettings,
     DiscoveredServices,
     ServiceIdentityConfig,
+    AppTabs,
   },
   setup() {
     const store = useStore();
     const q = useQuasar();
     const { t } = useI18n();
     const activeTab = ref("identity");
+
+    const tabs = computed(() => [
+      {
+        label: t("settings.correlation.serviceIdentityTab"),
+        value: "identity",
+      },
+      {
+        label: t("settings.correlation.discoveredServicesTab"),
+        value: "services",
+      },
+      {
+        label: t("settings.correlation.alertCorrelationTab"),
+        value: "alert-correlation",
+      },
+    ]);
+
+    const onTabChange = (tab: string) => {
+      activeTab.value = tab;
+    };
 
     const onCorrelationSettingsSaved = () => {
       // Child components handle their own notifications and data refresh
@@ -97,6 +104,8 @@ export default defineComponent({
     return {
       store,
       activeTab,
+      tabs,
+      onTabChange,
       onCorrelationSettingsSaved,
       t,
     };
@@ -114,16 +123,5 @@ export default defineComponent({
   font-size: 0.875rem;
   font-weight: 500;
   line-height: 1.25rem;
-}
-
-// Ensure tab panels have consistent background with card-container
-:deep(.q-tab-panels) {
-  background: var(--o2-card-bg) !important;
-  overflow: hidden;
-}
-
-:deep(.q-tab-panel) {
-  overflow: hidden;
-  background: var(--o2-card-bg) !important;
 }
 </style>

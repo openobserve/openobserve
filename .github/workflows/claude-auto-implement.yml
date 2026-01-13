@@ -1,0 +1,132 @@
+name: Claude Auto-Implement
+
+# Trigger on label or @claude_impl comment on issues/PRs
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-implement-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  # Security: Check if user is a member of argocd-dev team
+  check-permission:
+    if: |
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issues' && github.event.label.name == 'auto-implement') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.check.outputs.authorized }}
+    steps:
+      - name: Check team membership
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const team = 'argocd-dev';
+            const org = 'openobserve';
+            const username = context.actor;
+
+            try {
+              // Check if user is a member of the team
+              await github.rest.teams.getMembershipForUserInOrg({
+                org: org,
+                team_slug: team,
+                username: username
+              });
+              console.log(`✅ ${username} is a member of ${org}/${team}`);
+              core.setOutput('authorized', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ ${username} is NOT a member of ${org}/${team}`);
+                core.setOutput('authorized', 'false');
+
+                // Post a comment explaining why the workflow didn't run
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `⚠️ @${username} You don't have permission to trigger \`@claude_impl\`. Only members of the [argocd-dev](https://github.com/orgs/openobserve/teams/argocd-dev) team can use this command.`
+                });
+              } else {
+                throw error;
+              }
+            }
+
+  # Prepare job for label/comment triggers - detects if PR or Issue
+  prepare-auto:
+    needs: check-permission
+    if: |
+      needs.check-permission.outputs.authorized == 'true' &&
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issues' && github.event.label.name == 'auto-implement') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.detect.outputs.mode }}
+      branch: ${{ steps.detect.outputs.branch }}
+      pr_number: ${{ steps.detect.outputs.pr_number }}
+    steps:
+      - name: Detect if PR or Issue
+        id: detect
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const isPR = !!context.payload.issue.pull_request;
+            const num = context.issue.number;
+
+            if (isPR) {
+              // Get PR details to get branch name
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: num
+              });
+
+              core.setOutput('mode', 'pr_fix');
+              core.setOutput('branch', pr.head.ref);
+              core.setOutput('pr_number', String(num));
+              console.log(`Detected PR #${num} on branch '${pr.head.ref}'`);
+            } else {
+              core.setOutput('mode', 'implement');
+              core.setOutput('branch', '');
+              core.setOutput('pr_number', '');
+              console.log(`Detected Issue #${num}`);
+            }
+
+  # Dispatch to o2-enterprise workflow
+  dispatch:
+    needs: [check-permission, prepare-auto]
+    if: |
+      needs.check-permission.outputs.authorized == 'true' &&
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issues' && github.event.label.name == 'auto-implement') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude_impl'))
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dispatch Claude Implement Event to o2-enterprise
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          repository: openobserve/o2-enterprise
+          event-type: claude-impl-requested
+          client-payload: |-
+            {
+              "source_repo": "openobserve",
+              "issue_number": "${{ github.event.issue.number }}",
+              "issue_title": ${{ toJSON(github.event.issue.title) }},
+              "issue_body": ${{ toJSON(github.event.issue.body) }},
+              "mode": "${{ needs.prepare-auto.outputs.mode }}",
+              "branch": "${{ needs.prepare-auto.outputs.branch }}",
+              "pr_number": "${{ needs.prepare-auto.outputs.pr_number }}"
+            }

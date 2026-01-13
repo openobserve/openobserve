@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ export class MetricConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
+    chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
@@ -47,7 +47,7 @@ export class MetricConverter implements PromQLChartConverter {
           value,
           config?.unit,
           config?.unit_custom,
-          config?.decimals
+          config?.decimals,
         );
 
         metrics.push({
@@ -62,15 +62,16 @@ export class MetricConverter implements PromQLChartConverter {
     // If configured to show only one value, aggregate all metrics
     if (config.show_single_value && metrics.length > 1) {
       const totalValue = metrics.reduce((sum, m) => sum + m.rawValue, 0);
-      const avgValue = config.aggregate_method === "avg"
-        ? totalValue / metrics.length
-        : totalValue;
+      const avgValue =
+        config.aggregate_method === "avg"
+          ? totalValue / metrics.length
+          : totalValue;
 
       const unitValue = getUnitValue(
         avgValue,
         config?.unit,
         config?.unit_custom,
-        config?.decimals
+        config?.decimals,
       );
 
       return {
@@ -81,7 +82,7 @@ export class MetricConverter implements PromQLChartConverter {
         fontColor: config.font_color,
         backgroundColor: config.background_color,
         showTrend: config.show_trend !== false,
-        trendData: metrics.map(m => m.rawValue),
+        trendData: metrics.map((m) => m.rawValue),
       };
     }
 

@@ -165,13 +165,14 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
 /// Returns the status of a specific backfill job.
 #[utoipa::path(
     get,
-    path = "/{org_id}/pipelines/backfill/{job_id}",
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "GetBackfillJob",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     responses(
@@ -180,9 +181,25 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
         (status = 500, description = "Internal server error"),
     ),
 )]
-pub async fn get_backfill(Path((org_id, job_id)): Path<(String, String)>) -> Response {
+pub async fn get_backfill(
+    Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
+) -> Response {
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
+            // Verify the job belongs to the specified pipeline
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                MetaHttpResponse::not_found(format!(
+                    "Backfill job {} not found for pipeline {}",
+                    job_id, pipeline_id
+                ));
+            }
+
             log::debug!(
                 "[BACKFILL API] Retrieved backfill job {} for org {}",
                 job_id,
@@ -207,13 +224,14 @@ pub async fn get_backfill(Path((org_id, job_id)): Path<(String, String)>) -> Res
 /// Enables (resumes) or disables (pauses) a backfill job.
 #[utoipa::path(
     put,
-    path = "/{org_id}/pipelines/backfill/{job_id}/enable",
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "EnableBackfillJob",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
         ("value" = bool, Query, description = "Enable (true) or disable (false) the backfill job"),
     ),
@@ -224,14 +242,42 @@ pub async fn get_backfill(Path((org_id, job_id)): Path<(String, String)>) -> Res
         (status = 500, description = "Internal server error"),
     ),
 )]
+#[put("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable")]
 pub async fn enable_backfill(
-    Path((org_id, job_id)): Path<(String, String)>,
+    Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
+
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::NOT_FOUND,
+                    format!(
+                        "Backfill job {} not found for pipeline {}",
+                        job_id, pipeline_id
+                    ),
+                )));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::NOT_FOUND,
+                e.to_string(),
+            )));
+        }
+    }
 
     log::info!(
         "[BACKFILL API] {} backfill job {} for org {}",
@@ -273,13 +319,14 @@ pub async fn enable_backfill(
 /// Deletes a backfill job permanently.
 #[utoipa::path(
     delete,
-    path = "/{org_id}/pipelines/backfill/{job_id}",
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "DeleteBackfillJob",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     responses(
@@ -288,7 +335,36 @@ pub async fn enable_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> Response {
+pub async fn delete_backfill(
+    Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
+) -> Response {
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                return MetaHttpResponse::not_found(format!(
+                    "Backfill job {} not found for pipeline {}",
+                    job_id, pipeline_id
+                ));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return MetaHttpResponse::not_found(e.to_string());
+        }
+    }
+
     log::info!(
         "[BACKFILL API] Delete backfill job {} for org {}",
         job_id,
@@ -313,7 +389,7 @@ pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> 
                 org_id,
                 e
             );
-            MetaHttpResponse::not_found(e.to_string())
+            MetaHttpResponse::not_found(e.to_string());
         }
     }
 }
@@ -321,7 +397,7 @@ pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> 
 /// Update an existing backfill job
 #[utoipa::path(
     put,
-    path = "/{org_id}/pipelines/backfill/{job_id}",
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "UpdateBackfillJob",
@@ -330,6 +406,7 @@ pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> 
     ),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     request_body(
@@ -347,9 +424,36 @@ pub async fn delete_backfill(Path((org_id, job_id)): Path<(String, String)>) -> 
     )
 )]
 pub async fn update_backfill(
-    Path((org_id, job_id)): Path<(String, String)>,
+    Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
+    // Verify the job belongs to the specified pipeline
+    match backfill::get_backfill_job(&org_id, &job_id).await {
+        Ok(job) => {
+            if job.pipeline_id != pipeline_id {
+                log::warn!(
+                    "[BACKFILL API] Job {} belongs to pipeline {}, not {}",
+                    job_id,
+                    job.pipeline_id,
+                    pipeline_id
+                );
+                return MetaHttpResponse::not_found(format!(
+                    "Backfill job {} not found for pipeline {}",
+                    job_id, pipeline_id
+                ));
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[BACKFILL API] Failed to get backfill job {} for org {}: {}",
+                job_id,
+                org_id,
+                e
+            );
+            return MetaHttpResponse::not_found(e.to_string());
+        }
+    }
+
     log::info!(
         "[BACKFILL API] Updating backfill job {} for org {}",
         job_id,
@@ -374,7 +478,7 @@ pub async fn update_backfill(
                 org_id,
                 e
             );
-            MetaHttpResponse::bad_request(e.to_string())
+            MetaHttpResponse::bad_request(e.to_string());
         }
     }
 }

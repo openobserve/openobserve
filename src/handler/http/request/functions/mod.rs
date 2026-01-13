@@ -371,10 +371,10 @@ pub async fn test_function(
     Path(org_id): Path<String>,
     Json(req_body): Json<TestVRLRequest>,
 ) -> Response {
-    let TestVRLRequest { function, events } = req_body;
+    let TestVRLRequest { function, events, trans_type } = req_body;
 
-    // Assuming `test_function` applies the VRL function to each event
-    match crate::service::functions::test_run_function(&org_id, function, events).await {
+    // test_run_function will auto-detect VRL vs JS if trans_type is None
+    match crate::service::functions::test_run_function(&org_id, function, events, trans_type).await
         Ok(result) => result,
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()).into_response(),
     }

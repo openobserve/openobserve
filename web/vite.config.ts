@@ -41,6 +41,8 @@ if (process.env.NODE_ENV === "production") {
 
 const isTesting = process.env.NODE_ENV === "test";
 
+let buildTime = Date.now();
+
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
   async resolveId(source: string) {
@@ -95,6 +97,7 @@ export default defineConfig({
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
     __INTLIFY_JIT_COMPILATION__: true,
+    __BUILD_TIME__: buildTime,
   },
   server: {
     port: 8081,

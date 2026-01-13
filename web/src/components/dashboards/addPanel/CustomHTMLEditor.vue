@@ -50,6 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <HTMLRenderer
             :htmlContent="htmlContent"
             :variables-data="initialVariableValues"
+            :tabId="tabId"
+            :panelId="panelId"
           />
         </template>
       </q-splitter>
@@ -77,6 +79,14 @@ export default defineComponent({
     initialVariableValues: {
       type: Object,
       default: () => ({}),
+    },
+    tabId: {
+      type: String,
+      default: null,
+    },
+    panelId: {
+      type: String,
+      default: null,
     },
   },
   setup(props, { emit }) {

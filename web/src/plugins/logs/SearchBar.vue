@@ -4763,17 +4763,24 @@ export default defineComponent({
     box-shadow: 0 0 8px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 30%);
   }
 }
- .search-button-enterprise-border-radius{
-      border-radius: 0.375rem 0px 0px 0.375rem !important;
+.search-button-enterprise-border-radius {
+  border-radius: 0.375rem 0px 0px 0.375rem !important;
+}
+.search-button-normal-border-radius {
+  border-radius: 0.375rem;
+}
+.search-button-dropdown-enterprise-border-radius {
+  border-radius: 0px 0.375rem 0.375rem 0px !important;
+}
+
+.o2-color-cancel {
+  background-color: #f67a7a;
+  color: var(--o2-primary-btn-text);
+}
+
+.logs-search-splitter {
+  :deep(.q-splitter__separator) {
+    height: 100%;
   }
-  .search-button-normal-border-radius{
-      border-radius: 0.375rem;
-  }
-  .search-button-dropdown-enterprise-border-radius{
-          border-radius: 0px 0.375rem 0.375rem  0px !important;
-  }
-  .o2-color-cancel{
-    background-color:#f67a7a;
-    color: var(--o2-primary-btn-text);
-  }
+}
 </style>

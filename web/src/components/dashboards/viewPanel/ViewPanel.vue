@@ -51,7 +51,7 @@
           :min-refresh-interval="
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
-          style="padding-left: 0px; padding-right: 0px;"
+          style="padding-left: 0px; padding-right: 0px"
           @trigger="refreshData"
           class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
@@ -118,10 +118,15 @@
                 :showDynamicFilters="
                   currentDashboardData.data?.variables?.showDynamicFilters
                 "
-                :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
+                :selectedTimeDate="
+                  dateTimeForVariables || dashboardPanelData.meta.dateTime
+                "
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                :showAllVisible="true"
+                :tabId="currentTabId"
+                :panelId="currentPanelId"
               />
               <div style="flex: 1; overflow: hidden">
                 <div
@@ -202,6 +207,9 @@
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
                   :variablesData="currentVariablesDataRef"
+                  :currentVariablesData="liveVariablesData"
+                  :tabId="currentTabId"
+                  :panelId="currentPanelId"
                   :width="6"
                   :searchType="searchType"
                   :showLegendsButton="true"
@@ -276,6 +284,7 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { defineAsyncComponent } from "vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
@@ -330,6 +339,14 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
 
+    // IMPORTANT: Always create a NEW isolated instance for ViewPanel
+    // ViewPanel should NEVER share the variables manager with the parent dashboard
+    // This ensures that variable changes in ViewPanel don't affect the parent dashboard
+    const variablesManager = useVariablesManager();
+
+    // Provide to child components (ViewPanel's own isolated instance)
+    provide("variablesManager", variablesManager);
+
     const currentVariablesDataRef: any = reactive({});
 
     let parser: any;
@@ -366,7 +383,6 @@ export default defineComponent({
 
         return;
       } catch (error) {
-        console.error("Error updating variables data:", error);
       }
 
       // resize the chart when variables data is updated
@@ -534,10 +550,42 @@ export default defineComponent({
         for (let i = 0; i < histogramFields.value.length; i++) {
           if (
             histogramFields.value[i]?.args &&
-            histogramFields.value[i]?.args[0]?.value
+            histogramFields.value[i]?.args.length > 0
           ) {
-            histogramInterval.value = histogramFields.value[i]?.args[0]?.value;
-            break;
+            // Histogram function signature: histogram(field, interval)
+            // args[0] = timestamp field (object)
+            // args[1] = interval (string like '5m', '1h', etc.)
+
+            // Check if there's a second argument (the interval)
+            if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
+              const intervalArg = histogramFields.value[i].args[1];
+
+              // Extract interval value with explicit type checking
+              let intervalValue: string | null = null;
+
+              if (typeof intervalArg === 'string') {
+                // Direct string value
+                intervalValue = intervalArg;
+              } else if (typeof intervalArg === 'object' && intervalArg !== null) {
+                // Object with value property
+                if ('value' in intervalArg && typeof intervalArg.value === 'string') {
+                  intervalValue = intervalArg.value;
+                }
+              }
+
+              // Set the histogram interval only if we have a valid non-empty string
+              if (intervalValue && intervalValue.trim() !== '') {
+                histogramInterval.value = intervalValue;
+              } else {
+                // No valid interval - use Auto mode
+                histogramInterval.value = null;
+              }
+              break;
+            } else {
+              // No interval specified - this is "Auto" mode
+              histogramInterval.value = null;
+              break;
+            }
           }
         }
       }
@@ -595,6 +643,32 @@ export default defineComponent({
       );
       currentDashboardData.data = data;
 
+      // Initialize variables manager with dashboard variables
+      try {
+        // Get current tab and panel IDs for initialization
+        const tabId =
+          (route.query.tab as string) ??
+          currentDashboardData.data?.tabs?.[0]?.tabId;
+
+        // Initialize with panel-to-tab mapping (3rd parameter is critical for panel variables!)
+        await variablesManager.initialize(
+          currentDashboardData.data?.variables?.list || [],
+          currentDashboardData.data,
+          props.panelId ? { [props.panelId]: tabId || "" } : {},
+        );
+
+        // Mark current tab and panel as visible so their variables can load
+        if (tabId) {
+          variablesManager.setTabVisibility(tabId, true);
+        }
+
+        // Mark the panel as visible
+        if (props.panelId) {
+          variablesManager.setPanelVisibility(props.panelId, true);
+        }
+      } catch (error) {
+      }
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -612,7 +686,7 @@ export default defineComponent({
     });
 
     const dateTimeForVariables = ref(null);
-    
+
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();
       const startTime = new Date(date.startTime);
@@ -731,6 +805,37 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    // Computed properties for current tab and panel IDs
+    const currentTabId = computed(() => {
+      return (
+        (route.query.tab as string) ??
+        currentDashboardData.data?.tabs?.[0]?.tabId
+      );
+    });
+
+    const currentPanelId = computed(() => {
+      return props.panelId;
+    });
+
+    // Computed property for LIVE merged variables (for HTML/Markdown panels and drilldown)
+    // This includes global + tab + panel scoped variables with proper precedence
+    const liveVariablesData = computed(() => {
+      if (variablesManager && variablesManager.variablesData.isInitialized) {
+        const mergedVars = variablesManager.getVariablesForPanel(
+          currentPanelId.value,
+          currentTabId.value || "",
+        );
+        
+        return {
+          isVariablesLoading: variablesManager.isLoading.value,
+          values: mergedVars,
+        };
+      } else {
+        // Fallback to variablesData
+        return variablesData;
+      }
+    });
+
     const currentPanelData = computed(() => {
       const rendererData = panelSchemaRendererRef.value?.panelData || {};
       return {
@@ -756,6 +861,7 @@ export default defineComponent({
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
+      liveVariablesData,
       dateTimePickerRef,
       refreshInterval,
       refreshData,
@@ -779,6 +885,8 @@ export default defineComponent({
       errorMessage,
       outlinedWarning,
       symOutlinedDataInfoAlert,
+      currentTabId,
+      currentPanelId,
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,

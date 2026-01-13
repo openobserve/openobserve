@@ -433,7 +433,9 @@ async fn remote_write_inner(
 
     // Detailed performance logging
     if parse_timeseries_ms > 200 {
-        let other_time = parse_timeseries_ms * 1000 - total_preload_time - sample_processing_time;
+        let total_accounted = total_preload_time + sample_processing_time;
+        let parse_timeseries_us = parse_timeseries_ms * 1000;
+        let other_time = parse_timeseries_us.saturating_sub(total_accounted);
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \

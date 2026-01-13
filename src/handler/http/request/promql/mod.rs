@@ -1241,7 +1241,7 @@ async fn search_streaming(
     // generate partitions
     let partitions = generate_search_partition(&req.query, start, end, req.step);
     log::info!(
-        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions with time range [{start},{end}]",
+        "[HTTP2_STREAM PromQL trace_id {trace_id}] Generated {} partitions with time range [{start},{end}], partitions: {partitions:?}",
         partitions.len(),
     );
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(
@@ -1418,6 +1418,11 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     }
     partition_step -= partition_step % step;
 
+    // Ensure partition_step is at least 3x step to avoid empty partitions
+    if partition_step <= step {
+        partition_step = step * 3;
+    }
+
     if end - start <= partition_step {
         return vec![(start, end)];
     }
@@ -1435,7 +1440,10 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
     } else {
         // First partition: from start to next aligned boundary
         // we need to subtract the step to avoid the overlap of the next partition
-        let next_aligned_boundary = start - offset + partition_step - step;
+        let mut next_aligned_boundary = start - offset + partition_step - step;
+        if start == next_aligned_boundary {
+            next_aligned_boundary += partition_step - step;
+        }
         if next_aligned_boundary <= end {
             groups.push((start, next_aligned_boundary));
         }
@@ -1445,7 +1453,7 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
         let mut group_end = std::cmp::min(group_start + partition_step, end);
 
         // If this would be the last partition and it's too small, merge with previous
-        if group_end == end && !groups.is_empty() && (group_end - group_start < step * 5) {
+        if group_end == end && !groups.is_empty() && (group_end - group_start < step * 3) {
             groups.last_mut().unwrap().1 = group_end;
             break;
         }

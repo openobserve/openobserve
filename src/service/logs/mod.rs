@@ -33,6 +33,7 @@ use config::{
         json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
         time::now_micros,
+        util::DISTINCT_STREAM_PREFIX,
     },
 };
 use infra::{
@@ -48,11 +49,7 @@ use crate::{
         alerts::alert::AlertExt,
         db,
         ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-        metadata::{
-            MetadataItem, MetadataType,
-            distinct_values::{DISTINCT_STREAM_PREFIX, DvItem},
-            write,
-        },
+        metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
     },

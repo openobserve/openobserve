@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
         <div
@@ -82,7 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
-            :variablesData="variablesData"
+            :variablesData="currentVariablesData || variablesData"
+            :tabId="tabId"
+            :panelId="panelSchema.id"
           />
         </div>
 
@@ -364,6 +368,7 @@ import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import { throttle } from "lodash-es";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -431,6 +436,11 @@ export default defineComponent({
     variablesData: {
       required: true,
       type: Object,
+    },
+    currentVariablesData: {
+      required: false,
+      type: Object,
+      default: null,
     },
     forceLoad: {
       type: Boolean,
@@ -738,7 +748,6 @@ export default defineComponent({
       // Prepare panel data to pass to alert creation
       const query = panelSchema.value.queries?.[0];
       if (!query) {
-        console.error("No query found in panel");
         return;
       }
 
@@ -968,7 +977,6 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
-          console.error("error", error);
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -992,6 +1000,17 @@ export default defineComponent({
         }
       }
     };
+
+    // Track if we've rendered the first chunk with actual data
+    let hasRenderedFirstDataChunk = ref(false);
+
+    // Create a throttled version for streaming updates (350ms throttle)
+    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
+    // This prevents excessive re-renders while showing progressive updates
+    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
+      leading: true,  // Call immediately on first invocation
+      trailing: true  // Ensure final call after throttle period
+    });
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -1031,7 +1050,12 @@ export default defineComponent({
     );
 
     watch(
-      [data, store?.state, annotations],
+      [
+        data,
+        () => store?.state?.theme,
+        () => store?.state?.timezone,
+        annotations
+      ],
       async () => {
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
@@ -1062,8 +1086,28 @@ export default defineComponent({
             code: "",
           };
 
-        // Use the common function to convert panel data
-        await convertPanelDataCommon();
+        // Check if this is the first chunk with actual data
+        const hasData = data.value?.length > 0 &&
+                       data.value[0]?.result?.length > 0;
+
+        // Use throttled version during loading (streaming), immediate version when complete
+        // This prevents excessive re-renders during PromQL data streaming
+        if (loading.value) {
+          // First chunk with actual data: render immediately!
+          if (hasData && !hasRenderedFirstDataChunk.value) {
+            hasRenderedFirstDataChunk.value = true;
+            await convertPanelDataCommon();
+          } else {
+            // Subsequent chunks: throttle to reduce re-render frequency
+            await convertPanelDataThrottled();
+          }
+        } else {
+          // Loading complete: immediate final render with full data
+          // Cancel any pending throttled calls and render immediately
+          convertPanelDataThrottled.cancel();
+          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          await convertPanelDataCommon();
+        }
       },
       { deep: true },
     );
@@ -1091,11 +1135,23 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
         resizeObserver = new ResizeObserver(() => {
-          handleWindowLayoutChanges();
+          // Debounce the resize handler to prevent "ResizeObserver loop" errors
+          // This error occurs when the callback takes longer than one animation frame
+          if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
+          }
+
+          resizeTimeout = window.setTimeout(() => {
+            // Use requestAnimationFrame to ensure DOM updates happen at the right time
+            requestAnimationFrame(() => {
+              handleWindowLayoutChanges();
+            });
+          }, 100); // 100ms debounce delay
         });
 
         resizeObserver.observe(chartPanelRef.value);
@@ -1106,6 +1162,10 @@ export default defineComponent({
       if (resizeObserver) {
         resizeObserver.disconnect();
         resizeObserver = null;
+      }
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
       }
     });
 
@@ -1493,7 +1553,6 @@ export default defineComponent({
       const streamName = queryDetails?.queries[0]?.fields?.stream;
 
       if (!originalQuery || !streamName) {
-        console.error("Missing query or stream name.");
         return null;
       }
 
@@ -1521,7 +1580,6 @@ export default defineComponent({
       try {
         return parser.astify(originalQuery);
       } catch (error) {
-        console.error("Failed to parse query:", error);
         return null;
       }
     };
@@ -1681,7 +1739,6 @@ export default defineComponent({
         const navigateToLogs = async () => {
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
-            console.error("Panel schema is undefined.");
             return;
           }
 
@@ -1879,7 +1936,6 @@ export default defineComponent({
               });
             }
           } catch (error) {
-            console.error("Failed to navigate to logs:", error);
           }
         };
 
@@ -2008,7 +2064,6 @@ export default defineComponent({
           )?.folderId;
 
           if (!folderId) {
-            console.error(`Folder "${drilldownData.data.folder}" not found`);
             return;
           }
 
@@ -2030,9 +2085,6 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
-            console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
-            );
             return;
           }
 
@@ -2279,7 +2331,6 @@ export default defineComponent({
             showErrorNotification("Browser denied file download...");
           }
         } catch (error) {
-          console.error("Error downloading CSV:", error);
           showErrorNotification("Failed to download data as CSV");
         }
       }
@@ -2339,7 +2390,6 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        console.error("Error downloading JSON:", error);
         showErrorNotification("Failed to download data as JSON");
       }
     };

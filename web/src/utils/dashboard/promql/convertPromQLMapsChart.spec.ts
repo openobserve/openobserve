@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -107,7 +107,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series).toBeDefined();
@@ -146,7 +146,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([
@@ -178,7 +178,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([{ name: "Canada", value: 75 }]);
@@ -218,7 +218,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([
@@ -258,7 +258,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([{ name: "Japan", value: 30 }]);
@@ -293,7 +293,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([{ name: "China", value: 20 }]);
@@ -323,7 +323,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.error).toBe(true);
@@ -365,7 +365,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toHaveLength(1);
@@ -377,7 +377,7 @@ describe("MapsConverter", () => {
         "Maps conversion warnings:",
         expect.arrayContaining([
           expect.stringContaining("missing location name"),
-        ])
+        ]),
       );
 
       consoleSpy.mockRestore();
@@ -417,7 +417,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([
@@ -488,7 +488,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].map).toBe("world");
@@ -524,7 +524,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].map).toBe("USA");
@@ -556,7 +556,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].roam).toBe(true);
@@ -590,7 +590,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].roam).toBe(false);
@@ -622,7 +622,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].emphasis.label.show).toBe(true);
@@ -654,7 +654,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.tooltip.trigger).toBe("item");
@@ -689,7 +689,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.tooltip.formatter({
@@ -726,7 +726,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.tooltip.formatter({
@@ -763,7 +763,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       const formatted = result.tooltip.formatter({
@@ -800,7 +800,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.toolbox.show).toBe(true);
@@ -834,7 +834,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.xAxis).toEqual([]);
@@ -883,7 +883,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.min).toBe(50);
@@ -916,7 +916,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.min).toBe(0);
@@ -949,7 +949,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.left).toBe("right");
@@ -983,7 +983,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.visualMap.inRange.color).toEqual([
@@ -1040,7 +1040,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data).toEqual([
@@ -1075,7 +1075,7 @@ describe("MapsConverter", () => {
         processedData,
         panelSchema,
         mockStore,
-        mockExtras
+        mockExtras,
       );
 
       expect(result.series[0].data[0].value).toBe(100);
