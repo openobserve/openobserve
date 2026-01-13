@@ -49,23 +49,16 @@ jobs:
             // Parse the feature data from the matched section
             const featureSection = match[1].trim();
 
-            // Results tracking for multiple features
-            const results = [];
-            let allSuccess = true;
-            let errorMessages = [];
-
+            // Try to parse as JSON or YAML-like format
+            let featureData;
             try {
-              // Try to parse as JSON (single object or array)
-              let featureDataList = [];
+              // Try JSON first
               const jsonMatch = featureSection.match(/```json\s*([\s\S]*?)\s*```/);
-
               if (jsonMatch) {
-                const parsedData = JSON.parse(jsonMatch[1]);
-                // Support both single object and array format
-                featureDataList = Array.isArray(parsedData) ? parsedData : [parsedData];
+                featureData = JSON.parse(jsonMatch[1]);
               } else {
-                // Parse key-value format (single feature only)
-                const featureData = {};
+                // Parse key-value format
+                featureData = {};
                 const lines = featureSection.split('\n');
                 for (const line of lines) {
                   const kvMatch = line.match(/^\s*-?\s*\*?\*?(\w+)\*?\*?\s*:\s*(.+)$/);
@@ -87,95 +80,57 @@ jobs:
                     }
                   }
                 }
-                featureDataList = [featureData];
               }
 
-              console.log(`Processing ${featureDataList.length} feature(s)`);
+              console.log('Parsed feature data:', JSON.stringify(featureData, null, 2));
+
+              // Validate required fields
+              if (!featureData.id) {
+                throw new Error('Missing required field: id');
+              }
+              if (!featureData.availability) {
+                throw new Error('Missing required field: availability');
+              }
+              if (!featureData.availability.opensource ||
+                  !featureData.availability.enterprise ||
+                  !featureData.availability.cloud) {
+                throw new Error('Missing required availability fields (opensource, enterprise, cloud)');
+              }
 
               // Read existing features.json
               const featuresPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/constants/features.json');
               const featuresContent = fs.readFileSync(featuresPath, 'utf8');
               const featuresJson = JSON.parse(featuresContent);
 
-              // Process each feature
-              for (let i = 0; i < featureDataList.length; i++) {
-                const featureData = featureDataList[i];
-                const result = { index: i + 1 };
+              // Check if feature already exists
+              const existingIndex = featuresJson.features.findIndex(f => f.id === featureData.id);
 
-                try {
-                  console.log(`\nProcessing feature ${i + 1}:`, JSON.stringify(featureData, null, 2));
+              if (existingIndex >= 0) {
+                console.log(`Updating existing feature: ${featureData.id}`);
+                featuresJson.features[existingIndex] = featureData;
+                core.setOutput('action', 'updated');
+              } else {
+                console.log(`Adding new feature: ${featureData.id}`);
 
-                  // Validate required fields
-                  if (!featureData.id) {
-                    throw new Error(`Feature ${i + 1}: Missing required field: id`);
-                  }
-                  if (!featureData.availability) {
-                    throw new Error(`Feature ${i + 1}: Missing required field: availability`);
-                  }
-                  if (!featureData.availability.opensource ||
-                      !featureData.availability.enterprise ||
-                      !featureData.availability.cloud) {
-                    throw new Error(`Feature ${i + 1}: Missing required availability fields (opensource, enterprise, cloud)`);
-                  }
+                // Determine position
+                let position = featureData.position || 'end';
+                delete featureData.position; // Remove position field from feature data
 
-                  result.id = featureData.id;
-
-                  // Check if feature already exists
-                  const existingIndex = featuresJson.features.findIndex(f => f.id === featureData.id);
-
-                  if (existingIndex >= 0) {
-                    console.log(`Updating existing feature: ${featureData.id}`);
-                    // Preserve any fields not in the update
-                    featuresJson.features[existingIndex] = { ...featuresJson.features[existingIndex], ...featureData };
-                    result.action = 'updated';
-                  } else {
-                    console.log(`Adding new feature: ${featureData.id}`);
-
-                    // Determine position
-                    let position = featureData.position || 'end';
-                    delete featureData.position; // Remove position field from feature data
-
-                    if (position === 'start') {
-                      featuresJson.features.unshift(featureData);
-                    } else if (typeof position === 'number') {
-                      featuresJson.features.splice(position, 0, featureData);
-                    } else {
-                      featuresJson.features.push(featureData);
-                    }
-                    result.action = 'added';
-                  }
-
-                  result.success = true;
-                  console.log(`✅ Feature ${featureData.id} ${result.action} successfully`);
-
-                } catch (featureError) {
-                  console.error(`❌ Error processing feature ${i + 1}:`, featureError.message);
-                  result.success = false;
-                  result.error = featureError.message;
-                  allSuccess = false;
-                  errorMessages.push(featureError.message);
+                if (position === 'start') {
+                  featuresJson.features.unshift(featureData);
+                } else if (typeof position === 'number') {
+                  featuresJson.features.splice(position, 0, featureData);
+                } else {
+                  featuresJson.features.push(featureData);
                 }
-
-                results.push(result);
+                core.setOutput('action', 'added');
               }
 
-              // Write updated features.json only if at least one feature succeeded
-              const successCount = results.filter(r => r.success).length;
-              if (successCount > 0) {
-                fs.writeFileSync(featuresPath, JSON.stringify(featuresJson, null, 2) + '\n', 'utf8');
-                console.log(`\n✅ Successfully processed ${successCount}/${results.length} feature(s)`);
-              }
+              // Write updated features.json
+              fs.writeFileSync(featuresPath, JSON.stringify(featuresJson, null, 2) + '\n', 'utf8');
 
-              // Set outputs
-              core.setOutput('results', JSON.stringify(results));
-              core.setOutput('success', allSuccess ? 'true' : 'partial');
-              core.setOutput('total_count', results.length.toString());
-              core.setOutput('success_count', successCount.toString());
-              core.setOutput('feature_ids', results.filter(r => r.success).map(r => r.id).join(', '));
-
-              if (!allSuccess) {
-                core.setOutput('errors', errorMessages.join('; '));
-              }
+              core.setOutput('feature_id', featureData.id);
+              core.setOutput('success', 'true');
 
             } catch (error) {
               console.error('Error parsing feature data:', error.message);
@@ -185,7 +140,7 @@ jobs:
             }
 
       - name: Check for translation keys
-        if: steps.parse-feature.outputs.success == 'true' || steps.parse-feature.outputs.success == 'partial'
+        if: steps.parse-feature.outputs.success == 'true'
         id: check-translations
         uses: actions/github-script@v7
         with:
@@ -193,31 +148,19 @@ jobs:
             const fs = require('fs');
             const path = require('path');
 
-            const results = JSON.parse('${{ steps.parse-feature.outputs.results }}');
-            const translationResults = [];
+            const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
+            const expectedKey = `feature_${featureId}`;
 
             // Check if translation exists in en.json
             const enJsonPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/locales/languages/en.json');
             const enJson = JSON.parse(fs.readFileSync(enJsonPath, 'utf8'));
 
-            for (const result of results) {
-              if (result.success && result.id) {
-                const expectedKey = `feature_${result.id}`;
-                const hasTranslation = enJson.about && enJson.about[expectedKey];
-                translationResults.push({
-                  id: result.id,
-                  key: `about.${expectedKey}`,
-                  exists: hasTranslation
-                });
-              }
-            }
-
-            core.setOutput('translation_results', JSON.stringify(translationResults));
-            const allHaveTranslations = translationResults.every(t => t.exists);
-            core.setOutput('all_translations_exist', allHaveTranslations ? 'true' : 'false');
+            const hasTranslation = enJson.about && enJson.about[expectedKey];
+            core.setOutput('has_translation', hasTranslation ? 'true' : 'false');
+            core.setOutput('translation_key', `about.${expectedKey}`);
 
       - name: Commit changes
-        if: steps.parse-feature.outputs.success == 'true' || steps.parse-feature.outputs.success == 'partial'
+        if: steps.parse-feature.outputs.success == 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -230,92 +173,46 @@ jobs:
           git add web/src/constants/features.json
           git commit -m "chore: auto-update features.json from PR description
 
-          Features processed: ${{ steps.parse-feature.outputs.success_count }}/${{ steps.parse-feature.outputs.total_count }}
-          Feature IDs: ${{ steps.parse-feature.outputs.feature_ids }}
+          Feature ${{ steps.parse-feature.outputs.action }}: ${{ steps.parse-feature.outputs.feature_id }}
 
           🤖 Automated update via GitHub Actions"
 
           git push
 
       - name: Comment on PR - Success
-        if: steps.parse-feature.outputs.success == 'true' || steps.parse-feature.outputs.success == 'partial'
+        if: steps.parse-feature.outputs.success == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const results = JSON.parse('${{ steps.parse-feature.outputs.results }}');
-            const translationResults = JSON.parse('${{ steps.check-translations.outputs.translation_results }}');
-            const totalCount = parseInt('${{ steps.parse-feature.outputs.total_count }}');
-            const successCount = parseInt('${{ steps.parse-feature.outputs.success_count }}');
-            const isPartial = '${{ steps.parse-feature.outputs.success }}' === 'partial';
+            const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
+            const action = '${{ steps.parse-feature.outputs.action }}';
+            const hasTranslation = '${{ steps.check-translations.outputs.has_translation }}' === 'true';
+            const translationKey = '${{ steps.check-translations.outputs.translation_key }}';
 
-            let message = '';
-
-            // Header
-            if (isPartial) {
-              message += `### ⚠️ Features Partially Updated (${successCount}/${totalCount} succeeded)\n\n`;
-            } else {
-              message += `### ✅ ${totalCount > 1 ? 'Multiple Features' : 'Feature'} Updated Successfully!\n\n`;
-            }
-
+            let message = `### ✅ Feature ${action === 'added' ? 'Added' : 'Updated'} Successfully!\n\n`;
+            message += `**Feature ID:** \`${featureId}\`\n`;
+            message += `**Action:** ${action}\n\n`;
             message += `📝 **File Updated:** \`web/src/constants/features.json\`\n\n`;
 
-            // Summary table for multiple features
-            if (totalCount > 1) {
-              message += `| # | Feature ID | Status | Action |\n`;
-              message += `|---|------------|--------|--------|\n`;
-
-              results.forEach(result => {
-                const status = result.success ? '✅' : '❌';
-                const action = result.action ? result.action : '-';
-                const id = result.id || 'N/A';
-                message += `| ${result.index} | \`${id}\` | ${status} | ${action} |\n`;
-              });
-              message += `\n`;
-            }
-
-            // Details for each feature
-            results.forEach(result => {
-              if (result.success) {
-                message += `#### ${totalCount > 1 ? `Feature ${result.index}: ` : ''}\`${result.id}\`\n`;
-                message += `- **Action:** ${result.action}\n`;
-
-                // Check translation
-                const translation = translationResults.find(t => t.id === result.id);
-                if (translation) {
-                  if (translation.exists) {
-                    message += `- **Translation:** ✅ Found (\`${translation.key}\`)\n`;
-                  } else {
-                    message += `- **Translation:** ⚠️ Missing (\`${translation.key}\`)\n`;
-                  }
-                }
-                message += `\n`;
-              } else {
-                message += `#### ${totalCount > 1 ? `Feature ${result.index}: ` : ''}❌ Failed\n`;
-                message += `- **Error:** ${result.error}\n\n`;
-              }
-            });
-
-            // Translation instructions if any are missing
-            const missingTranslations = translationResults.filter(t => !t.exists);
-            if (missingTranslations.length > 0) {
-              message += `### ⚠️ Missing Translations\n\n`;
-              message += `Please add the following translation keys to:\n`;
+            if (!hasTranslation) {
+              message += `### ⚠️ Translation Missing\n\n`;
+              message += `Please add the translation key \`${translationKey}\` to:\n`;
               message += `- \`web/src/locales/languages/en.json\`\n`;
               message += `- All other language files\n\n`;
+              message += `Example for \`en.json\`:\n`;
               message += `\`\`\`json\n`;
               message += `{\n`;
               message += `  "about": {\n`;
-              missingTranslations.forEach((t, idx) => {
-                const comma = idx < missingTranslations.length - 1 ? ',' : '';
-                message += `    "feature_${t.id}": "Your Feature Name Here"${comma}\n`;
-              });
+              message += `    "feature_${featureId}": "Your Feature Name Here"\n`;
               message += `  }\n`;
               message += `}\n`;
-              message += `\`\`\`\n\n`;
+              message += `\`\`\`\n`;
+            } else {
+              message += `✅ Translation key \`${translationKey}\` found!\n`;
             }
 
-            message += `---\n`;
-            message += `🤖 ${totalCount > 1 ? 'These features were' : 'This feature was'} automatically ${isPartial ? 'partially ' : ''}processed from your PR description.`;
+            message += `\n---\n`;
+            message += `🤖 This feature was automatically added from your PR description.`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -344,7 +241,7 @@ jobs:
             });
 
       - name: Add label
-        if: steps.parse-feature.outputs.success == 'true' || steps.parse-feature.outputs.success == 'partial'
+        if: steps.parse-feature.outputs.success == 'true'
         uses: actions/github-script@v7
         with:
           script: |
