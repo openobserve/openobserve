@@ -127,12 +127,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm" />
+                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
                     <div class="text-caption text-orange-800">
-                      <strong>Warning:</strong> This will permanently delete all
-                      data in the destination stream for the specified time
-                      range before running the backfill. This action cannot be
-                      undone.
+                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
+                      <div class="tw-mb-2">
+                        This will permanently delete all data in the destination stream for the specified time
+                        range before running the backfill. This action cannot be undone.
+                      </div>
+                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
+                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
+                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
+                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -311,6 +317,7 @@ const updateBackfillJobRequest = async () => {
   try {
     await backfillService.updateBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: props.job!.pipeline_id,
       job_id: props.job!.job_id,
       data: {
         start_time: formData.value.startTimeMicros,
