@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use actix_web::{HttpResponse, http};
+use axum::{
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
+};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -61,7 +64,7 @@ pub async fn handle_request(
     in_stream_name: Option<&str>,
     user_email: &str,
     req_type: OtlpRequestType,
-) -> Result<HttpResponse> {
+) -> Result<Response> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
@@ -462,10 +465,12 @@ pub async fn handle_request(
     if json_data_by_stream.is_empty() {
         let mut out = BytesMut::with_capacity(res.encoded_len());
         res.encode(&mut out).expect("Out of memory");
-        return Ok(HttpResponse::Ok()
-            .status(http::StatusCode::OK)
-            .content_type(content_type)
-            .body(out)); // just return
+        return Ok((
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, content_type)],
+            out.freeze(),
+        )
+            .into_response()); // just return
     }
 
     let mut status = IngestionStatus::Record(stream_status.status);
@@ -520,10 +525,12 @@ pub async fn handle_request(
         .with_label_values(&label_values)
         .inc();
 
-    Ok(HttpResponse::Ok()
-        .status(http::StatusCode::OK)
-        .content_type(content_type)
-        .body(response_body))
+    Ok((
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, content_type)],
+        response_body.freeze(),
+    )
+        .into_response())
 }
 
 #[cfg(test)]
