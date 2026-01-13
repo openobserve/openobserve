@@ -281,6 +281,11 @@ export default defineComponent({
     signout() {
       this.closeSocket();
 
+      // Stop session replay recording on logout
+      if (this.store.state.zoConfig?.rum?.enabled) {
+        openobserveRum.stopSessionReplayRecording();
+      }
+
       if (config.isEnterprise == "true") {
         invalidateLoginData();
       }
