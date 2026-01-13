@@ -589,11 +589,11 @@ pub fn create_router_routes() -> axum::Router {
 
     axum::Router::new()
         .route("/config", any(dispatch))
-        .route("/config/*path", any(dispatch))
-        .route("/api/*path", any(dispatch))
-        .route("/aws/*path", any(dispatch))
-        .route("/gcp/*path", any(dispatch))
-        .route("/rum/*path", any(dispatch))
+        .route("/config/{*path}", any(dispatch))
+        .route("/api/{*path}", any(dispatch))
+        .route("/aws/{*path}", any(dispatch))
+        .route("/gcp/{*path}", any(dispatch))
+        .route("/rum/{*path}", any(dispatch))
 }
 
 #[cfg(test)]
