@@ -199,18 +199,15 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
     // await page.locator(".cm-line").first().click();
 
-    // Focus on the first line of the editor
-    await page.locator(".view-line").first().click();
+    // Focus on the Monaco editor and type the query
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .locator(".monaco-editor")
       .click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".ime-text-area")
-      .fill(
-        'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
-      );
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.type(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
+    );
 
     // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
@@ -723,13 +720,15 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
 
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
-      .fill(
-        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-      );
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.type(
+      'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+    );
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -777,13 +776,15 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("line");
 
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
-      .fill(
-        'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
-      );
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.type(
+      'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
+    );
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -874,21 +875,15 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("line");
 
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
-    await page.locator('[data-test="dashboard-custom-query-type"]').click();    
-    
-    await page.locator(".view-line").first().click();
+    await page.locator('[data-test="dashboard-custom-query-type"]').click();
     await page
-      .locator('[data-test="dashboard-panel-query-editor"] .ime-text-area')
-      .fill(
-        `SELECT histogram(_timestamp, '5 minute') AS "_time",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount",
-       COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount",
-       COUNT(CASE WHEN kubernetes_container_name = 'prometheus' THEN 1 END) AS "pageViewCount"
-FROM e2e_automate
-GROUP BY _time
-ORDER BY _time ASC`
-      );
+      .locator('[data-test="dashboard-panel-query-editor"]')
+      .locator(".monaco-editor")
+      .click();
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.type(
+      `SELECT histogram(_timestamp, '5 minute') AS "_time", COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE '4%' THEN 1 END) AS "4xxErrorCount", COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_container_name LIKE 'tes%' THEN 1 END) AS "5xxErrorCount", COUNT(CASE WHEN kubernetes_namespace_name = 'ziox' AND kubernetes_pod_id IS NULL THEN 1 END) AS "NullErrorCount", COUNT(CASE WHEN kubernetes_container_name = 'prometheus' THEN 1 END) AS "pageViewCount" FROM e2e_automate GROUP BY _time ORDER BY _time ASC`
+    );
 
     await pm.chartTypeSelector.searchAndAddField("_time", "x");
     await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");
