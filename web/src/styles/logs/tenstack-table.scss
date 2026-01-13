@@ -43,6 +43,9 @@ table {
   border-collapse: collapse;
   border-spacing: 0;
   font-size: 12px !important;
+  // Performance optimizations
+  will-change: transform;
+  contain: layout style paint;
 }
 
 thead {
@@ -90,6 +93,15 @@ td {
 }
 
 .table-row-hover {
+  // Performance optimization: use transform for better compositing
+  will-change: transform;
+  transform: translateZ(0);
+  contain: layout style paint;
+
+  // Modern CSS optimization for off-screen content
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24px; // Match row height
+
   &:hover {
     .ai-btn {
       visibility: visible !important;

@@ -162,8 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
-name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -359,9 +358,10 @@ name="warning" class="q-mr-xs" />
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
+
                 <span
                   v-if="
-                    processedResults[`${cell.column.id}_${virtualRow.index}`]
+                    processedResults[`${cell.column.id}_{virtualRow.index}`]
                   "
                   :key="`${cell.column.id}_${virtualRow.index}`"
                   :class="store.state.theme === 'dark' ? 'dark' : ''"
@@ -561,8 +561,8 @@ watch(
         props.columns,
         true,
         props.highlightQuery,
-        200,
-        selectedStreamFtsKeys.value
+        100,
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -588,7 +588,7 @@ watch(
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -758,7 +758,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 20,
+    overscan: 50, // Reduced from 100 to 5 - only pre-render 5 rows above/below viewport
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
@@ -766,10 +766,15 @@ const rowVirtualizerOptions = computed(() => {
             // Only measure expanded rows (check if it's actually an expanded row)
             const isExpandedRow =
               formattedRows.value[index]?.original?.isExpandedRow;
-            if (isExpandedRow || props.wrap) {
+            if (
+              (isExpandedRow || props.wrap) &&
+              !expandedRowHeights.value.hasOwnProperty(index)
+            ) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
               return height;
+            } else if (expandedRowHeights.value.hasOwnProperty(index)) {
+              return expandedRowHeights.value[index];
             }
             return 24; // Fixed height for collapsed rows
           }
