@@ -24,8 +24,12 @@ mod tests {
         thread,
     };
 
-    use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
+    use axum::{
+        Router,
+        body::Body,
+        http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header},
+    };
     use bytes::{Bytes, BytesMut};
     use chrono::{Duration, Utc};
     use config::{
@@ -61,7 +65,7 @@ mod tests {
                     alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
                     destinations::{Destination, DestinationType},
                 },
-                router::*,
+                router::{basic_routes, config_routes, service_routes},
             },
         },
         migration,
@@ -75,6 +79,7 @@ mod tests {
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use serde_json::json;
     use tonic::codec::CompressionEncoding;
+    use tower::ServiceExt;
 
     static START: Once = Once::new();
 
@@ -102,6 +107,67 @@ mod tests {
             "Authorization",
             "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=",
         )
+    }
+
+    /// Initialize test router with service and basic routes
+    fn init_test_router() -> Router {
+        Router::new()
+            .nest("/", service_routes())
+            .nest("/", basic_routes())
+    }
+
+    /// Make a test request and return the response
+    async fn make_request(
+        app: &Router,
+        method: Method,
+        uri: &str,
+        headers: Option<HeaderMap>,
+        body: Option<String>,
+    ) -> (StatusCode, Bytes) {
+        let mut req_builder = Request::builder().method(method).uri(uri);
+
+        if let Some(hdrs) = headers {
+            for (key, value) in hdrs.iter() {
+                req_builder = req_builder.header(key, value);
+            }
+        }
+
+        let req = if let Some(body_str) = body {
+            req_builder
+                .body(Body::from(body_str))
+                .expect("Failed to build request")
+        } else {
+            req_builder
+                .body(Body::empty())
+                .expect("Failed to build request")
+        };
+
+        let response = app
+            .clone()
+            .oneshot(req)
+            .await
+            .expect("Failed to execute request");
+
+        let status = response.status();
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("Failed to read response body");
+
+        (status, body_bytes)
+    }
+
+    /// Helper to create headers with auth
+    fn auth_headers(auth: (&str, &str)) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(auth.1).expect("Invalid auth header"),
+        );
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        headers
     }
 
     async fn init_grpc_server() -> Result<(), anyhow::Error> {
@@ -148,27 +214,21 @@ mod tests {
     /// templates. This ensures idempotency when tests are retried.
     async fn cleanup_previous_test_state() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // 1. Delete alerts first (they reference destinations)
         // List alerts and delete by ID
-        let list_req = test::TestRequest::get()
-            .uri("/api/e2e/olympics_schema/alerts?stream_type=logs")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let list_resp = test::call_service(&app, list_req).await;
-        if list_resp.status().is_success() {
-            let body = test::read_body(list_resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            "/api/e2e/olympics_schema/alerts?stream_type=logs",
+            Some(headers.clone()),
+            None,
+        )
+        .await;
+
+        if status.is_success() {
             if let Ok(alerts) = serde_json::from_slice::<serde_json::Value>(&body)
                 && let Some(list) = alerts.get("list").and_then(|l| l.as_array())
             {
@@ -178,12 +238,14 @@ mod tests {
                         && alert_names.contains(&name)
                         && let Some(id) = alert.get("alert_id").and_then(|id| id.as_str())
                     {
-                        let delete_req = test::TestRequest::delete()
-                            .uri(&format!("/api/e2e/olympics_schema/alerts/{}?type=logs", id))
-                            .insert_header(ContentType::json())
-                            .append_header(auth)
-                            .to_request();
-                        let _ = test::call_service(&app, delete_req).await;
+                        let _ = make_request(
+                            &app,
+                            Method::DELETE,
+                            &format!("/api/e2e/olympics_schema/alerts/{}?type=logs", id),
+                            Some(headers.clone()),
+                            None,
+                        )
+                        .await;
                         log::info!("Cleanup: deleted alert {}", name);
                     }
                 }
@@ -192,31 +254,37 @@ mod tests {
 
         // 2. Delete destinations (they reference templates)
         for dest in ["slack", "email", "sns_alert"] {
-            let delete_req = test::TestRequest::delete()
-                .uri(&format!("/api/e2e/alerts/destinations/{}", dest))
-                .insert_header(ContentType::json())
-                .append_header(auth)
-                .to_request();
-            let _ = test::call_service(&app, delete_req).await;
+            let _ = make_request(
+                &app,
+                Method::DELETE,
+                &format!("/api/e2e/alerts/destinations/{}", dest),
+                Some(headers.clone()),
+                None,
+            )
+            .await;
         }
 
         // 3. Delete templates last
         for template in ["slackTemplate", "email_template", "snsTemplate"] {
-            let delete_req = test::TestRequest::delete()
-                .uri(&format!("/api/e2e/alerts/templates/{}", template))
-                .insert_header(ContentType::json())
-                .append_header(auth)
-                .to_request();
-            let _ = test::call_service(&app, delete_req).await;
+            let _ = make_request(
+                &app,
+                Method::DELETE,
+                &format!("/api/e2e/alerts/templates/{}", template),
+                Some(headers.clone()),
+                None,
+            )
+            .await;
         }
 
         // 4. Delete user if exists
-        let delete_req = test::TestRequest::delete()
-            .uri("/api/e2e/users/nonadmin@example.com")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let _ = test::call_service(&app, delete_req).await;
+        let _ = make_request(
+            &app,
+            Method::DELETE,
+            "/api/e2e/users/nonadmin@example.com",
+            Some(headers.clone()),
+            None,
+        )
+        .await;
 
         log::info!("Cleanup: finished cleaning up previous test state");
     }
@@ -410,28 +478,17 @@ mod tests {
         let auth = setup();
         let path = "./tests/input.json";
         let body_str = fs::read_to_string(path).expect("Read file failed");
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_bulk", "e2e"),
+            Some(headers),
+            Some(body_str),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_bulk", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        let status = resp.status();
         if !status.is_success() {
-            let body = test::read_body(resp).await;
             let body_str = String::from_utf8_lossy(&body);
             panic!(
                 "e2e_1_post_bulk failed with status {}: {}",
@@ -443,30 +500,20 @@ mod tests {
     async fn e2e_post_json() {
         let auth = setup();
 
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // timestamp in past
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/_json", "e2e", "olympics_schema"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
         let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(res.code, 200);
         assert_eq!(res.status.len(), 1);
@@ -482,15 +529,15 @@ mod tests {
 
         // timestamp in future
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":9999999999999999}]";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/_json", "e2e", "olympics_schema"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
         let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(res.code, 200);
         assert_eq!(res.status.len(), 1);
@@ -506,15 +553,15 @@ mod tests {
 
         // timestamp not present
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\"}]";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/_json", "e2e", "olympics_schema"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
         let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(res.code, 200);
         assert_eq!(res.status.len(), 1);
@@ -526,15 +573,15 @@ mod tests {
         let body_str = format!(
             "[{{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":{ts}}}]"
         );
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/_json", "e2e", "olympics_schema"),
+            Some(headers.clone()),
+            Some(body_str),
+        )
+        .await;
+        assert!(status.is_success());
         let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(res.code, 200);
         assert_eq!(res.status.len(), 1);
@@ -544,52 +591,45 @@ mod tests {
 
     async fn e2e_post_hec() {
         let auth = setup();
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // test case : missing index in metadata
         let body_str = "{\"event\":\"hello\"}";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_hec", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_hec", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
 
         // test case : valid payload
         let body_str = "{\"event\":\"hello\",\"index\":\"hec_test\"}";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_hec", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_hec", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
 
         // test case : json event
         let body_str =
             "{\"event\":{\"log\":\"hello\",\"severity\":\"info\"},\"index\":\"hec_test\"}";
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_hec", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_hec", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
 
         // test case : ndjson
         let body_str = r#"
@@ -597,157 +637,110 @@ mod tests {
                 { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "fields": {"cluster":"c1", "namespace":"n1"} }
                 { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
             "#;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_hec", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_hec", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
+        assert!(status.is_success());
     }
 
     async fn e2e_post_multi() {
         let auth = setup();
         let body_str = "{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}";
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/_multi", "e2e", "olympics_schema"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/_multi", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_stream() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/streams", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/streams", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_stream_schema() {
         let auth = setup();
         let one_sec = time::Duration::from_secs(2);
         thread::sleep(one_sec);
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/streams/{}/schema", "e2e", "olympics_schema"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/streams/{}/schema",
-                "e2e", "olympics_schema"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
         let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["city"],"remove":[]}}"#;
         // app
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            &format!("/api/{}/streams/{}/settings", "e2e", "olympics_schema"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::put()
-            .uri(&format!(
-                "/api/{}/streams/{}/settings",
-                "e2e", "olympics_schema"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_stream() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/streams/{}", "e2e", "olympics_schema"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/streams/{}", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_org() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_function() {
@@ -757,83 +750,60 @@ mod tests {
             "function":".sqNew,err = .Year*.Year \n .",
             "params":"row"
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/functions", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/functions", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = test::read_body(resp).await;
+        if !status.is_success() {
             let body_str = String::from_utf8_lossy(&body);
             println!("e2e_post_function response status: {status:?}");
             println!("e2e_post_function response body: {body_str:?}");
 
             // If function already exists, that's OK for our test
-            if status == actix_web::http::StatusCode::BAD_REQUEST
-                && body_str.contains("Function already exist")
-            {
+            if status == StatusCode::BAD_REQUEST && body_str.contains("Function already exist") {
                 println!("Function already exists, continuing with test");
                 return;
             }
 
             panic!("e2e_post_function failed with status: {status:?}");
         }
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_list_functions() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/functions", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/functions", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_function() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/functions/{}", "e2e", "e2etestfn"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/functions/{}", "e2e", "e2etestfn"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_search() {
@@ -847,73 +817,53 @@ mod tests {
                 "end_time": 1714944000000
             }
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/_search", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/_search", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_search_around() {
         let auth = setup();
 
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
         let ts = chrono::Utc::now().timestamp_micros();
 
-        let req = test::TestRequest::get()
-            .uri(&format!(
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!(
                 "/api/{}/{}/_around?key={}&size=10",
                 "e2e", "olympics_schema", ts
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+            ),
+            Some(headers),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
     }
 
     async fn e2e_list_users() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/users", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/users", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        assert!(status.is_success());
         let body_str = String::from_utf8_lossy(&body);
         println!("list users resp: {body_str:?}");
         // deserialize the body into UserList
@@ -935,67 +885,42 @@ mod tests {
 
     async fn e2e_get_organizations() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/organizations")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) =
+            make_request(&app, Method::GET, "/api/organizations", Some(headers), None).await;
+        assert!(status.is_success());
     }
 
     async fn e2e_get_user_passcode() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/passcode", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/passcode", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_update_user_passcode() {
         let auth = setup();
         let body_str = "";
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            &format!("/api/{}/passcode", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::put()
-            .uri(&format!("/api/{}/passcode", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_user_authentication() {
@@ -1004,23 +929,21 @@ mod tests {
                                 "name": "root@example.com",
                                 "password": "Complexpass#123"
                             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            "/auth/login",
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri("/auth/login")
-            .insert_header(ContentType::json())
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_user_authentication_with_error() {
@@ -1029,64 +952,55 @@ mod tests {
                                 "name": "root2@example.com",
                                 "password": "Complexpass#123"
                             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            "/auth/login",
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri("/auth/login")
-            .insert_header(ContentType::json())
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(!resp.status().is_success());
+        assert!(!status.is_success());
     }
 
     async fn e2e_post_user() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // Delete user if it exists from previous test runs to avoid conflicts
-        let delete_req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let _ = test::call_service(&app, delete_req).await;
+        let _ = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"),
+            Some(headers.clone()),
+            None,
+        )
+        .await;
 
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
                                 "role": "admin"
                             }"#;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/users", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
+        )
+        .await;
         // print the body from resp
-        println!("post user resp: {resp:?}");
-        let is_success = resp.status().is_success();
-        let body = test::read_body(resp).await;
+        println!("post user status: {status:?}");
         println!("post user body: {}", String::from_utf8_lossy(&body));
-        assert!(is_success);
+        assert!(status.is_success());
     }
 
     async fn e2e_update_user() {
@@ -1096,47 +1010,33 @@ mod tests {
                                 "new_password": "12345678",
                                 "change_password": true
                             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            &format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::put()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_update_user_with_empty() {
         let auth = setup();
         let body_str = r#"{}"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            &format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::put()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(!resp.status().is_success());
+        assert!(!status.is_success());
     }
 
     async fn e2e_add_root_user_to_org() {
@@ -1144,48 +1044,35 @@ mod tests {
         let body_str = r#"{
             "role":"member"
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/users/{}", "e2e", "root@example.com"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users/{}", "e2e", "root@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
         // It should fail as root user cannot be added to an organization
-        assert!(!resp.status().is_success());
+        assert!(!status.is_success());
     }
 
     async fn e2e_add_user_to_org() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // Check if admin@example.com already exists from initialization
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/users", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/users", "e2e"),
+            Some(headers.clone()),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
         let body_str = String::from_utf8_lossy(&body);
         let user_list: UserList = serde_json::from_str(&body_str).unwrap();
         let admin_exists = user_list
@@ -1198,15 +1085,16 @@ mod tests {
             let body_str = r#"{
                 "role":"admin"
             }"#;
-            let req = test::TestRequest::post()
-                .uri(&format!("/api/{}/users/{}", "e2e", "admin@example.com"))
-                .insert_header(ContentType::json())
-                .append_header(auth)
-                .set_payload(body_str)
-                .to_request();
-            let resp = test::call_service(&app, req).await;
+            let (status, _body) = make_request(
+                &app,
+                Method::POST,
+                &format!("/api/{}/users/{}", "e2e", "admin@example.com"),
+                Some(headers.clone()),
+                Some(body_str.to_string()),
+            )
+            .await;
             // Should fail as the user still does not exist
-            assert!(resp.status().is_client_error());
+            assert!(status.is_client_error());
 
             // Add the user
             let body_str = r#"{
@@ -1215,14 +1103,15 @@ mod tests {
                 "role": "admin"
             }"#;
 
-            let req = test::TestRequest::post()
-                .uri(&format!("/api/{}/users", "e2e"))
-                .insert_header(ContentType::json())
-                .append_header(auth)
-                .set_payload(body_str)
-                .to_request();
-            let resp = test::call_service(&app, req).await;
-            assert!(resp.status().is_success());
+            let (status, _body) = make_request(
+                &app,
+                Method::POST,
+                &format!("/api/{}/users", "e2e"),
+                Some(headers.clone()),
+                Some(body_str.to_string()),
+            )
+            .await;
+            assert!(status.is_success());
         }
 
         // Role in the default organization
@@ -1231,15 +1120,14 @@ mod tests {
         }"#;
 
         // Add the user to the default organization with role admin
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/users/{}", "default", "admin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        let status = resp.status();
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/users/{}", "default", "admin@example.com"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
+        )
+        .await;
         println!(
             "add user to default org body: {}",
             String::from_utf8_lossy(&body)
@@ -1250,47 +1138,33 @@ mod tests {
 
     async fn e2e_delete_user() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/users/{}", "e2e", "nonadmin@example.com"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_create_dashboard() -> Dashboard {
         let auth = setup();
         let body_str = r##"{"version":5,"title":"b2","dashboardId":"","description":"desc2","role":"","owner":"root@example.com","created":"2023-03-30T07:49:41.744+00:00","tabs":[{"tabId":"tab1","name":"Main","panels":[{"id":"Panel_ID7857010","type":"bar","title":"p5","description":"sample config blah blah blah","config":{"show_legends":true},"queryType":"sql","queries":[{"query":"SELECT histogram(_timestamp) as \"x_axis_1\", count(kubernetes_host) as \"y_axis_1\" FROM \"default\" GROUP BY \"x_axis_1\" ORDER BY \"x_axis_1\"","customQuery":false,"fields":{"stream":"default","stream_type":"logs","x":[{"label":"Timestamp","alias":"x_axis_1","column":"_timestamp","color":null,"aggregationFunction":"histogram"}],"y":[{"label":"Kubernetes Host","alias":"y_axis_1","column":"kubernetes_host","color":"#5960b2","aggregationFunction":"count"}],"filter":{"filterType":"group","logicalOperator":"AND","conditions":[]}},"config":{"promql_legend":""}}],"layout":{"x":0,"y":0,"w":12,"h":13,"i":1}}]}]}"##;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (_status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/dashboards", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/dashboards", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
 
-        let resp = test::call_service(&app, req).await;
-        let body = test::read_body(resp).await;
         let body_str = String::from_utf8_lossy(&body);
         let result: Dashboard = json::from_slice(&body)
             .unwrap_or_else(|e| panic!("Failed to deserialize dashboard: {e}\nBody: {body_str}"));
@@ -1299,24 +1173,18 @@ mod tests {
 
     async fn e2e_list_dashboards() -> Vec<Dashboard> {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (_status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/dashboards", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/dashboards", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
 
         // Try to parse the response body as a list of dashboards.
-        let body = test::call_and_read_body(&app, req).await;
         let mut body_json: json::Value = json::from_slice(&body).unwrap();
         let list_json = body_json
             .as_object_mut()
@@ -1330,71 +1198,52 @@ mod tests {
 
     async fn e2e_update_dashboard(dashboard: v5::Dashboard, hash: String) -> Dashboard {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::put()
-            .uri(&format!(
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (_status, body) = make_request(
+            &app,
+            Method::PUT,
+            &format!(
                 "/api/{}/dashboards/{}?hash={}",
                 "e2e", dashboard.dashboard_id, hash
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(json::to_string(&dashboard).unwrap())
-            .to_request();
+            ),
+            Some(headers),
+            Some(json::to_string(&dashboard).unwrap()),
+        )
+        .await;
 
-        let body = test::call_and_read_body(&app, req).await;
         json::from_slice(&body).unwrap()
     }
 
     async fn e2e_get_dashboard(dashboard_id: &str) -> Dashboard {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (_status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/dashboards/{dashboard_id}", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/dashboards/{dashboard_id}", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
 
-        let body = test::call_and_read_body(&app, req).await;
         json::from_slice(&body).unwrap()
     }
 
     async fn e2e_delete_dashboard(dashboard_id: &str) {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/dashboards/{dashboard_id}", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/dashboards/{dashboard_id}", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_trace() {
@@ -1403,26 +1252,17 @@ mod tests {
         let body_str = fs::read_to_string(path).expect("Read file failed");
 
         // app
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/traces", "e2e"),
+            Some(headers),
+            Some(body_str),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/traces", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_metrics() {
@@ -1487,223 +1327,169 @@ mod tests {
             .expect("Out of memory");
 
         // app
-        let thread_id: usize = 0;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .app_data(web::Data::new(thread_id))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/prometheus/api/v1/write", "e2e"))
-            .insert_header(("X-Prometheus-Remote-Write-Version", "0.1.0"))
-            .insert_header(("Content-Encoding", "snappy"))
-            .insert_header(("Content-Type", "application/x-protobuf"))
-            .append_header(auth)
-            .set_payload(body)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
+        let app = init_test_router();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "X-Prometheus-Remote-Write-Version",
+            HeaderValue::from_static("0.1.0"),
+        );
+        headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("snappy"));
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/x-protobuf"),
+        );
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(auth.1).expect("Invalid auth header"),
+        );
+
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(&format!("/api/{}/prometheus/api/v1/write", "e2e"));
+        let mut req_builder = req;
+        for (key, value) in headers.iter() {
+            req_builder = req_builder.header(key, value);
+        }
+        let req = req_builder
+            .body(Body::from(body))
+            .expect("Failed to build request");
+
+        let response = app
+            .clone()
+            .oneshot(req)
+            .await
+            .expect("Failed to execute request");
+        let status = response.status();
         assert!(
-            resp.status().is_success(),
+            status.is_success(),
             "Prometheus write failed with status: {}. This may indicate memtable overflow or resource constraints.",
-            resp.status()
+            status
         );
     }
 
     async fn e2e_get_org_summary() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/summary", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/summary", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
-        assert!(resp.status().is_success());
+        log::info!("{:?}", status);
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_template() {
-        use actix_web::body::MessageBody;
-
         let auth = setup();
         let body_str = r#"{"name":"slackTemplate","body":"{\"text\":\"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}\"}"}"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/templates", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/templates", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        let status = resp.status();
-        let text = resp.into_body().try_into_bytes().unwrap_or_default();
-        let text = String::from_utf8_lossy(&text).to_string();
+        let text = String::from_utf8_lossy(&body).to_string();
         println!("e2e_post_alert_template: status: {status:?}, text: {text:?}");
         assert!(status.is_success());
     }
 
     async fn e2e_get_alert_template() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/templates/{}", "e2e", "slackTemplate"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "slackTemplate"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_alert_template() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/alerts/templates/{}", "e2e", "slackTemplate"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "slackTemplate"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_email_template() {
         let auth = setup();
         let body_str = r#"{"name":"email_template","body":"This is email for {alert_name}.","type":"email","title":"Email Subject"}"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/templates", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/templates", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_alert_email_template() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/templates/{}", "e2e", "email_template"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "email_template"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_alert_email_template() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/alerts/templates/{}", "e2e", "email_template"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "email_template"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_list_alert_template() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/templates", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts/templates", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_destination() {
@@ -1717,176 +1503,125 @@ mod tests {
                     "x_org_id":"Test_header"
                 }
             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_alert_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "slack"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts/destinations/{}", "e2e", "slack"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_alert_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "slack"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/alerts/destinations/{}", "e2e", "slack"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
-        assert!(resp.status().is_success());
+        log::info!("{:?}", status);
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_email_destination() {
         let auth = setup();
         let body_str = r#"{"url":"","method":"post","skip_tls_verify":false,"template":"email_template","headers":{},"name":"email","type":"email","emails":["nonadmin@example.com"]}"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_email_destination_should_fail() {
         let auth = setup();
         let body_str = r#"{"url":"","method":"post","skip_tls_verify":false,"template":"email_template","headers":{},"name":"email_fail","type":"email","emails":["nonadmin2@example.com"]}"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_client_error());
+        assert!(status.is_client_error());
     }
 
     async fn e2e_get_alert_email_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "email"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts/destinations/{}", "e2e", "email"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_alert_email_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "email"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/alerts/destinations/{}", "e2e", "email"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_list_alert_destinations() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_sns_alert_template() {
@@ -1895,24 +1630,17 @@ mod tests {
             "name": "snsTemplate",
             "body": "{\"default\": \"SNS alert {alert_name} triggered for {stream_name} in {org_name}\"}"
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/templates", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/templates", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_sns_alert_destination() {
@@ -1924,51 +1652,34 @@ mod tests {
             "aws_region": "us-east-1",
             "template": "snsTemplate"
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_get_sns_alert_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
 
         // Optionally, deserialize and check the response body
-        let body = test::read_body(resp).await;
         let destination: Destination = serde_json::from_slice(&body).unwrap();
         assert_eq!(destination.destination_type, DestinationType::Sns);
         assert_eq!(
@@ -1980,26 +1691,19 @@ mod tests {
 
     async fn e2e_list_alert_destinations_with_sns() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts/destinations", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
 
         // Optionally, deserialize and check the response body
-        let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
         assert!(
             destinations
@@ -2017,51 +1721,32 @@ mod tests {
             "aws_region": "us-west-2",
             "template": "snsTemplate"
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::put()
-            .uri(&format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_sns_alert_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_with_sns_destination() {
@@ -2088,48 +1773,35 @@ mod tests {
                 "app_name": "TestApp"
             }
         }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_delete_alert_with_sns_destination() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::delete()
-            .uri(&format!(
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!(
                 "/api/{}/{}/alerts/{}",
                 "e2e", "olympics_schema", "sns_test_alert"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+            ),
+            Some(headers),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
     }
 
     async fn e2e_post_alert_multirange() {
@@ -2160,24 +1832,17 @@ mod tests {
                                     "app_name":"App1"
                                 }
                             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            Some(headers),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
 
         // Get the alert with the same stream name
         let alert = openobserve::service::db::alerts::alert::get_by_name(
@@ -2209,16 +1874,7 @@ mod tests {
 
     async fn e2e_delete_alert_multirange() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
 
         // Get the alert with the same stream name
         let alert = openobserve::service::db::alerts::alert::get_by_name(
@@ -2237,13 +1893,16 @@ mod tests {
         let id = id.unwrap();
 
         // Use the v2 api to delete the alert
-        let req = test::TestRequest::delete()
-            .uri(&format!("/api/v2/{}/alerts/{}", "e2e", id))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/v2/{}/alerts/{}", "e2e", id),
+            Some(headers),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
@@ -2281,36 +1940,29 @@ mod tests {
                                     "app_name":"App1"
                                 }
                             }"#;
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/v2/{}/alerts", "e2e"),
+            Some(headers.clone()),
+            Some(body_str.to_string()),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/v2/{}/alerts", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        println!("{:?}", resp.status());
-        println!("{:?}", resp.response().body());
-        assert!(resp.status().is_success());
+        println!("{:?}", status);
+        assert!(status.is_success());
 
         // Get the alert list
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/v2/{}/alerts", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/v2/{}/alerts", "e2e"),
+            Some(headers),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
         let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
         assert!(!alert_list_response.list.is_empty());
         let alert = alert_list_response
@@ -2336,26 +1988,19 @@ mod tests {
 
     async fn e2e_get_alert() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
+        let headers = auth_headers(auth);
 
         // Get the alert list
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/v2/{}/alerts", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/v2/{}/alerts", "e2e"),
+            Some(headers.clone()),
+            None,
+        )
+        .await;
+        assert!(status.is_success());
         let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
         assert!(!alert_list_response.list.is_empty());
         let alert = alert_list_response
@@ -2369,15 +2014,16 @@ mod tests {
         let id = alert.alert_id;
         let id = id.to_string();
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/v2/{}/alerts/{}", "e2e", id))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let (status, body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/v2/{}/alerts/{}", "e2e", id),
+            Some(headers),
+            None,
+        )
+        .await;
+        log::info!("{:?}", status);
+        assert!(status.is_success());
         let alert_response: GetAlertResponseBody = serde_json::from_slice(&body).unwrap();
         assert_eq!(alert_response.0.name, "alertChk");
         assert_eq!(
@@ -2579,16 +2225,7 @@ mod tests {
 
     async fn e2e_delete_alert() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
+        let app = init_test_router();
 
         let alert = openobserve::service::db::alerts::alert::get_by_name(
             "e2e",
@@ -2605,17 +2242,17 @@ mod tests {
         assert!(id.is_some());
         let id = id.unwrap();
 
-        let req = test::TestRequest::delete()
-            .uri(&format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "alertChk"
-            ))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        log::info!("{:?}", resp.status());
-        assert!(resp.status().is_success());
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::DELETE,
+            &format!("/api/{}/{}/alerts/{}", "e2e", "olympics_schema", "alertChk"),
+            Some(headers),
+            None,
+        )
+        .await;
+        log::info!("{:?}", status);
+        assert!(status.is_success());
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
@@ -2628,111 +2265,69 @@ mod tests {
 
     async fn e2e_list_alerts() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/alerts", "e2e"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/alerts", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_list_real_time_alerts() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::GET,
+            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            Some(headers),
+            None,
         )
         .await;
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        assert!(status.is_success());
     }
 
     async fn e2e_health_check() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/healthz")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let app = init_test_router();
+        let headers = auth_headers(auth);
+        let (status, _body) =
+            make_request(&app, Method::GET, "/healthz", Some(headers), None).await;
+        assert!(status.is_success());
     }
 
     async fn e2e_config() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_config_routes)
-                .configure(get_service_routes)
-                .configure(get_basic_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/config")
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
+        let app = Router::new()
+            .nest("/", config_routes())
+            .nest("/", service_routes())
+            .nest("/", basic_routes());
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
+        assert!(status.is_success());
     }
 
     // Helper function to create pipeline via API
     async fn e2e_post_pipeline(pipeline_data: Pipeline) {
         let auth = setup();
         let body_str = serde_json::to_string(&pipeline_data).unwrap();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
+        let app = Router::new().nest("/", service_routes());
+        let headers = auth_headers(auth);
+        let (status, body) = make_request(
+            &app,
+            Method::POST,
+            &format!("/api/{}/pipelines", "e2e"),
+            Some(headers),
+            Some(body_str),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/pipelines", "e2e"))
-            .insert_header(ContentType::json())
-            .append_header(auth)
-            .set_payload(body_str)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        if !resp.status().is_success() {
-            let body = test::read_body(resp).await;
+        if !status.is_success() {
             println!("Response body: {}", String::from_utf8_lossy(&body));
             panic!("Failed to create pipeline");
         }
@@ -2818,22 +2413,11 @@ mod tests {
     async fn e2e_handle_derived_stream_success() {
         // list the pipelines and choose the first one using API
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let app = Router::new().nest("/", service_routes());
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
+        assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
@@ -2949,22 +2533,11 @@ mod tests {
     async fn e2e_handle_derived_stream_max_retries() {
         // list pipelines using API
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let app = Router::new().nest("/", service_routes());
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
+        assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipelines = pipeline_list.list.first();
@@ -3091,15 +2664,7 @@ mod tests {
         e2e_post_pipeline(pipeline_data.clone()).await;
 
         // Check if pipeline was saved successfully by doing a list using API
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
+        let app = Router::new().nest("/", service_routes());
 
         // delete the city field from the stream
         // Make a PUT call to `e2e/streams/olympics_schema/delete_fields` api
@@ -3107,13 +2672,16 @@ mod tests {
         let delete_fields_url = "/api/e2e/streams/olympics_schema/delete_fields";
         let delete_fields_payload = serde_json::json!({"fields": ["city"]});
 
-        let req = test::TestRequest::put()
-            .uri(delete_fields_url)
-            .append_header(auth)
-            .set_json(&delete_fields_payload)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success(), "Failed to delete fields");
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::PUT,
+            delete_fields_url,
+            Some(headers),
+            Some(serde_json::to_string(&delete_fields_payload).unwrap()),
+        )
+        .await;
+        assert!(status.is_success(), "Failed to delete fields");
 
         let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 
@@ -3316,15 +2884,7 @@ mod tests {
 
     async fn test_derived_stream_invalid_timerange_with_cron_frequency() {
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
+        let app = Router::new().nest("/", service_routes());
 
         // Create a pipeline with derived stream using cron frequency
         let pipeline_data = Pipeline {
@@ -3404,14 +2964,17 @@ mod tests {
         };
 
         // Create the pipeline
-        let req = test::TestRequest::post()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .set_json(&pipeline_data)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        println!("test derived stream invalid timerange with cron frequency resp: {resp:?}");
-        assert!(resp.status().is_success());
+        let headers = auth_headers(auth);
+        let (status, _body) = make_request(
+            &app,
+            Method::POST,
+            "/api/e2e/pipelines",
+            Some(headers),
+            Some(serde_json::to_string(&pipeline_data).unwrap()),
+        )
+        .await;
+        println!("test derived stream invalid timerange with cron frequency status: {status:?}");
+        assert!(status.is_success());
 
         let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 
@@ -3505,22 +3068,11 @@ mod tests {
     async fn e2e_cleanup_test_pipeline() {
         // list the pipelines and choose the first one using API
         let auth = setup();
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let body = test::read_body(resp).await;
+        let app = Router::new().nest("/", service_routes());
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
+        assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
@@ -3534,22 +3086,11 @@ mod tests {
     async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
         let auth = setup();
         // Check if pipeline was saved successfully by doing a list using API
-        let app = test::init_service(
-            App::new()
-                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
-                .app_data(web::PayloadConfig::new(
-                    get_config().limit.req_payload_limit,
-                ))
-                .configure(get_service_routes),
-        )
-        .await;
-        let req = test::TestRequest::get()
-            .uri("/api/e2e/pipelines")
-            .append_header(auth)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success(), "Failed to list pipelines");
-        let body = test::read_body(resp).await;
+        let app = Router::new().nest("/", service_routes());
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
+        assert!(status.is_success(), "Failed to list pipelines");
         let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
         // Get the pipeline that matches the pipeline name

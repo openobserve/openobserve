@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,117 +14,162 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    future::{Ready, ready},
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
-use actix_web::{
-    Error,
-    dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
-};
+use axum::{body::Body, http::Request, response::Response};
 use config::utils::time::now_micros;
-use futures_util::future::LocalBoxFuture;
+use pin_project_lite::pin_project;
+use tower::{Layer, Service};
 
-pub struct SlowLog {
+use crate::handler::http::request::HEADER_O2_PROCESS_TIME;
+
+/// Layer that logs slow requests
+#[derive(Clone)]
+pub struct SlowLogLayer {
     threshold_secs: u64,
 }
 
-impl SlowLog {
+impl SlowLogLayer {
     pub fn new(threshold_secs: u64) -> Self {
-        SlowLog { threshold_secs }
+        SlowLogLayer { threshold_secs }
     }
 }
 
-impl<S, B> Transform<S, ServiceRequest> for SlowLog
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = SlowLogMiddleware<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+impl<S> Layer<S> for SlowLogLayer {
+    type Service = SlowLogService<S>;
 
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(SlowLogMiddleware {
-            service,
+    fn layer(&self, inner: S) -> Self::Service {
+        SlowLogService {
+            inner,
             threshold_secs: self.threshold_secs,
-        }))
+        }
     }
 }
 
-pub struct SlowLogMiddleware<S> {
-    service: S,
+/// Service that logs slow requests
+#[derive(Clone)]
+pub struct SlowLogService<S> {
+    inner: S,
     threshold_secs: u64,
 }
 
-impl<S, B> Service<ServiceRequest> for SlowLogMiddleware<S>
+impl<S> Service<Request<Body>> for SlowLogService<S>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
+    S: Service<Request<Body>, Response = Response> + Clone + Send + 'static,
+    S::Future: Send + 'static,
 {
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = SlowLogFuture<S::Future>;
 
-    forward_ready!(service);
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
 
-    fn call(&self, req: ServiceRequest) -> Self::Future {
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
         let start = Instant::now();
         let start_time = now_micros();
 
-        let remote_addr = match req.headers().contains_key("X-Forwarded-For")
-            || req.headers().contains_key("Forwarded")
-        {
-            true => req
-                .connection_info()
-                .realip_remote_addr()
-                .unwrap_or("-")
-                .to_string(),
-            false => req.connection_info().peer_addr().unwrap_or("-").to_string(),
-        };
+        // Extract request info before moving req
+        let remote_addr = req
+            .headers()
+            .get("X-Forwarded-For")
+            .or_else(|| req.headers().get("Forwarded"))
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("-")
+            .to_string();
+
         let path = req
             .uri()
             .path_and_query()
             .map(|x| x.as_str())
             .unwrap_or("")
             .to_string();
+
         let method = req.method().to_string();
-        let body_size = match req.headers().get("Content-Length") {
-            Some(size) => size.to_str().unwrap_or("0").parse::<usize>().unwrap_or(0),
-            None => 0,
-        };
+
+        let body_size = req
+            .headers()
+            .get("Content-Length")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+
         let threshold = Duration::from_secs(self.threshold_secs);
 
-        let fut = self.service.call(req);
+        SlowLogFuture {
+            inner: self.inner.call(req),
+            start,
+            start_time,
+            remote_addr,
+            path,
+            method,
+            body_size,
+            threshold,
+        }
+    }
+}
 
-        Box::pin(async move {
-            let resp = fut.await?;
-            let duration = start.elapsed();
+pin_project! {
+    pub struct SlowLogFuture<F> {
+        #[pin]
+        inner: F,
+        start: Instant,
+        start_time: i64,
+        remote_addr: String,
+        path: String,
+        method: String,
+        body_size: usize,
+        threshold: Duration,
+    }
+}
 
-            // watch the request duration
-            let took_time = duration.as_millis();
+impl<F, E> Future for SlowLogFuture<F>
+where
+    F: Future<Output = Result<Response, E>>,
+{
+    type Output = Result<Response, E>;
 
-            // log the slow request
-            if duration > threshold {
-                // get the process time in the queue
-                let process_time = resp
-                    .headers()
-                    .get("o2_process_time")
-                    .map(|v| v.to_str().unwrap_or("0").parse::<i64>().unwrap_or(0));
-                let wait_time_str = match process_time {
-                    Some(v) if v > 0 => format!(" wait_time: {} ms,", (v - start_time) / 1000),
-                    _ => "".to_string(),
-                };
-                log::warn!(
-                    "slow request detected - remote_addr: {remote_addr}, method: {method}, path: {path}, size: {body_size},{wait_time_str} took: {took_time} ms"
-                );
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        match this.inner.poll(cx) {
+            Poll::Ready(result) => {
+                let duration = this.start.elapsed();
+                let took_time = duration.as_millis();
+
+                if duration > *this.threshold {
+                    // Get the process time from the response if available
+                    let wait_time_str = if let Ok(ref resp) = result {
+                        resp.headers()
+                            .get(HEADER_O2_PROCESS_TIME)
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| s.parse::<i64>().ok())
+                            .filter(|&v| v > 0)
+                            .map(|v| format!(" wait_time: {} ms,", (v - *this.start_time) / 1000))
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+
+                    log::warn!(
+                        "slow request detected - remote_addr: {}, method: {}, path: {}, size: {},{} took: {} ms",
+                        this.remote_addr,
+                        this.method,
+                        this.path,
+                        this.body_size,
+                        wait_time_str,
+                        took_time
+                    );
+                }
+
+                Poll::Ready(result)
             }
-
-            Ok(resp)
-        })
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

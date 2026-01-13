@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod compress;
-mod encoding;
+mod access_log;
 mod org_blocking;
 mod slow_log;
 
-pub use compress::Compress;
+pub use access_log::{AccessLogLayer, AccessLogService, get_http_access_log_format};
 pub use org_blocking::blocked_orgs_middleware;
-pub use slow_log::SlowLog;
+pub use slow_log::{SlowLogLayer, SlowLogService};
+// Re-export tower_http compression for convenience
+pub use tower_http::compression::CompressionLayer;
