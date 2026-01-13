@@ -391,11 +391,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-sticky-first-column"
           class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
           <template v-slot:default>
             <div class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2">
