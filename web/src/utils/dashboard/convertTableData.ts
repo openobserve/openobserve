@@ -178,6 +178,9 @@ export const convertTableData = (
   const unitConfigMap: Record<string, any> = {};
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
+ // Cache timezone to avoid repeated store lookups
+  const timezone = store.state.timezone;
+
   try {
     // Build maps for both color and unit configs
     overrideConfigs.forEach((o: any) => {
@@ -365,7 +368,7 @@ export const convertTableData = (
             return valueMapping;
           }
           // Use unified parser to format for display
-          return parseTimestampValue(val, store.state.timezone) || val;
+          return parseTimestampValue(val, timezone) || val;
         };
       }
       return obj;
@@ -409,7 +412,7 @@ export const convertTableData = (
           }
 
           // Parse and format the base date part
-          formattedDate = parseTimestampValue(baseVal, store.state.timezone);
+          formattedDate = parseTimestampValue(baseVal, timezone);
 
           // Append the underscore part (if it exists) back to the formatted date
           formattedDate = formattedDate
@@ -507,8 +510,6 @@ export const convertTableData = (
     ];
 
     // Transpose rows, adding 'label' as the first column
-    // Cache timezone to avoid repeated store lookups
-    const timezone = store.state.timezone;
 
     tableRows = columnData.map((it: any) => {
       const isHistogramField = histogramFields.includes(it.alias);
