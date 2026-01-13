@@ -109,9 +109,18 @@ const parseTimestampValue = (value: any, timezone: string) => {
   ) {
     timestamp = parseInt(value.toString()) / 1000;
   } else if (typeof value === "string") {
+    // If the string is already a formatted date (no 'T', looks like "YYYY-MM-DD HH:mm:ss")
+    // return it as-is to avoid double timezone conversion
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
+      return value;
+    }
+
     // Regular ISO string - treat as UTC timestamp
-    // Append 'Z' to naive strings to force UTC interpretation, aligning with other charts
-    const isoString = value.endsWith("Z") ? value : `${value}Z`;
+    // Only append 'Z' if it looks like an ISO string with 'T' and lacks an offset/timezone indicator
+    const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
+    const hasOffsetOrZ = /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
+
+    const isoString = (iso8601WithT && !hasOffsetOrZ) ? `${value}Z` : value;
     timestamp = new Date(isoString).getTime();
 
     // Fallback if the 'Z' trick failed (already has an offset or is invalid)
@@ -355,8 +364,8 @@ export const convertTableData = (
           if (valueMapping != null) {
             return valueMapping;
           }
-          // Return as-is since it's already formatted
-          return val;
+          // Use unified parser to format for display
+          return parseTimestampValue(val, store.state.timezone) || val;
         };
       }
       return obj;
@@ -480,7 +489,7 @@ export const convertTableData = (
           };
         }
 
-        // Check if it's a histogram field - timestamps are pre-formatted in rows
+        // Check if it's a histogram field
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
             // value mapping - use cached lookup
@@ -488,8 +497,8 @@ export const convertTableData = (
             if (valueMapping != null) {
               return valueMapping;
             }
-            // Return as-is since it's already formatted
-            return val;
+            // Use unified parser to format for display
+            return parseTimestampValue(val, timezone) || val;
           };
         }
 
@@ -507,9 +516,7 @@ export const convertTableData = (
         (acc: any, curr: any, reduceIndex: any) => {
           const value =
             getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
-          acc[curr] = isHistogramField
-            ? parseTimestampValue(value, timezone)
-            : value;
+          acc[curr] = value;
           return acc;
         },
         {},
@@ -517,32 +524,6 @@ export const convertTableData = (
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
-  }
-
-  // Pre-format timestamp fields in rows (like PromQL does)
-  // This ensures consistent timezone handling across all table types
-  // Skip if isTransposeEnabled since transpose section already formats timestamps
-  if (!isTransposeEnabled) {
-    const timezone = store.state.timezone;
-    const formattedRows = tableRows.map((row: any) => {
-      const formattedRow = { ...row };
-      histogramFields.forEach((fieldAlias: string) => {
-        const fieldValue = getDataValue(row, fieldAlias);
-        if (fieldValue != null) {
-          // Use unified parser to format and store back in the row
-          const actualField = Object.keys(row).find(
-            (key) => key.toLowerCase() === fieldAlias.toLowerCase()
-          ) || fieldAlias;
-          formattedRow[actualField] = parseTimestampValue(fieldValue, timezone);
-        }
-      });
-      return formattedRow;
-    });
-
-    return {
-      rows: formattedRows,
-      columns,
-    };
   }
 
   return {
