@@ -108,170 +108,39 @@ async fn process_stream(
         (end_time - start_time) / 1_000_000
     );
 
-    // Build service graph using span_kind and peer identification attributes
-    // Uses ONLY mandatory fields + COALESCE for optional peer attributes
-    //
-    // Mandatory fields: service_name, span_kind (always present)
-    // Optional peer attributes (priority order): peer_service, server_address, db_name, db_system
-    //
-    // Logic:
-    //   - CLIENT spans (span_kind='3'): client=service_name, server=COALESCE(peer attrs)
-    //   - SERVER spans (span_kind='2'): client=COALESCE(peer attrs), server=service_name
-    //   - INTERNAL/other spans: ignored (can't determine client/server relationship)
+    // Build service graph using parent-child span relationships via reference_parent_span_id
+    // JOIN approach: match parent CLIENT/INTERNAL spans with child SERVER/INTERNAL spans
 
-    // Check schema for available peer identification attributes
-    let schema = match infra::schema::get_cache(org_id, stream_name, StreamType::Traces).await {
-        Ok(schema) => schema,
-        Err(e) => {
-            log::debug!(
-                "[ServiceGraph] Failed to get schema for {}/{}: {} - skipping",
-                org_id,
-                stream_name,
-                e
-            );
-            return Ok(());
-        }
-    };
-
-    let schema_arrow = schema.schema();
-
-    // Build COALESCE expression for peer identification
-    // Try multiple attributes in priority order (following OTel conventions)
-    // NOTE: We use server_address (hostname only) instead of http_url (full URL with path/query)
-    // to avoid creating separate nodes for each URL variation with different query parameters
-    // or path parameters. This follows OpenTelemetry and Grafana Tempo best practices.
-    let peer_attr_candidates = [
-        "peer_service",   // peer.service - explicit peer service name
-        "server_address", // server.address - hostname only (prevents URL cardinality explosion)
-        "db_name",        // db.name - database name
-        "db_system",      /* db.system - database type
-                           * "http_url" removed - causes node explosion due to query params and
-                           * path variations */
-    ];
-
-    let mut available_peer_attrs = Vec::new();
-    for attr in peer_attr_candidates {
-        if schema_arrow.field_with_name(attr).is_ok() {
-            available_peer_attrs.push(attr);
-        }
-    }
-
-    // If no peer attributes are available, we can still process INTERNAL spans
-    // by using a fallback value for the peer/server side
-    let peer_expr = if available_peer_attrs.is_empty() {
-        log::debug!(
-            "[ServiceGraph] Stream {}/{} has no peer identification attributes - will use 'internal' fallback for INTERNAL spans",
-            org_id,
-            stream_name
-        );
-        "'internal'".to_string() // Literal string fallback
-    } else if available_peer_attrs.len() > 1 {
-        format!("COALESCE({})", available_peer_attrs.join(", "))
-    } else {
-        available_peer_attrs[0].to_string()
-    };
-
-    log::debug!(
-        "[ServiceGraph] Stream {}/{} using peer expression: {}",
-        org_id,
-        stream_name,
-        peer_expr
-    );
-
-    // Check if INTERNAL spans should be excluded (default: include them)
     let exclude_internal = get_o2_config().service_graph.exclude_internal_spans;
 
-    if exclude_internal {
-        log::debug!(
-            "[ServiceGraph] INTERNAL spans (span_kind='1') will be excluded from {}/{}",
-            org_id,
-            stream_name
-        );
-    }
-
-    let span_kinds = if exclude_internal {
-        // Exclude INTERNAL spans (span_kind='1')
-        "('2', '3')"
+    let (server_span_kinds, client_span_kinds) = if exclude_internal {
+        ("('2')", "('3')")
     } else {
-        // Include INTERNAL spans (span_kind='1') - default behavior
-        "('1', '2', '3')"
+        ("('1', '2')", "('1', '3')")
     };
 
-    let sql = if exclude_internal {
-        format!(
-            "WITH edges AS (
-           SELECT
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
-             END as client,
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
-             END as server,
-             end_time - start_time as duration,
-             span_status
-           FROM \"{}\"
-           WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN {}
-         )
-         SELECT
-           {} as start,
-           {} as end,
-           client,
-           server,
-           'standard' as connection_type,
-           COUNT(*) as total_requests,
-           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
-           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
-           approx_median(duration) as p50,
-           approx_percentile_cont(duration, 0.95) as p95,
-           approx_percentile_cont(duration, 0.99) as p99
-         FROM edges
-         WHERE client IS NOT NULL AND server IS NOT NULL
-         GROUP BY client, server",
-            peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
-        )
-    } else {
-        format!(
-            "WITH edges AS (
-           SELECT
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '1' THEN service_name
-             END as client,
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '1' THEN COALESCE({}, 'internal')
-             END as server,
-             end_time - start_time as duration,
-             span_status
-           FROM \"{}\"
-           WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN {}
-         )
-         SELECT
-           {} as start,
-           {} as end,
-           client,
-           server,
-           'standard' as connection_type,
-           COUNT(*) as total_requests,
-           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
-           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
-           approx_median(duration) as p50,
-           approx_percentile_cont(duration, 0.95) as p95,
-           approx_percentile_cont(duration, 0.99) as p99
-         FROM edges
-         WHERE client IS NOT NULL AND server IS NOT NULL
-         GROUP BY client, server",
-            peer_expr, peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
-        )
-    };
-
-    // Execute search
+    let sql = format!(
+        r#"SELECT
+            client.service_name AS client,
+            server.service_name AS server,
+            'standard' AS connection_type,
+            COUNT(*) AS total_requests,
+            COUNT(*) FILTER (WHERE server.span_status = 'ERROR') AS errors,
+            CAST(COUNT(*) FILTER (WHERE server.span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+            CAST(approx_median(server.end_time - server.start_time) AS BIGINT) AS p50,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.95) AS BIGINT) AS p95,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.99) AS BIGINT) AS p99
+        FROM "{stream_name}" AS server
+        LEFT JOIN "{stream_name}" AS client
+            ON server.reference_parent_span_id = client.span_id
+            AND server.trace_id = client.trace_id
+        WHERE client.service_name IS NOT NULL
+            AND server._timestamp >= {start_time} AND server._timestamp < {end_time}
+            AND CAST(server.span_kind AS VARCHAR) IN {server_span_kinds}
+            AND CAST(client.span_kind AS VARCHAR) IN {client_span_kinds}
+            AND client.service_name != server.service_name
+        GROUP BY client.service_name, server.service_name"#,
+    );
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql,
