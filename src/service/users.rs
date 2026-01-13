@@ -894,7 +894,7 @@ pub async fn list_users(
         }
     });
 
-    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[cfg(not(feature = "cloud"))]
     {
         if !org_id.eq(DEFAULT_ORG) && role.is_none() {
             let root = ROOT_USER.get("root").unwrap();
@@ -1414,6 +1414,22 @@ mod tests {
                 email: "admin@zo.dev".to_string(),
                 created_at: 0,
                 allow_static_token: true,
+            },
+        );
+        ROOT_USER.insert(
+            "root".to_string(),
+            User {
+                email: "root@zo.dev".to_string(),
+                first_name: "Root".to_string(),
+                last_name: "User".to_string(),
+                password: "root_password_hash".to_string(),
+                salt: "root_salt".to_string(),
+                token: "root_token".to_string(),
+                rum_token: Some("root_rum_token".to_string()),
+                role: UserRole::Root,
+                org: "default".to_string(),
+                is_external: false,
+                password_ext: Some("root_password_ext_hash".to_string()),
             },
         );
     }
