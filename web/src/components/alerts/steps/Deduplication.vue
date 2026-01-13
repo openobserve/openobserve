@@ -37,10 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-select
           v-model="localDeduplication.fingerprint_fields"
-          :options="columns"
+          :options="filteredColumns"
           color="input-border"
           bg-color="input-bg"
-          class="showLabelOnTop no-case"
+          class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
           dense
           borderless
           multiple
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           new-value-mode="add-unique"
           emit-value
           map-options
+          @filter="filterColumns"
           @update:model-value="emitUpdate"
-          style="width: 300px;"
         >
           <template v-slot:hint>
             <div class="tw:text-xs">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
         <div class="tw:flex tw:items-center">
-          <div style="width: 210px; margin-left: 0 !important">
+          <div class="tw:w-[210px] tw:ml-0">
             <q-input
               v-model.number="localDeduplication.time_window_minutes"
               type="number"
@@ -142,6 +142,8 @@ export default defineComponent({
       time_window_minutes: props.deduplication?.time_window_minutes || undefined,
     });
 
+    const filteredColumns = ref(props.columns || []);
+
     // Watch for prop changes
     watch(
       () => props.deduplication,
@@ -157,6 +159,14 @@ export default defineComponent({
       { deep: true }
     );
 
+    // Watch for columns prop changes
+    watch(
+      () => props.columns,
+      (newVal) => {
+        filteredColumns.value = newVal || [];
+      }
+    );
+
     const emitUpdate = () => {
       emit("update:deduplication", {
         enabled: true,
@@ -165,11 +175,27 @@ export default defineComponent({
       });
     };
 
+    const filterColumns = (val: string, update: any) => {
+      update(() => {
+        if (val === '') {
+          filteredColumns.value = props.columns || [];
+        } else {
+          const needle = val.toLowerCase();
+          filteredColumns.value = (props.columns || []).filter((v: any) => {
+            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
+            return str.toLowerCase().indexOf(needle) > -1;
+          });
+        }
+      });
+    };
+
     return {
       t,
       store,
       localDeduplication,
+      filteredColumns,
       emitUpdate,
+      filterColumns,
     };
   },
 });
@@ -199,6 +225,52 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
+  }
+}
+
+:deep(.fingerprint-select) {
+  .q-field__control {
+    min-height: 40px;
+  }
+
+  .q-field__control-container {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-right: 36px; // Reserve space for dropdown arrow
+  }
+
+  .q-field__native {
+    min-height: 32px;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+
+    // Hide scrollbar but keep scrolling functionality
+    scrollbar-width: none; // Firefox
+    -ms-overflow-style: none; // IE/Edge
+
+    &::-webkit-scrollbar {
+      display: none; // Chrome/Safari/Opera
+    }
+  }
+
+  .q-chip {
+    margin: 0 !important;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  // Ensure the input field stays visible and accessible
+  input {
+    min-width: 100px !important;
+    flex-shrink: 0 !important;
+  }
+
+  // Ensure dropdown icon is always visible
+  .q-field__append {
+    padding-left: 8px;
   }
 }
 </style>
