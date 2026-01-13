@@ -104,7 +104,7 @@ test.describe("HTML chart dashboard", () => {
   });
 
   //skip because value is not set in the variable on other environments its is working
-  test.skip("Should correctly replace the dashboard variable value on the HTML chart.", async ({
+  test("Should correctly replace the dashboard variable value on the HTML chart.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
