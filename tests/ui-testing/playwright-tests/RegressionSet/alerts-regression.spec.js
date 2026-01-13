@@ -310,19 +310,8 @@ test.describe("Alerts Regression Bugs", () => {
     const currentValue = await pm.alertsPage.getPromqlConditionValue();
     testLogger.info('Retrieved value from promql_condition input', { currentValue, expectedValue: testValue });
 
-    // Verify the input has a numeric value (may be default or saved value)
-    // NOTE: Known issue - saved promql_condition.value may not load correctly
-    const numericValue = parseInt(currentValue);
-    expect(numericValue).toBeGreaterThanOrEqual(0);
-
-    // Log if value doesn't match expected (for tracking the separate bug)
-    if (numericValue !== testValue) {
-      testLogger.warn('PromQL condition value may not be loading from saved alert', {
-        expected: testValue,
-        actual: numericValue,
-        note: 'This may be a separate backend/frontend bug - promql_condition.value not persisting'
-      });
-    }
+    // Verify the saved value loads correctly
+    expect(parseInt(currentValue)).toBe(testValue);
 
     // Cancel and go back using page object
     await pm.alertsPage.clickBackButton();
