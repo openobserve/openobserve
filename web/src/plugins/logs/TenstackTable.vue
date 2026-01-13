@@ -766,15 +766,10 @@ const rowVirtualizerOptions = computed(() => {
             // Only measure expanded rows (check if it's actually an expanded row)
             const isExpandedRow =
               formattedRows.value[index]?.original?.isExpandedRow;
-            if (
-              (isExpandedRow || props.wrap) &&
-              !expandedRowHeights.value.hasOwnProperty(index)
-            ) {
+            if (isExpandedRow || props.wrap) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
               return height;
-            } else if (expandedRowHeights.value.hasOwnProperty(index)) {
-              return expandedRowHeights.value[index];
             }
             return 24; // Fixed height for collapsed rows
           }
