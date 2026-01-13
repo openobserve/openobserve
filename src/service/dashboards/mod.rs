@@ -381,6 +381,15 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
+    // Check if dashboard exists and belongs to the specified folder.
+    // Note: We don't need to explicitly check if the folder exists because
+    // the folder-dashboard relationship is enforced by a foreign key constraint.
+    // If the dashboard exists in the folder, the folder must exist.
+    let existing = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
+    if existing.is_none() {
+        return Err(DashboardError::DashboardNotFound);
+    }
+
     let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
 
     #[cfg(feature = "enterprise")]
