@@ -571,9 +571,9 @@ pub fn service_routes() -> Router {
         // Search
         .route("/{org_id}/_search", post(search::search))
         .route("/{org_id}/_search_partition", post(search::search_partition))
-        .route("/{org_id}/_result_schema", post(search::result_schema))
+        .route("/{org_id}/result_schema", post(search::result_schema))
         .route("/{org_id}/{stream_name}/_around", get(search::around_v1))
-        .route("/{org_id}/_around/{stream_name}", get(search::around_v2))
+        .route("/{org_id}/{stream_name}/_around", post(search::around_v2))
         .route("/{org_id}/_search_profile", get(search::search_inspector::get_search_profile))
         .route("/{org_id}/_values", post(search::values))
         .route("/{org_id}/_search_history", get(search::search_history))
@@ -620,12 +620,12 @@ pub fn service_routes() -> Router {
 
 
         // Alerts - incidents must be before alerts to avoid route conflicts
-        .route("/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
-        .route("/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
-        .route("/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
-        .route("/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
-        .route("/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
-        .route("/{org_id}/alerts/incidents/{incident_id}/status", patch(alerts::incidents::update_incident_status))
+        .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
+        .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/status", patch(alerts::incidents::update_incident_status))
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
