@@ -41,6 +41,7 @@ use infra::{
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::router::ERROR_HEADER,
     service::{
         db,
         enrichment::storage::Values,
@@ -73,7 +74,7 @@ pub async fn save_enrichment_data(
     if !LOCAL_NODE.is_ingester() {
         let mut resp = MetaHttpResponse::internal_error("not an ingester");
         resp.headers_mut().insert(
-            http::HeaderName::from_static("x-error-message"),
+            ERROR_HEADER,
             http::HeaderValue::from_str("not an ingester").unwrap(),
         );
         return Ok(resp);
@@ -89,7 +90,7 @@ pub async fn save_enrichment_data(
         let error_msg = format!("enrichment table [{stream_name}] is being deleted");
         let mut resp = MetaHttpResponse::bad_request(&error_msg);
         resp.headers_mut().insert(
-            http::HeaderName::from_static("x-error-message"),
+            ERROR_HEADER,
             http::HeaderValue::from_str(&error_msg).unwrap(),
         );
         return Ok(resp);
@@ -190,7 +191,7 @@ pub async fn save_enrichment_data(
         let error_msg = format!("Schema mismatch for enrichment table {org_id}/{stream_name}");
         let mut resp = MetaHttpResponse::internal_error(&error_msg);
         resp.headers_mut().insert(
-            http::HeaderName::from_static("x-error-message"),
+            ERROR_HEADER,
             http::HeaderValue::from_str(&error_msg).unwrap(),
         );
         return Ok(resp);
@@ -242,7 +243,7 @@ pub async fn save_enrichment_data(
             let mut resp =
                 MetaHttpResponse::internal_error("Error writing enrichment table to database");
             resp.headers_mut().insert(
-                http::HeaderName::from_static("x-error-message"),
+                ERROR_HEADER,
                 http::HeaderValue::from_str(&error_msg).unwrap(),
             );
             return Ok(resp);

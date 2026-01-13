@@ -131,6 +131,8 @@ reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
+rustls-native-certs.workspace = true
+webpki-roots.workspace = true
 sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
@@ -352,6 +354,8 @@ rustls = { version = "0.23.20", default-features = false, features = [
     "std",
     "tls12",
 ] }
+rustls-native-certs = "0.8"
+webpki-roots = "0.26"
 sea-orm = { version = "1.1.8", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
