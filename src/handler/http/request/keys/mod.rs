@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{
-    Json,
-    extract::Path,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
@@ -31,6 +26,7 @@ use {
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
+    axum::{Json, http::StatusCode, response::IntoResponse},
     config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},

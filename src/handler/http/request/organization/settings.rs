@@ -15,13 +15,16 @@
 
 use axum::{
     Json,
-    extract::{Path, Query},
+    extract::Path,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
-use {axum::extract::Multipart, o2_enterprise::enterprise::common::settings};
+use {
+    axum::extract::{Multipart, Query},
+    o2_enterprise::enterprise::common::settings,
+};
 
 use crate::{
     common::meta::{

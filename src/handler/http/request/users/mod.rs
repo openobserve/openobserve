@@ -907,6 +907,8 @@ pub async fn get_auth(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(headers);
+        drop(query);
         Response::builder()
             .status(StatusCode::FORBIDDEN)
             .header(header::CONTENT_TYPE, "application/json")

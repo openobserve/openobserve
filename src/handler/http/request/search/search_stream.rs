@@ -16,9 +16,11 @@
 use axum::{
     body::Bytes,
     extract::{Path, Query},
-    http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
+    http::HeaderMap,
+    response::Response,
 };
+#[cfg(feature = "enterprise")]
+use axum::{http::StatusCode, response::IntoResponse};
 use config::{
     get_config,
     meta::{

@@ -17,7 +17,6 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    body::Body,
     extract::{FromRequestParts, Path, Request},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
@@ -31,7 +30,7 @@ use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
-    axum::body::to_bytes,
+    axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::{
@@ -489,9 +488,9 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let mut router = Router::new()
-        // Users
-        .route("/{org_id}/users", get(users::list).post(users::save))
+    let mut router = Router::new();
+    // Users
+    router = router.route("/{org_id}/users", get(users::list).post(users::save))
         .route("/{org_id}/users/bulk_delete", delete(users::delete_bulk))
         // TODO: users::get function doesn't exist, removing for now
         .route("/{org_id}/users/{email_id}", put(users::update).delete(users::delete))
@@ -906,13 +905,24 @@ pub fn create_app_router() -> Router {
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
         // Router node: use proxy routes that dispatch to backend nodes
         // All routes under base_uri will be proxied to backend nodes
-        // TODO: Add rate limiting middleware for router nodes (enterprise feature)
-        // See: o2_ratelimit::middleware::RateLimitController
 
-        let router_routes = Router::new()
+        let mut router_routes = Router::new();
+        router_routes = router_routes
             .merge(crate::router::http::create_router_routes())
             .nest("/config", config_routes())
             .merge(proxy_routes(true));
+
+        // Add rate limiting middleware for router nodes (enterprise feature)
+        #[cfg(feature = "enterprise")]
+        {
+            router_routes = router_routes.layer(
+                o2_ratelimit::middleware::RateLimitLayer::new_with_extractor(Some(
+                    crate::router::ratelimit::resource_extractor::default_extractor,
+                )),
+            );
+        }
+
+        let router_routes = router_routes;
 
         // Apply base_uri if configured
         let router_routes = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {

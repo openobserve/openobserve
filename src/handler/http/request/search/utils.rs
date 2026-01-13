@@ -15,6 +15,7 @@
 
 use std::collections::HashSet;
 
+#[cfg(feature = "enterprise")]
 use axum::response::Response;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,

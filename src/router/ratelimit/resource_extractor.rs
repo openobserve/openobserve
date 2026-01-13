@@ -132,11 +132,21 @@ fn rule_extractor(
 }
 
 // Commented out: This function uses actix-web types and is not currently used
-// pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
-//     let auth_str = extract_basic_auth_str(req.request());
-//     let local_path = req.path().to_string();
-//     rule_extractor(auth_str, local_path, req.method())
-// }
+/// Default extractor for axum Request
+pub fn default_extractor(req: &axum::extract::Request) -> BoxFuture<'_, ExtractorRuleResult> {
+    let auth_str = extract_basic_auth_str_axum(req);
+    let local_path = req.uri().path().to_string();
+    rule_extractor(auth_str, local_path, req.method())
+}
+
+/// Extract basic auth string from axum Request
+fn extract_basic_auth_str_axum(req: &axum::extract::Request) -> String {
+    req.headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string()
+}
 
 async fn find_default_and_custom_rules(
     org_id: &str,

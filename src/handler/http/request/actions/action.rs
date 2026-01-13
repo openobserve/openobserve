@@ -107,6 +107,7 @@ pub async fn delete_action(Path((org_id, ksuid)): Path<(String, Ksuid)>) -> Resp
 
     #[cfg(not(feature = "enterprise"))]
     {
+        let _ = (org_id, ksuid);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

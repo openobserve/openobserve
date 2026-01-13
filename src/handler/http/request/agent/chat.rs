@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{Json, body::Body, extract::Path, http::StatusCode, response::Response};
+#[cfg(feature = "enterprise")]
+use axum::body::Body;
+use axum::{Json, extract::Path, http::StatusCode, response::Response};
 // Re-export enterprise types for OpenAPI and route handlers
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::alerts::rca_agent::{
@@ -272,6 +274,7 @@ pub async fn agent_chat_stream(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        use axum::response::IntoResponse;
         (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({

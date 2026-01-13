@@ -75,6 +75,7 @@ pub async fn get_dimension_analytics(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
         MetaHttpResponse::forbidden("Service Discovery is an enterprise-only feature")
     }
 }
@@ -168,6 +169,7 @@ pub async fn correlate_streams(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
         (
             StatusCode::FORBIDDEN,
             Json(MetaHttpResponse::error(
@@ -241,6 +243,7 @@ pub async fn get_services_grouped(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
         log::info!("Service Discovery is an enterprise-only feature");
         MetaHttpResponse::forbidden("Service Discovery is an enterprise-only feature")
     }

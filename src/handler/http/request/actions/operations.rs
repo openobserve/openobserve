@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 
-use axum::{Json, extract::Path, response::Response};
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
     crate::{
@@ -22,6 +22,7 @@ use {
         },
         handler::http::{extractors::Headers, models::action::TestActionRequest},
     },
+    axum::Json,
     itertools::Itertools,
     o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource},
     tracing::{Level, span},

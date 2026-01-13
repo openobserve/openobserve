@@ -19,6 +19,8 @@ use std::{
 };
 
 use async_trait::async_trait;
+#[cfg(feature = "enterprise")]
+use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
@@ -41,7 +43,6 @@ use config::{
     },
 };
 use cron::Schedule;
-use http::HeaderMap;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,

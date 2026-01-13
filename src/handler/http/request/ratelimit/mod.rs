@@ -201,6 +201,10 @@ pub async fn api_modules(Path(org_id): Path<String>) -> Response {
 
     #[cfg(not(feature = "enterprise"))]
     {
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
         drop(org_id);
         Response::builder()
             .status(StatusCode::FORBIDDEN)
@@ -277,6 +281,10 @@ pub async fn list_module_ratelimit(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
         drop(org_id);
         let _ = query;
         Response::builder()
@@ -374,6 +382,10 @@ pub async fn list_role_ratelimit(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
         drop(org_id);
         let _ = query;
         Response::builder()
@@ -474,6 +486,10 @@ pub async fn update_ratelimit(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
         drop(org_id);
         let _ = query;
         drop(body);

@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    Json,
     body::{Body, Bytes},
     extract::Path,
-    http::{HeaderMap, StatusCode, header},
+    http::{StatusCode, header},
     response::Response,
 };
 #[cfg(feature = "enterprise")]
 use {
+    axum::{Json, http::HeaderMap},
     futures_util::StreamExt,
     o2_enterprise::enterprise::ai::mcp::{
         MCPRequest, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream,

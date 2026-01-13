@@ -16,7 +16,7 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use config::meta::search::Request;
@@ -36,6 +36,7 @@ use {
         },
         service::db::search_job::{search_job_partitions::*, search_jobs::*},
     },
+    axum::http::HeaderMap,
     config::{
         get_config,
         meta::{
