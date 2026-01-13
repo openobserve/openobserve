@@ -96,6 +96,7 @@ impl From<DashboardError> for Response {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard will be created. Used for RBAC checks in enterprise version. Defaults to 'default' if not specified"),
     ),
     request_body(
         content = inline(DashboardRequestBody),
@@ -107,6 +108,7 @@ impl From<DashboardError> for Response {
     ),
     responses(
         (status = StatusCode::CREATED, description = "Dashboard created", body = inline(DashboardResponseBody)),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
     ),
     extensions(
@@ -149,11 +151,14 @@ pub async fn create_dashboard(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = String, Query, description = "Folder ID where the dashboard is located"),
+        ("hash" = Option<String>, Query, description = "Hash value for conflict detection. Required when updating an existing dashboard to prevent concurrent edit conflicts"),
     ),
     request_body(content = inline(DashboardRequestBody), description = "Dashboard details"),
     responses(
         (status = StatusCode::OK, description = "Dashboard updated", body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::CONFLICT, description = "Conflict: Failed to save due to concurrent changes", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = ()),
     ),
     extensions(
@@ -240,10 +245,12 @@ pub async fn list_dashboards(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
         (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
@@ -274,10 +281,12 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
         (status = StatusCode::OK, body = inline(DashboardResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
@@ -308,10 +317,12 @@ pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboard is located. Used for RBAC permission checks in enterprise version"),
     ),
     responses(
         (status = StatusCode::OK, description = "Success", body = Object),
         (status = StatusCode::NOT_FOUND, description = "NotFound", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
@@ -340,6 +351,7 @@ pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID where the dashboards are located. Required for RBAC permission checks in enterprise version"),
     ),
     request_body(
         content = BulkDeleteRequest,
@@ -348,6 +360,7 @@ pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     ),
     responses(
         (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+        (status = StatusCode::FORBIDDEN, description = "Unauthorized Access", body = ()),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = ()),
     ),
     extensions(
