@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, get, put, web};
+use axum::{extract::Path, response::Response};
 use config::META_ORG_ID;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::domain_management::{self, meta::DomainManagementRequest};
@@ -34,6 +32,8 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
 
 /// Get domain management configuration
 #[utoipa::path(
+    get,
+    path = "/{org_id}/domain_management",
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "GetDomainManagementConfig",
@@ -53,31 +53,34 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
-#[get("/{org_id}/domain_management")]
-pub async fn get_domain_management_config(path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-
+pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Response {
     // Validate that only meta org can access domain management APIs
     if let Err(e) = validate_meta_org_access(&org_id) {
-        return Ok(MetaHttpResponse::forbidden(e));
+        return MetaHttpResponse::forbidden(e);
     }
 
+    #[cfg(feature = "enterprise")]
     match domain_management::get_domain_management_config().await {
-        Ok(response) => Ok(MetaHttpResponse::json(response)),
+        Ok(response) => MetaHttpResponse::json(response),
         Err(e) => {
             log::error!("Error getting domain management config: {e}");
             match e {
                 infra::errors::Error::Message(ref msg) if msg.contains("not found") => {
-                    Ok(MetaHttpResponse::not_found(e))
+                    MetaHttpResponse::not_found(e)
                 }
-                _ => Ok(MetaHttpResponse::internal_error(e)),
+                _ => MetaHttpResponse::internal_error(e),
             }
         }
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    MetaHttpResponse::forbidden("Domain management is not available")
 }
 
 /// Set domain management configuration
 #[utoipa::path(
+    put,
+    path = "/{org_id}/domain_management",
     context_path = "/api",
     tag = "Domain Management",
     operation_id = "SetDomainManagementConfig",
@@ -98,27 +101,27 @@ pub async fn get_domain_management_config(path: web::Path<String>) -> Result<Htt
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     )
 )]
-#[put("/{org_id}/domain_management")]
 pub async fn set_domain_management_config(
-    path: web::Path<String>,
-    body: web::Json<DomainManagementRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let request = body.into_inner();
-
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] axum::Json(body): axum::Json<DomainManagementRequest>,
+) -> Response {
     // Validate that only meta org can access domain management APIs
     if let Err(e) = validate_meta_org_access(&org_id) {
-        return Ok(MetaHttpResponse::forbidden(e));
+        return MetaHttpResponse::forbidden(e);
     }
 
-    match domain_management::set_domain_management_config(request).await {
-        Ok(response) => Ok(MetaHttpResponse::json(response)),
+    #[cfg(feature = "enterprise")]
+    match domain_management::set_domain_management_config(body).await {
+        Ok(response) => MetaHttpResponse::json(response),
         Err(e) => {
             log::error!("Error setting domain management config: {e}");
             match e {
-                infra::errors::Error::Message(_) => Ok(MetaHttpResponse::bad_request(e)),
-                _ => Ok(MetaHttpResponse::internal_error(e)),
+                infra::errors::Error::Message(_) => MetaHttpResponse::bad_request(e),
+                _ => MetaHttpResponse::internal_error(e),
             }
         }
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    MetaHttpResponse::forbidden("Domain management is not available")
 }

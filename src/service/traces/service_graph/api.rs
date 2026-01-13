@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,10 @@
 //! HTTP handlers for service graph topology queries.
 //! Business logic is in enterprise crate.
 
-use actix_web::{HttpResponse, web};
+use axum::response::Response as HttpResponse;
 use serde::Deserialize;
+
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Query parameters for service graph API
 #[derive(Debug, Deserialize)]
@@ -55,12 +57,11 @@ pub struct ServiceGraphQuery {
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "service_graph_topology"}))
     )
 )]
-#[actix_web::get("/{org_id}/traces/service_graph/topology/current")]
 #[cfg(feature = "enterprise")]
 pub async fn get_current_topology(
-    org_id: web::Path<String>,
-    query: web::Query<ServiceGraphQuery>,
-) -> Result<HttpResponse, actix_web::Error> {
+    axum::extract::Path(org_id): axum::extract::Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ServiceGraphQuery>,
+) -> HttpResponse {
     use config::meta::service_graph::ServiceGraphData;
 
     // Query edges from stream (last 60 minutes by default)
@@ -73,11 +74,11 @@ pub async fn get_current_topology(
                 "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
                 e
             );
-            return Ok(HttpResponse::Ok().json(serde_json::json!({
+            return MetaHttpResponse::json(serde_json::json!({
                 "nodes": vec![] as Vec<()>,
                 "edges": vec![] as Vec<()>,
                 "availableStreams": vec![] as Vec<String>,
-            })));
+            }));
         }
     };
 
@@ -86,27 +87,27 @@ pub async fn get_current_topology(
             "[ServiceGraph] No edges found for org '{}'",
             org_id.as_str()
         );
-        return Ok(HttpResponse::Ok().json(ServiceGraphData {
+        return MetaHttpResponse::json(ServiceGraphData {
             nodes: vec![],
             edges: vec![],
-        }));
+        });
     }
 
     log::debug!(
         "[ServiceGraph] Processing {} edge records for org '{}'",
         edges.len(),
-        org_id.as_str()
+        &org_id
     );
 
     // Use enterprise business logic to build topology
     let (nodes, edges, available_streams) =
         o2_enterprise::enterprise::service_graph::build_topology(edges);
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
+    MetaHttpResponse::json(serde_json::json!({
         "nodes": nodes,
         "edges": edges,
         "availableStreams": available_streams,
-    })))
+    }))
 }
 
 #[cfg(feature = "enterprise")]
@@ -232,11 +233,10 @@ pub async fn query_edges_from_stream_internal(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
 )]
-#[actix_web::get("/{org_id}/traces/service_graph/topology/current")]
 #[cfg(not(feature = "enterprise"))]
 pub async fn get_current_topology(
-    _org_id: web::Path<String>,
-    _query: web::Query<ServiceGraphQuery>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    axum::extract::Path(_org_id): axum::extract::Path<String>,
+    axum::extract::Query(_query): axum::extract::Query<ServiceGraphQuery>,
+) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
 }

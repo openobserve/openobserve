@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,13 +15,7 @@
 
 use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
-use actix_web::{
-    Error as ActixErr, HttpMessage,
-    body::MessageBody,
-    dev::{ServiceRequest, ServiceResponse},
-    middleware::Next,
-    web,
-};
+use axum::{body::Body, http::Request, middleware::Next, response::Response};
 use maxminddb::geoip2::city::Location;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -79,19 +73,21 @@ impl RumExtraData {
             })
     }
 
-    pub async fn extractor(
-        req: ServiceRequest,
-        next: Next<impl MessageBody>,
-    ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
-        let mut data =
-            web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    /// Middleware function for axum to extract RUM extra data
+    pub async fn extractor_middleware(mut request: Request<Body>, next: Next) -> Response {
+        // Parse query parameters
+        let query_string = request.uri().query().unwrap_or("");
+        let mut data: HashMap<String, String> =
+            url::form_urlencoded::parse(query_string.as_bytes())
+                .into_owned()
+                .collect();
+
         Self::filter_api_keys(&mut data);
 
         // These are the tags which come in `ootags` or `o2tags`
         let tags: HashMap<String, serde_json::Value> = Self::filter_tags(&data);
 
         let mut user_agent_hashmap: HashMap<String, serde_json::Value> = data
-            .into_inner()
             .into_iter()
             .map(|(key, val)| (key, val.into()))
             .collect();
@@ -99,19 +95,14 @@ impl RumExtraData {
         // Now extend the existing hashmap with tags.
         user_agent_hashmap.extend(tags);
         {
-            let headers = req.headers();
-            // Borrow checker can't reliably tell that RefCell has been dropped
-            // before an await, even if `drop` is directly used
-            // This little contraption helps avoid clippy issues
-            let ip_address = {
-                let conn_info = req.connection_info();
-                match headers.contains_key("X-Forwarded-For") || headers.contains_key("Forwarded") {
-                    true => conn_info.realip_remote_addr(),
-                    false => conn_info.peer_addr(),
-                }
-                .unwrap()
-                .to_string()
-            };
+            let headers = request.headers();
+            // Get IP address from headers or connection info
+            let ip_address = headers
+                .get("X-Forwarded-For")
+                .or_else(|| headers.get("Forwarded"))
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("127.0.0.1")
+                .to_string();
 
             let ip = match parse_ip_addr(&ip_address) {
                 Ok((ip, _)) => ip,
@@ -154,7 +145,7 @@ impl RumExtraData {
 
         // User-agent parsing
         {
-            let user_agent = req
+            let user_agent = request
                 .headers()
                 .get("User-Agent")
                 .and_then(|v| v.to_str().ok())
@@ -171,8 +162,11 @@ impl RumExtraData {
         let rum_extracted_data = RumExtraData {
             data: user_agent_hashmap,
         };
-        req.extensions_mut().insert(rum_extracted_data);
-        next.call(req).await
+
+        // Insert into request extensions
+        request.extensions_mut().insert(rum_extracted_data);
+
+        next.run(request).await
     }
 }
 
@@ -186,13 +180,12 @@ mod tests {
         let query_string =
             "oo-api-key=123&o2-api-key=456&oo-param1=value1&o2-param2=value2&batch_time=123456";
 
-        // Create a mock ServiceRequest with the query string
-        let req = actix_web::test::TestRequest::with_uri(&format!("/path?{query_string}"))
-            .to_srv_request();
+        // Parse query string manually
+        let mut data: HashMap<String, String> =
+            url::form_urlencoded::parse(query_string.as_bytes())
+                .into_owned()
+                .collect();
 
-        // Call the from_query function
-        let mut data =
-            web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         RumExtraData::filter_api_keys(&mut data);
 
         // Assert that the data is filtered correctly
@@ -211,13 +204,10 @@ mod tests {
         let query_string_o2_tags = "o2tags=sdk_version:0.2.9,api:fetch,env:production,service:web-application,version:1.0.1";
 
         for query in &[query_string_oo_tags, query_string_o2_tags] {
-            // Create a mock ServiceRequest with the query string
-            let req =
-                actix_web::test::TestRequest::with_uri(&format!("/path?{query}")).to_srv_request();
+            let query_data: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
+                .into_owned()
+                .collect();
 
-            // Call the from_query function
-            let query_data =
-                web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
             let data = RumExtraData::filter_tags(&query_data);
 
             // Assert that the tags are filtered correctly
