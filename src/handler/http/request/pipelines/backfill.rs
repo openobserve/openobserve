@@ -242,7 +242,6 @@ pub async fn get_backfill(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[put("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable")]
 pub async fn enable_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
@@ -256,13 +255,10 @@ pub async fn enable_backfill(
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
             if job.pipeline_id != pipeline_id {
-                return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::NOT_FOUND,
-                    format!(
-                        "Backfill job {} not found for pipeline {}",
-                        job_id, pipeline_id
-                    ),
-                )));
+                return MetaHttpResponse::not_found(format!(
+                    "Backfill job {} not found for pipeline {}",
+                    job_id, pipeline_id
+                ));
             }
         }
         Err(e) => {
@@ -272,10 +268,7 @@ pub async fn enable_backfill(
                 org_id,
                 e
             );
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::NOT_FOUND,
-                e.to_string(),
-            )));
+            return MetaHttpResponse::not_found(e.to_string());
         }
     }
 
@@ -389,7 +382,7 @@ pub async fn delete_backfill(
                 org_id,
                 e
             );
-            MetaHttpResponse::not_found(e.to_string());
+            MetaHttpResponse::not_found(e.to_string())
         }
     }
 }
@@ -478,7 +471,7 @@ pub async fn update_backfill(
                 org_id,
                 e
             );
-            MetaHttpResponse::bad_request(e.to_string());
+            MetaHttpResponse::bad_request(e.to_string())
         }
     }
 }

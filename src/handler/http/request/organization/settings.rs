@@ -123,9 +123,9 @@ pub async fn create(
     if let Some(max_series_per_query) = settings.max_series_per_query {
         // Validate max_series_per_query is within acceptable range
         if !(1_000..=1_000_000).contains(&max_series_per_query) {
-            return Ok(MetaHttpResponse::bad_request(
+            return MetaHttpResponse::bad_request(
                 "max_series_per_query must be between 1,000 and 1,000,000",
-            ));
+            );
         }
         field_found = true;
         data.max_series_per_query = Some(max_series_per_query);

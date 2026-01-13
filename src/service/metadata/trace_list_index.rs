@@ -302,7 +302,7 @@ mod tests {
         hour_buf.records_size += data_size;
 
         let writer = ingester::get_writer(
-            get_thread_id(),
+            0,
             "openobserve",
             StreamType::Metadata.as_str(),
             STREAM_NAME,

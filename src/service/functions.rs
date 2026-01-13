@@ -56,10 +56,9 @@ pub enum FunctionDeleteError {
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        )));
+        ));
     }
 
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
@@ -86,10 +85,10 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                 }
             }
             _ => {
-              return Ok(MetaHttpResponse::bad_request("Invalid transform type. Use 0 for VRL or 1 for JS."));
-               
+                return Ok(MetaHttpResponse::bad_request(
+                    "Invalid transform type. Use 0 for VRL or 1 for JS.",
+                ));
             }
-
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -128,19 +127,17 @@ pub async fn test_run_function(
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if trans_type == 1 && org_id != "_meta" {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        )));
+        ));
     }
 
     match trans_type {
         0 => test_run_vrl_function(org_id, function, events).await,
         1 => test_run_js_function(org_id, function, events).await,
-        _ => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        _ => Ok(MetaHttpResponse::bad_request(
             "Invalid transform type. Use 0 for VRL or 1 for JS.",
-        ))),
+        )),
     }
 }
 
@@ -257,8 +254,7 @@ async fn test_run_js_function(
     let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
         Ok(config) => config,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            return Ok(MetaHttpResponse::bad_request(e));
         }
     };
 
@@ -322,7 +318,7 @@ async fn test_run_js_function(
         results: transformed_events,
     };
 
-    Ok(HttpResponse::Ok().json(results))
+    Ok(MetaHttpResponse::json(results))
 }
 
 #[tracing::instrument(skip(func))]
@@ -340,10 +336,9 @@ pub async fn update_function(
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        )));
+        ));
     }
 
     if func == existing_fn {
@@ -369,7 +364,9 @@ pub async fn update_function(
             }
         }
         _ => {
-          return Ok(MetaHttpResponse::bad_request("Invalid transform type. Use 0 for VRL or 1 for JS."));
+            return Ok(MetaHttpResponse::bad_request(
+                "Invalid transform type. Use 0 for VRL or 1 for JS.",
+            ));
         }
     }
     extract_num_args(&mut func);
@@ -628,6 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_js_function_blocked_in_regular_org() {
+        use http_body_util::BodyExt;
         use serde_json::json;
 
         let org_id = "default";
@@ -643,7 +641,7 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 
         // Verify error message
-        let body_bytes = to_bytes(response.into_body()).await.unwrap();
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(
             body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
@@ -693,7 +691,8 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
 
         // Verify error message
-        let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+        use http_body_util::BodyExt;
+        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(
             body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
