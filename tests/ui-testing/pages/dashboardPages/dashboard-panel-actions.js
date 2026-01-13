@@ -30,10 +30,23 @@ export default class DashboardactionPage {
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
+
+    // Wait for the save API call to complete
+    const savePromise = this.page.waitForResponse(
+      (response) =>
+        response.url().includes("/dashboards/") &&
+        response.request().method() === "PUT" &&
+        response.status() === 200,
+      { timeout: 30000 }
+    );
+
     await this.panelSaveBtn.click();
 
-    // Wait for save to complete
-    await this.page.waitForLoadState("networkidle");
+    // Wait for save API to complete
+    await savePromise;
+
+    // Brief wait for UI to update
+    await this.page.waitForTimeout(500);
   }
 
   //Apply dashboard button
