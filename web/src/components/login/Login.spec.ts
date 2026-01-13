@@ -595,6 +595,9 @@ describe("Login", () => {
       name: "testuser ",
       email: "testuser",
     });
+    expect(rum.openobserveRum.startSessionReplayRecording).toHaveBeenCalledWith({
+      force: true,
+    });
   });
 
   // Test 23: successful sign in handles session storage
