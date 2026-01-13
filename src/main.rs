@@ -1301,10 +1301,10 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
-        .layer(TimeoutLayer::new(Duration::from_secs(max(
-            1,
-            cfg.limit.http_request_timeout,
-        ))));
+        .layer(TimeoutLayer::with_status_code(
+            http::StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
+        ));
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1357,9 +1357,9 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn create_script_server_router() -> Router {
+pub fn create_script_server_router() -> axum::Router {
     use axum::{
-        middleware,
+        Router, middleware,
         routing::{delete, get, patch, post},
     };
     use openobserve::handler::http::{request::script_server, router::cors_layer};

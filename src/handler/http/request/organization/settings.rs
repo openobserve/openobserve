@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    extract::Path,
+    extract::{Path, Query},
     http::StatusCode,
     response::{IntoResponse, Response},
 };

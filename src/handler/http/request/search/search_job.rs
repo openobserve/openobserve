@@ -16,7 +16,7 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::meta::search::Request;
@@ -477,8 +477,7 @@ pub async fn get_job_result(
         if let Some(msg) = model.error_message {
             MetaHttpResponse::internal_error(format!("job_id: {job_id} error: {msg}",))
         } else if model.status == 1 && model.partition_num != Some(1) {
-            let response = get_partition_result(&model, from, size).await;
-            response
+            get_partition_result(&model, from, size).await
         } else if model.result_path.is_none() || model.cluster.is_none() {
             MetaHttpResponse::not_found(format!(
                 "[Job_Id: {job_id}] don't have result_path or cluster"

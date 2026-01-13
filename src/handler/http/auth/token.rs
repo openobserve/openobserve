@@ -143,50 +143,31 @@ pub async fn token_validator(
                         || is_member_subscription
                         || allow_nonexistent_user) =>
                     {
-                        // here we need mul request because we need to insert the user_id into the
-                        // request headers for next handler, we will use the user_id to identify the
-                        // user in the next handler,
-                        let mut req = req;
-
-                        if req.method().eq(&Method::POST)
-                            && !req.headers().contains_key("content-type")
-                        {
-                            req.headers_mut().insert(
-                                header::CONTENT_TYPE,
-                                header::HeaderValue::from_static(
-                                    "application/x-www-form-urlencoded",
-                                ),
-                            );
-                        }
-                        req.headers_mut().insert(
-                            header::HeaderName::from_static("user_id"),
-                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
-                        );
-                        Ok(req)
+                        // Allow these special cases without requiring user in DB
+                        Ok(AuthValidationResult {
+                            user_email: res.0.user_email.clone(),
+                            user_role: None,
+                            is_internal_user: false,
+                        })
                     }
                     Some(user) => {
-                        // / Hack for prometheus, need support POST and check the header
-                        let mut req = req;
-
-                        if req.method().eq(&Method::POST)
-                            && !req.headers().contains_key("content-type")
-                        {
-                            req.headers_mut().insert(
-                                header::CONTENT_TYPE,
-                                header::HeaderValue::from_static(
-                                    "application/x-www-form-urlencoded",
-                                ),
-                            );
-                        }
-                        req.headers_mut().insert(
-                            header::HeaderName::from_static("user_id"),
-                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
-                        );
+                        // Check permissions for the user
+                        let user_role = user.role;
+                        let is_external = user.is_external;
                         if auth_info.bypass_check
-                            || check_permissions(user_id, auth_info, user.role, user.is_external)
-                                .await
+                            || check_permissions(
+                                user_id,
+                                auth_info.clone(),
+                                user_role.clone(),
+                                is_external,
+                            )
+                            .await
                         {
-                            Ok(req)
+                            Ok(AuthValidationResult {
+                                user_email: res.0.user_email.clone(),
+                                user_role: Some(user_role),
+                                is_internal_user: !is_external,
+                            })
                         } else {
                             Err(AuthError::Forbidden("Forbidden".to_string()))
                         }

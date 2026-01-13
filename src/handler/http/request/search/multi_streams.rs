@@ -1489,6 +1489,7 @@ pub async fn search_multi_stream(
 }
 
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 pub async fn report_to_audit(
     user_id: String,
     org_id: String,

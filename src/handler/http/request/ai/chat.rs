@@ -22,7 +22,7 @@ use axum::{
 };
 use o2_enterprise::enterprise::{ai::agent, common::config::get_config as get_o2_config};
 use serde::Deserialize;
-use tracing::{Instrument, Span};
+use tracing::Span;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -197,10 +197,7 @@ impl TraceInfo {
     )
 )]
 #[axum::debug_handler]
-pub async fn chat_stream(
-    Path(org_id): Path<String>,
-    mut in_req: axum::extract::Request,
-) -> Response {
+pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     // Extract headers manually to avoid conflict with body extraction
     let (mut parts, body) = in_req.into_parts();
 

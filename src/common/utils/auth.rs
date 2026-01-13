@@ -1009,7 +1009,7 @@ fn extract_cookie_from_parts(parts: &Parts) -> HashMap<&str, &str> {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn extract_auth_str_from_parts(req: &HttpRequest) -> String {
+pub async fn extract_auth_str_from_parts(parts: &Parts) -> String {
     let cookies = extract_cookie_from_parts(parts);
     if let Some(cookie) = cookies.get("auth_tokens") {
         let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
@@ -1108,7 +1108,7 @@ pub async fn extract_auth_str_from_parts(req: &HttpRequest) -> String {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn extract_basic_auth_str_from_parts(req: &HttpRequest) -> String {
+pub fn extract_basic_auth_str_from_parts(parts: &Parts) -> String {
     let cookies = extract_cookie_from_parts(parts);
 
     if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1176,7 +1176,7 @@ pub fn extract_basic_auth_str_from_parts(req: &HttpRequest) -> String {
             format!("Bearer {access_token}")
         }
     } else if let Some(cookie) = cookies.get("auth_ext") {
-        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         std::str::from_utf8(&val).unwrap_or_default().to_string()
     } else if let Some(auth_header) = parts.headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
@@ -1331,7 +1331,7 @@ pub async fn check_permissions(
 
 #[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry_and_user_id(
-    req: &HttpRequest,
+    parts: &Parts,
 ) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
     use crate::handler::http::auth::validator::get_user_email_from_auth_str;
 

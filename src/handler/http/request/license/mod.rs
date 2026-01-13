@@ -39,7 +39,7 @@ struct LicenseResponse {
     ingestion_exceeded: u8,
 }
 
-struct SaveLicenseRequest {
+pub struct SaveLicenseRequest {
     key: License,
     raw_key: String,
 }

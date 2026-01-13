@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use axum::{
     Router,
+    body::Body,
     extract::{FromRequestParts, Path, Request},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
@@ -488,7 +489,7 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let router = Router::new()
+    let mut router = Router::new()
         // Users
         .route("/{org_id}/users", get(users::list).post(users::save))
         .route("/{org_id}/users/bulk_delete", delete(users::delete_bulk))
@@ -921,9 +922,7 @@ pub fn create_app_router() -> Router {
         };
 
         // basic_routes are at root level (not under base_uri)
-        Router::new()
-            .merge(basic_routes())
-            .merge(router_routes)
+        Router::new().merge(basic_routes()).merge(router_routes)
     } else {
         // Non-router node: use direct service routes
         Router::new()

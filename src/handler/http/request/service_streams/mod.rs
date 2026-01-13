@@ -56,7 +56,7 @@ use crate::{
     )
 )]
 pub async fn get_dimension_analytics(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Response {
     // Note: No stream-specific permissions needed - this is org-level analytics
@@ -129,7 +129,7 @@ pub async fn get_dimension_analytics(
     )
 )]
 pub async fn correlate_streams(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
     #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
 ) -> Response {
@@ -220,7 +220,7 @@ pub struct CorrelationRequest {
     )
 )]
 pub async fn get_services_grouped(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
 ) -> Response {
     #[cfg(feature = "enterprise")]

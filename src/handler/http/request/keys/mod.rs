@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{extract::Path, response::Response};
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
@@ -358,7 +363,6 @@ pub async fn delete_bulk(
     Json(body): Json<BulkDeleteRequest>,
 ) -> Response {
     let org_id = path;
-    let body = body;
     let user_id = &user_email.user_id;
     for key in &body.ids {
         if !check_permissions(key, &org_id, user_id, "cipher_keys", "DELETE", None).await {
@@ -368,21 +372,21 @@ pub async fn delete_bulk(
     let mut successful = Vec::with_capacity(body.ids.len());
     let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
-    for key_name in body.ids {
+    for key_name in &body.ids {
         match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
-            &key_name,
+            key_name,
         )
         .await
         {
             Ok(_) => {
-                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
-                successful.push(key_name);
+                remove_ownership(&org_id, "cipher_keys", Authz::new(key_name)).await;
+                successful.push(key_name.clone());
             }
             Err(e) => {
                 log::error!("error in deleting key {key_name} : {e}");
-                unsuccessful.push(key_name);
+                unsuccessful.push(key_name.clone());
                 err = Some(e.to_string());
             }
         }

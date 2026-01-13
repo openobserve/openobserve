@@ -18,8 +18,6 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(feature = "enterprise")]
-use HeaderMap;
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
@@ -43,6 +41,7 @@ use config::{
     },
 };
 use cron::Schedule;
+use http::HeaderMap;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,

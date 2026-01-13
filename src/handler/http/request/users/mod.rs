@@ -234,8 +234,6 @@ pub async fn update(
     let email_id = email_id.trim().to_lowercase();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user;
-    #[cfg(feature = "enterprise")]
-    let user = user;
     if user.eq(&UpdateUser::default()) {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -725,8 +723,8 @@ pub async fn get_presigned_url(
 }
 
 pub async fn get_auth(
-    _headers: HeaderMap,
-    Query(_query): Query<HashMap<String, String>>,
+    headers: http::HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -739,12 +737,6 @@ pub async fn get_auth(
         let mut request_time = None;
         let mut expires_in = 300;
         let mut req_ts = 0;
-
-        let query_string = query
-            .iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<_>>()
-            .join("&");
 
         let mut audit_message = AuditMessage {
             user_email: "".to_string(),
@@ -869,6 +861,7 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
+                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -886,6 +879,7 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
+                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
@@ -901,7 +895,7 @@ pub async fn get_auth(
             Response::builder()
                 .status(StatusCode::FOUND)
                 .header(header::LOCATION, url)
-                .header(header::SET_COOKIE, auth_cookie)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(serde_json::to_string(&resp).unwrap()))
                 .unwrap()

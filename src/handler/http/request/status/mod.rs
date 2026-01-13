@@ -44,6 +44,7 @@ use infra::{
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
 use serde::Serialize;
+use time;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
@@ -860,8 +861,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -875,10 +875,12 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Found()
-                .append_header((header::LOCATION, login_url))
-                .cookie(auth_cookie)
-                .finish())
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, login_url)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
         }
         Err(e) => {
             audit_message.response_meta.http_response_code = 400;
@@ -983,8 +985,7 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -995,7 +996,11 @@ pub async fn refresh_token_with_dex(
                 auth_cookie.set_same_site(SameSite::None);
             }
 
-            HttpResponse::Ok().cookie(auth_cookie).finish()
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
         }
         Err(_) => {
             let conf = get_config();
@@ -1004,8 +1009,7 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1016,10 +1020,12 @@ pub async fn refresh_token_with_dex(
                 auth_cookie.set_same_site(SameSite::None);
             }
 
-            HttpResponse::Unauthorized()
-                .append_header((header::LOCATION, "/"))
-                .cookie(auth_cookie)
-                .finish()
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .header(header::LOCATION, "/")
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .body(Body::empty())
+                .unwrap()
         }
     }
 }
@@ -1048,13 +1054,17 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
 
 pub async fn logout(
     cookies: CookieJar,
-    #[cfg(feature = "enterprise")] headers: HeaderMap,
+    #[cfg(feature = "enterprise")] headers: http::HeaderMap,
 ) -> Response {
     // remove the session
     let conf = get_config();
 
     #[cfg(feature = "enterprise")]
-    let auth_str = extract_auth_str(&req).await;
+    let auth_str = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
 
     // Only get the user email from the auth_str, no need to check for permissions and others
     #[cfg(feature = "enterprise")]

@@ -28,10 +28,9 @@ mod tests {
     use axum::{
         Router,
         body::Body,
-        http::{header, HeaderMap, HeaderValue, Method, Request, StatusCode},
+        http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header},
     };
     use bytes::{Bytes, BytesMut};
-    use tower::ServiceExt;
     use chrono::{Duration, Utc};
     use config::{
         get_config,
@@ -80,6 +79,7 @@ mod tests {
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use serde_json::json;
     use tonic::codec::CompressionEncoding;
+    use tower::ServiceExt;
 
     static START: Once = Once::new();
 
@@ -688,10 +688,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::GET,
-            &format!(
-                "/api/{}/streams/{}/schema",
-                "e2e", "olympics_schema"
-            ),
+            &format!("/api/{}/streams/{}/schema", "e2e", "olympics_schema"),
             Some(headers),
             None,
         )
@@ -708,10 +705,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::PUT,
-            &format!(
-                "/api/{}/streams/{}/settings",
-                "e2e", "olympics_schema"
-            ),
+            &format!("/api/{}/streams/{}/settings", "e2e", "olympics_schema"),
             Some(headers),
             Some(body_str.to_string()),
         )
@@ -772,9 +766,7 @@ mod tests {
             println!("e2e_post_function response body: {body_str:?}");
 
             // If function already exists, that's OK for our test
-            if status == StatusCode::BAD_REQUEST
-                && body_str.contains("Function already exist")
-            {
+            if status == StatusCode::BAD_REQUEST && body_str.contains("Function already exist") {
                 println!("Function already exists, continuing with test");
                 return;
             }
@@ -895,14 +887,8 @@ mod tests {
         let auth = setup();
         let app = init_test_router();
         let headers = auth_headers(auth);
-        let (status, _body) = make_request(
-            &app,
-            Method::GET,
-            "/api/organizations",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, _body) =
+            make_request(&app, Method::GET, "/api/organizations", Some(headers), None).await;
         assert!(status.is_success());
     }
 
@@ -1347,10 +1333,7 @@ mod tests {
             "X-Prometheus-Remote-Write-Version",
             HeaderValue::from_static("0.1.0"),
         );
-        headers.insert(
-            header::CONTENT_ENCODING,
-            HeaderValue::from_static("snappy"),
-        );
+        headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("snappy"));
         headers.insert(
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/x-protobuf"),
@@ -1425,10 +1408,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::GET,
-            &format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "slackTemplate"
-            ),
+            &format!("/api/{}/alerts/templates/{}", "e2e", "slackTemplate"),
             Some(headers),
             None,
         )
@@ -1443,10 +1423,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "slackTemplate"
-            ),
+            &format!("/api/{}/alerts/templates/{}", "e2e", "slackTemplate"),
             Some(headers),
             None,
         )
@@ -1477,10 +1454,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::GET,
-            &format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "email_template"
-            ),
+            &format!("/api/{}/alerts/templates/{}", "e2e", "email_template"),
             Some(headers),
             None,
         )
@@ -1495,10 +1469,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "email_template"
-            ),
+            &format!("/api/{}/alerts/templates/{}", "e2e", "email_template"),
             Some(headers),
             None,
         )
@@ -1701,10 +1672,7 @@ mod tests {
         let (status, body) = make_request(
             &app,
             Method::GET,
-            &format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ),
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
             Some(headers),
             None,
         )
@@ -1758,10 +1726,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::PUT,
-            &format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ),
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
             Some(headers),
             Some(body_str.to_string()),
         )
@@ -1776,10 +1741,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!(
-                "/api/{}/alerts/destinations/{}",
-                "e2e", "sns_alert"
-            ),
+            &format!("/api/{}/alerts/destinations/{}", "e2e", "sns_alert"),
             Some(headers),
             None,
         )
@@ -2284,10 +2246,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "alertChk"
-            ),
+            &format!("/api/{}/{}/alerts/{}", "e2e", "olympics_schema", "alertChk"),
             Some(headers),
             None,
         )
@@ -2338,14 +2297,8 @@ mod tests {
         let auth = setup();
         let app = init_test_router();
         let headers = auth_headers(auth);
-        let (status, _body) = make_request(
-            &app,
-            Method::GET,
-            "/healthz",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, _body) =
+            make_request(&app, Method::GET, "/healthz", Some(headers), None).await;
         assert!(status.is_success());
     }
 
@@ -2356,14 +2309,7 @@ mod tests {
             .nest("/", service_routes())
             .nest("/", basic_routes());
         let headers = auth_headers(auth);
-        let (status, _body) = make_request(
-            &app,
-            Method::GET,
-            "/config",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
         assert!(status.is_success());
     }
 
@@ -2469,14 +2415,8 @@ mod tests {
         let auth = setup();
         let app = Router::new().nest("/", service_routes());
         let headers = auth_headers(auth);
-        let (status, body) = make_request(
-            &app,
-            Method::GET,
-            "/api/e2e/pipelines",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
@@ -2595,14 +2535,8 @@ mod tests {
         let auth = setup();
         let app = Router::new().nest("/", service_routes());
         let headers = auth_headers(auth);
-        let (status, body) = make_request(
-            &app,
-            Method::GET,
-            "/api/e2e/pipelines",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
@@ -3136,14 +3070,8 @@ mod tests {
         let auth = setup();
         let app = Router::new().nest("/", service_routes());
         let headers = auth_headers(auth);
-        let (status, body) = make_request(
-            &app,
-            Method::GET,
-            "/api/e2e/pipelines",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
         let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();
@@ -3160,14 +3088,8 @@ mod tests {
         // Check if pipeline was saved successfully by doing a list using API
         let app = Router::new().nest("/", service_routes());
         let headers = auth_headers(auth);
-        let (status, body) = make_request(
-            &app,
-            Method::GET,
-            "/api/e2e/pipelines",
-            Some(headers),
-            None,
-        )
-        .await;
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success(), "Failed to list pipelines");
         let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
             json::from_slice(&body).unwrap();

@@ -16,7 +16,6 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    http::StatusCode,
     response::Response,
 };
 use infra::table::re_pattern::PatternEntry;
@@ -37,7 +36,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-struct PatternCreateRequest {
+pub struct PatternCreateRequest {
     name: String,
     description: String,
     pattern: String,
@@ -95,7 +94,7 @@ struct PatternListResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-struct PatternTestRequest {
+pub struct PatternTestRequest {
     pattern: String,
     test_records: Vec<String>,
     #[serde(default)]
@@ -114,7 +113,7 @@ struct BuiltInPatternsResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-struct BuiltInPatternsQuery {
+pub struct BuiltInPatternsQuery {
     #[serde(default)]
     search: String,
     #[serde(default)]

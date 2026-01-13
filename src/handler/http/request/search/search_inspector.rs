@@ -16,7 +16,7 @@
 use axum::{
     Json,
     extract::{Path, Query},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use config::{

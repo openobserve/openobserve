@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 
-use axum::{extract::Path, response::Response};
+use axum::{Json, extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
     crate::{

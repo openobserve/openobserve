@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
+    Json,
     body::{Body, Bytes},
     extract::Path,
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::Response,
 };
 #[cfg(feature = "enterprise")]
@@ -99,9 +100,8 @@ pub async fn handle_mcp_post(
             }
         };
 
-        let body_stream = stream.map(|result| {
-            result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-        });
+        let body_stream =
+            stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
         Response::builder()
             .status(StatusCode::OK)
@@ -211,9 +211,7 @@ pub async fn handle_mcp_get(
         }
     };
 
-    let body_stream = stream.map(|result| {
-        result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-    });
+    let body_stream = stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
     Response::builder()
         .status(StatusCode::OK)

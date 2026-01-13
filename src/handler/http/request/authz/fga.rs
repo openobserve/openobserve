@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{Json, extract::Path, response::Response};
+use axum::{
+    Json,
+    extract::Path,
+    response::{IntoResponse, Response},
+};
 #[cfg(feature = "enterprise")]
 use {crate::common::utils::auth::check_permissions, o2_dex::meta::auth::RoleRequest};
 

@@ -23,7 +23,7 @@ use svix_ksuid::Ksuid;
 use {
     crate::{
         common::{
-            meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+            meta::authz::Authz,
             utils::auth::{check_permissions, remove_ownership, set_ownership},
         },
         handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
@@ -93,10 +93,10 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn delete_action(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) -> Response {
+pub async fn delete_action(Path((org_id, ksuid)): Path<(String, Ksuid)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match delete_app_from_target_cluster(&_org_id, _ksuid).await {
+        match delete_app_from_target_cluster(&org_id, ksuid).await {
             Ok(_) => {
                 remove_ownership(&org_id, "actions", Authz::new(&ksuid.to_string())).await;
                 MetaHttpResponse::ok("Action deleted")
@@ -223,7 +223,10 @@ pub async fn serve_action_zip(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) ->
     {
         match serve_file_from_s3(&_org_id, _ksuid).await {
             Ok((bytes, file_name)) => {
-                use axum::{body::Body, http::header, response::IntoResponse};
+                use axum::{
+                    body::Body,
+                    http::{StatusCode, header},
+                };
                 use futures::stream;
 
                 let stream = stream::once(async move { Ok::<Bytes, std::io::Error>(bytes) });
@@ -474,7 +477,7 @@ pub async fn upload_zipped_action(
         };
 
         let mut received_fields = Vec::new();
-        while let Ok(Some(mut field)) = multipart.next_field().await {
+        while let Ok(Some(field)) = multipart.next_field().await {
             let field_name = field.name().unwrap_or("").to_string();
 
             match field_name.as_str() {

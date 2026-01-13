@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    body::Body,
     extract::{Path, Query},
-    http::{StatusCode, header},
     response::Response,
 };
 use serde::Deserialize;
@@ -27,7 +25,6 @@ use {
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
     config::meta::ratelimit::{RatelimitRule, RatelimitRuleUpdater},
-    futures_util::StreamExt,
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
         default_rules::{

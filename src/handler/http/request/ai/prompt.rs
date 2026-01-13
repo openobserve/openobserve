@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
 use axum::{Json, extract::Path, http::StatusCode, response::Response};
 use config::meta::ai::PromptType;
 use o2_enterprise::enterprise::ai::agent::prompt::{

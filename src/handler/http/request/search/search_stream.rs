@@ -16,8 +16,8 @@
 use axum::{
     body::Bytes,
     extract::{Path, Query},
-    http::HeaderMap,
-    response::Response,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use config::{
     get_config,
@@ -599,6 +599,7 @@ pub async fn search_http2_stream(
 }
 
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 pub async fn report_to_audit(
     user_id: String,
     org_id: String,
