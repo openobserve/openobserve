@@ -609,9 +609,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/reports/{report_name}/trigger", put(dashboards::reports::trigger_report))
 
         // Timed annotations
-        .route("/{org_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations))
-        .route("/{org_id}/annotations/{annotation_id}", put(dashboards::timed_annotations::update_annotations).delete(dashboards::timed_annotations::delete_annotations))
-        .route("/{org_id}/annotations/{annotation_id}/panels", delete(dashboards::timed_annotations::delete_annotation_panels))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations).delete(dashboards::timed_annotations::delete_annotations))
+        .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
 
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
