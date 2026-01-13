@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{FromRequestParts, Path, Request},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
@@ -952,6 +952,9 @@ pub fn create_app_router() -> Router {
             )
             .nest_service("/web", ui::ui_routes());
     }
+
+    // Set request body size limit (equivalent to actix-web's PayloadConfig)
+    app = app.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     app
 }
