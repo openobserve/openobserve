@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="filteredColumns"
           color="input-border"
           bg-color="input-bg"
-          class="showLabelOnTop no-case fingerprint-select"
+          class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
           dense
           borderless
           multiple
@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           map-options
           @filter="filterColumns"
           @update:model-value="emitUpdate"
-          style="max-width: 600px; min-width: 300px;"
         >
           <template v-slot:hint>
             <div class="tw:text-xs">
@@ -82,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
         <div class="tw:flex tw:items-center">
-          <div style="width: 210px; margin-left: 0 !important">
+          <div class="tw:w-[210px] tw:ml-0">
             <q-input
               v-model.number="localDeduplication.time_window_minutes"
               type="number"
