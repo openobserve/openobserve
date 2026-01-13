@@ -223,7 +223,7 @@ async fn can_use_distinct_stream(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp.", "category": "search"}))
     )
 )]
 pub async fn search(
