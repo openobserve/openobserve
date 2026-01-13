@@ -894,7 +894,7 @@ pub async fn list_users(
         }
     });
 
-    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[cfg(not(feature = "cloud"))]
     {
         if !org_id.eq(DEFAULT_ORG) && role.is_none() {
             let root = ROOT_USER.get("root").unwrap();
