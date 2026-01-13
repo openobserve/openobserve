@@ -49,15 +49,6 @@ export default class DashboardactionPage {
     await this.page.waitForTimeout(500);
   }
 
-  // Click save panel button without waiting for successful API response
-  // Useful for testing validation errors or when the save is expected to fail
-  async clickSavePanel() {
-    await this.panelSaveBtn.waitFor({ state: "visible" });
-    await this.panelSaveBtn.click();
-    // Brief wait for UI to respond
-    await this.page.waitForTimeout(500);
-  }
-
   //Apply dashboard button
   async applyDashboardBtn() {
     await this.applyDashboard.click();
