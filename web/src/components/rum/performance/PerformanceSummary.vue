@@ -117,12 +117,14 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
-      performanceChartsRef.value.layoutUpdate();
+      if (performanceChartsRef?.value?.layoutUpdate)
+        performanceChartsRef?.value?.layoutUpdate();
 
       // Dashboards gets overlapped as we have used keep alive
       // Its an internal bug of vue-grid-layout
       // So adding settimeout of 1 sec to fix the issue
-      performanceChartsRef.value.layoutUpdate();
+      if (performanceChartsRef?.value?.layoutUpdate)
+        performanceChartsRef?.value?.layoutUpdate();
       window.dispatchEvent(new Event("resize"));
     };
 
