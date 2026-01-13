@@ -974,6 +974,116 @@ class APICleanup {
     }
 
     /**
+     * Fetch all metrics streams
+     * @returns {Promise<Array>} Array of metrics stream objects
+     */
+    async fetchMetricsStreams() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch metrics streams', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch metrics streams', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single metrics stream
+     * @param {string} streamName - The metrics stream name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteMetricsStream(streamName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete metrics stream', { streamName, status: response.status });
+                return { code: response.status, error: `HTTP ${response.status}` };
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            testLogger.error('Failed to delete metrics stream', { streamName, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up metrics streams matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match metrics stream names
+     * @param {Array<string>} protectedStreams - Array of metrics stream names to never delete (optional, e.g., 'default')
+     */
+    async cleanupMetricsStreams(patterns = [], protectedStreams = ['default']) {
+        testLogger.info('Starting metrics streams cleanup', {
+            patterns: patterns.map(p => p.source),
+            protectedStreams
+        });
+
+        try {
+            // Fetch all metrics streams
+            const streams = await this.fetchMetricsStreams();
+            testLogger.info('Fetched metrics streams', { total: streams.length });
+
+            // Filter streams matching patterns but excluding protected streams
+            const matchingStreams = streams.filter(s =>
+                patterns.some(pattern => pattern.test(s.name)) &&
+                !protectedStreams.includes(s.name)
+            );
+            testLogger.info('Found metrics streams matching cleanup patterns', { count: matchingStreams.length });
+
+            if (matchingStreams.length === 0) {
+                testLogger.info('No metrics streams to clean up');
+                return;
+            }
+
+            // Delete all matching metrics streams
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const stream of matchingStreams) {
+                const result = await this.deleteMetricsStream(stream.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted metrics stream', { name: stream.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete metrics stream', { name: stream.name, result });
+                }
+            }
+
+            testLogger.info('Metrics streams cleanup completed', {
+                total: matchingStreams.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Metrics streams cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Clean up streams matching specified patterns
      * @param {Array<RegExp>} patterns - Array of regex patterns to match stream names
      * @param {Array<string>} protectedStreams - Array of stream names to never delete (optional)
