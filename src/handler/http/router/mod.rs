@@ -21,7 +21,7 @@ use axum::{
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use config::get_config;
 use tower_http::cors::{Any, CorsLayer};
@@ -598,8 +598,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/{dashboard_id}", get(dashboards::get_dashboard).put(dashboards::update_dashboard).delete(dashboards::delete_dashboard))
         .route("/{org_id}/dashboards/{dashboard_id}/export", get(dashboards::export_dashboard))
         .route("/{org_id}/dashboards/bulk_delete", delete(dashboards::delete_dashboard_bulk))
-        .route("/{org_id}/dashboards/{dashboard_id}/move", put(dashboards::move_dashboard))
-        .route("/{org_id}/dashboards/move", put(dashboards::move_dashboards))
+        .route("/{org_id}/dashboards/{dashboard_id}/move", patch(dashboards::move_dashboard))
+        .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
 
         // Reports
         .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
@@ -614,9 +614,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/annotations/{annotation_id}/panels", delete(dashboards::timed_annotations::delete_annotation_panels))
 
         // Folders (v2)
-        .route("/v2/{org_id}/folders", get(folders::list_folders).post(folders::create_folder))
-        .route("/v2/{org_id}/folders/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
-        .route("/v2/{org_id}/folders/name/{folder_name}", get(folders::get_folder_by_name))
+        .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
+        .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
+        .route("/v2/{org_id}/folders/{folder_type}/name/{folder_name}", get(folders::get_folder_by_name))
 
 
         // Alerts - incidents must be before alerts to avoid route conflicts
@@ -625,18 +625,18 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca))
         .route("/{org_id}/alerts/incidents/{incident_id}/service_graph", get(alerts::incidents::get_incident_service_graph))
-        .route("/{org_id}/alerts/incidents/{incident_id}/status", put(alerts::incidents::update_incident_status))
+        .route("/{org_id}/alerts/incidents/{incident_id}/status", patch(alerts::incidents::update_incident_status))
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/export", get(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk_delete", delete(alerts::delete_alert_bulk))
-        .route("/v2/{org_id}/alerts/{alert_id}/enable", put(alerts::enable_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
         .route("/v2/{org_id}/alerts/bulk_enable", put(alerts::enable_alert_bulk))
-        .route("/v2/{org_id}/alerts/{alert_id}/trigger", put(alerts::trigger_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
-        .route("/v2/{org_id}/alerts/move", put(alerts::move_alerts))
+        .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/dedup_stats", get(alerts::dedup_stats::get_dedup_summary))
 
