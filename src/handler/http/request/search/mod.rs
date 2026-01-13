@@ -17,7 +17,7 @@ use std::io::Error;
 
 use arrow_schema::Schema;
 use axum::{
-    Extension, Json,
+    Json,
     extract::{Path, Query},
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -229,7 +229,7 @@ async fn can_use_distinct_stream(
 pub async fn search(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Query(url_query): Query<HashMap<String, String>>,
     Json(mut req): Json<Request>,
 ) -> Response {
@@ -271,7 +271,7 @@ pub async fn search(
         Span::none()
     };
 
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = &user_email.user_id;
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
@@ -558,7 +558,7 @@ pub async fn search(
 )]
 pub async fn around_v1(
     Path((org_id, stream_name)): Path<(String, String)>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
     Query(url_query): Query<HashMap<String, String>>,
 ) -> Response {
@@ -587,7 +587,7 @@ pub async fn around_v1(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
@@ -679,7 +679,7 @@ pub async fn around_v1(
 )]
 pub async fn around_v2(
     Path((org_id, stream_name)): Path<(String, String)>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
     Query(url_query): Query<HashMap<String, String>>,
     body: axum::body::Bytes,
@@ -709,7 +709,7 @@ pub async fn around_v2(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
@@ -783,7 +783,7 @@ pub async fn around_v2(
 )]
 pub async fn values(
     Path((org_id, stream_name)): Path<(String, String)>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
     Query(url_query): Query<HashMap<String, String>>,
 ) -> Response {
@@ -813,7 +813,7 @@ pub async fn values(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     // originally there was v1 which would to a full stream search
     // and v2 which would do search on a distinct values stream iff
@@ -1446,7 +1446,7 @@ async fn values_v1(
 )]
 pub async fn search_partition(
     Path(org_id): Path<String>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
     Query(url_query): Query<HashMap<String, String>>,
     Json(mut req): Json<SearchPartitionRequest>,
@@ -1459,7 +1459,7 @@ pub async fn search_partition(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     let user_id = &user_email.user_id;
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
@@ -1640,7 +1640,7 @@ pub async fn search_partition(
 )]
 pub async fn search_history(
     Path(org_id): Path<String>,
-    Extension(header_map): Extension<HeaderMap>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<SearchHistoryRequest>,
 ) -> Response {
@@ -1652,7 +1652,7 @@ pub async fn search_history(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(&header_map, &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
     // restrict history only to path org_id
