@@ -998,10 +998,14 @@ export default defineComponent({
     const setRumUser = () => {
       if (store.state.zoConfig?.rum?.enabled == true) {
         const userInfo = store.state.userInfo;
+        // Set user information first
         openobserveRum.setUser({
           name: userInfo.given_name + " " + userInfo.family_name,
           email: userInfo.email,
         });
+        // Start session replay recording after user is identified
+        // This handles cases where user refreshes the page or accesses app directly
+        openobserveRum.startSessionReplayRecording({ force: true });
       }
     };
 
