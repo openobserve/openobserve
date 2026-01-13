@@ -200,7 +200,7 @@ const alerts = {
     params.append("size", query.size || "100");
     if (query.sort_by) params.append("sort_by", query.sort_by);
     if (query.sort_order) params.append("sort_order", query.sort_order);
-    return http().get(`/api/${org_identifier}/alerts/history?${params}`);
+    return http().get(`/api/v2/${org_identifier}/alerts/history?${params}`);
   },
   getOrganizationDeduplicationConfig: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/alerts/deduplication/config`);
