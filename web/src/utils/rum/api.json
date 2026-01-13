@@ -21,7 +21,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(resource_duration/1000000) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_duration>=0 and resource_method is not null and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "query": "SELECT avg(resource_duration/1000000) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_duration>=0 and resource_method is not null and service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -69,7 +69,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(resource_size/1024) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_size>=0 and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "query": "SELECT avg(resource_size/1024) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_size>=0 and service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -117,7 +117,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT count(*) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_status_code>400 and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "query": "SELECT count(*) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_status_code>400 and service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -162,19 +162,6 @@
           "stream_type": "logs",
           "stream": "_rumdata",
           "field": "service",
-          "max_record_size": null
-        },
-        "value": "",
-        "options": []
-      },
-      {
-        "type": "query_values",
-        "name": "env",
-        "label": "Env",
-        "query_data": {
-          "stream_type": "logs",
-          "stream": "_rumdata",
-          "field": "env",
           "max_record_size": null
         },
         "value": "",
