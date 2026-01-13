@@ -902,12 +902,37 @@ pub fn other_service_routes() -> Router {
 pub fn create_app_router() -> Router {
     let cfg = get_config();
 
-    let mut app = Router::new()
-        .merge(basic_routes())
-        .nest("/config", config_routes())
-        .nest("/api", service_routes())
-        .merge(other_service_routes())
-        .merge(proxy_routes(true));
+    let mut app = if config::cluster::LOCAL_NODE.is_router() {
+        // Router node: use proxy routes that dispatch to backend nodes
+        // All routes under base_uri will be proxied to backend nodes
+        // TODO: Add rate limiting middleware for router nodes (enterprise feature)
+        // See: o2_ratelimit::middleware::RateLimitController
+
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+
+        // Apply base_uri if configured
+        let router_routes = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+            router_routes
+        } else {
+            Router::new().nest(&cfg.common.base_uri, router_routes)
+        };
+
+        // basic_routes are at root level (not under base_uri)
+        Router::new()
+            .merge(basic_routes())
+            .merge(router_routes)
+    } else {
+        // Non-router node: use direct service routes
+        Router::new()
+            .merge(basic_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
+            .merge(other_service_routes())
+            .merge(proxy_routes(true))
+    };
 
     // Add UI routes at app level (outside basic_routes to avoid any middleware conflicts)
     if cfg.common.ui_enabled {

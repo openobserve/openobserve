@@ -582,6 +582,20 @@ async fn read_payload_bytes(req: Request, request_type: &str) -> Result<Bytes, R
     }
 }
 
+/// Creates router-specific routes that proxy requests to backend nodes.
+/// This is used when the node is running in router mode.
+pub fn create_router_routes() -> axum::Router {
+    use axum::routing::any;
+
+    axum::Router::new()
+        .route("/config", any(dispatch))
+        .route("/config/*path", any(dispatch))
+        .route("/api/*path", any(dispatch))
+        .route("/aws/*path", any(dispatch))
+        .route("/gcp/*path", any(dispatch))
+        .route("/rum/*path", any(dispatch))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
