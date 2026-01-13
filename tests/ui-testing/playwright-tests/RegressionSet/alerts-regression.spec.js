@@ -141,124 +141,74 @@ test.describe("Alerts Regression Bugs", () => {
     // ========== PART 1: UI Element Visibility Tests ==========
     testLogger.info('PART 1: Testing UI element visibility');
 
-    // Wait for Add Alert button to be enabled (destinations need to load first)
-    const addAlertBtn = page.locator('[data-test="alert-list-add-alert-btn"]');
-    await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
-    // Wait for button to become enabled (not disabled)
-    await expect(addAlertBtn).toBeEnabled({ timeout: 15000 });
+    // Click Add Alert button using page object
+    await pm.alertsPage.clickAddAlertButton();
 
-    // Click Add Alert button
-    await addAlertBtn.click();
-    await page.waitForLoadState('networkidle');
+    // Fill alert name using page object
+    await pm.alertsPage.fillAlertName('test_promql_comprehensive');
 
-    // Fill alert name
-    await page.locator('[data-test="add-alert-name-input"]').fill('test_promql_comprehensive');
+    // Select metrics stream type using page object
+    await pm.alertsPage.selectStreamType('metrics');
 
-    // Select metrics stream type
-    await page.locator('[data-test="add-alert-stream-type-select-dropdown"]').click();
-    await page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
-    await page.waitForTimeout(1000);
-
-    // Select a metrics stream (use any available one)
-    const streamDropdown = page.locator('[data-test="add-alert-stream-name-select-dropdown"]');
-    await streamDropdown.click();
-
-    // Try to find our test stream first
-    const testStreamOption = page.getByText(METRICS_STREAM, { exact: true });
-    try {
-      await expect(testStreamOption).toBeVisible({ timeout: 5000 });
-      await testStreamOption.click();
-      testLogger.info('Selected test metrics stream', { stream: METRICS_STREAM });
-    } catch (e) {
-      // Retry: click dropdown again
-      await streamDropdown.click();
-      await page.waitForTimeout(1000);
-
-      // Try again or use first available stream
-      if (await testStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await testStreamOption.click();
-        testLogger.info('Selected test metrics stream on retry', { stream: METRICS_STREAM });
-      } else {
-        // Use first available metrics stream from dropdown
-        const anyStreamOption = page.locator('.q-menu .q-item').first();
-        if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await anyStreamOption.click();
-          testLogger.info('Using first available metrics stream');
-        } else {
-          testLogger.warn('No metrics streams available - skipping test');
-          test.skip(true, 'No metrics streams available on environment');
-          return;
-        }
-      }
+    // Select a metrics stream using page object (handles retry and fallback)
+    const streamSelected = await pm.alertsPage.selectMetricsStream(METRICS_STREAM);
+    if (!streamSelected) {
+      testLogger.warn('No metrics streams available - skipping test');
+      test.skip(true, 'No metrics streams available on environment');
+      return;
     }
 
-    // Select Scheduled alert type
-    await page.locator('[data-test="add-alert-scheduled-alert-radio"]').click();
+    // Select Scheduled alert type using page object
+    await pm.alertsPage.selectScheduledAlertType();
 
     // Navigate to Step 2: Conditions
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await pm.alertsPage.clickContinueButton();
+    await page.waitForTimeout(500);
 
     // ✅ COVERAGE: P1 - PromQL tab visibility for metrics streams
-    const promqlTab = page.locator('[data-test="tab-promql"]');
-    await expect(promqlTab).toBeVisible({ timeout: 10000 });
+    await pm.alertsPage.expectPromqlTabVisible();
     testLogger.info('✅ P1: PromQL tab is visible for metrics stream');
 
     // Verify all three tabs are visible
-    const customTab = page.locator('[data-test="tab-custom"]');
-    const sqlTab = page.locator('[data-test="tab-sql"]');
-    await expect(customTab).toBeVisible();
-    await expect(sqlTab).toBeVisible();
+    await pm.alertsPage.expectCustomTabVisible();
+    await pm.alertsPage.expectSqlTabVisible();
     testLogger.info('✅ All three tabs (Custom, SQL, PromQL) visible');
 
-    // Click PromQL tab
-    await promqlTab.click();
-    await page.waitForTimeout(1000);
+    // Click PromQL tab using page object
+    await pm.alertsPage.clickPromqlTab();
 
     // Navigate to Step 4 to verify promql_condition fields
-    await page.getByRole('button', { name: 'Continue' }).click(); // Step 3
+    await pm.alertsPage.clickContinueButton(); // Step 3
+    await pm.alertsPage.clickContinueButton(); // Step 4
     await page.waitForTimeout(500);
-    await page.getByRole('button', { name: 'Continue' }).click(); // Step 4
-    await page.waitForTimeout(1000);
 
     // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear in Step 4
-    const promqlConditionRow = page.locator('.alert-settings-row').filter({ hasText: 'Trigger if the value is' });
-    await expect(promqlConditionRow).toBeVisible({ timeout: 10000 });
+    await pm.alertsPage.expectPromqlConditionRowVisible();
     testLogger.info('✅ P1: PromQL condition row "Trigger if the value is" is visible');
 
     // Verify operator dropdown and value input exist
-    const operatorDropdown = promqlConditionRow.locator('.q-select').first();
-    await expect(operatorDropdown).toBeVisible();
-    const valueInput = promqlConditionRow.locator('input[type="number"]');
-    await expect(valueInput).toBeVisible();
+    await pm.alertsPage.expectOperatorDropdownVisible();
+    await pm.alertsPage.expectValueInputVisible();
     testLogger.info('✅ P1: Operator dropdown and value input are visible');
 
     // ========== PART 2: Mode Switching Test ==========
     testLogger.info('PART 2: Testing mode switching behavior');
 
-    // Go back to Step 2 using wizard step navigation
-    const step2Indicator = page.locator('.q-stepper__tab').nth(1);
-    await step2Indicator.click();
-    await page.waitForTimeout(1000);
+    // Go back to Step 2 using wizard step navigation (index 1 = Step 2)
+    await pm.alertsPage.clickStepIndicator(1);
 
-    // Switch to Custom tab
-    await page.locator('[data-test="tab-custom"]').click();
-    await page.waitForTimeout(1000);
+    // Switch to Custom tab using page object
+    await pm.alertsPage.clickCustomTab();
 
-    // Navigate to Step 4
-    const step4Indicator = page.locator('.q-stepper__tab').nth(3);
-    await step4Indicator.click();
-    await page.waitForTimeout(1000);
+    // Navigate to Step 4 (index 3 = Step 4)
+    await pm.alertsPage.clickStepIndicator(3);
 
     // ✅ COVERAGE: P2 - promql_condition clears when switching to Custom mode
-    const promqlConditionRowAfter = page.locator('.alert-settings-row').filter({ hasText: 'Trigger if the value is' });
-    await expect(promqlConditionRowAfter).not.toBeVisible({ timeout: 5000 });
+    await pm.alertsPage.expectPromqlConditionRowNotVisible();
     testLogger.info('✅ P2: PromQL condition row NOT visible in Custom mode');
 
-    // Cancel this wizard flow
-    await page.locator('[data-test="add-alert-back-btn"]').click();
-    await page.waitForLoadState('networkidle');
+    // Cancel this wizard flow using page object
+    await pm.alertsPage.clickBackButton();
 
     // ========== PART 3: Save Alerts with Different Operators ==========
     testLogger.info('PART 3: Testing alert save with different operators');
@@ -284,12 +234,10 @@ test.describe("Alerts Regression Bugs", () => {
       createdAlerts.push(alertName);
       testLogger.info(`Alert created with operator ${operator}`, { alertName });
 
-      // Verify alert appears in the list
+      // Verify alert appears in the list using page object
       await pm.alertsPage.searchAlert(alertName);
       await page.waitForTimeout(2000);
-
-      const alertRow = page.locator(`[data-test="alert-list-${alertName}-update-alert"]`);
-      await expect(alertRow).toBeVisible({ timeout: 10000 });
+      await pm.alertsPage.expectAlertRowVisible(alertName);
       testLogger.info(`✅ P0/P1: Alert with operator ${operator} saved successfully`);
     }
 
@@ -335,41 +283,31 @@ test.describe("Alerts Regression Bugs", () => {
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle');
 
-    // Search for the alert
+    // Search for the alert using page object
     await pm.alertsPage.searchAlert(alertName);
     await page.waitForTimeout(2000);
 
-    // Click to edit the alert
-    const updateBtn = page.locator(`[data-test="alert-list-${alertName}-update-alert"]`);
-    await updateBtn.click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
-
+    // Click to edit the alert using page object
+    await pm.alertsPage.clickAlertUpdateButton(alertName);
     testLogger.info('Opened alert for editing');
 
     // Navigate to Step 4: Alert Settings to check the promql_condition values
-    // Click Continue buttons to get to Step 4
-    await page.getByRole('button', { name: 'Continue' }).click(); // Step 2
+    await pm.alertsPage.clickContinueButton(); // Step 2
+    await pm.alertsPage.clickContinueButton(); // Step 3
+    await pm.alertsPage.clickContinueButton(); // Step 4
     await page.waitForTimeout(500);
-    await page.getByRole('button', { name: 'Continue' }).click(); // Step 3
-    await page.waitForTimeout(500);
-    await page.getByRole('button', { name: 'Continue' }).click(); // Step 4
-    await page.waitForTimeout(1000);
 
     // Verify the PromQL condition row is visible (key fix from Bug #9967)
-    const promqlConditionRow = page.locator('.alert-settings-row').filter({ hasText: 'Trigger if the value is' });
-    await expect(promqlConditionRow).toBeVisible({ timeout: 5000 });
+    await pm.alertsPage.expectPromqlConditionRowVisible();
     testLogger.info('PromQL condition row is visible in edit mode - Bug #9967 fix verified');
 
-    // Verify the operator dropdown is visible and functional
-    const operatorDropdown = promqlConditionRow.locator('.q-select').first();
-    await expect(operatorDropdown).toBeVisible();
+    // Verify the operator dropdown is visible
+    await pm.alertsPage.expectOperatorDropdownVisible();
     testLogger.info('Operator dropdown is visible in edit mode');
 
-    // Verify the value input exists and is editable
-    const valueInput = promqlConditionRow.locator('input[type="number"]');
-    await expect(valueInput).toBeVisible();
-    const currentValue = await valueInput.inputValue();
+    // Verify the value input exists and get its value
+    await pm.alertsPage.expectValueInputVisible();
+    const currentValue = await pm.alertsPage.getPromqlConditionValue();
     testLogger.info('Retrieved value from promql_condition input', { currentValue, expectedValue: testValue });
 
     // Verify the input has a numeric value (may be default or saved value)
@@ -386,9 +324,8 @@ test.describe("Alerts Regression Bugs", () => {
       });
     }
 
-    // Cancel and go back
-    await page.locator('[data-test="add-alert-back-btn"]').click();
-    await page.waitForLoadState('networkidle');
+    // Cancel and go back using page object
+    await pm.alertsPage.clickBackButton();
 
     // Cleanup: Delete the test alert
     await pm.alertsPage.searchAndDeleteAlert(alertName);
