@@ -1072,7 +1072,6 @@ export default defineComponent({
 .panel-chart-wrapper {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 .panelHeader {

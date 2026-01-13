@@ -30,8 +30,20 @@ static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 
+/// Cached base timestamp in microseconds for UUID v7 validation.
+/// Initialized once on first use to avoid repeated syscalls.
+static BASE_TIMESTAMP_MICROS: LazyLock<i64> = LazyLock::new(|| {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as i64
+});
+// 10 years in microseconds: 10 * 365.25 * 24 * 60 * 60 * 1_000_000
+const TEN_YEARS_MICROS: i64 = 315_576_000_000_000;
+
 pub fn init() {
     _ = generate();
+    _ = BASE_TIMESTAMP_MICROS;
 }
 
 pub fn reload_machine_id() {
@@ -94,7 +106,20 @@ pub fn get_start_time_from_trace_id(trace_id: &str) -> Option<i64> {
             if let Some(timestamp) = uuid.get_timestamp() {
                 // Convert to microseconds: seconds * 1_000_000 + nanoseconds / 1_000
                 let (seconds, nanoseconds) = timestamp.to_unix();
-                Some((seconds * 1_000_000 + nanoseconds as u64 / 1_000) as i64)
+                let timestamp_micros = (seconds * 1_000_000 + nanoseconds as u64 / 1_000) as i64;
+
+                // Validate timestamp is reasonable:
+                // - Should be within +/- 10 years from base time (when module was loaded)
+                // This allows for some clock skew and future-dated traces while rejecting clearly
+                // invalid timestamps
+                let min_timestamp = BASE_TIMESTAMP_MICROS.saturating_sub(TEN_YEARS_MICROS);
+                let max_timestamp = BASE_TIMESTAMP_MICROS.saturating_add(TEN_YEARS_MICROS);
+
+                if timestamp_micros >= min_timestamp && timestamp_micros <= max_timestamp {
+                    Some(timestamp_micros)
+                } else {
+                    None // Timestamp is out of reasonable range
+                }
             } else {
                 None // No timestamp available
             }
@@ -481,6 +506,42 @@ mod tests {
         assert!(
             non_hex_result.is_none(),
             "Should return None for non-hex characters"
+        );
+
+        // Test with trace_id that parses as UUID but has invalid timestamp
+        // This specific trace_id can be parsed as a UUID but the extracted timestamp is invalid
+        let invalid_timestamp_result =
+            get_start_time_from_trace_id("dcada199d60f72d202bdcf69a0cd7c8c");
+        assert!(
+            invalid_timestamp_result.is_none(),
+            "Should return None for trace_id with invalid timestamp range"
+        );
+    }
+
+    #[test]
+    fn test_get_start_time_from_trace_id_valid_uuid_v7() {
+        // This is a known valid UUID v7 trace_id that should successfully extract timestamp
+        // Original format: 019BA22B-DCFB-78A4-84F8-4F8F530BBFBA
+        // OpenTelemetry trace_id format (32 hex chars, no hyphens, lowercase)
+        let trace_id = "019ba22bdcfb78a484f84f8f530bbfba";
+
+        // Should successfully extract a timestamp
+        let result = get_start_time_from_trace_id(trace_id);
+        assert!(
+            result.is_some(),
+            "Should extract timestamp from valid UUID v7 trace_id: {}",
+            trace_id
+        );
+
+        // Convert to human-readable date for verification
+        let timestamp_micros = result.unwrap();
+        let timestamp_secs = timestamp_micros / 1_000_000;
+        let datetime = chrono::DateTime::from_timestamp(timestamp_secs, 0).unwrap();
+
+        // Log the extracted timestamp for manual verification
+        println!(
+            "Extracted timestamp from {}: {} microseconds ({} UTC)",
+            trace_id, timestamp_micros, datetime
         );
     }
 

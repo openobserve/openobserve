@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
@@ -61,6 +62,7 @@ impl From<i16> for EnrichmentTableStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnrichmentTableUrlJob {
+    pub id: String, // KSUID (27 chars)
     pub org_id: String,
     pub table_name: String,
     pub url: String,
@@ -79,7 +81,9 @@ pub struct EnrichmentTableUrlJob {
 impl EnrichmentTableUrlJob {
     pub fn new(org_id: String, table_name: String, url: String, append_data: bool) -> Self {
         let now = chrono::Utc::now().timestamp_micros();
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
         Self {
+            id,
             org_id,
             table_name,
             url,

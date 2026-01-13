@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
-use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
+use axum::{
+    Json,
+    extract::FromRequestParts,
+    http::{StatusCode, request::Parts},
+    response::{IntoResponse, Response},
+};
 use base64::Engine;
 use config::{
     meta::user::UserRole,
@@ -37,7 +42,7 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
     o2_openfga::meta::mapping::OFGA_MODELS,
     serde_json::Value,
-    std::{collections::HashMap, str::FromStr},
+    std::str::FromStr,
 };
 
 use crate::common::{
@@ -224,507 +229,74 @@ pub struct AuthExtractor {
     pub parent_id: String,
 }
 
-impl FromRequest for AuthExtractor {
-    type Error = Error;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
+/// Rejection type for AuthExtractor
+pub struct AuthExtractorRejection {
+    message: String,
+}
+
+impl IntoResponse for AuthExtractorRejection {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({
+                "code": 401,
+                "message": self.message
+            })),
+        )
+            .into_response()
+    }
+}
+
+impl<S> FromRequestParts<S> for AuthExtractor
+where
+    S: Send + Sync,
+{
+    type Rejection = AuthExtractorRejection;
 
     #[cfg(feature = "enterprise")]
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        use actix_web::web;
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         use config::{get_config, meta::stream::StreamType};
         use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
-        let req = req.clone();
+        let start = std::time::Instant::now();
 
-        Box::pin(async move {
-            let start = std::time::Instant::now();
+        // Parse query string
+        let query_string = parts.uri.query().unwrap_or("");
+        let query: HashMap<String, String> = url::form_urlencoded::parse(query_string.as_bytes())
+            .into_owned()
+            .collect();
 
-            let query =
-                web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-            let stream_type = get_stream_type_from_request(&query);
+        let stream_type = get_stream_type_from_request(&query);
+        let folder = get_folder(&query);
 
-            let folder = get_folder(&query);
+        let mut method = parts.method.to_string();
+        let local_path = parts.uri.path().to_string();
+        let path = match local_path
+            .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
+        {
+            Some(path) => path,
+            None => &local_path,
+        };
 
-            let mut method = req.method().to_string();
-            let local_path = req.path().to_string();
-            let path = match local_path
-                .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
-            {
-                Some(path) => path,
-                None => &local_path,
-            };
+        let path_columns = path.split('/').collect::<Vec<&str>>();
+        let url_len = path_columns.len();
+        let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
+            path_columns[1].to_string()
+        } else {
+            path_columns[0].to_string()
+        };
 
-            let path_columns = path.split('/').collect::<Vec<&str>>();
-            let url_len = path_columns.len();
-            let org_id = if url_len > 1 && path_columns[0].eq(V2_API_PREFIX) {
-                path_columns[1].to_string()
-            } else {
-                path_columns[0].to_string()
-            };
-
-            // This is case for ingestion endpoints where we need to check
-            // permissions on the stream
-            if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-                if let Some(auth_header) = req.headers().get("Authorization")
-                    && let Ok(auth_str) = auth_header.to_str()
-                {
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    });
-                }
-                return Err(actix_web::error::ErrorUnauthorized("Unauthorized Access"));
-            }
-
-            // get ofga object type from the url
-            // depends on the url path count
-            let object_type = if url_len == 1 {
-                // for organization entity itself, get requires the list
-                // permissions, and the object is a special format string
-                if path_columns[0].eq("organizations") {
-                    if method.eq("GET") {
-                        method = "LIST".to_string();
-                    };
-
-                    "org:##user_id##".to_string()
-                } else if path_columns[0].eq("invites") && method.eq("GET") {
-                    let auth_str = extract_auth_str(&req).await;
-                    // because the /invites route is checked by user_id,
-                    // and does not return any other info, we can bypass the auth
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method: "GET".to_string(),
-                        o2_type: "".to_string(),
-                        org_id: "".to_string(),
-                        bypass_check: true, // bypass check permissions
-                        parent_id: "".to_string(),
-                    });
-                } else {
-                    path_columns[0].to_string()
-                }
-            } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
-                // for settings (including settings/v2), the post/delete require PUT permissions,
-                // GET needs LIST permissions. This handles:
-                // - /org/settings (v1 settings API)
-                // - /org/settings/logo, /org/settings/text (logo/text endpoints)
-                // - /org/settings/v2/... (v2 multi-level settings API)
-                //
-                // Settings v2 API paths:
-                // - GET /{org_id}/settings/v2/{key} - get setting
-                // - GET /{org_id}/settings/v2 - list settings
-                // - POST /{org_id}/settings/v2/org - set org setting
-                // - POST /{org_id}/settings/v2/user/{user_id} - set user setting
-                // - DELETE /{org_id}/settings/v2/org/{key} - delete org setting
-                // - DELETE /{org_id}/settings/v2/user/{user_id}/{key} - delete user setting
-                if path_columns[1].eq("settings") {
-                    if method.eq("POST") || method.eq("DELETE") {
-                        method = "PUT".to_string();
-                    }
-                } else if method.eq("GET") {
-                    method = "LIST".to_string();
-                }
-
-                if path_columns[0].eq("invites") && method.eq("DELETE") {
-                    let auth_str = extract_auth_str(&req).await;
-                    // because the delete /invites/token route is checked by user_id,
-                    // and does not return any other info, we can bypass the auth
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method: "DELETE".to_string(),
-                        o2_type: "".to_string(),
-                        org_id: "".to_string(),
-                        bypass_check: true, // bypass check permissions
-                        parent_id: "".to_string(),
-                    });
-                }
-
-                // this will take format of settings:{org_id} or pipelines:{org_id} etc
-                let key = if path_columns[1].eq("invites") {
-                    "users"
-                } else if (path_columns[1].eq("rename")
-                    || path_columns[1].eq("extend_trial_period"))
-                    && method.eq("PUT")
-                {
-                    "organizations"
-                } else {
-                    path_columns[1]
-                };
-
-                // for organization api changes we need perms on _all_{org}
-                let entity = match (key, path_columns[1]) {
-                    ("organizations", "extend_trial_period") => "_all__meta".to_string(),
-                    ("organizations", "organizations") => {
-                        // Special case: assume_service_account endpoint should check org:_all__meta
-                        if url_len == 3 && path_columns[2] == "assume_service_account" {
-                            format!("_all_{}", path_columns[0])
-                        } else {
-                            path_columns[0].to_string()
-                        }
-                    }
-                    ("organizations", _) => format!("_all_{}", path_columns[0]),
-                    _ => path_columns[0].to_string(),
-                };
-
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS.get(key).map_or(key, |model| model.key),
-                    entity
-                )
-            } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
-                // for groups or roles, path will be of format /org/roles/id , so we need
-                // to check permission on role:org/id for permissions on that specific role
-                format!(
-                    "{}:{org_id}/{}",
-                    OFGA_MODELS
-                        .get(path_columns[1])
-                        .map_or(path_columns[1], |model| model.key),
-                    path_columns[2]
-                )
-            } else if url_len == 3 {
-                // Handle /v2 alert apis
-                if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
-                    if method.eq("GET") {
-                        method = "LIST".to_string();
-                    }
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS.get("alert_folders").unwrap().key,
-                        folder
-                    )
-                } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
-                    // specifically for testing re_patterns we need get permissions
-                    // on re patterns
-                    method = "LIST".to_string();
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[0]
-                    )
-                }
-                // these are cases where the entity is "sub-entity" of some other entity,
-                // for example, alerts are on route /org/stream/alerts
-                // or templates are on route /org/alerts/templates and so on
-                // users/roles is one of the special exception here
-                else if path_columns[2].eq("alerts")
-                    || path_columns[2].eq("templates")
-                    || path_columns[2].eq("destinations")
-                    || path.ends_with("users/roles")
-                {
-                    if method.eq("GET") {
-                        method = "LIST".to_string();
-                    }
-                    if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs")
-                    {
-                        // for put/delete actions i.e. updations, we need permissions
-                        // on that particular "sub-entity", and this will take form of
-                        // alert:templates or alerts:destinations or stream:alerts
-                        // search jobs also fall under this 3 length case
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[1])
-                                .map_or(path_columns[1], |model| model.key),
-                            path_columns[2]
-                        )
-                    } else {
-                        // otherwise for listing/creating we need permissions on that "sub-entity"
-                        // in general such as org:templates or org:destinations or org:alerts
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[2])
-                                .map_or(path_columns[2], |model| model.key),
-                            path_columns[0]
-                        )
-                    }
-                } else if path_columns[2].starts_with("_values")
-                    || path_columns[2].starts_with("_around")
-                {
-                    if method.eq("POST") {
-                        // For _around search, the rbac check will be "GET"
-                        method = "GET".to_string();
-                    }
-                    // special case of _values/_around , where we need permission on that stream,
-                    // as it is part of search, but still 3-part route
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS.get("streams").unwrap().key,
-                        path_columns[1]
-                    )
-                } else if path_columns[1].starts_with("rename") {
-                    // Org rename
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS.get("organizations").unwrap().key,
-                        org_id
-                    )
-                } else if path_columns[1].eq("invites") && method.eq("DELETE") {
-                    // this is specifically for deleting an existing invite
-                    let key = "users";
-                    let entity = path_columns[0].to_string();
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS.get(key).map_or(key, |model| model.key),
-                        entity
-                    )
-                } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
-                    || method.eq("DELETE")
-                    || path_columns[1].eq("reports")
-                    || path_columns[1].eq("savedviews")
-                    || path_columns[1].eq("functions")
-                    || path_columns[1].eq("service_accounts")
-                    || path_columns[1].eq("cipher_keys")
-                {
-                    // Similar to the alerts/templates etc, but for other entities such as specific
-                    // pipeline, specific stream, specific alert/destination etc.
-                    // and these are not "sub-entities" under some other entities, hence
-                    // a separate else-if clause
-                    // Similarly, for the put/delete or any operation on these
-                    // entities, we need access to that particular item
-                    // so url will be of form /org/reports/name or /org/functions/name etc.
-                    // nd this will take form name:reports or name:function
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[2]
-                    )
-                } else if method.eq("GET")
-                    && (path_columns[1].eq("dashboards")
-                        || path_columns[1].eq("folders")
-                        || path_columns[1].eq("actions"))
-                {
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[2] // dashboard id
-                    )
-                } else {
-                    // for things like dashboards and folders etc,
-                    // this will take form org:dashboard or org:folders
-
-                    // handle ratelimit:org
-                    if method.eq("GET")
-                        && (path_columns[1].starts_with("ratelimit")
-                            || path_columns[1].starts_with("enrichment_tables"))
-                    {
-                        method = "LIST".to_string();
-                    }
-
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[0]
-                    )
-                }
-            } else if url_len == 4 {
-                // Handle /v2 alert apis
-                if path_columns[0].eq(V2_API_PREFIX) {
-                    if path_columns[2].eq("alerts") {
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[2])
-                                .map_or(path_columns[2], |model| model.key),
-                            path_columns[3]
-                        )
-                    } else {
-                        if method.eq("GET") {
-                            method = "LIST".to_string();
-                        }
-                        let ofga_type = if path_columns[3].eq("alerts") {
-                            "alert_folders"
-                        } else {
-                            "folders"
-                        };
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(ofga_type)
-                                .map_or(ofga_type, |model| model.key),
-                            path_columns[1]
-                        )
-                    }
-                }
-                // this is for specific sub-items like specific alert, destination etc.
-                // and sub-items such as schema, stream settings, or enabling/triggering reports
-                else if method.eq("PUT") && path_columns[1].eq("reports") {
-                    // for report enable/trigger, we need permissions on that specific
-                    // report, so this will be name:reports
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[2]
-                    )
-                } else if method.eq("PUT")
-                    && path_columns[1] != "streams"
-                    && path_columns[1] != "pipelines"
-                    || method.eq("DELETE") && path_columns[3] != "annotations"
-                {
-                    // for put on on-stream, non-pipeline such as specific
-                    // alert/template/destination or delete on any such
-                    // (stream/pipeline delete are not 4-part routes)
-                    // this will take form of name:alert or name:destination or name:template etc
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[2])
-                            .map_or(path_columns[2], |model| model.key),
-                        path_columns[3]
-                    )
-                } else if method.eq("GET")
-                    && path_columns[1].eq("folders")
-                    && path_columns[2].eq("name")
-                {
-                    // To search with folder name, you need GET permission on all folders
-                    format!(
-                        "{}:_all_{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[0]
-                    )
-                } else if method.eq("GET")
-                    && path_columns[1].eq("actions")
-                    && path_columns[2].eq("download")
-                {
-                    // To access actions download name, you need GET permission on actions
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[3]
-                    )
-                } else if method.eq("GET")
-                    && (path_columns[2].eq("templates")
-                        || path_columns[2].eq("destinations")
-                        || path_columns[2].eq("alerts"))
-                {
-                    // To access templates, you need GET permission on the template
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[2])
-                            .map_or(path_columns[2], |model| model.key),
-                        path_columns[3]
-                    )
-                } else if method.eq("POST") && path_columns[1].eq("enrichment_tables") {
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[0]
-                    )
-                } else {
-                    // for other get/put requests on any entities such as templates,
-                    // alerts, enable pipeline, update dashboard etc, we need permission
-                    // on that entity in general, this will take form of
-                    // alerts:destinations or roles:role_name or stream_name:alerts etc
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[2]
-                    )
-                }
-            } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
-                // this block is for all other urls
-                // specifically checking PUT /org_id/streams/stream_name/delete_fields
-                // even though method is put, we actually need to check delete permissions
-                if path_columns[url_len - 1].eq("delete_fields") {
-                    method = "DELETE".to_string();
-                }
-
-                if method.eq("PATCH") {
-                    method = "PUT".to_string();
-                }
-
-                // Handle /v2 folders apis
-                if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("folders") {
-                    let ofga_type = if path_columns[3].eq("alerts") {
-                        "alert_folders"
-                    } else {
-                        "folders"
-                    };
-                    if url_len == 6 {
-                        // Should check for all_org permissions
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS.get(ofga_type).unwrap().key,
-                            path_columns[1]
-                        )
-                    } else {
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS.get(ofga_type).unwrap().key,
-                            path_columns[4]
-                        )
-                    }
-                }
-                //  this is specifically for enabling alerts
-                else if path_columns[url_len - 1].eq("enable") {
-                    // this will take form name:alert
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[2])
-                            .map_or(path_columns[2], |model| model.key),
-                        path_columns[3]
-                    )
-                } else {
-                    // This is specifically for triggering the alert on url
-                    // /org_id/stream_name/alerts/alert_name/trigger
-                    // and will take form stream_name:alerts
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[2]
-                    )
-                }
-            } else {
-                // This is the final catch-all for what did not fit in above cases,
-                // and for the prometheus urls this will be ignored below.
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get(path_columns[1])
-                        .map_or(path_columns[1], |model| model.key),
-                    path_columns[2]
-                )
-            };
-
-            // Check if the ws request is using internal grpc token
-            if method.eq("GET")
-                && path.contains("/ws")
-                && let Some(auth_header) = req.headers().get("Authorization")
-                && auth_header
-                    .to_str()
-                    .unwrap()
-                    .eq(&get_config().grpc.internal_grpc_token)
+        // This is case for ingestion endpoints where we need to check
+        // permissions on the stream
+        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+            if let Some(auth_header) = parts.headers.get("Authorization")
+                && let Ok(auth_str) = auth_header.to_str()
             {
                 return Ok(AuthExtractor {
-                    auth: auth_header.to_str().unwrap().to_string(),
+                    auth: auth_str.to_owned(),
                     method,
                     o2_type: format!("stream:{org_id}"),
                     org_id,
@@ -732,149 +304,600 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 });
             }
+            return Err(AuthExtractorRejection {
+                message: "Unauthorized Access".to_string(),
+            });
+        }
 
-            let auth_str = extract_auth_str(&req).await;
+        // get ofga object type from the url
+        // depends on the url path count
+        let object_type = if url_len == 1 {
+            // for organization entity itself, get requires the list
+            // permissions, and the object is a special format string
+            if path_columns[0].eq("organizations") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                };
 
-            // Log auth metadata without exposing sensitive tokens
-            let auth_type = if auth_str.starts_with("Basic ") {
-                "Basic"
-            } else if auth_str.starts_with("Bearer ") {
-                "Bearer"
-            } else if auth_str.starts_with("Session::") {
-                "Session"
-            } else if auth_str.is_empty() {
-                "None"
+                "org:##user_id##".to_string()
+            } else if path_columns[0].eq("invites") && method.eq("GET") {
+                let auth_str = extract_auth_str_from_parts(parts).await;
+                // because the /invites route is checked by user_id,
+                // and does not return any other info, we can bypass the auth
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "GET".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: "".to_string(),
+                });
             } else {
-                "Other"
+                path_columns[0].to_string()
+            }
+        } else if url_len == 2 || (url_len > 2 && path_columns[1].eq("settings")) {
+            // for settings (including settings/v2), the post/delete require PUT permissions,
+            // GET needs LIST permissions. This handles:
+            // - /org/settings (v1 settings API)
+            // - /org/settings/logo, /org/settings/text (logo/text endpoints)
+            // - /org/settings/v2/... (v2 multi-level settings API)
+            //
+            // Settings v2 API paths:
+            // - GET /{org_id}/settings/v2/{key} - get setting
+            // - GET /{org_id}/settings/v2 - list settings
+            // - POST /{org_id}/settings/v2/org - set org setting
+            // - POST /{org_id}/settings/v2/user/{user_id} - set user setting
+            // - DELETE /{org_id}/settings/v2/org/{key} - delete org setting
+            // - DELETE /{org_id}/settings/v2/user/{user_id}/{key} - delete user setting
+            if path_columns[1].eq("settings") {
+                if method.eq("POST") || method.eq("DELETE") {
+                    method = "PUT".to_string();
+                }
+            } else if method.eq("GET") {
+                method = "LIST".to_string();
+            }
+
+            if path_columns[0].eq("invites") && method.eq("DELETE") {
+                let auth_str = extract_auth_str_from_parts(parts).await;
+                // because the delete /invites/token route is checked by user_id,
+                // and does not return any other info, we can bypass the auth
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "DELETE".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: "".to_string(),
+                });
+            }
+
+            // this will take format of settings:{org_id} or pipelines:{org_id} etc
+            let key = if path_columns[1].eq("invites") {
+                "users"
+            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT")
+            {
+                "organizations"
+            } else {
+                path_columns[1]
             };
 
-            log::debug!(
-                "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
-                local_path,
-                auth_str.is_empty(),
-                auth_type,
-                auth_str.len()
-            );
-
-            // if let Some(auth_header) = req.headers().get("Authorization") {
-            if !auth_str.is_empty() {
-                let path_is_bulk_operation = method.eq("DELETE")
-                    && (path.contains("/cipher_keys/bulk")
-                        || path.contains("/re_patterns/bulk")
-                        || path.contains("/alerts/templates/bulk")
-                        || path.contains("/alerts/destinations/bulk")
-                        || (path.starts_with("v2/") && path.contains("/alerts/bulk"))
-                        || path.contains("/dashboards/bulk")
-                        || path.contains("/pipelines/bulk")
-                        || path.contains("/actions/bulk")
-                        || path.contains("/groups/bulk")
-                        || path.contains("/roles/bulk")
-                        || path.contains("/service_accounts/bulk")
-                        || path.contains("/functions/bulk")
-                        || path.contains("/users/bulk")
-                        || path.contains("/reports/bulk"));
-
-                if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
-                || (method.eq("POST")
-                    && url_len > 1
-                    && path_columns[1].starts_with("result_schema"))
-                || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
-                || path.contains("/prometheus/api/v1/query")
-                || path.contains("/resources")
-                || path.contains("/format_query")
-                || path.contains("/prometheus/api/v1/series")
-                || path.contains("/traces/latest")
-                || path.contains("clusters")
-                || path.contains("query_manager")
-                || path.contains("/short")
-                || path.contains("/ws")
-                || path.contains("/_values_stream")
-                // bulk enable of pipelines and alerts
-                || path_is_bulk_operation
-                // for license the function itself with do a perm check
-                || (url_len == 1 && path.contains("license"))
-                // service_streams APIs are org-level, not stream-specific
-                || path.contains("/service_streams/_analytics")
-                || path.contains("/service_streams/_correlate")
-                {
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method: "".to_string(),
-                        o2_type: "".to_string(),
-                        org_id: "".to_string(),
-                        bypass_check: true, // bypass check permissions
-                        parent_id: folder,
-                    });
-                }
-                if object_type.starts_with("stream") {
-                    let object_type = match stream_type {
-                        Some(stream_type) => {
-                            if stream_type.eq(&StreamType::EnrichmentTables) {
-                                // since enrichment tables have separate permissions
-                                let stream_type_str = format!("{stream_type}");
-
-                                object_type.replace(
-                                    "stream:",
-                                    format!(
-                                        "{}:",
-                                        OFGA_MODELS
-                                            .get(stream_type_str.as_str())
-                                            .map_or(stream_type_str.as_str(), |model| model.key)
-                                    )
-                                    .as_str(),
-                                )
-                            } else {
-                                object_type.replace("stream:", format!("{stream_type}:").as_str())
-                            }
-                        }
-                        None => object_type,
-                    };
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: object_type,
-                        org_id,
-                        bypass_check: false,
-                        parent_id: folder,
-                    });
-                }
-                if object_type.contains("dashboard") && url_len > 1 {
-                    let object_type = if method.eq("POST") || method.eq("LIST") {
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[1])
-                                .map_or("dfolder", |model| model.parent),
-                            folder.as_str(),
-                        )
+            // for organization api changes we need perms on _all_{org}
+            let entity = match (key, path_columns[1]) {
+                ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "organizations") => {
+                    // Special case: assume_service_account endpoint should check org:_all__meta
+                    if url_len == 3 && path_columns[2] == "assume_service_account" {
+                        format!("_all_{}", path_columns[0])
                     } else {
-                        object_type
-                    };
-                    // Currently, we have a patch api for dashboard move,
-                    // which can not be handled by the middleware layer,
-                    // so we need to bypass the check here
-                    if method.eq("PATCH") {
-                        return Ok(AuthExtractor {
-                            auth: auth_str.to_owned(),
-                            method: "".to_string(),
-                            o2_type: "".to_string(),
-                            org_id: "".to_string(),
-                            bypass_check: true, // bypass check permissions
-                            parent_id: folder,
-                        });
+                        path_columns[0].to_string()
                     }
+                }
+                ("organizations", _) => format!("_all_{}", path_columns[0]),
+                _ => path_columns[0].to_string(),
+            };
 
-                    return Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: object_type,
-                        org_id,
-                        bypass_check: false,
-                        parent_id: folder,
-                    });
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                entity
+            )
+        } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
+            // for groups or roles, path will be of format /org/roles/id , so we need
+            // to check permission on role:org/id for permissions on that specific role
+            format!(
+                "{}:{org_id}/{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[2]
+            )
+        } else if url_len == 3 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("alert_folders").unwrap().key,
+                    folder
+                )
+            } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
+                // specifically for testing re_patterns we need get permissions
+                // on re patterns
+                method = "LIST".to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
+            }
+            // these are cases where the entity is "sub-entity" of some other entity,
+            // for example, alerts are on route /org/stream/alerts
+            // or templates are on route /org/alerts/templates and so on
+            // users/roles is one of the special exception here
+            else if path_columns[2].eq("alerts")
+                || path_columns[2].eq("templates")
+                || path_columns[2].eq("destinations")
+                || path.ends_with("users/roles")
+                || path.ends_with("pipelines/backfill")
+            {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
+                    // for put/delete actions i.e. updations, we need permissions
+                    // on that particular "sub-entity", and this will take form of
+                    // alert:templates or alerts:destinations or stream:alerts
+                    // search jobs also fall under this 3 length case
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or(path_columns[1], |model| model.key),
+                        path_columns[2]
+                    )
+                } else if path.ends_with("pipelines/backfill") {
+                    // list all backfill jobs for given org - /{org_id}/pipelines/backfill
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or(path_columns[1], |model| model.key),
+                        path_columns[0]
+                    )
+                } else {
+                    // otherwise for listing/creating we need permissions on that "sub-entity"
+                    // in general such as org:templates or org:destinations or org:alerts
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[0]
+                    )
+                }
+            } else if path_columns[2].starts_with("_values")
+                || path_columns[2].starts_with("_around")
+            {
+                if method.eq("POST") {
+                    // For _around search, the rbac check will be "GET"
+                    method = "GET".to_string();
+                }
+                // special case of _values/_around , where we need permission on that stream,
+                // as it is part of search, but still 3-part route
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("streams").unwrap().key,
+                    path_columns[1]
+                )
+            } else if path_columns[1].starts_with("rename") {
+                // Org rename
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("organizations").unwrap().key,
+                    org_id
+                )
+            } else if path_columns[1].eq("invites") && method.eq("DELETE") {
+                // this is specifically for deleting an existing invite
+                let key = "users";
+                let entity = path_columns[0].to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                    entity
+                )
+            } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
+                || method.eq("DELETE")
+                || path_columns[1].eq("reports")
+                || path_columns[1].eq("savedviews")
+                || path_columns[1].eq("functions")
+                || path_columns[1].eq("service_accounts")
+                || path_columns[1].eq("cipher_keys")
+            {
+                // Similar to the alerts/templates etc, but for other entities such as specific
+                // pipeline, specific stream, specific alert/destination etc.
+                // and these are not "sub-entities" under some other entities, hence
+                // a separate else-if clause
+                // Similarly, for the put/delete or any operation on these
+                // entities, we need access to that particular item
+                // so url will be of form /org/reports/name or /org/functions/name etc.
+                // nd this will take form name:reports or name:function
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            } else if method.eq("GET")
+                && (path_columns[1].eq("dashboards")
+                    || path_columns[1].eq("folders")
+                    || path_columns[1].eq("actions"))
+            {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2] // dashboard id
+                )
+            } else {
+                // for things like dashboards and folders etc,
+                // this will take form org:dashboard or org:folders
+
+                // handle ratelimit:org
+                if method.eq("GET")
+                    && (path_columns[1].starts_with("ratelimit")
+                        || path_columns[1].starts_with("enrichment_tables"))
+                {
+                    method = "LIST".to_string();
                 }
 
-                if method.eq("PATCH") && object_type.eq("alert:move") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
+            }
+        } else if url_len == 4 {
+            // Handle /v2 alert apis
+            if path_columns[0].eq(V2_API_PREFIX) {
+                if path_columns[2].eq("alerts") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[3]
+                    )
+                } else {
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    let ofga_type = if path_columns[3].eq("alerts") {
+                        "alert_folders"
+                    } else {
+                        "folders"
+                    };
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(ofga_type)
+                            .map_or(ofga_type, |model| model.key),
+                        path_columns[1]
+                    )
+                }
+            }
+            // this is for specific sub-items like specific alert, destination etc.
+            // and sub-items such as schema, stream settings, or enabling/triggering reports
+            else if method.eq("PUT") && path_columns[1].eq("reports") {
+                // for report enable/trigger, we need permissions on that specific
+                // report, so this will be name:reports
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            } else if method.eq("PUT")
+                && path_columns[1] != "streams"
+                && path_columns[1] != "pipelines"
+                || method.eq("DELETE") && path_columns[3] != "annotations"
+            {
+                // for put on on-stream, non-pipeline such as specific
+                // alert/template/destination or delete on any such
+                // (stream/pipeline delete are not 4-part routes)
+                // this will take form of name:alert or name:destination or name:template etc
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("GET")
+                && path_columns[1].eq("folders")
+                && path_columns[2].eq("name")
+            {
+                // To search with folder name, you need GET permission on all folders
+                format!(
+                    "{}:_all_{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
+            } else if method.eq("GET")
+                && path_columns[1].eq("actions")
+                && path_columns[2].eq("download")
+            {
+                // To access actions download name, you need GET permission on actions
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("GET")
+                && (path_columns[2].eq("templates")
+                    || path_columns[2].eq("destinations")
+                    || path_columns[2].eq("alerts"))
+            {
+                // To access templates, you need GET permission on the template
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("POST") && path_columns[1].eq("enrichment_tables") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
+            } else {
+                // Handles the backfill job creation, which is considered an UPDATE
+                // to the pipeline from the rbac perspective.
+                if method.eq("POST")
+                    && path_columns[1].eq("pipelines")
+                    && path_columns[3].eq("backfill")
+                {
+                    method = "PUT".to_string();
+                }
+                // for other get/put requests on any entities such as templates,
+                // alerts, enable pipeline, update dashboard etc, we need permission
+                // on that entity in general, this will take form of
+                // alerts:destinations or roles:role_name or stream_name:alerts etc
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            }
+        } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
+            // this block is for all other urls
+            // specifically checking PUT /org_id/streams/stream_name/delete_fields
+            // even though method is put, we actually need to check delete permissions
+            if path_columns[url_len - 1].eq("delete_fields") {
+                method = "DELETE".to_string();
+            }
+
+            if method.eq("PATCH") {
+                method = "PUT".to_string();
+            }
+
+            // Handle /v2 folders apis
+            if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("folders") {
+                let ofga_type = if path_columns[3].eq("alerts") {
+                    "alert_folders"
+                } else {
+                    "folders"
+                };
+                if url_len == 6 {
+                    // Should check for all_org permissions
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[1]
+                    )
+                } else {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS.get(ofga_type).unwrap().key,
+                        path_columns[4]
+                    )
+                }
+            }
+            //  this is specifically for enabling alerts
+            else if !(path_columns[1].eq("pipelines") && path_columns[3].eq("backfill"))
+                && path_columns[url_len - 1].eq("enable")
+            {
+                // this will take form name:alert
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
+            } else {
+                // This is specifically for triggering the alert on url
+                // /org_id/stream_name/alerts/alert_name/trigger
+                // and will take form stream_name:alerts
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            }
+        } else {
+            // This is the final catch-all for what did not fit in above cases,
+            // and for the prometheus urls this will be ignored below.
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
+                path_columns[2]
+            )
+        };
+
+        // Check if the ws request is using internal grpc token
+        if method.eq("GET")
+            && path.contains("/ws")
+            && let Some(auth_header) = parts.headers.get("Authorization")
+            && auth_header
+                .to_str()
+                .unwrap()
+                .eq(&get_config().grpc.internal_grpc_token)
+        {
+            return Ok(AuthExtractor {
+                auth: auth_header.to_str().unwrap().to_string(),
+                method,
+                o2_type: format!("stream:{org_id}"),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            });
+        }
+
+        let auth_str = extract_auth_str_from_parts(parts).await;
+
+        // Log auth metadata without exposing sensitive tokens
+        let auth_type = if auth_str.starts_with("Basic ") {
+            "Basic"
+        } else if auth_str.starts_with("Bearer ") {
+            "Bearer"
+        } else if auth_str.starts_with("Session::") {
+            "Session"
+        } else if auth_str.is_empty() {
+            "None"
+        } else {
+            "Other"
+        };
+
+        log::debug!(
+            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
+            local_path,
+            auth_str.is_empty(),
+            auth_type,
+            auth_str.len()
+        );
+
+        // if let Some(auth_header) = parts.headers.get("Authorization") {
+        if !auth_str.is_empty() {
+            let path_is_bulk_operation = method.eq("DELETE")
+                && (path.contains("/cipher_keys/bulk")
+                    || path.contains("/re_patterns/bulk")
+                    || path.contains("/alerts/templates/bulk")
+                    || path.contains("/alerts/destinations/bulk")
+                    || (path.starts_with("v2/") && path.contains("/alerts/bulk"))
+                    || path.contains("/dashboards/bulk")
+                    || path.contains("/pipelines/bulk")
+                    || path.contains("/actions/bulk")
+                    || path.contains("/groups/bulk")
+                    || path.contains("/roles/bulk")
+                    || path.contains("/service_accounts/bulk")
+                    || path.contains("/functions/bulk")
+                    || path.contains("/users/bulk")
+                    || path.contains("/reports/bulk"));
+
+            if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
+            || (method.eq("POST")
+                && url_len > 1
+                && path_columns[1].starts_with("result_schema"))
+            || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
+            || path.contains("/prometheus/api/v1/query")
+            || path.contains("/resources")
+            || path.contains("/format_query")
+            || path.contains("/prometheus/api/v1/series")
+            || path.contains("/traces/latest")
+            || path.contains("clusters")
+            || path.contains("query_manager")
+            || path.contains("/short")
+            || path.contains("/ws")
+            || path.contains("/_values_stream")
+            // bulk enable of pipelines and alerts
+            || path_is_bulk_operation
+            // for license the function itself with do a perm check
+            || (url_len == 1 && path.contains("license"))
+            // service_streams APIs are org-level, not stream-specific
+            || path.contains("/service_streams/_analytics")
+            || path.contains("/service_streams/_correlate")
+            {
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: folder,
+                });
+            }
+            if object_type.starts_with("stream") {
+                let object_type = match stream_type {
+                    Some(stream_type) => {
+                        if stream_type.eq(&StreamType::EnrichmentTables) {
+                            // since enrichment tables have separate permissions
+                            let stream_type_str = format!("{stream_type}");
+
+                            object_type.replace(
+                                "stream:",
+                                format!(
+                                    "{}:",
+                                    OFGA_MODELS
+                                        .get(stream_type_str.as_str())
+                                        .map_or(stream_type_str.as_str(), |model| model.key)
+                                )
+                                .as_str(),
+                            )
+                        } else {
+                            object_type.replace("stream:", format!("{stream_type}:").as_str())
+                        }
+                    }
+                    None => object_type,
+                };
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: object_type,
+                    org_id,
+                    bypass_check: false,
+                    parent_id: folder,
+                });
+            }
+            if object_type.contains("dashboard") && url_len > 1 {
+                let object_type = if method.eq("POST") || method.eq("LIST") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or("dfolder", |model| model.parent),
+                        folder.as_str(),
+                    )
+                } else {
+                    object_type
+                };
+                // Currently, we have a patch api for dashboard move,
+                // which can not be handled by the middleware layer,
+                // so we need to bypass the check here
+                if method.eq("PATCH") {
                     return Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
                         method: "".to_string(),
@@ -894,76 +917,115 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 });
             }
-            log::debug!(
-                "AuthExtractor::from_request took {} ms",
-                start.elapsed().as_millis()
-            );
-            Err(actix_web::error::ErrorUnauthorized("Unauthorized Access"))
-        })
-    }
 
-    #[cfg(not(feature = "enterprise"))]
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let req = req.clone();
-        Box::pin(async move {
-            let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
-                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
-                let auth_tokens: AuthTokens =
-                    json::from_str(std::str::from_utf8(&val).unwrap_or_default())
-                        .unwrap_or_default();
-                let access_token = auth_tokens.access_token;
-                if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
-                    access_token
-                } else {
-                    format!("Bearer {access_token}")
-                }
-            } else if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    auth_str.to_owned()
-                } else {
-                    "".to_string()
-                }
-            } else {
-                "".to_string()
-            };
-
-            // if let Some(auth_header) = req.headers().get("Authorization") {
-            if !auth_str.is_empty() {
+            if method.eq("PATCH") && object_type.eq("alert:move") {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method: "".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
                     bypass_check: true, // bypass check permissions
-                    parent_id: "".to_string(),
+                    parent_id: folder,
                 });
             }
 
-            Err(actix_web::error::ErrorUnauthorized("Unauthorized Access"))
+            return Ok(AuthExtractor {
+                auth: auth_str.to_owned(),
+                method,
+                o2_type: object_type,
+                org_id,
+                bypass_check: false,
+                parent_id: folder,
+            });
+        }
+        log::debug!(
+            "AuthExtractor::from_request took {} ms",
+            start.elapsed().as_millis()
+        );
+        Err(AuthExtractorRejection {
+            message: "Unauthorized Access".to_string(),
+        })
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let cookies = extract_cookie_from_parts(parts);
+        let auth_str = if let Some(cookie) = cookies.get("auth_tokens") {
+            let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
+            let auth_tokens: AuthTokens =
+                json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
+            let access_token = auth_tokens.access_token;
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                access_token
+            } else {
+                format!("Bearer {access_token}")
+            }
+        } else if let Some(auth_header) = parts.headers.get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                auth_str.to_owned()
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
+
+        // if let Some(auth_header) = parts.headers.get("Authorization") {
+        if !auth_str.is_empty() {
+            return Ok(AuthExtractor {
+                auth: auth_str.to_owned(),
+                method: "".to_string(),
+                o2_type: "".to_string(),
+                org_id: "".to_string(),
+                bypass_check: true, // bypass check permissions
+                parent_id: "".to_string(),
+            });
+        }
+
+        Err(AuthExtractorRejection {
+            message: "Unauthorized Access".to_string(),
         })
     }
 }
 
-#[cfg(feature = "enterprise")]
-pub async fn extract_auth_str(req: &HttpRequest) -> String {
-    let auth_ext_cookie = |req: &HttpRequest| -> String {
-        req.cookie("auth_ext")
-            .map(|cookie| {
-                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
-                std::str::from_utf8(&val).unwrap_or_default().to_string()
-            })
-            .unwrap_or_default()
-    };
+fn extract_cookie_from_parts(parts: &Parts) -> HashMap<&str, &str> {
+    // Check cookies
+    let cookies = parts
+        .headers
+        .get(http::header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
 
-    if let Some(cookie) = req.cookie("auth_tokens") {
-        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+    // Parse cookies
+    let cookie_map: HashMap<&str, &str> = cookies
+        .split(';')
+        .filter_map(|c| {
+            let mut parts = c.trim().splitn(2, '=');
+            Some((parts.next()?, parts.next()?))
+        })
+        .collect();
+
+    cookie_map
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn extract_auth_str_from_parts(parts: &Parts) -> String {
+    let cookies = extract_cookie_from_parts(parts);
+    if let Some(cookie) = cookies.get("auth_tokens") {
+        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
         if access_token.is_empty() {
             // If cookie was set but access token is still empty
             // we check auth_ext cookie to get the token.
-            auth_ext_cookie(req)
+            cookies
+                .get("auth_ext")
+                .map(|cookie| {
+                    let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
+                    std::str::from_utf8(&val).unwrap_or_default().to_string()
+                })
+                .unwrap_or_default()
         } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
             access_token
         } else if access_token.starts_with("session") {
@@ -989,10 +1051,10 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
         } else {
             format!("Bearer {access_token}")
         }
-    } else if let Some(cookie) = req.cookie("auth_ext") {
-        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+    } else if let Some(cookie) = cookies.get("auth_ext") {
+        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         std::str::from_utf8(&val).unwrap_or_default().to_string()
-    } else if let Some(auth_header) = req.headers().get("Authorization") {
+    } else if let Some(auth_header) = parts.headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             // Log auth type without exposing sensitive tokens
             let auth_type = if auth_str.starts_with("Basic ") {
@@ -1005,7 +1067,7 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
                 "Other"
             };
             log::debug!(
-                "Authorization header (extract_auth_str): type='{}', len={}",
+                "Authorization header (extract_auth_str_from_parts): type='{}', len={}",
                 auth_type,
                 auth_str.len()
             );
@@ -1046,25 +1108,24 @@ pub async fn extract_auth_str(req: &HttpRequest) -> String {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
-    let auth_ext_cookie = |req: &HttpRequest| -> String {
-        req.cookie("auth_ext")
-            .map(|cookie| {
-                let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
-                std::str::from_utf8(&val).unwrap_or_default().to_string()
-            })
-            .unwrap_or_default()
-    };
+pub fn extract_basic_auth_str_from_parts(parts: &Parts) -> String {
+    let cookies = extract_cookie_from_parts(parts);
 
-    if let Some(cookie) = req.cookie("auth_tokens") {
-        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+    if let Some(cookie) = cookies.get("auth_tokens") {
+        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         let auth_tokens: AuthTokens =
             json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
         if access_token.is_empty() {
             // If cookie was set but access token is still empty
             // we check auth_ext cookie to get the token.
-            auth_ext_cookie(req)
+            cookies
+                .get("auth_ext")
+                .map(|cookie| {
+                    let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
+                    std::str::from_utf8(&val).unwrap_or_default().to_string()
+                })
+                .unwrap_or_default()
         } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
             access_token
         } else if access_token.starts_with("session") {
@@ -1114,10 +1175,10 @@ pub fn extract_basic_auth_str(req: &HttpRequest) -> String {
         } else {
             format!("Bearer {access_token}")
         }
-    } else if let Some(cookie) = req.cookie("auth_ext") {
-        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+    } else if let Some(cookie) = cookies.get("auth_ext") {
+        let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
         std::str::from_utf8(&val).unwrap_or_default().to_string()
-    } else if let Some(auth_header) = req.headers().get("Authorization") {
+    } else if let Some(auth_header) = parts.headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             // Handle session tokens from Authorization header (same as cookie path)
             if auth_str.starts_with("session ") {
@@ -1270,7 +1331,7 @@ pub async fn check_permissions(
 
 #[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry_and_user_id(
-    req: &HttpRequest,
+    parts: &Parts,
 ) -> (Option<chrono::DateTime<chrono::Utc>>, Option<String>) {
     use crate::handler::http::auth::validator::get_user_email_from_auth_str;
 
@@ -1286,7 +1347,7 @@ pub async fn extract_auth_expiry_and_user_id(
         }
     };
 
-    let auth_str = extract_auth_str(req).await;
+    let auth_str = extract_auth_str_from_parts(parts).await;
     if auth_str.is_empty() {
         return (None, None);
     } else if auth_str.starts_with("Basic") {

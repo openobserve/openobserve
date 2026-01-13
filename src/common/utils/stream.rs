@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@
 
 use std::io::Error;
 
-use actix_web::HttpResponse;
 use arrow::array::{Int64Array, RecordBatch};
+use axum::response::Response;
 use config::{
     FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -28,7 +28,7 @@ use config::{
 use crate::service::users;
 
 #[inline(always)]
-pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
+pub fn stream_type_query_param_error() -> Result<Response, Error> {
     Err(Error::other(
         "only 'type' query param with value 'logs' or 'metrics' allowed",
     ))

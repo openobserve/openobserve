@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, delete, get, post, put, web};
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use config::meta::function::{FunctionList, TestVRLRequest, Transform};
 
 #[cfg(feature = "enterprise")]
@@ -31,6 +34,8 @@ use crate::{
 
 /// CreateFunction
 #[utoipa::path(
+    post,
+    path = "/{org_id}/functions",
     context_path = "/api",
     tag = "Functions",
     operation_id = "createFunction",
@@ -55,21 +60,21 @@ use crate::{
         ("x-o2-mcp" = json!({"description": "Create a VRL function", "category": "functions"}))
     )
 )]
-#[post("/{org_id}/functions")]
-pub async fn save_function(
-    path: web::Path<String>,
-    func: web::Json<Transform>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let mut transform = func.into_inner();
+pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transform>) -> Response {
+    let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    crate::service::functions::save_function(org_id, transform).await
+    match crate::service::functions::save_function(org_id, transform).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
 }
 
 /// ListFunctions
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/functions",
     context_path = "/api",
     tag = "Functions",
     operation_id = "listFunctions",
@@ -92,11 +97,10 @@ pub async fn save_function(
         ("x-o2-mcp" = json!({"description": "List all functions", "category": "functions"}))
     )
 )]
-#[get("/{org_id}/functions")]
-async fn list_functions(
-    org_id: web::Path<String>,
+pub async fn list_functions(
+    Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -113,20 +117,23 @@ async fn list_functions(
                 _permitted = list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
     }
 
-    crate::service::functions::list_functions(org_id.into_inner(), _permitted).await
+    match crate::service::functions::list_functions(org_id, _permitted).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
 }
 
 /// DeleteFunction
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunction",
@@ -152,33 +159,43 @@ async fn list_functions(
         ("x-o2-mcp" = json!({"description": "Delete a function", "category": "functions"}))
     )
 )]
-#[delete("/{org_id}/functions/{name}")]
-async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn delete_function(Path((org_id, name)): Path<(String, String)>) -> Response {
     match crate::service::functions::delete_function(&org_id, &name).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            actix_web::http::StatusCode::OK,
-            "Function deleted",
-        ))),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(MetaHttpResponse::message(
+                StatusCode::OK,
+                "Function deleted",
+            )),
+        )
+            .into_response(),
         Err(e) => match e {
-            FunctionDeleteError::NotFound => {
-                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::NOT_FOUND,
+            FunctionDeleteError::NotFound => (
+                StatusCode::NOT_FOUND,
+                Json(MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND,
                     "Function not found",
-                )))
-            }
-            FunctionDeleteError::FunctionInUse(e) => Ok(HttpResponse::BadRequest().json(
-                MetaHttpResponse::error(actix_web::http::StatusCode::BAD_REQUEST, e),
-            )),
-            FunctionDeleteError::PipelineDependencies(e) => Ok(HttpResponse::Conflict().json(
-                MetaHttpResponse::error(actix_web::http::StatusCode::CONFLICT, e),
-            )),
+                )),
+            )
+                .into_response(),
+            FunctionDeleteError::FunctionInUse(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response(),
+            FunctionDeleteError::PipelineDependencies(e) => (
+                StatusCode::CONFLICT,
+                Json(MetaHttpResponse::error(StatusCode::CONFLICT, e)),
+            )
+                .into_response(),
         },
     }
 }
 
 /// DeleteFunctionBulk
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/functions/bulk",
     context_path = "/api",
     tag = "Functions",
     operation_id = "deleteFunctionBulk",
@@ -202,20 +219,17 @@ async fn delete_function(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/functions/bulk")]
-async fn delete_function_bulk(
-    path: web::Path<String>,
+pub async fn delete_function_bulk(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if !check_permissions(name, &org_id, &_user_id, "functions", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -237,16 +251,18 @@ async fn delete_function_bulk(
         }
     }
 
-    Ok(HttpResponse::Ok().json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 /// UpdateFunction
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "updateFunction",
@@ -272,22 +288,25 @@ async fn delete_function_bulk(
         ("x-o2-mcp" = json!({"description": "Update a VRL function", "category": "functions"}))
     )
 )]
-#[put("/{org_id}/functions/{name}")]
 pub async fn update_function(
-    path: web::Path<(String, String)>,
-    func: web::Json<Transform>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+    Path((org_id, name)): Path<(String, String)>,
+    Json(func): Json<Transform>,
+) -> Response {
     let name = name.trim();
-    let mut transform = func.into_inner();
+    let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    crate::service::functions::update_function(&org_id, name, transform).await
+    match crate::service::functions::update_function(&org_id, name, transform).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
 }
 
 /// FunctionPipelineDependency
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/functions/{name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "functionPipelineDependency",
@@ -313,16 +332,19 @@ pub async fn update_function(
         ("x-o2-mcp" = json!({"description": "Check function dependencies", "category": "functions"}))
     )
 )]
-#[get("/{org_id}/functions/{name}")]
 pub async fn list_pipeline_dependencies(
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, fn_name) = path.into_inner();
-    crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await
+    Path((org_id, fn_name)): Path<(String, String)>,
+) -> Response {
+    match crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+    }
 }
 
 /// Test a Function
 #[utoipa::path(
+    post,
+    path = "/{org_id}/functions/test",
     context_path = "/api",
     tag = "Functions",
     operation_id = "testFunction",
@@ -345,22 +367,20 @@ pub async fn list_pipeline_dependencies(
     extensions(
     )
 )]
-#[post("/{org_id}/functions/test")]
 pub async fn test_function(
-    path: web::Path<String>,
-    req_body: web::Json<TestVRLRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    Path(org_id): Path<String>,
+    Json(req_body): Json<TestVRLRequest>,
+) -> Response {
     let TestVRLRequest {
         function,
         events,
         trans_type,
-    } = req_body.into_inner();
+    } = req_body;
 
     // test_run_function will auto-detect VRL vs JS if trans_type is None
     match crate::service::functions::test_run_function(&org_id, function, events, trans_type).await
     {
-        Ok(result) => Ok(result),
-        Err(err) => Ok(HttpResponse::BadRequest().body(err.to_string())),
+        Ok(result) => result,
+        Err(err) => (StatusCode::BAD_REQUEST, err.to_string()).into_response(),
     }
 }

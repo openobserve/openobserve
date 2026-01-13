@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    io::Error,
-};
+use std::collections::{HashMap, HashSet};
 
-#[cfg(feature = "cloud")]
-use actix_web::delete;
-use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    response::{IntoResponse, Response},
+};
 use config::meta::cluster::NodeInfo;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -53,6 +52,8 @@ use crate::{
 /// GetOrganizations
 
 #[utoipa::path(
+    get,
+    path = "/organizations",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetUserOrganizations",
@@ -69,14 +70,12 @@ use crate::{
         ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
     )
 )]
-#[get("/organizations")]
 pub async fn organizations(
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let user_id = user_email.user_id.as_str();
     let mut id = 0;
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
     let mut orgs: Vec<OrgDetails> = vec![];
     let mut org_names = HashSet::new();
@@ -94,15 +93,12 @@ pub async fn organizations(
     let is_root_user = is_root_user(user_id);
     let all_orgs = if is_root_user {
         let Ok(records) = organization::list_all_orgs(limit).await else {
-            return Ok(MetaHttpResponse::internal_error("Something went wrong"));
+            return MetaHttpResponse::internal_error("Something went wrong");
         };
         records
     } else {
         let Ok(records) = organization::list_orgs_by_user(user_id).await else {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND,
-                "Something went wrong",
-            )));
+            return MetaHttpResponse::not_found("Something went wrong");
         };
         records
     };
@@ -114,7 +110,7 @@ pub async fn organizations(
             .map(|cb| (cb.org_id, cb.subscription_type as i32))
             .collect::<HashMap<_, _>>(),
         Err(e) => {
-            return Ok(MetaHttpResponse::internal_error(e.to_string()));
+            return MetaHttpResponse::internal_error(e.to_string());
         }
     };
 
@@ -146,11 +142,13 @@ pub async fn organizations(
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
 
-    Ok(HttpResponse::Ok().json(org_response))
+    MetaHttpResponse::json(org_response)
 }
 
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/organizations",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetAllOrganizations",
@@ -163,22 +161,17 @@ pub async fn organizations(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
     )
 )]
-#[get("/{org_id}/organizations")]
 pub async fn all_organizations(
-    org_id: web::Path<String>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let org = org_id;
     if org != "_meta" {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED,
-            "not authorized to access this resource".to_string(),
-        )));
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
     }
 
     let mut orgs = vec![];
     let mut org_names = HashSet::new();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let limit = query
         .get("page_size")
         .unwrap_or(&"100".to_string())
@@ -189,7 +182,7 @@ pub async fn all_organizations(
     let all_orgs = match infra::table::organizations::list(filter).await {
         Ok(orgs) => orgs,
         Err(e) => {
-            return Ok(MetaHttpResponse::internal_error(e.to_string()));
+            return MetaHttpResponse::internal_error(e.to_string());
         }
     };
 
@@ -199,7 +192,7 @@ pub async fn all_organizations(
             .map(|cb| (cb.org_id, cb.subscription_type as i32))
             .collect::<HashMap<_, _>>(),
         Err(e) => {
-            return Ok(MetaHttpResponse::internal_error(e.to_string()));
+            return MetaHttpResponse::internal_error(e.to_string());
         }
     };
 
@@ -227,12 +220,14 @@ pub async fn all_organizations(
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = AllOrganizationResponse { data: orgs };
 
-    Ok(HttpResponse::Ok().json(org_response))
+    MetaHttpResponse::json(org_response)
 }
 
 /// GetOrganizationSummary
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/summary",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationSummary",
@@ -252,16 +247,17 @@ pub async fn all_organizations(
         ("x-o2-mcp" = json!({"description": "Get organization summary"}))
     )
 )]
-#[get("/{org_id}/summary")]
-async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
+    let org = org_id;
     let org_summary = organization::get_summary(&org).await;
-    Ok(HttpResponse::Ok().json(org_summary))
+    Json(org_summary)
 }
 
 /// GetIngestToken
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/passcode",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
@@ -282,29 +278,27 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/passcode")]
-async fn get_user_passcode(
+pub async fn get_user_passcode(
     Headers(user_email): Headers<UserEmail>,
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+) -> Response {
+    let org = org_id;
     let user_id = user_email.user_id.as_str();
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
     }
     match get_passcode(org_id, user_id).await {
-        Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(passcode) => MetaHttpResponse::json(PasscodeResponse { data: passcode }),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// UpdateIngestToken
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/passcode",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
@@ -325,29 +319,27 @@ async fn get_user_passcode(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/passcode")]
-async fn update_user_passcode(
+pub async fn update_user_passcode(
     Headers(user_email): Headers<UserEmail>,
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+) -> Response {
+    let org = org_id;
     let user_id = user_email.user_id.as_str();
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
     }
     match update_passcode(org_id, user_id).await {
-        Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(passcode) => MetaHttpResponse::json(PasscodeResponse { data: passcode }),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// GetRumIngestToken
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationUserRumIngestToken",
@@ -368,29 +360,27 @@ async fn update_user_passcode(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/rumtoken")]
-async fn get_user_rumtoken(
+pub async fn get_user_rumtoken(
     Headers(user_email): Headers<UserEmail>,
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+) -> Response {
+    let org = org_id;
     let user_id = user_email.user_id.as_str();
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
     }
     match get_rum_token(org_id, user_id).await {
-        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(rumtoken) => MetaHttpResponse::json(RumIngestionResponse { data: rumtoken }),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// UpdateRumIngestToken
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserRumIngestToken",
@@ -411,29 +401,27 @@ async fn get_user_rumtoken(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/rumtoken")]
-async fn update_user_rumtoken(
+pub async fn update_user_rumtoken(
     Headers(user_email): Headers<UserEmail>,
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+) -> Response {
+    let org = org_id;
     let user_id = user_email.user_id.as_str();
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
     }
     match update_rum_token(org_id, user_id).await {
-        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(rumtoken) => MetaHttpResponse::json(RumIngestionResponse { data: rumtoken }),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// CreateRumIngestToken
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/rumtoken",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganizationUserRumIngestToken",
@@ -454,29 +442,27 @@ async fn update_user_rumtoken(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/rumtoken")]
-async fn create_user_rumtoken(
+pub async fn create_user_rumtoken(
     Headers(user_email): Headers<UserEmail>,
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+    Path(org_id): Path<String>,
+) -> Response {
+    let org = org_id;
     let user_id = user_email.user_id.as_str();
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
     }
     match update_rum_token(org_id, user_id).await {
-        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => {
-            Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
-        }
+        Ok(rumtoken) => MetaHttpResponse::json(RumIngestionResponse { data: rumtoken }),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// CreateOrganization
 
 #[utoipa::path(
+    post,
+    path = "/organizations",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "CreateOrganization",
@@ -494,12 +480,11 @@ async fn create_user_rumtoken(
         ("x-o2-mcp" = json!({"description": "Create an organization"}))
     )
 )]
-#[post("/organizations")]
-async fn create_org(
+pub async fn create_org(
     Headers(user_email): Headers<UserEmail>,
-    org: web::Json<Organization>,
-) -> Result<HttpResponse, Error> {
-    let mut org = org.into_inner();
+    Json(org): Json<Organization>,
+) -> Response {
+    let mut org = org;
 
     let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
@@ -509,15 +494,16 @@ async fn create_org(
                 organization: created_org,
                 service_account: service_account_info,
             };
-            Ok(HttpResponse::Ok().json(response))
+            MetaHttpResponse::json(response)
         }
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/extend_trial_period",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "ExtendTrialPeriod",
@@ -534,46 +520,39 @@ async fn create_org(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/extend_trial_period")]
-async fn extend_trial_period(
-    org_id: web::Path<String>,
-    req: web::Json<ExtendTrialPeriodRequest>,
-) -> Result<HttpResponse, Error> {
+pub async fn extend_trial_period(
+    Path(org_id): Path<String>,
+    Json(req): Json<ExtendTrialPeriodRequest>,
+) -> Response {
+    use axum::body::Body;
+
     use crate::service::db::organization::ORG_KEY_PREFIX;
 
-    let req = req.into_inner();
-    let org = org_id.into_inner();
+    let org = org_id;
     if org != "_meta" {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED,
-            "not authorized to access this resource".to_string(),
-        )));
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
     }
 
     let org = match infra::table::organizations::get(&req.org_id).await {
         Ok(org) => org,
         Err(e) => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND,
-                e.to_string(),
-            )));
+            return MetaHttpResponse::not_found(e.to_string());
         }
     };
     if org.trial_ends_at > req.new_end_date {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Existing trial end date is after the provided date".to_string(),
-        )));
+        return MetaHttpResponse::bad_request("Existing trial end date is after the provided date");
     }
 
     let ret = match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date)
         .await
     {
-        Ok(_) => Ok(HttpResponse::Ok().body("success")),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            err.to_string(),
-        ))),
+        Ok(_) => axum::response::Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from("success"))
+            .unwrap(),
+        Err(err) => {
+            return MetaHttpResponse::bad_request(err.to_string());
+        }
     };
 
     let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
@@ -583,6 +562,8 @@ async fn extend_trial_period(
 
 /// RenameOrganization
 #[utoipa::path(
+    put,
+    path = "/{org_id}/rename",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "RenameOrganization",
@@ -599,32 +580,29 @@ async fn extend_trial_period(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
-#[put("/{org_id}/rename")]
-async fn rename_org(
+pub async fn rename_org(
     Headers(user_email): Headers<UserEmail>,
-    path: web::Path<String>,
-    new_name: web::Json<OrgRenameBody>,
-) -> Result<HttpResponse, Error> {
-    let org = path.into_inner();
-    let new_name = new_name.into_inner().new_name;
+    Path(path): Path<String>,
+    Json(new_name): Json<OrgRenameBody>,
+) -> Response {
+    let org = path;
+    let new_name = new_name.new_name;
     if new_name.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "New name cannot be empty",
-        )));
+        return MetaHttpResponse::bad_request("New name cannot be empty");
     }
 
     let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
     match result {
-        Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Ok(org) => MetaHttpResponse::json(org),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
 /// InviteOrganizationMembers
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/invites",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetOrganizationMemberInvites",
@@ -640,11 +618,10 @@ async fn rename_org(
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationInviteUserRecord)),
     )
 )]
-#[get("/{org_id}/invites")]
-pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_org_invites(Path(path): Path<String>) -> Response {
     use crate::common::meta::user::InviteStatus;
 
-    let org = path.into_inner();
+    let org = path;
 
     let result = organization::get_invitations_for_org(&org).await;
     match result {
@@ -653,16 +630,17 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
                 .into_iter()
                 .filter(|invite| invite.status == InviteStatus::Pending)
                 .collect();
-            Ok(HttpResponse::Ok().json(result))
+            MetaHttpResponse::json(result)
         }
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
 /// InviteOrganizationMembers
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/invites",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "InviteOrganizationMembers",
@@ -678,26 +656,25 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
         (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
-#[post("/{org_id}/invites")]
 pub async fn generate_org_invite(
     Headers(user_email): Headers<UserEmail>,
-    path: web::Path<String>,
-    invites: web::Json<OrganizationInvites>,
-) -> Result<HttpResponse, Error> {
-    let org = path.into_inner();
-    let invites = invites.into_inner();
+    Path(path): Path<String>,
+    Json(invites): Json<OrganizationInvites>,
+) -> Response {
+    let org = path;
 
     let result = organization::generate_invitation(&org, &user_email.user_id, invites).await;
     match result {
-        Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Ok(org) => MetaHttpResponse::json(org),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
 /// RemoveOrganizationInvite
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/invites/{token}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "RemoveOrganizationInvite",
@@ -712,20 +689,20 @@ pub async fn generate_org_invite(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
-#[delete("/{org_id}/invites/{token}")]
-pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, token) = path.into_inner();
+pub async fn delete_org_invite(Path(path): Path<(String, String)>) -> Response {
+    let (org_id, token) = path;
 
     let result = organization::delete_invite_by_token(&org_id, &token).await;
     match result {
-        Ok(_) => Ok(HttpResponse::Ok().json("success")),
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Ok(_) => MetaHttpResponse::json("success"),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 /// AcceptOrganizationInvite
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/member_subscription/{invite_token}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "AcceptOrganizationInvite",
@@ -742,18 +719,16 @@ pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<Http
         (status = 200, description = "Success", content_type = "application/json", body = inline(Organization)),
     )
 )]
-#[put("/{org_id}/member_subscription/{invite_token}")]
-async fn accept_org_invite(
+pub async fn accept_org_invite(
     Headers(user_email): Headers<UserEmail>,
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
-    let (_org, invite_token) = path.into_inner();
+    Path(path): Path<(String, String)>,
+) -> Response {
+    let (_org, invite_token) = path;
 
     let result = organization::accept_invitation(&user_email.user_id, &invite_token).await;
     match result {
-        Ok(_) => Ok(MetaHttpResponse::ok("Invitation accepted successfully")),
-        Err(err) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+        Ok(_) => MetaHttpResponse::ok("Invitation accepted successfully"),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
@@ -771,6 +746,8 @@ async fn accept_org_invite(
 /// NOTE: This endpoint is only accessible through the "_meta" organization and requires
 /// the user to have access to this special organization.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/node/list",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationNodeList",
@@ -792,24 +769,22 @@ async fn accept_org_invite(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/node/list")]
-async fn node_list(
-    org_id: web::Path<String>,
-    query: web::Query<std::collections::HashMap<String, String>>,
-) -> Result<HttpResponse, Error> {
-    node_list_impl(&org_id.into_inner(), query.into_inner()).await
+pub async fn node_list(
+    Path(org_id): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    node_list_impl(&org_id, query).await
 }
 
 pub async fn node_list_impl(
     org_id: &str,
     query: std::collections::HashMap<String, String>,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
 
     // Extract regions from query params
@@ -827,7 +802,7 @@ pub async fn node_list_impl(
         // Super cluster is enabled, get nodes from super cluster
         match get_super_cluster_nodes(&_regions).await {
             Ok(response) => response,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         }
     } else {
         // Super cluster not enabled, get local nodes
@@ -845,7 +820,7 @@ pub async fn node_list_impl(
     }
 
     // Return the nested response
-    Ok(HttpResponse::Ok().json(response))
+    MetaHttpResponse::json(response)
 }
 
 /// GetClusterInfo
@@ -863,6 +838,8 @@ pub async fn node_list_impl(
 /// NOTE: This endpoint is only accessible through the "_meta" organization and requires
 /// the user to have access to this special organization.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/cluster/info",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "GetMetaOrganizationClusterInfo",
@@ -884,19 +861,17 @@ pub async fn node_list_impl(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/cluster/info")]
-async fn cluster_info(
-    org_id: web::Path<String>,
-    query: web::Query<std::collections::HashMap<String, String>>,
-) -> Result<HttpResponse, Error> {
-    let org = org_id.into_inner();
+pub async fn cluster_info(
+    Path(org_id): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let org = org_id;
 
     // Ensure this API is only available for the "_meta" organization
     if org != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
 
     // Extract regions from query params
@@ -914,24 +889,24 @@ async fn cluster_info(
         // Super cluster is enabled, get info from super cluster
         match get_super_cluster_info(&_regions).await {
             Ok(resp) => resp,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         }
     } else {
         // Super cluster not enabled, get local info
         match get_local_cluster_info().await {
             Ok(resp) => resp,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         }
     };
 
     #[cfg(not(feature = "enterprise"))]
     let cluster_info_response = match get_local_cluster_info().await {
         Ok(resp) => resp,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
     // Return the response
-    Ok(HttpResponse::Ok().json(cluster_info_response))
+    MetaHttpResponse::json(cluster_info_response)
 }
 
 /// Helper function to collect nodes from the local cluster

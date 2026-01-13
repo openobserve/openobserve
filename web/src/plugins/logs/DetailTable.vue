@@ -53,19 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
-          <!-- Correlation Tabs (only visible when service streams enabled) -->
+          <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
           <q-tab
-            v-if="serviceStreamsEnabled"
+            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
           <q-tab
-            v-if="serviceStreamsEnabled"
+            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-metrics"
             :label="t('correlation.correlatedMetrics')"
           />
           <q-tab
-            v-if="serviceStreamsEnabled"
+            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-traces"
             :label="t('correlation.correlatedTraces')"
           />
@@ -151,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td
                 :data-test="`log-detail-${props.row.field}-key`"
                 class="text-left"
-                :class="store.state.theme == 'dark' ? 'tw:text-[#f67a7aff]' : 'tw:text-[#B71C1C]'"
+                :class="
+                  store.state.theme == 'dark'
+                    ? 'tw:text-[#f67a7aff]'
+                    : 'tw:text-[#B71C1C]'
+                "
               >
                 {{ props.row.field }}
               </q-td>
@@ -462,6 +466,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import config from "@/aws-exports";
 
 const defaultValue: any = () => {
   return {
@@ -762,6 +767,7 @@ export default defineComponent({
       tableRows,
       tablePagination,
       serviceStreamsEnabled,
+      config,
     };
   },
   async created() {

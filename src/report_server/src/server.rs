@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
-use actix_web::{App, HttpServer, dev::ServerHandle, middleware, web};
+use tokio::net::TcpListener;
 
-use crate::router::{healthz, send_report};
+use crate::router::create_router;
 
 pub async fn spawn_server() -> Result<(), anyhow::Error> {
     // Locate or fetch chromium
@@ -29,24 +29,21 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
         format!("{}:{}", ip, cfg.report_server.port).parse()?
     };
     log::info!("starting Report server at: {haddr}");
-    let server = HttpServer::new(move || {
-        App::new()
-            .service(web::scope("/api").service(send_report).service(healthz))
-            .wrap(middleware::Logger::new(
-                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
-            ))
-    })
-    .bind(haddr)?
-    .run();
 
-    let handle = server.handle();
-    tokio::task::spawn(graceful_shutdown(handle));
-    server.await?;
+    // Create the axum router
+    let app = create_router();
+
+    // Bind and serve
+    let listener = TcpListener::bind(haddr).await?;
+    axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+
     log::info!("Report server stopped");
     Ok(())
 }
 
-async fn graceful_shutdown(handle: ServerHandle) {
+async fn shutdown_signal() {
     #[cfg(unix)]
     {
         use tokio::signal::unix::{SignalKind, signal};
@@ -78,8 +75,4 @@ async fn graceful_shutdown(handle: ServerHandle) {
             _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
         }
     }
-    // tokio::signal::ctrl_c().await.unwrap();
-    // println!("ctrl-c received!");
-
-    handle.stop(true).await;
 }

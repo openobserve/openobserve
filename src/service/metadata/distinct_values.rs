@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -42,7 +42,8 @@ use tokio::sync::{RwLock, mpsc};
 use crate::{
     common::meta::stream::SchemaRecords,
     service::{
-        db, ingestion,
+        db,
+        ingestion::{self, get_thread_id},
         metadata::{Metadata, MetadataItem},
         schema::get_schema_changes,
     },
@@ -322,7 +323,7 @@ impl Metadata for DistinctValues {
             }
 
             let writer = ingester::get_writer(
-                0,
+                get_thread_id(),
                 &org_id,
                 StreamType::Metadata.as_str(),
                 &distinct_stream_name,

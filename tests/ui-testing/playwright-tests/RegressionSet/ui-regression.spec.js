@@ -63,17 +63,14 @@ test.describe("UI Regression Bugs", () => {
   test("should redirect to OpenAPI documentation from Help menu @bug-9308 @P1 @regressionBugs @navigation", async ({ page }) => {
     testLogger.info('Test: OpenAPI button redirect (Bug #9308)');
 
-    // Click Help menu
-    const helpButton = page.locator('[data-test="menu-link-help-item"]');
-    await helpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await helpButton.click();
+    // Click Help menu - using POM method
+    await pm.enrichmentPage.clickHelpMenuItem();
     await page.waitForTimeout(1000);
 
     testLogger.info('Help menu opened');
 
-    // Look for OpenAPI menu item
-    const openApiMenuItem = page.locator('text=/openapi/i').first();
-    const openApiVisible = await openApiMenuItem.isVisible().catch(() => false);
+    // Look for OpenAPI menu item - using POM method
+    const openApiVisible = await pm.enrichmentPage.isOpenApiMenuItemVisible();
 
     if (openApiVisible) {
       testLogger.info('OpenAPI menu item found');
@@ -81,8 +78,8 @@ test.describe("UI Regression Bugs", () => {
       // Listen for navigation or new page
       const pagePromise = page.context().waitForEvent('page', { timeout: 10000 }).catch(() => null);
 
-      // Click OpenAPI
-      await openApiMenuItem.click();
+      // Click OpenAPI - using POM method
+      await pm.enrichmentPage.clickOpenApiMenuItemIfVisible();
       await page.waitForTimeout(2000);
 
       // Check if new page opened or current page navigated

@@ -22,6 +22,8 @@
           transition: shouldAnimate
             ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'none',
+          willChange: loading ? 'width' : 'auto',
+          transform: 'translateZ(0)', // Force GPU acceleration
         }"
       >
         <div

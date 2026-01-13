@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use actix_web::web;
+use axum::body::Bytes;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
@@ -50,7 +50,7 @@ pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
@@ -402,7 +402,7 @@ mod tests {
         let bulk_request = r#"{"index": {"_index": "test-stream", "_id": "1"}}
 {"message": "test log message", "level": "info"}"#;
 
-        let body = web::Bytes::from(bulk_request);
+        let body = Bytes::from(bulk_request);
         let thread_id = 1;
         let org_id = "test-org";
         let user = IngestUser::from_user_email("test@example.com");
@@ -911,7 +911,7 @@ mod tests {
         #[test]
         fn test_empty_bulk_request() {
             let empty_request = "";
-            let body = web::Bytes::from(empty_request);
+            let body = Bytes::from(empty_request);
 
             // Empty request should be handled gracefully
             // (Test would need actual infrastructure to run fully)

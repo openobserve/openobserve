@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,8 @@
 
 use std::collections::HashSet;
 
+#[cfg(feature = "enterprise")]
+use axum::response::Response;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
     TIMESTAMP_COL_NAME, meta::stream::StreamType,
@@ -30,7 +32,6 @@ use {
         },
         service::users::get_user,
     },
-    actix_web::HttpResponse,
     config::meta::user::User,
     o2_openfga::meta::mapping::OFGA_MODELS,
 };
@@ -44,7 +45,7 @@ pub async fn check_stream_permissions(
     org_id: &str,
     user_id: &str,
     stream_type: &StreamType,
-) -> Option<HttpResponse> {
+) -> Option<Response> {
     if !is_root_user(user_id) {
         let user: User = get_user(Some(org_id), user_id).await.unwrap();
         let stream_type_str = stream_type.as_str();

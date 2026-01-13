@@ -196,7 +196,6 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
-                # "visualization-vrl.spec.js"
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -210,6 +209,12 @@ jobs:
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
                 # "remotepipeline.spec.js"
+              ]
+          - testfolder: "Functions"
+            browser: "chrome"
+            run_files: [
+                "js-transform-type.spec.js",
+                "row-expansion.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"

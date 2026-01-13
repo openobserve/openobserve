@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::web;
+use axum::extract::Query;
 use chrono::{Duration, Utc};
 use config::{
     DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME,
@@ -48,9 +48,9 @@ pub(crate) async fn around(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    query: web::Query<HashMap<String, String>>,
+    query: Query<HashMap<String, String>>,
     sql: Option<String>,
-    body: Option<web::Bytes>,
+    body: Option<bytes::Bytes>,
     user_id: Option<String>,
 ) -> Result<config::meta::search::Response, infra::errors::Error> {
     let start = std::time::Instant::now();

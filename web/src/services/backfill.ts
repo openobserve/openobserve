@@ -96,12 +96,14 @@ const backfill = {
    */
   getBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJob> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill/${job_id}`;
     const response = await http().get(url);
     return response.data;
   },
@@ -112,14 +114,16 @@ const backfill = {
    */
   enableBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
     enable,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
     enable: boolean;
   }): Promise<BackfillJobActionResponse> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}/enable?value=${enable}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill/${job_id}/enable?value=${enable}`;
     const response = await http().put(url);
     return response.data;
   },
@@ -130,12 +134,14 @@ const backfill = {
    */
   pauseBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    return backfill.enableBackfillJob({ org_id, job_id, enable: false });
+    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: false });
   },
 
   /**
@@ -144,12 +150,14 @@ const backfill = {
    */
   resumeBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    return backfill.enableBackfillJob({ org_id, job_id, enable: true });
+    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: true });
   },
 
   /**
@@ -157,14 +165,16 @@ const backfill = {
    */
   updateBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
     data,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
     data: CreateBackfillJobRequest;
   }): Promise<BackfillJobActionResponse> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill/${job_id}`;
     const response = await http().put(url, data);
     return response.data;
   },
@@ -174,12 +184,14 @@ const backfill = {
    */
   deleteBackfillJob: async ({
     org_id,
+    pipeline_id,
     job_id,
   }: {
     org_id: string;
+    pipeline_id: string;
     job_id: string;
   }): Promise<BackfillJobActionResponse> => {
-    const url = `/api/${org_id}/pipelines/backfill/${job_id}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill/${job_id}`;
     const response = await http().delete(url);
     return response.data;
   },

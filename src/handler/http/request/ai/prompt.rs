@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, Result, delete, get, http::StatusCode, put, web};
+use axum::{Json, extract::Path, http::StatusCode, response::Response};
 use config::meta::ai::PromptType;
 use o2_enterprise::enterprise::ai::agent::prompt::{
     meta::UpdatePromptRequest, service as prompt_service,
@@ -27,6 +25,8 @@ use crate::{
 
 /// ListPrompts
 #[utoipa::path(
+    get,
+    path = "/{org_id}/ai/prompts",
     context_path = "/api",
     tag = "Ai",
     operation_id = "ListPrompts",
@@ -47,24 +47,23 @@ use crate::{
         ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "list"}))
     )
 )]
-#[get("/{org_id}/ai/prompts")]
-pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_prompts(Path(org_id): Path<String>) -> Response {
     // Ensure this API is only available for the "_meta" organization
-    let org_id = org_id.into_inner();
     if org_id != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
     match prompt_service::get_all_prompts().await {
-        Ok(response) => Ok(MetaHttpResponse::json(response)),
-        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
+        Ok(response) => MetaHttpResponse::json(response),
+        Err(err) => MetaHttpResponse::internal_error(err),
     }
 }
 
 /// GetPrompt
 #[utoipa::path(
+    get,
+    path = "/{org_id}/ai/prompts/{prompt_type}",
     context_path = "/api",
     tag = "Ai",
     operation_id = "GetPrompt",
@@ -87,25 +86,24 @@ pub async fn list_prompts(org_id: web::Path<String>) -> Result<HttpResponse, Err
         ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "get"}))
     )
 )]
-#[get("/{org_id}/ai/prompts/{prompt_type}")]
-pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpResponse, Error> {
-    let (org_id, prompt_type) = path.into_inner();
+pub async fn get_prompt(Path((org_id, prompt_type)): Path<(String, PromptType)>) -> Response {
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
 
     match prompt_service::get_prompt(prompt_type).await {
-        Ok(prompt) => Ok(MetaHttpResponse::json(prompt)),
-        Err(err) => Ok(MetaHttpResponse::not_found(err)),
+        Ok(prompt) => MetaHttpResponse::json(prompt),
+        Err(err) => MetaHttpResponse::not_found(err),
     }
 }
 
 /// UpdatePrompt
 #[utoipa::path(
+    put,
+    path = "/{org_id}/ai/prompts",
     context_path = "/api",
     tag = "Ai",
     operation_id = "UpdatePrompt",
@@ -119,13 +117,13 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
     ),
     request_body(
         content = inline(UpdatePromptRequest),
-        description = "Prompt details", 
+        description = "Prompt details",
         example = json!({
             "content": "Write a SQL query to get the top 10 users by response time in the default stream"
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Prompt updated", body = inline(PromptResponse)), 
+        (status = StatusCode::OK, description = "Prompt updated", body = inline(PromptResponse)),
         (status = StatusCode::NOT_FOUND, description = "Prompt not found", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
@@ -134,20 +132,16 @@ pub async fn get_prompt(path: web::Path<(String, PromptType)>) -> Result<HttpRes
         ("x-o2-ratelimit" = json!({"module": "Prompt", "operation": "update"}))
     )
 )]
-#[put("/{org_id}/ai/prompts")]
 pub async fn update_prompt(
-    path: web::Path<String>,
-    request: web::Json<UpdatePromptRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    Path(org_id): Path<String>,
+    Json(request): Json<UpdatePromptRequest>,
+) -> Response {
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
-    let request = request.into_inner();
     match prompt_service::update_prompt(request.content.clone()).await {
         Ok(_) => {
             // Emit cluster coordinator event to notify nodes in current cluster
@@ -176,13 +170,15 @@ pub async fn update_prompt(
                 }
             }
 
-            Ok(MetaHttpResponse::ok("Prompt updated"))
+            MetaHttpResponse::ok("Prompt updated")
         }
-        Err(err) => Ok(MetaHttpResponse::bad_request(err)),
+        Err(err) => MetaHttpResponse::bad_request(err),
     }
 }
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/ai/prompts",
     context_path = "/api",
     tag = "Ai",
     operation_id = "RollbackPrompt",
@@ -200,15 +196,12 @@ pub async fn update_prompt(
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
     ),
 )]
-#[delete("/{org_id}/ai/prompts")]
-pub async fn rollback_prompt(path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+pub async fn rollback_prompt(Path(org_id): Path<String>) -> Response {
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            StatusCode::FORBIDDEN,
+        return MetaHttpResponse::forbidden(
             "This API is only available for the _meta organization",
-        )));
+        );
     }
     match prompt_service::rollback_to_default_prompt().await {
         Ok(()) => {
@@ -217,8 +210,11 @@ pub async fn rollback_prompt(path: web::Path<String>) -> Result<HttpResponse, Er
                 log::error!("Failed to emit AI prompt rollback event to cluster coordinator: {e}");
             }
 
-            Ok(HttpResponse::NoContent().finish())
+            axum::http::Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body(axum::body::Body::empty())
+                .unwrap_or_else(|_| Response::new(axum::body::Body::empty()))
         }
-        Err(err) => Ok(MetaHttpResponse::not_found(err)),
+        Err(err) => MetaHttpResponse::not_found(err),
     }
 }
