@@ -263,6 +263,21 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up saved views matching test patterns
     await pm.apiCleanup.cleanupSavedViews();
 
+    // Clean up metrics streams matching test patterns
+    // Metrics tests use OTLP ingestion which may create test-specific streams
+    await pm.apiCleanup.cleanupMetricsStreams(
+      [
+        /^test_.*_metrics$/,              // test_*_metrics streams (general test streams)
+        /^e2e_metrics_/,                  // e2e_metrics_* (E2E test streams)
+        /^otlp_test_/,                    // otlp_test_* (OTLP ingestion test streams)
+        /^metrics_test_/,                 // metrics_test_* (Metrics-specific test streams)
+        /^prom_test_/,                    // prom_test_* (Prometheus test streams)
+        /^temp_metrics_/                  // temp_metrics_* (Temporary test streams)
+      ],
+      // Protected metrics streams - never delete
+      ['default']  // 'default' is the primary metrics stream used by tests
+    );
+
     // Note: Stream deletion waiting is no longer needed here because:
     // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)
     // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
