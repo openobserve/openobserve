@@ -315,7 +315,14 @@ const confirmCancelJob = () => {
 };
 
 const cancelJob = async () => {
-  if (!job.value) return;
+  if (!job.value || !job.value.pipeline_id) {
+    $q.notify({
+      type: "negative",
+      message: "Job information not available. Please try again.",
+      timeout: 3000,
+    });
+    return;
+  }
 
   try {
     await backfillService.cancelBackfillJob({

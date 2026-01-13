@@ -599,7 +599,7 @@ const confirmPauseJob = (job: BackfillJob) => {
     show: true,
     title: "Pause Backfill Job",
     message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
-    onConfirm: () => pauseJob(job.job_id),
+    onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };
 };
 
@@ -608,7 +608,7 @@ const confirmResumeJob = (job: BackfillJob) => {
     show: true,
     title: "Resume Backfill Job",
     message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
-    onConfirm: () => resumeJob(job.job_id),
+    onConfirm: () => resumeJob(job.pipeline_id, job.job_id),
   };
 };
 
@@ -617,21 +617,15 @@ const confirmDeleteJob = (job: BackfillJob) => {
     show: true,
     title: "Delete Backfill Job",
     message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
-    onConfirm: () => deleteJob(job.job_id),
+    onConfirm: () => deleteJob(job.pipeline_id, job.job_id),
   };
 };
 
-const pauseJob = async (jobId: string) => {
+const pauseJob = async (pipelineId: string, jobId: string) => {
   try {
-    // Find the job to get the pipeline_id
-    const job = jobs.value.find((j) => j.job_id === jobId);
-    if (!job) {
-      throw new Error("Job not found");
-    }
-
     await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
-      pipeline_id: job.pipeline_id,
+      pipeline_id: pipelineId,
       job_id: jobId,
       enable: false,
     });
@@ -653,17 +647,11 @@ const pauseJob = async (jobId: string) => {
   }
 };
 
-const resumeJob = async (jobId: string) => {
+const resumeJob = async (pipelineId: string, jobId: string) => {
   try {
-    // Find the job to get the pipeline_id
-    const job = jobs.value.find((j) => j.job_id === jobId);
-    if (!job) {
-      throw new Error("Job not found");
-    }
-
     await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
-      pipeline_id: job.pipeline_id,
+      pipeline_id: pipelineId,
       job_id: jobId,
       enable: true,
     });
@@ -685,17 +673,11 @@ const resumeJob = async (jobId: string) => {
   }
 };
 
-const deleteJob = async (jobId: string) => {
+const deleteJob = async (pipelineId: string, jobId: string) => {
   try {
-    // Find the job to get the pipeline_id
-    const job = jobs.value.find((j) => j.job_id === jobId);
-    if (!job) {
-      throw new Error("Job not found");
-    }
-
     await backfillService.deleteBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
-      pipeline_id: job.pipeline_id,
+      pipeline_id: pipelineId,
       job_id: jobId,
     });
 
