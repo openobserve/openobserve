@@ -180,7 +180,6 @@ pub struct PanelFields {
     pub target: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<AxisItem>,
-    #[schema(value_type = PanelFilter)]
     pub filter: PanelFilter,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub promql_labels: Vec<PromQLLabelFilter>,
@@ -294,7 +293,7 @@ pub enum PanelFilter {
 pub struct GroupType {
     pub filter_type: String,
     pub logical_operator: String,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Vec<Object>)]
     pub conditions: Vec<PanelFilter>,
 }
 
