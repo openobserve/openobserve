@@ -855,11 +855,6 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                     "Failed to store session {} in cluster coordinator",
                     session_id
                 );
-            } else {
-                log::info!(
-                    "Successfully stored session {} in cluster coordinator",
-                    session_id
-                );
             }
 
             let access_token = format!("session {session_id}");
@@ -990,11 +985,6 @@ pub async fn refresh_token_with_dex(
             {
                 log::error!(
                     "Failed to store session {} in cluster coordinator",
-                    session_id
-                );
-            } else {
-                log::info!(
-                    "Successfully stored session {} in cluster coordinator",
                     session_id
                 );
             }

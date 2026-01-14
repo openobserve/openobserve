@@ -250,20 +250,39 @@ pub async fn get_alert_history(
         }
         // If RBAC is enabled, check permissions
         else if o2_openfga::config::get_config().enabled {
-            let _user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
                     return MetaHttpResponse::forbidden("User not found");
                 }
             };
 
-            // If specific alert_id is requested, skip RBAC check
-            // The alert existence was already verified above (lines 222-237),
-            // and if the user can view the alert in the UI, they should be able to view its
-            // history. The middleware authentication already verified the user is
-            // authenticated.
-            if query.alert_id.is_some() {
-                // User has permission to this specific alert (verified by existence check)
+            let role = user.role.to_string();
+
+            // If specific alert_id is requested, check access to it
+            if let Some(ref alert_id) = query.alert_id {
+                let folder_id = _folder_id.clone().unwrap_or_default();
+                let alert_obj = format!(
+                    "{}:{}",
+                    o2_openfga::meta::mapping::OFGA_MODELS
+                        .get("alerts")
+                        .unwrap()
+                        .key,
+                    alert_id
+                );
+
+                let has_permission = o2_openfga::authorizer::authz::is_allowed(
+                    &org_id, user_id, "GET", &alert_obj, &folder_id, &role,
+                )
+                .await;
+
+                if !has_permission {
+                    return MetaHttpResponse::forbidden(format!(
+                        "Access denied to alert '{alert_id}'"
+                    ));
+                }
+
+                // User has permission to this specific alert
                 None
             } else {
                 // List all history - filter by accessible alerts

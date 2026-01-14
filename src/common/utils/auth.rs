@@ -449,25 +449,6 @@ where
                     path_columns[0]
                 )
             }
-            // handle alerts/deduplication without /config suffix - requires settings permissions
-            else if path_columns[1].eq("alerts") && path_columns[2].eq("deduplication") {
-                // This handles paths like /org/alerts/deduplication (3 segments)
-                // The /config paths are handled in the url_len == 4 block
-                // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
-                // endpoints
-                if method.eq("GET") {
-                    method = "LIST".to_string();
-                } else if method.eq("POST") || method.eq("DELETE") {
-                    method = "PUT".to_string();
-                }
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("settings")
-                        .map_or("settings", |model| model.key),
-                    path_columns[0]
-                )
-            }
             // these are cases where the entity is "sub-entity" of some other entity,
             // for example, alerts are on route /org/stream/alerts
             // or templates are on route /org/alerts/templates and so on
