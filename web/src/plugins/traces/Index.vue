@@ -22,7 +22,7 @@ style="min-height: auto">
       <div
         class="tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
         :class="
-          activeTab === 'service-maps' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
+          activeTab === 'service-graph' ? 'tw:min-h-[45px]' : 'tw:min-h-[82px]'
         "
       >
         <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
@@ -39,9 +39,9 @@ style="min-height: auto">
         />
       </div>
 
-      <!-- Service Maps Tab Content -->
+      <!-- Service Graph Tab Content -->
       <div
-        v-if="activeTab === 'service-maps' && store.state.zoConfig.service_graph_enabled"
+        v-if="activeTab === 'service-graph' && store.state.zoConfig.service_graph_enabled"
         class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-[calc(100vh-98px)] tw:overflow-hidden"
       >
         <service-graph class="tw:h-full" />
@@ -1096,10 +1096,11 @@ onBeforeMount(async () => {
   restoreUrlQueryParams();
   // Restore active tab from URL query params
   const queryParams = router.currentRoute.value.query;
-  if (queryParams.tab === 'service-maps') {
-    // Only allow service-maps tab if service graph is enabled
+  if (queryParams.tab === 'service-graph' || queryParams.tab === 'service-maps') {
+    // Support both old 'service-maps' and new 'service-graph' for backwards compatibility
+    // Only allow service graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      activeTab.value = 'service-maps';
+      activeTab.value = 'service-graph';
     } else {
       // If service graph is disabled, default to search tab
       activeTab.value = 'search';
@@ -1369,10 +1370,10 @@ watch(updateSelectedColumns, () => {
 // Watch for active tab changes and update URL
 watch(activeTab, (newTab) => {
   const query = { ...router.currentRoute.value.query };
-  if (newTab === 'service-maps') {
-    // Only set service-maps tab if service graph is enabled
+  if (newTab === 'service-graph') {
+    // Only set service-graph tab if service graph is enabled
     if (store.state.zoConfig.service_graph_enabled) {
-      query.tab = 'service-maps';
+      query.tab = 'service-graph';
     } else {
       // If service graph is disabled, force back to search tab
       activeTab.value = 'search';

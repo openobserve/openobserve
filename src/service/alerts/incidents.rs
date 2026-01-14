@@ -456,9 +456,20 @@ pub async fn get_incident_with_alerts(
         status: incident.status.parse().unwrap_or_default(),
         severity: incident.severity.parse().unwrap_or_default(),
         stable_dimensions: serde_json::from_value(incident.stable_dimensions).unwrap_or_default(),
-        topology_context: incident
-            .topology_context
-            .and_then(|v| serde_json::from_value(v).ok()),
+        topology_context: incident.topology_context.and_then(|v| {
+            match serde_json::from_value(v.clone()) {
+                Ok(topology) => Some(topology),
+                Err(e) => {
+                    log::error!(
+                        "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
+                        incident_id,
+                        e,
+                        v
+                    );
+                    None
+                }
+            }
+        }),
         first_alert_at: incident.first_alert_at,
         last_alert_at: incident.last_alert_at,
         resolved_at: incident.resolved_at,
@@ -547,24 +558,38 @@ pub async fn list_incidents(
 
     let incidents_list = incidents
         .into_iter()
-        .map(|i| config::meta::alerts::incidents::Incident {
-            id: i.id,
-            org_id: i.org_id,
-            correlation_key: i.correlation_key,
-            status: i.status.parse().unwrap_or_default(),
-            severity: i.severity.parse().unwrap_or_default(),
-            stable_dimensions: serde_json::from_value(i.stable_dimensions).unwrap_or_default(),
-            topology_context: i
-                .topology_context
-                .and_then(|v| serde_json::from_value(v).ok()),
-            first_alert_at: i.first_alert_at,
-            last_alert_at: i.last_alert_at,
-            resolved_at: i.resolved_at,
-            alert_count: i.alert_count,
-            title: i.title,
-            assigned_to: i.assigned_to,
-            created_at: i.created_at,
-            updated_at: i.updated_at,
+        .map(|i| {
+            let incident_id = i.id.clone();
+            config::meta::alerts::incidents::Incident {
+                id: i.id,
+                org_id: i.org_id,
+                correlation_key: i.correlation_key,
+                status: i.status.parse().unwrap_or_default(),
+                severity: i.severity.parse().unwrap_or_default(),
+                stable_dimensions: serde_json::from_value(i.stable_dimensions).unwrap_or_default(),
+                topology_context: i.topology_context.and_then(|v| {
+                    match serde_json::from_value(v.clone()) {
+                        Ok(topology) => Some(topology),
+                        Err(e) => {
+                            log::error!(
+                                "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
+                                incident_id,
+                                e,
+                                v
+                            );
+                            None
+                        }
+                    }
+                }),
+                first_alert_at: i.first_alert_at,
+                last_alert_at: i.last_alert_at,
+                resolved_at: i.resolved_at,
+                alert_count: i.alert_count,
+                title: i.title,
+                assigned_to: i.assigned_to,
+                created_at: i.created_at,
+                updated_at: i.updated_at,
+            }
         })
         .collect();
 
@@ -715,9 +740,21 @@ pub async fn get_service_graph(
     let incident_service = get_primary_service(&all_services);
 
     // Get topology context if available
-    let topology: Option<config::meta::alerts::incidents::IncidentTopology> = incident
-        .topology_context
-        .and_then(|v| serde_json::from_value(v).ok());
+    let topology: Option<config::meta::alerts::incidents::IncidentTopology> =
+        incident.topology_context.and_then(|v| {
+            match serde_json::from_value(v.clone()) {
+                Ok(topology) => Some(topology),
+                Err(e) => {
+                    log::error!(
+                        "[incidents] Failed to deserialize topology_context in get_service_graph for incident {}: {}. Raw value: {:?}",
+                        incident_id,
+                        e,
+                        v
+                    );
+                    None
+                }
+            }
+        });
 
     // Get all alerts for this incident to count by service
     let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
@@ -838,15 +875,26 @@ pub async fn update_status(
     }
 
     Ok(config::meta::alerts::incidents::Incident {
-        id: updated.id,
+        id: updated.id.clone(),
         org_id: updated.org_id,
         correlation_key: updated.correlation_key,
         status: updated.status.parse().unwrap_or_default(),
         severity: updated.severity.parse().unwrap_or_default(),
         stable_dimensions: serde_json::from_value(updated.stable_dimensions).unwrap_or_default(),
-        topology_context: updated
-            .topology_context
-            .and_then(|v| serde_json::from_value(v).ok()),
+        topology_context: updated.topology_context.and_then(|v| {
+            match serde_json::from_value(v.clone()) {
+                Ok(topology) => Some(topology),
+                Err(e) => {
+                    log::error!(
+                        "[incidents] Failed to deserialize topology_context in update_status for incident {}: {}. Raw value: {:?}",
+                        updated.id,
+                        e,
+                        v
+                    );
+                    None
+                }
+            }
+        }),
         first_alert_at: updated.first_alert_at,
         last_alert_at: updated.last_alert_at,
         resolved_at: updated.resolved_at,

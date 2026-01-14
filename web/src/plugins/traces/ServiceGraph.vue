@@ -42,7 +42,22 @@
             </q-input>
           </div>
           <div class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]">
-            <!-- 1. Refresh button -->
+            <!-- 1. Time range selector -->
+            <date-time
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="timeRange.type"
+              :default-absolute-time="{
+                startTime: timeRange.startTime,
+                endTime: timeRange.endTime,
+              }"
+              :default-relative-time="timeRange.relativeTimePeriod"
+              data-test="service-graph-date-time-picker"
+              class="tw:h-[2rem]"
+              @on:date-change="updateTimeRange"
+            />
+
+            <!-- 2. Refresh button -->
             <q-btn
               data-test="service-graph-refresh-btn"
               no-caps
@@ -56,7 +71,7 @@
               <q-tooltip>Refresh Service Graph</q-tooltip>
             </q-btn>
 
-            <!-- 2. Graph/Tree view toggle buttons -->
+            <!-- 3. Graph/Tree view toggle buttons -->
             <q-btn-toggle
               v-model="visualizationType"
               toggle-color="primary"
@@ -69,7 +84,7 @@
               @update:model-value="setVisualizationType"
             />
 
-            <!-- 3. Layout dropdown -->
+            <!-- 4. Layout dropdown -->
             <q-select
               v-model="layoutType"
               :options="layoutOptions"
@@ -201,6 +216,7 @@ import { useStore } from "vuex";
 import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
+import DateTime from "@/components/DateTime.vue";
 import { convertServiceGraphToTree, convertServiceGraphToNetwork } from "@/utils/traces/convertTraceData";
 
 export default defineComponent({
@@ -208,6 +224,7 @@ export default defineComponent({
   components: {
     AppTabs,
     ChartRenderer,
+    DateTime,
   },
   setup() {
     const store = useStore();
@@ -261,6 +278,16 @@ export default defineComponent({
     });
 
     const stats = ref<any>(null);
+
+    // Time range state - default to last 15 minutes
+    const timeRange = ref({
+      type: 'relative',
+      relativeTimePeriod: '15m',
+      startTime: Date.now() * 1000 - 15 * 60 * 1000000, // 15 minutes ago in microseconds
+      endTime: Date.now() * 1000, // Now in microseconds
+    });
+
+    const dateTimeRef = ref<any>(null);
 
     // Store node positions for graph view to prevent re-layout on updates
     const graphNodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
@@ -620,6 +647,17 @@ export default defineComponent({
       return num.toString();
     };
 
+    const updateTimeRange = (value: any) => {
+      timeRange.value = {
+        startTime: value.startTime,
+        endTime: value.endTime,
+        relativeTimePeriod: value.relativeTimePeriod || timeRange.value.relativeTimePeriod,
+        type: value.relativeTimePeriod ? "relative" : "absolute",
+      };
+      // Reload service graph with new time range
+      loadServiceGraph();
+    };
+
     onMounted(() => {
       loadServiceGraph();
     });
@@ -643,12 +681,15 @@ export default defineComponent({
       chartData,
       chartKey,
       chartRendererRef,
+      timeRange,
+      dateTimeRef,
       loadServiceGraph,
       formatNumber,
       applyFilters,
       onStreamFilterChange,
       setLayout,
       setVisualizationType,
+      updateTimeRange,
     };
   },
 });
