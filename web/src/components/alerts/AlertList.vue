@@ -28,13 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <!-- View Mode Tabs (Alerts / Incidents) -->
-            <div class="view-mode-tabs-container">
-              <app-tabs
-                :tabs="viewTabs"
-                v-model:active-tab="viewMode"
-                @update:active-tab="onViewModeChange"
-                data-test="alert-incident-view-tabs"
-              />
+            <div class="flex justify-start">
+              <q-tabs v-model="viewMode" inline-label dense @update:model-value="onViewModeChange">
+                <q-tab
+                  name="alerts"
+                  :label="t('alerts.header')"
+                  no-caps
+                  data-test="alert-view-tab"
+                />
+                <q-tab
+                  name="incidents"
+                  :label="t('alerts.incidents.title')"
+                  no-caps
+                  data-test="incident-view-tab"
+                />
+              </q-tabs>
             </div>
           </div>
           <div class="flex q-ml-auto tw:ps-2 items-center">
