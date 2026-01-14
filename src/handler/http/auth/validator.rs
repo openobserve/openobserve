@@ -605,7 +605,7 @@ pub async fn validate_credentials_ext(
     _in_password: &str,
     _path: &str,
     _auth_token: AuthTokensExt,
-    method: &str,
+    _method: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
     Err(AuthError::Forbidden("Not allowed".to_string()))
 }

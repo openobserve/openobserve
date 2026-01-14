@@ -614,9 +614,9 @@ dependencies = [
 
 [[package]]
 name = "async-fs"
-version = "2.1.2"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebcd09b382f40fcd159c2d695175b2ae620ffa5f3bd6f664131efff4e8b9e04a"
+checksum = "8034a681df4aed8b8edbd7fbe472401ecf009251c8b40556b304567052e294c5"
 dependencies = [
  "async-lock",
  "blocking",
@@ -735,17 +735,6 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tungstenite",
-]
-
-[[package]]
-name = "async-walkdir"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37672978ae0febce7516ae0a85b53e6185159a9a28787391eb63fc44ec36037d"
-dependencies = [
- "async-fs",
- "futures-lite",
- "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -2191,8 +2180,8 @@ dependencies = [
  "arrow",
  "arrow-json",
  "arrow-schema",
+ "async-fs",
  "async-recursion",
- "async-walkdir",
  "aws-config",
  "aws-sdk-sns",
  "axum 0.8.8",
@@ -2251,6 +2240,7 @@ dependencies = [
  "tantivy",
  "tantivy-fst",
  "tempfile",
+ "thiserror 2.0.17",
  "tokio",
  "tokio-util",
  "tonic 0.14.2",
@@ -5086,7 +5076,6 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "arrow-schema",
- "async-walkdir",
  "byteorder",
  "bytes",
  "chrono",
@@ -6480,7 +6469,6 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
- "async-walkdir",
  "aws-sdk-sns",
  "axum 0.8.8",
  "axum-extra",
