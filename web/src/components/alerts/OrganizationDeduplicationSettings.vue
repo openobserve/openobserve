@@ -15,149 +15,152 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full org-dedup-settings q-mt-sm">
-    <div class="tw:mb-6">
-      <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
-      <div class="text-body2 text-grey-7">
-        {{ t('alerts.correlation.description') }}
-      </div>
-      <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
-        {{ t('alerts.correlation.semanticFieldNote') }}
-      </div>
-      <q-btn
-        data-test="dedup-settings-refresh-btn"
-        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        flat
-        dense
-        color="primary"
-        :label="t('common.refresh')"
-        @click="loadConfig"
-      />
-    </div>
-
-    <q-separator class="tw:mb-6" />
-
-    <!-- Enable Deduplication -->
-    <div class="tw:mb-6">
-      <q-checkbox
-        data-test="organization-deduplication-enable-checkbox"
-        v-model="localConfig.enabled"
-        :label="t('alerts.correlation.enableOrgLevel')"
-        dense
-        @update:model-value="emitUpdate"
-      >
-        <q-tooltip>
-          {{ t('alerts.correlation.enableOrgLevelTooltip') }}
-        </q-tooltip>
-      </q-checkbox>
-    </div>
-
-    <!-- Cross-Alert Deduplication -->
-    <div class="tw:mb-6" v-if="localConfig.enabled">
-      <q-checkbox
-        data-test="organizationdeduplication-enable-cross-alert-checkbox"
-        v-model="localConfig.alert_dedup_enabled"
-        :label="t('alerts.correlation.enableCrossAlert')"
-        dense
-        @update:model-value="emitUpdate"
-      >
-        <q-tooltip>
-          {{ t('alerts.correlation.enableCrossAlertTooltip') }}
-        </q-tooltip>
-      </q-checkbox>
-    </div>
-
-    <!-- Cross-Alert Fingerprint Groups -->
-    <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
-      <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-        {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
-        <q-icon
-          :name="outlinedInfo"
-          size="17px"
-          class="q-ml-xs cursor-pointer"
-          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-        >
-          <q-tooltip
-            anchor="center right"
-            self="center left"
-            max-width="300px"
-            style="font-size: 12px"
-          >
-            {{ t('alerts.correlation.fingerprintGroupsTooltip') }}
-          </q-tooltip>
-        </q-icon>
-      </div>
-      <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-        {{ t('alerts.correlation.fingerprintGroupsHint') }}
-      </div>
-      <div class="tw:flex tw:flex-col tw:gap-2">
-        <q-checkbox
-          v-for="group in localSemanticGroups"
-          :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
-          :key="group.id"
-          :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
-          @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
-          :label="`${group.display} (${group.id})`"
+  <div class="tw:w-full tw:h-[calc(100vh-172px)] tw:px-2 org-dedup-settings tw:flex tw:flex-col">
+    <!-- Scrollable content area -->
+    <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
+      <div class="tw:mb-6">
+        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
+        <div class="text-body2 text-grey-7">
+          {{ t('alerts.correlation.description') }}
+        </div>
+        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+          {{ t('alerts.correlation.semanticFieldNote') }}
+        </div>
+        <q-btn
+          data-test="dedup-settings-refresh-btn"
+          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          flat
           dense
+          color="primary"
+          :label="t('common.refresh')"
+          @click="loadConfig"
         />
-        <div
-          v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-          class="tw:text-red-500 tw:text-sm tw:mt-1"
+      </div>
+
+      <q-separator class="tw:mb-6" />
+
+      <!-- Enable Deduplication -->
+      <div class="tw:mb-6">
+        <q-checkbox
+          data-test="organization-deduplication-enable-checkbox"
+          v-model="localConfig.enabled"
+          :label="t('alerts.correlation.enableOrgLevel')"
+          dense
+          @update:model-value="emitUpdate"
         >
-          {{ t('alerts.correlation.fingerprintGroupsRequired') }}
+          <q-tooltip>
+            {{ t('alerts.correlation.enableOrgLevelTooltip') }}
+          </q-tooltip>
+        </q-checkbox>
+      </div>
+
+      <!-- Cross-Alert Deduplication -->
+      <div class="tw:mb-6" v-if="localConfig.enabled">
+        <q-checkbox
+          data-test="organizationdeduplication-enable-cross-alert-checkbox"
+          v-model="localConfig.alert_dedup_enabled"
+          :label="t('alerts.correlation.enableCrossAlert')"
+          dense
+          @update:model-value="emitUpdate"
+        >
+          <q-tooltip>
+            {{ t('alerts.correlation.enableCrossAlertTooltip') }}
+          </q-tooltip>
+        </q-checkbox>
+      </div>
+
+      <!-- Cross-Alert Fingerprint Groups -->
+      <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
+        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+          {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              style="font-size: 12px"
+            >
+              {{ t('alerts.correlation.fingerprintGroupsTooltip') }}
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+          {{ t('alerts.correlation.fingerprintGroupsHint') }}
+        </div>
+        <div class="tw:flex tw:flex-col tw:gap-2">
+          <q-checkbox
+            v-for="group in localSemanticGroups"
+            :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
+            :key="group.id"
+            :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
+            @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
+            :label="`${group.display} (${group.id})`"
+            dense
+          />
+          <div
+            v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
+            class="tw:text-red-500 tw:text-sm tw:mt-1"
+          >
+            {{ t('alerts.correlation.fingerprintGroupsRequired') }}
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Time Window -->
-    <div class="tw:mb-6">
-      <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-        {{ t('alerts.correlation.defaultWindow') }}
-        <q-icon
-          :name="outlinedInfo"
-          size="17px"
-          class="q-ml-xs cursor-pointer"
-          :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-        >
-          <q-tooltip
-            anchor="center right"
-            self="center left"
-            max-width="300px"
-            style="font-size: 12px"
+      <!-- Time Window -->
+      <div class="tw:mb-6">
+        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+          {{ t('alerts.correlation.defaultWindow') }}
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            {{ t('alerts.correlation.defaultWindowTooltip') }}
-          </q-tooltip>
-        </q-icon>
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              style="font-size: 12px"
+            >
+              {{ t('alerts.correlation.defaultWindowTooltip') }}
+            </q-tooltip>
+          </q-icon>
+        </div>
+        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+          {{ t('alerts.correlation.defaultWindowDescription') }}
+        </div>
+        <q-input
+          data-test="orgnaizationdeduplication-default-window-input"
+          v-model.number="localConfig.time_window_minutes"
+          type="number"
+          dense
+          borderless
+          min="1"
+          :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
+          :class="
+            store.state.theme === 'dark'
+              ? 'input-box-bg-dark input-border-dark'
+              : 'input-box-bg-light input-border-light'
+          "
+          @update:model-value="emitUpdate"
+        />
       </div>
-      <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-        {{ t('alerts.correlation.defaultWindowDescription') }}
-      </div>
-      <q-input
-        data-test="orgnaizationdeduplication-default-window-input"
-        v-model.number="localConfig.time_window_minutes"
-        type="number"
-        dense
-        filled
-        min="1"
-        :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
-        :class="
-          store.state.theme === 'dark'
-            ? 'input-box-bg-dark input-border-dark'
-            : 'input-box-bg-light input-border-light'
-        "
-        @update:model-value="emitUpdate"
-      />
     </div>
 
-    <div class="tw:flex tw:justify-end tw:gap-3">
-      <q-btn outline :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="tw:px-4" />
+    <!-- Sticky footer with buttons -->
+    <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
+      <q-btn :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="o2-secondary-button" />
       <q-btn
         :label="t('alerts.correlation.saveButton')"
-        color="primary"
         @click="saveSettings"
         :loading="saving"
-        class="tw:px-4"
+        class="o2-primary-button"
       />
     </div>
   </div>
