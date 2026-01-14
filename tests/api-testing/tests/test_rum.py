@@ -102,10 +102,6 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 
     rum_api_token = resp_get_rumtoken.json()["data"]["rum_token"]
 
-    # session = create_session
-    # rum_org = "default"
-    # logs_url = f"{base_url}rum/v1/{rum_org}/logs"
-    # rum_api_token = "rumv7Tjj3SNoF5k9R3A"
     params = {
         "oosource": "browser",
         "ootags": "sdk_version:0.2.7,api:fetch,env:production,service:my-web-application,version:0.0.1",
