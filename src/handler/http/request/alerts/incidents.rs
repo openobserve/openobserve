@@ -480,7 +480,11 @@ pub async fn trigger_incident_rca(_path: Path<(String, String)>) -> Response {
     )
 )]
 pub async fn list_incidents(_path: Path<String>, _query: Query<ListIncidentsQuery>) -> Response {
-    MetaHttpResponse::forbidden("Not Supported")
+    // Only supported with enterprise features enabled
+    MetaHttpResponse::json(ListIncidentsResponse {
+        incidents: vec![],
+        total: 0,
+    })
 }
 
 #[cfg(not(feature = "enterprise"))]

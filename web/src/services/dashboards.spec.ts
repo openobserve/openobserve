@@ -400,7 +400,7 @@ describe("Dashboards Service", () => {
     it("should list folders for organization", async () => {
       await dashboards.list_Folders("test-org");
 
-      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/folders");
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/folders/dashboards");
     });
 
     it("should handle different organization names", async () => {
@@ -414,7 +414,7 @@ describe("Dashboards Service", () => {
 
       for (const org of organizations) {
         await dashboards.list_Folders(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/folders`);
+        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards`);
       }
 
       expect(mockHttp.get).toHaveBeenCalledTimes(organizations.length);
@@ -425,7 +425,7 @@ describe("Dashboards Service", () => {
 
       for (const org of specialOrgs) {
         await dashboards.list_Folders(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/folders`);
+        expect(mockHttp.get).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards`);
       }
     });
   });
@@ -440,7 +440,7 @@ describe("Dashboards Service", () => {
       await dashboards.new_Folder("test-org", folderData);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/folders",
+        "/api/v2/test-org/folders/dashboards",
         folderData,
         { headers: { "Content-Type": "application/json; charset=UTF-8" } }
       );
@@ -469,7 +469,7 @@ describe("Dashboards Service", () => {
       await dashboards.new_Folder("prod-org", complexFolderData);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/prod-org/folders",
+        "/api/v2/prod-org/folders/dashboards",
         complexFolderData,
         { headers: { "Content-Type": "application/json; charset=UTF-8" } }
       );
@@ -479,7 +479,7 @@ describe("Dashboards Service", () => {
       await dashboards.new_Folder("test-org", {});
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/folders",
+        "/api/v2/test-org/folders/dashboards",
         {},
         { headers: { "Content-Type": "application/json; charset=UTF-8" } }
       );
@@ -498,7 +498,7 @@ describe("Dashboards Service", () => {
       for (const folderData of specialFolders) {
         await dashboards.new_Folder("test-org", folderData);
         expect(mockHttp.post).toHaveBeenCalledWith(
-          "/api/test-org/folders",
+          "/api/v2/test-org/folders/dashboards",
           folderData,
           { headers: { "Content-Type": "application/json; charset=UTF-8" } }
         );
@@ -516,7 +516,7 @@ describe("Dashboards Service", () => {
       await dashboards.edit_Folder("test-org", "folder-123", updatedData);
 
       expect(mockHttp.put).toHaveBeenCalledWith(
-        "/api/test-org/folders/folder-123",
+        "/api/v2/test-org/folders/dashboards/folder-123",
         updatedData,
         { headers: { "Content-Type": "application/json; charset=UTF-8" } }
       );
@@ -537,7 +537,7 @@ describe("Dashboards Service", () => {
       for (const folderId of folderIds) {
         await dashboards.edit_Folder("test-org", folderId, updateData);
         expect(mockHttp.put).toHaveBeenCalledWith(
-          `/api/test-org/folders/${folderId}`,
+          `/api/v2/test-org/folders/dashboards/${folderId}`,
           updateData,
           { headers: { "Content-Type": "application/json; charset=UTF-8" } }
         );
@@ -555,7 +555,7 @@ describe("Dashboards Service", () => {
       for (const update of partialUpdates) {
         await dashboards.edit_Folder("test-org", "folder-id", update);
         expect(mockHttp.put).toHaveBeenCalledWith(
-          "/api/test-org/folders/folder-id",
+          "/api/v2/test-org/folders/dashboards/folder-id",
           update,
           { headers: { "Content-Type": "application/json; charset=UTF-8" } }
         );
@@ -568,7 +568,7 @@ describe("Dashboards Service", () => {
       for (const id of numericIds) {
         await dashboards.edit_Folder("test-org", id, { name: "Test" });
         expect(mockHttp.put).toHaveBeenCalledWith(
-          `/api/test-org/folders/${id}`,
+          `/api/v2/test-org/folders/dashboards/${id}`,
           { name: "Test" },
           { headers: { "Content-Type": "application/json; charset=UTF-8" } }
         );
@@ -580,7 +580,7 @@ describe("Dashboards Service", () => {
     it("should delete folder by ID", async () => {
       await dashboards.delete_Folder("test-org", "folder-123");
 
-      expect(mockHttp.delete).toHaveBeenCalledWith("/api/test-org/folders/folder-123");
+      expect(mockHttp.delete).toHaveBeenCalledWith("/api/v2/test-org/folders/dashboards/folder-123");
     });
 
     it("should handle different folder ID types", async () => {
@@ -594,7 +594,7 @@ describe("Dashboards Service", () => {
 
       for (const folderId of folderIds) {
         await dashboards.delete_Folder("org", folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/org/folders/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/org/folders/dashboards/${folderId}`);
       }
     });
 
@@ -607,7 +607,7 @@ describe("Dashboards Service", () => {
 
       for (const { org, folderId } of testCases) {
         await dashboards.delete_Folder(org, folderId);
-        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/${org}/folders/${folderId}`);
+        expect(mockHttp.delete).toHaveBeenCalledWith(`/api/v2/${org}/folders/dashboards/${folderId}`);
       }
     });
   });
