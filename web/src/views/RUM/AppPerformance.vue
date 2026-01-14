@@ -40,13 +40,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="refreshData"
             />
             <q-btn
-              class="q-ml-sm tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! tw:h-[2rem] tw:px-[0.325rem]! hover:tw:bg-[var(--o2-hover-accent)]!"
-              outline
+              :outline="isVariablesChanged ? false : true"
+              class="q-ml-sm tw:border! tw:border-solid! tw:h-[2rem] tw:px-[0.325rem]!"
+              :class="
+                !isVariablesChanged
+                  ? 'hover:tw:bg-[var(--o2-hover-accent)]!'
+                  : ''
+              "
+              data-test="rum-performance-refresh"
               padding="xs"
               no-caps
               icon="refresh"
               @click="refreshData"
+              :color="isVariablesChanged ? 'warning' : ''"
+              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
             >
+              <q-tooltip>
+                {{
+                  isVariablesChanged
+                    ? t("dashboard.refreshToApplyVariableChanges")
+                    : t("dashboard.refresh")
+                }}
+              </q-tooltip>
             </q-btn>
           </div>
         </div>
@@ -70,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selected-date="selectedDate"
               ref="activePerformanceComponent"
               @variablesManagerReady="onVariablesManagerReady"
+              @update:dateTime="onDataZoom"
             />
           </div>
         </div>
@@ -120,6 +136,21 @@ export default defineComponent({
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
+
+    // Track if there are uncommitted variable changes
+    const isVariablesChanged = computed(() => {
+      // If using variables manager, access hasUncommittedChanges directly from the manager
+      // Explicitly dereference to ensure Vue tracks the dependency
+      const manager = variablesManager.value;
+
+      if (manager && "hasUncommittedChanges" in manager) {
+        // Access the value (Vue auto-unwraps computed refs in composable returns)
+        const hasChanges = manager.hasUncommittedChanges;
+        return hasChanges;
+      }
+
+      return false;
+    });
 
     // Computed ref to access RenderDashboardCharts from the active child component
     const performanceChartsRef = computed(() => {
@@ -343,6 +374,25 @@ export default defineComponent({
       dateTimePicker.value.refresh();
     };
 
+    const onDataZoom = (event: any) => {
+      const selectedDateObj = {
+        start: new Date(event.start),
+        end: new Date(event.end),
+      };
+      // Truncate seconds and milliseconds from the dates
+      selectedDateObj.start.setSeconds(0, 0);
+      selectedDateObj.end.setSeconds(0, 0);
+
+      // Compare the truncated dates
+      if (selectedDateObj.start.getTime() === selectedDateObj.end.getTime()) {
+        // Increment the end date by 1 minute
+        selectedDateObj.end.setMinutes(selectedDateObj.end.getMinutes() + 1);
+      }
+
+      // Update the selected date to trigger time range change
+      dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
+    };
+
     // ------- work with query params ----------
     onActivated(async () => {
       const params = route.query;
@@ -398,6 +448,7 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      onDataZoom,
       onDeletePanel,
       onVariablesManagerReady,
       showDashboardSettingsDialog,
@@ -407,6 +458,7 @@ export default defineComponent({
       tabs,
       activePerformanceTab,
       activePerformanceComponent,
+      isVariablesChanged,
     };
   },
 });
