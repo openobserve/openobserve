@@ -2058,7 +2058,9 @@
       "metrics": "Metrics",
       "retry": "Retry",
       "filters": "Filters",
-      "availableDimensions": "Available Dimensions"
+      "availableDimensions": "Available Dimensions",
+      "semanticFieldGroupsTitle": "Field Mappings",
+      "groupsLabel": "groups"
     }
   },
   "reports": {

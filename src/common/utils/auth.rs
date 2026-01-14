@@ -278,7 +278,7 @@ where
             .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
         {
             Some(path) => path,
-            None => &local_path.strip_prefix("/").unwrap_or(&local_path),
+            None => local_path.strip_prefix("/").unwrap_or(&local_path),
         };
 
         let path_columns = path.split('/').collect::<Vec<&str>>();
@@ -449,8 +449,10 @@ where
                     path_columns[0]
                 )
             }
-            // handle alerts/deduplication config - requires settings permissions
+            // handle alerts/deduplication without /config suffix - requires settings permissions
             else if path_columns[1].eq("alerts") && path_columns[2].eq("deduplication") {
+                // This handles paths like /org/alerts/deduplication (3 segments)
+                // The /config paths are handled in the url_len == 4 block
                 // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
                 // endpoints
                 if method.eq("GET") {
@@ -600,13 +602,25 @@ where
             // Handle /v2 alert apis
             if path_columns[0].eq(V2_API_PREFIX) {
                 if path_columns[2].eq("alerts") {
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[2])
-                            .map_or(path_columns[2], |model| model.key),
-                        path_columns[3]
-                    )
+                    // Special case for /v2/{org_id}/alerts/history - use alert_folders
+                    if path_columns[3].eq("history") {
+                        if method.eq("GET") {
+                            method = "LIST".to_string();
+                        }
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS.get("alert_folders").unwrap().key,
+                            path_columns[1] // org_id
+                        )
+                    } else {
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[2])
+                                .map_or(path_columns[2], |model| model.key),
+                            path_columns[3]
+                        )
+                    }
                 } else {
                     if method.eq("GET") {
                         method = "LIST".to_string();
@@ -625,10 +639,30 @@ where
                     )
                 }
             }
-            // alerts/deduplication/semantic_groups require settings permissions
+            // alerts/deduplication/config require settings permissions
             else if path_columns[1].eq("alerts")
                 && path_columns[2].eq("deduplication")
-                && path_columns[3].eq("semantic_groups")
+                && path_columns[3].eq("config")
+            {
+                // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
+                // endpoints
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                } else if method.eq("POST") || method.eq("DELETE") {
+                    method = "PUT".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get("settings")
+                        .map_or("settings", |model| model.key),
+                    path_columns[0]
+                )
+            }
+            // alerts/deduplication/semantic-groups require settings permissions
+            else if path_columns[1].eq("alerts")
+                && path_columns[2].eq("deduplication")
+                && path_columns[3].eq("semantic-groups")
             {
                 // Convert GET to LIST, POST to PUT for consistency with other settings endpoints
                 if method.eq("GET") {
@@ -742,10 +776,10 @@ where
         } else if method.eq("POST")
             && path_columns.get(1) == Some(&"alerts")
             && path_columns.get(2) == Some(&"deduplication")
-            && path_columns.get(3) == Some(&"semantic_groups")
-            && path_columns.get(4) == Some(&"preview")
+            && path_columns.get(3) == Some(&"semantic-groups")
+            && path_columns.get(4) == Some(&"preview-diff")
         {
-            // POST to semantic_groups/preview (5 parts) requires settings permissions
+            // POST to semantic-groups/preview-diff (5 parts) requires settings permissions
             // Convert POST to PUT for consistency with other settings endpoints
             method = "PUT".to_string();
             // This will be checked as settings:{org_id} with PUT permission
@@ -755,6 +789,22 @@ where
                     .get("settings")
                     .map_or("settings", |model| model.key),
                 path_columns[0]
+            )
+        } else if method.eq("POST")
+            && path_columns[0].eq(V2_API_PREFIX)
+            && path_columns.get(2) == Some(&"alerts")
+            && path_columns.get(3) == Some(&"bulk")
+            && path_columns.get(4) == Some(&"enable")
+        {
+            // POST /v2/{org_id}/alerts/bulk/enable requires LIST permission on alert_folders
+            // The handler will check individual alert permissions
+            method = "LIST".to_string();
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get("alert_folders")
+                    .map_or("alert_folders", |model| model.key),
+                path_columns[1] // org_id
             )
         } else if path_columns[0].eq(V2_API_PREFIX)
             && path_columns.get(2) == Some(&"alerts")
@@ -965,6 +1015,7 @@ where
             || path.contains("/ws")
             || path.contains("/_values_stream")
             // bulk enable of pipelines and alerts
+            || path.contains("/bulk/enable")
             || path_is_bulk_operation
             // for license the function itself with do a perm check
             || (url_len == 1 && path.contains("license"))
