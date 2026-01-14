@@ -4,7 +4,7 @@ def test_e2e_ingestlogs(create_session, base_url):
     session = create_session
     url = base_url
     org_id = "default"
-    stream_name = "newpy-tests"
+    stream_name = "newpy_tests"
     payload = [
         {
             "Athlete": "newtemp",
@@ -24,14 +24,14 @@ def test_e2e_ingestlogs(create_session, base_url):
         },
     ]
 
-    resp_create_logstream = session.post(
+    resp = session.post(
         f"{url}api/{org_id}/{stream_name}/_json", json=payload
     )
 
-    print(resp_create_logstream.content)
+    print(resp.content)
     assert (
-        resp_create_logstream.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+        resp.status_code == 200
+    ), f"Get all alerts list 200, but got {resp.status_code} {resp.content}"
 
 
 def test_e2e_nostreamname(create_session, base_url):
@@ -60,13 +60,13 @@ def test_e2e_nostreamname(create_session, base_url):
         },
     ]
 
-    resp_create_logstream = session.post(
+    resp = session.post(
         f"{url}api/{org_id}/{stream_name}/_json", json=payload
     )
-    print(resp_create_logstream.content)
+    print(resp.content)
     assert (
-        resp_create_logstream.status_code == 404
-    ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+        resp.status_code == 400
+    ), f"Stream name is empty 400, but got {resp.status_code} {resp.content}"
 
 
 def test_e2e_invalidstreamname(create_session, base_url):
@@ -94,51 +94,43 @@ def test_e2e_invalidstreamname(create_session, base_url):
             "Year": 1896,
         },
     ]
-    resp_create_logstream = session.post(
+    resp = session.post(
         f"{url}api/{org_id}/{stream_name}/_json", json=payload
     )
 
-    print(resp_create_logstream.content)
+    print(resp.content)
     assert (
-        resp_create_logstream.status_code == 404
-    ), f"Get all alerts list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+        resp.status_code == 405
+    ), f"Invalid stream name 405, but got {resp.status_code} {resp.content}"
 
 
 def test_e2e_vrl(create_session, base_url):
-    """Running an E2E test for search log query."""
+    """Running an E2E test for log search with VRL function."""
 
     session = create_session
     org_id = "default"
-    stream_name = "gke_fluentbit"
-    access_key = "f="
-    headers = {
-        "Authorization": f"Basic {access_key}",
-        "Content-Type": "application/json",
-    }
-
-    payload = [
-        {
-            "query": {
-                "sql": f'select * from "{stream_name}" ',
-                "start_time": 1700629279639000,
-                "end_time": 1700630179639000,
-                "from": 0,
-                "size": 150,
-                "query_fn": "LmEgPTEgCiAu",
-            }
+    stream_name = "newpy_tests"
+  
+    payload = {
+        "query": {
+            "sql": f"select * from \"{stream_name}\"",
+            "start_time": 1700629279639000,
+            "end_time": 1700630179639000,
+            "from": 0,
+            "size": 150,
+            "query_fn": "LmEgPTEgCiAu",
         }
-    ]
+    }
+     
 
-    resp_get_allalerts = session.post(
-        f"{base_url}web/logs?stream={stream_name}&period=15m&refresh=0&org_identifier={org_id}",
-        json=payload,
-        headers=headers,
+    resp = session.post(
+        f"{base_url}api/{org_id}/_search?type=logs", json=payload
     )
 
-    print(resp_get_allalerts.content)
+    print(resp.content)
     assert (
-        resp_get_allalerts.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp.status_code == 200
+    ), f"VRL query 200, but got {resp.status_code} {resp.content}"
 
 
 def test_e2e_getallstreams(create_session, base_url):
@@ -153,7 +145,7 @@ def test_e2e_getallstreams(create_session, base_url):
     print(resp_get_allstreams.content)
     assert (
         resp_get_allstreams.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_allstreams.status_code} {resp_get_allstreams.content}"
+    ), f"Get all streams 200, but got {resp_get_allstreams.status_code} {resp_get_allstreams.content}"
 
 
 def test_e2e_getschema(create_session, base_url):
@@ -168,7 +160,7 @@ def test_e2e_getschema(create_session, base_url):
     print(resp_get_streamschema.content)
     assert (
         resp_get_streamschema.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_streamschema.status_code} {resp_get_streamschema.content}"
+    ), f"Get stream schema 200, but got {resp_get_streamschema.status_code} {resp_get_streamschema.content}"
 
 
 def test_e2e_deleteinvalidstreams(create_session, base_url):
@@ -183,7 +175,7 @@ def test_e2e_deleteinvalidstreams(create_session, base_url):
     print(resp_get_deletestreams.content)
     assert (
         resp_get_deletestreams.status_code == 404
-    ), f"Get all alerts list 200, but got {resp_get_deletestreams.status_code} {resp_get_deletestreams.content}"
+    ), f"Invalid stream 404, but got {resp_get_deletestreams.status_code} {resp_get_deletestreams.content}"
 
 
 def test_e2e_incorrectstreamesettings(create_session, base_url):
@@ -196,8 +188,8 @@ def test_e2e_incorrectstreamesettings(create_session, base_url):
 
     print(resp_get_streamssettings.content)
     assert (
-        resp_get_streamssettings.status_code == 400
-    ), f"Get all alerts list 200, but got {resp_get_streamssettings.status_code} {resp_get_streamssettings.content}"
+        resp_get_streamssettings.status_code == 415
+    ), f"Invalid stream settings 415, but got {resp_get_streamssettings.status_code} {resp_get_streamssettings.content}"
 
 
 def test_e2e_deletevalidstreams(create_session, base_url):
@@ -212,4 +204,4 @@ def test_e2e_deletevalidstreams(create_session, base_url):
     print(resp_get_allstreams.content)
     assert (
         resp_get_allstreams.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_allstreams.status_code} {resp_get_allstreams.content}"
+    ), f"Delete stream 200, but got {resp_get_allstreams.status_code} {resp_get_allstreams.content}"

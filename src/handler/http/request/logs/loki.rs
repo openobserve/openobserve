@@ -21,15 +21,14 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
+use config::axum::middlewares::{get_process_time, insert_process_time_header};
 use flate2::read::GzDecoder;
 use prost::Message;
 use proto::loki_rpc;
 
 use crate::{
     common::meta::loki::{LokiError, LokiPushRequest},
-    handler::http::request::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
-    },
+    handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{ingestion::get_thread_id, logs},
 };
 

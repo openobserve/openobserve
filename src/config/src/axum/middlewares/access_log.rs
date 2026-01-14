@@ -21,7 +21,6 @@ use std::{
 };
 
 use axum::{body::Body, http::Request, response::Response};
-use config::get_config;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
@@ -44,7 +43,7 @@ use tower::{Layer, Service};
 ///
 /// Returns a format string that can be used by the AccessLogLayer middleware.
 pub fn get_http_access_log_format() -> String {
-    let log_format = get_config().http.access_log_format.to_string();
+    let log_format = crate::get_config().http.access_log_format.to_string();
     if log_format.is_empty() || log_format.to_lowercase() == "common" {
         r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#.to_string()
     } else if log_format.to_lowercase() == "json" {
