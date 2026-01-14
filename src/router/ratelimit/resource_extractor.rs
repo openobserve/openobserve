@@ -73,7 +73,7 @@ fn rule_extractor(
         .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
         Some(path) => path,
-        None => &local_path,
+        None => &local_path.strip_prefix("/").unwrap_or(&local_path),
     };
 
     let (path, org_id) = (path.to_string(), extract_org_id(path));
