@@ -23,7 +23,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_largest_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -73,7 +73,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(CASE WHEN view_interaction_to_next_paint IS NOT NULL THEN view_interaction_to_next_paint/1000000 ELSE NULL END) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -122,7 +122,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": false,
           "fields": {
             "stream": "_rumdata",
@@ -173,7 +173,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_contentful_paint/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -223,7 +223,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_byte/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_first_byte/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -273,7 +273,7 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_loading_time/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_loading_time/1000000000) as \"y_axis_1\"  FROM \"_rumdata\" where service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
           "customQuery": true,
           "fields": {
             "stream": "_rumdata",
@@ -319,6 +319,19 @@
           "stream_type": "logs",
           "stream": "_rumdata",
           "field": "service",
+          "max_record_size": null
+        },
+        "value": "",
+        "options": []
+      },
+      {
+        "type": "query_values",
+        "name": "env",
+        "label": "Env",
+        "query_data": {
+          "stream_type": "logs",
+          "stream": "_rumdata",
+          "field": "env",
           "max_record_size": null
         },
         "value": "",
