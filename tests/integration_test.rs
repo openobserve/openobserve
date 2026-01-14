@@ -112,8 +112,9 @@ mod tests {
     /// Initialize test router with service and basic routes
     fn init_test_router() -> Router {
         Router::new()
-            .nest("/", service_routes())
-            .nest("/", basic_routes())
+            .merge(basic_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
     }
 
     /// Make a test request and return the response
