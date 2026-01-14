@@ -6,9 +6,11 @@ license.workspace = true
 
 [dependencies]
 tempfile.workspace = true
-log.workspace = true    
+log.workspace = true
 anyhow.workspace = true
-actix-web.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
 env_logger.workspace = true
 config.workspace = true
 serde.workspace = true

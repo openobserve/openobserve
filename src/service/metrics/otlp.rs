@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,11 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{HttpResponse, http, web};
-use bytes::BytesMut;
+use axum::{
+    Json, http,
+    response::{IntoResponse, Response as HttpResponse},
+};
+use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -55,7 +58,7 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
@@ -68,17 +71,14 @@ use crate::{
 
 pub async fn otlp_proto(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {e}"),
-            )));
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf, user).await {
@@ -90,10 +90,7 @@ pub async fn otlp_proto(
             // Check if this is a schema validation error (columns limit)
             let error_msg = e.to_string();
             if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    error_msg,
-                )));
+                return Ok(MetaHttpResponse::bad_request(error_msg));
             }
             Err(Error::other(e))
         }
@@ -102,17 +99,14 @@ pub async fn otlp_proto(
 
 pub async fn otlp_json(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {e}"),
-            )));
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, user).await {
@@ -122,10 +116,7 @@ pub async fn otlp_json(
             // Check if this is a schema validation error (columns limit)
             let error_msg = e.to_string();
             if error_msg.contains("ZO_COLS_PER_RECORD_LIMIT") {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
-                    error_msg,
-                )));
+                return Ok(MetaHttpResponse::bad_request(error_msg));
             }
             Err(Error::other(e))
         }
@@ -142,20 +133,17 @@ pub async fn handle_otlp_request(
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
+            return Ok(MetaHttpResponse::too_many_requests(e));
         } else {
             log::error!("[METRICS:OTLP] ingestion error: {e}");
-            return Ok(
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                Json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
                     e,
                 )),
-            );
+            )
+                .into_response());
         }
     }
 
@@ -599,8 +587,13 @@ pub async fn handle_otlp_request(
         }
 
         // write to file
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metrics.as_str(),
+            &stream_name,
+        )
+        .await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
@@ -1030,17 +1023,19 @@ fn format_response(
 
     match req_type {
         OtlpRequestType::HttpJson => Ok(if partial {
-            HttpResponse::PartialContent().json(res)
+            (http::StatusCode::PARTIAL_CONTENT, Json(res)).into_response()
         } else {
-            HttpResponse::Ok().json(res)
+            MetaHttpResponse::json(res)
         }),
         _ => {
             let mut out = BytesMut::with_capacity(res.encoded_len());
             res.encode(&mut out).expect("Out of memory");
-            Ok(HttpResponse::Ok()
-                .status(http::StatusCode::OK)
-                .content_type("application/x-protobuf")
-                .body(out))
+            Ok((
+                http::StatusCode::OK,
+                [(http::header::CONTENT_TYPE, "application/x-protobuf")],
+                out.to_vec(),
+            )
+                .into_response())
         }
     }
 }
@@ -1647,14 +1642,14 @@ mod tests {
     }
 
     mod protobuf_json_tests {
-        use actix_web::web;
+        use bytes::Bytes;
         use prost::Message;
 
         use super::*;
 
         #[test]
         fn test_decode_invalid_protobuf() {
-            let invalid_data = web::Bytes::from("invalid protobuf data");
+            let invalid_data = Bytes::from("invalid protobuf data");
             let result = ExportMetricsServiceRequest::decode(invalid_data);
             assert!(result.is_err());
         }

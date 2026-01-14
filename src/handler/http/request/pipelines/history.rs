@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, get, web};
+use axum::{
+    extract::{Path, Query},
+    http::HeaderMap,
+    response::Response,
+};
 use chrono::{Duration, Utc};
 use config::{
     meta::{
-        search::{Query, Request as SearchRequest},
+        search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
@@ -100,6 +104,8 @@ pub struct PipelineHistoryResponse {
 /// This prevents header forgery attacks as the header is populated server-side after
 /// authentication.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/history",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "GetPipelineHistory",
@@ -125,16 +131,12 @@ pub struct PipelineHistoryResponse {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
-#[get("/{org_id}/pipelines/history")]
 pub async fn get_pipeline_history(
-    path: web::Path<String>,
-    query: web::Query<PipelineHistoryQuery>,
+    Path(org_id): Path<String>,
+    Query(query): Query<PipelineHistoryQuery>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let query = query.into_inner();
-
+    headers: HeaderMap,
+) -> Response {
     // Set default pagination values
     let from = query.from.unwrap_or(0).max(0);
     let size = query.size.unwrap_or(100).clamp(1, 1000);
@@ -367,7 +369,7 @@ pub async fn get_pipeline_history(
     // No additional filter needed in WHERE clause
 
     // Get trace ID for the request
-    let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
+    let trace_id = get_or_create_trace_id(&headers, &Span::current());
 
     // Step 1: Get the total count of matching records
     // Build count query (no LIMIT/OFFSET, will be rewritten to COUNT(*) by track_total_hits)
@@ -375,7 +377,7 @@ pub async fn get_pipeline_history(
     log::info!("Pipeline history sql {count_sql}");
 
     let count_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: count_sql,
             start_time,
             end_time,
@@ -434,7 +436,7 @@ pub async fn get_pipeline_history(
     log::info!("Pipeline history data_sql: {data_sql}");
 
     let data_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: data_sql,
             start_time,
             end_time,

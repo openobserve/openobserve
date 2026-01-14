@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse as ActixHttpResponse, http::StatusCode};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -109,73 +113,129 @@ impl HttpResponse {
 
     /// Send a normal response in json format and associate the
     /// provided message as `message` field.
-    pub fn ok(msg: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Ok().json(Self::message(StatusCode::OK, msg.to_string()))
+    pub fn ok(msg: impl ToString) -> Response {
+        (
+            StatusCode::OK,
+            Json(Self::message(StatusCode::OK, msg.to_string())),
+        )
+            .into_response()
     }
 
     /// Send a BadRequest response in json format and associate the
     /// provided error as `error` field.
-    pub fn bad_request(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::BadRequest()
-            .json(Self::error(StatusCode::BAD_REQUEST, error.to_string()))
+    pub fn bad_request(error: impl ToString) -> Response {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(Self::error(StatusCode::BAD_REQUEST, error.to_string())),
+        )
+            .into_response()
     }
 
     /// Send an Unauthorized response in json format and sets the
     /// provided error as the `error` field.
-    pub fn unauthorized(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Forbidden()
-            .json(Self::error(StatusCode::UNAUTHORIZED, error.to_string()))
+    pub fn unauthorized(error: impl ToString) -> Response {
+        (
+            StatusCode::FORBIDDEN,
+            Json(Self::error(StatusCode::UNAUTHORIZED, error.to_string())),
+        )
+            .into_response()
     }
 
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
-    pub fn forbidden(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Forbidden().json(Self::error(StatusCode::FORBIDDEN, error.to_string()))
+    pub fn forbidden(error: impl ToString) -> Response {
+        (
+            StatusCode::FORBIDDEN,
+            Json(Self::error(StatusCode::FORBIDDEN, error.to_string())),
+        )
+            .into_response()
     }
 
     /// Send a Forbidden response in json format and associate the
     /// provided error as `error` field.
-    pub fn conflict(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Conflict().json(Self::error(StatusCode::CONFLICT, error.to_string()))
+    pub fn conflict(error: impl ToString) -> Response {
+        (
+            StatusCode::CONFLICT,
+            Json(Self::error(StatusCode::CONFLICT, error.to_string())),
+        )
+            .into_response()
     }
 
     /// Send a NotFound response in json format and associate the
     /// provided error as `error` field.
-    pub fn not_found(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::NotFound().json(Self::error(StatusCode::NOT_FOUND, error.to_string()))
+    pub fn not_found(error: impl ToString) -> Response {
+        (
+            StatusCode::NOT_FOUND,
+            Json(Self::error(StatusCode::NOT_FOUND, error.to_string())),
+        )
+            .into_response()
     }
 
     /// Send a InternalServerError response in json format and associate the
     /// provided error as `error` field.
-    pub fn internal_error(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::InternalServerError().json(Self::error(
+    pub fn internal_error(error: impl ToString) -> Response {
+        (
             StatusCode::INTERNAL_SERVER_ERROR,
-            error.to_string(),
-        ))
+            Json(Self::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
+    /// Send a TooManyRequests response in json format and associate the
+    /// provided error as `error` field.
+    pub fn too_many_requests(error: impl ToString) -> Response {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(Self::error(
+                StatusCode::TOO_MANY_REQUESTS,
+                error.to_string(),
+            )),
+        )
+            .into_response()
     }
 
     /// Send a response in json format, status code is 200.
     /// The payload should be serde-serializable.
-    pub fn json(payload: impl Serialize) -> ActixHttpResponse {
-        ActixHttpResponse::Ok().json(payload)
+    pub fn json<T: Serialize>(payload: T) -> Response {
+        (StatusCode::OK, Json(payload)).into_response()
+    }
+}
+
+/// Implement IntoResponse for HttpResponse so it can be returned directly from handlers
+impl IntoResponse for HttpResponse {
+    fn into_response(self) -> Response {
+        let status = match self.code {
+            200 => StatusCode::OK,
+            400 => StatusCode::BAD_REQUEST,
+            401 => StatusCode::UNAUTHORIZED,
+            403 => StatusCode::FORBIDDEN,
+            404 => StatusCode::NOT_FOUND,
+            409 => StatusCode::CONFLICT,
+            429 => StatusCode::TOO_MANY_REQUESTS,
+            500 => StatusCode::INTERNAL_SERVER_ERROR,
+            503 => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::OK,
+        };
+        (status, Json(self)).into_response()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use actix_web::http;
-
     use super::*;
 
     #[test]
     fn test_http_response() {
         let msg = "This is an error response";
-        let err = HttpResponse::message(http::StatusCode::OK, msg.to_string());
-        assert_eq!(err.code, http::StatusCode::OK);
+        let err = HttpResponse::message(StatusCode::OK, msg.to_string());
+        assert_eq!(err.code, StatusCode::OK.as_u16());
         assert_eq!(err.message, msg);
 
-        let err = HttpResponse::error(http::StatusCode::INTERNAL_SERVER_ERROR, msg.to_string());
-        assert_eq!(err.code, http::StatusCode::INTERNAL_SERVER_ERROR);
+        let err = HttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR, msg.to_string());
+        assert_eq!(err.code, StatusCode::INTERNAL_SERVER_ERROR.as_u16());
         assert_eq!(err.message, msg);
 
         let errcode = errors::ErrorCodes::ServerInternalError(msg.to_string());
@@ -187,21 +247,21 @@ mod tests {
 
     #[test]
     fn test_http_response_with_trace_id() {
-        let mut response = HttpResponse::message(http::StatusCode::OK, "test");
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
         response.with_trace_id("trace-123".to_string());
         assert_eq!(response.trace_id, Some("trace-123".to_string()));
     }
 
     #[test]
     fn test_http_response_with_id() {
-        let mut response = HttpResponse::message(http::StatusCode::OK, "test");
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
         response.with_id("id-123".to_string());
         assert_eq!(response.id, Some("id-123".to_string()));
     }
 
     #[test]
     fn test_http_response_with_name() {
-        let mut response = HttpResponse::message(http::StatusCode::OK, "test");
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
         response.with_name("test-name".to_string());
         assert_eq!(response.name, Some("test-name".to_string()));
     }
@@ -332,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_http_response_builder_chaining() {
-        let mut response = HttpResponse::message(http::StatusCode::OK, "test");
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
         response
             .with_id("id-1".into())
             .with_name("name-1".into())

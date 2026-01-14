@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,13 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{
-    HttpResponse, ResponseError,
-    http::header::{ContentType, LOCATION},
+use axum::{
+    body::Body,
+    http::{
+        StatusCode,
+        header::{CONTENT_TYPE, LOCATION},
+    },
+    response::{IntoResponse, Response},
 };
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
@@ -29,7 +33,7 @@ pub struct RedirectResponse {
 }
 
 impl RedirectResponse {
-    pub fn redirect_http(&self) -> HttpResponse {
+    pub fn redirect_http(&self) -> Response {
         self.build_redirect_response()
     }
 
@@ -51,13 +55,15 @@ impl RedirectResponse {
         redirect_uri
     }
 
-    fn build_redirect_response(&self) -> HttpResponse {
+    fn build_redirect_response(&self) -> Response {
         let mut redirect_uri = self.build_full_redirect_uri();
         redirect_uri = redirect_uri.trim_matches('"').to_string();
         if redirect_uri.len() < 1024 {
-            HttpResponse::Found()
-                .append_header((LOCATION, redirect_uri))
-                .finish()
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(LOCATION, redirect_uri)
+                .body(Body::empty())
+                .unwrap()
         } else {
             // if the URL is too long, we send the original URL and let FE handle the redirect.
             let html = format!(
@@ -74,9 +80,11 @@ impl RedirectResponse {
                 </body>
                 </html>"#
             );
-            HttpResponse::Found()
-                .content_type(ContentType::html())
-                .body(html)
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(CONTENT_TYPE, "text/html")
+                .body(Body::from(html))
+                .unwrap()
         }
     }
 }
@@ -88,9 +96,8 @@ impl fmt::Display for RedirectResponse {
     }
 }
 
-impl ResponseError for RedirectResponse {
-    /// Generate an HTTP response that performs a redirection to the stored URL.
-    fn error_response(&self) -> HttpResponse {
+impl IntoResponse for RedirectResponse {
+    fn into_response(self) -> Response {
         self.build_redirect_response()
     }
 }
@@ -135,7 +142,7 @@ impl Default for RedirectResponseBuilder {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{HttpResponse, http::header::LOCATION};
+    use axum::http::header::LOCATION;
 
     use super::*;
 
@@ -154,9 +161,17 @@ mod tests {
         assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
 
         // Check if the HTTP response contains the correct "Location" header
-        let http_response: HttpResponse = redirect_response.redirect_http();
-        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
-        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+        let http_response = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), StatusCode::FOUND);
+        assert_eq!(
+            http_response
+                .headers()
+                .get(LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            expected_uri
+        );
     }
 
     #[test]
@@ -169,9 +184,17 @@ mod tests {
         assert_eq!(redirect_response.build_full_redirect_uri(), expected_uri);
 
         // Check if the HTTP response contains the correct "Location" header
-        let http_response: HttpResponse = redirect_response.redirect_http();
-        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
-        assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
+        let http_response = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), StatusCode::FOUND);
+        assert_eq!(
+            http_response
+                .headers()
+                .get(LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            expected_uri
+        );
     }
 
     #[test]
@@ -196,10 +219,15 @@ mod tests {
         );
 
         // Check if the HTTP response contains the correct "Location" header
-        let http_response: HttpResponse = redirect_response.redirect_http();
-        assert_eq!(http_response.status(), actix_web::http::StatusCode::FOUND);
+        let http_response = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), StatusCode::FOUND);
         // assert_eq!(http_response.headers().get(LOCATION).unwrap(), expected_uri);
-        let location = http_response.headers().get(LOCATION).unwrap();
+        let location = http_response
+            .headers()
+            .get(LOCATION)
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(location == expected_uri_1 || location == expected_uri_2);
     }
 }

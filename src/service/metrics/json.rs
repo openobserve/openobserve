@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,9 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{http, web};
 use anyhow::{Result, anyhow};
+use axum::http;
+use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -51,8 +52,8 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_write_partition_key,
-            write_file,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+            get_write_partition_key, write_file,
         },
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
@@ -62,7 +63,7 @@ use crate::{
 
 pub async fn ingest(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource
@@ -494,8 +495,13 @@ pub async fn ingest(
             continue;
         }
 
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metrics.as_str(),
+            &stream_name,
+        )
+        .await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
