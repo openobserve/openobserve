@@ -765,10 +765,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     // Build the router
     let app = create_app_router()
-        .layer(middlewares::AccessLogLayer::new(
-            middlewares::get_http_access_log_format(),
+        .layer(config::axum::middlewares::AccessLogLayer::new(
+            config::axum::middlewares::get_http_access_log_format(),
         ))
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
@@ -837,7 +837,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     // Build the router without tracing
     let app = create_app_router()
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
