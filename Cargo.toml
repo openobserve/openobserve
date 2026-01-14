@@ -64,7 +64,6 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-async-walkdir.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.9"
@@ -195,7 +194,6 @@ flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
-async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
@@ -232,6 +230,7 @@ ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
 axum-extra = { version = "0.10", features = ["typed-header", "query", "cookie"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
+async-fs = "2.2"
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
     "cors",
@@ -255,7 +254,6 @@ async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
-async-walkdir = "2.1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
 base64 = "0.22"

@@ -85,7 +85,7 @@ use tonic::{
     metadata::{MetadataKey, MetadataMap, MetadataValue},
     transport::{Identity, ServerTlsConfig},
 };
-use tower_http::{compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
@@ -772,11 +772,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(TraceLayer::new_for_http());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -840,11 +836,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(CompressionLayer::new());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1300,11 +1292,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(CompressionLayer::new());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
