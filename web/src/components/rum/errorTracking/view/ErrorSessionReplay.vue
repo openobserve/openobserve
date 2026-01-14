@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </div>
     <q-btn
-      class="bg-primary rounded text-white tw:mt-[0.625rem]"
+      class="bg-primary rounded text-white tw:mt-[0.625rem] q-mt-sm"
       no-caps
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"

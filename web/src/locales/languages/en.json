@@ -386,7 +386,9 @@
     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
     "getStartedRUM": "Get started with Real User Monitoring",
-    "loadingErrorDetails": "Hold on tight, we're fetching error details."
+    "loadingErrorDetails": "Hold on tight, we're fetching error details.",
+    "eventID": "Event ID",
+    "loadingApplicationErrors": "Hold on tight, we're fetching application errors."
   },
   "about": {
     "name": "OpenObserve",

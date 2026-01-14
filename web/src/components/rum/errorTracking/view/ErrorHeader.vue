@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <span class="text-bold">Event ID:</span>
+        <span class="text-bold">{{ t("rum.eventID") }}:</span>
         <span
           data-test="error-id"
           :title="error.error_id"
@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineProps } from "vue";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 const router = useRouter();
 const q = useQuasar();
 const props = defineProps({
