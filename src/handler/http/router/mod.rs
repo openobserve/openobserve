@@ -572,10 +572,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_search", post(search::search))
         .route("/{org_id}/_search_partition", post(search::search_partition))
         .route("/{org_id}/result_schema", post(search::result_schema))
-        .route("/{org_id}/{stream_name}/_around", get(search::around_v1))
-        .route("/{org_id}/{stream_name}/_around", post(search::around_v2))
+        .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
+        .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_profile", get(search::search_inspector::get_search_profile))
-        .route("/{org_id}/_values", get(search::values))
         .route("/{org_id}/_search_history", get(search::search_history))
 
         // Saved views

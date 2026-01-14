@@ -1123,6 +1123,7 @@ async fn values_v1(
     };
 
     if let Some(v) = query.get("sql")
+        && !v.is_empty()
         && let Ok(sql) = base64::decode_url(v)
     {
         uses_fn = functions::get_all_transform_keys(org_id)
