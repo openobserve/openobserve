@@ -136,13 +136,15 @@ pub async fn validator(
         .path()
         .strip_prefix(format!("{}{}", cfg.common.base_uri, path_prefix).as_str())
     {
-        Some(path) => path.strip_prefix('/').unwrap_or(path),
+        Some(path) => path,
         None => req_data.uri.path(),
     };
+    let path = path.strip_prefix("/").unwrap_or(path);
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        validate_credentials_ext(user_id, password, path, auth_token).await
+        let method = req_data.method.to_string();
+        validate_credentials_ext(user_id, password, path, auth_token, &method).await
     } else {
         validate_credentials(user_id, password.trim(), path, auth_info.bypass_check).await
     } {
@@ -428,6 +430,7 @@ pub async fn validate_credentials_ext(
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
+    method: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
     let cfg = get_config();
     let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
@@ -473,7 +476,35 @@ pub async fn validate_credentials_ext(
                     users::get_user(Some(org_id), user_id).await
                 }
             }
-            None => users::get_user(None, user_id).await,
+            None => {
+                if path_columns.len() == 1 && path_columns[0] == "license" {
+                    // for license requests, we only need to check if part of o2
+                    // rest rbac is done in the handlers themselves
+                    if method == "GET" {
+                        if let Ok(v) = db::user::get_user_record(user_id).await {
+                            Some(config::meta::user::User {
+                                email: v.email,
+                                first_name: v.first_name,
+                                last_name: v.last_name,
+                                password: v.password,
+                                salt: v.salt,
+                                token: "".into(),
+                                rum_token: None,
+                                role: config::meta::user::UserRole::User,
+                                org: "".into(),
+                                is_external: v.user_type == config::meta::user::UserType::External,
+                                password_ext: v.password_ext,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        users::get_user(Some("_meta"), user_id).await
+                    }
+                } else {
+                    users::get_user(None, user_id).await
+                }
+            }
         }
     };
 
@@ -574,6 +605,7 @@ pub async fn validate_credentials_ext(
     _in_password: &str,
     _path: &str,
     _auth_token: AuthTokensExt,
+    method: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
     Err(AuthError::Forbidden("Not allowed".to_string()))
 }
