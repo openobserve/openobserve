@@ -450,9 +450,9 @@ where
                 )
             }
             // handle alerts/deduplication config - requires settings permissions
-            else if path_columns[1].eq("alerts") && path_columns[2].eq("deduplication")
-            {
-                // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings endpoints
+            else if path_columns[1].eq("alerts") && path_columns[2].eq("deduplication") {
+                // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
+                // endpoints
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 } else if method.eq("POST") || method.eq("DELETE") {
@@ -639,7 +639,9 @@ where
                 // This will be checked as settings:{org_id} with appropriate permission
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("settings").map_or("settings", |model| model.key),
+                    OFGA_MODELS
+                        .get("settings")
+                        .map_or("settings", |model| model.key),
                     path_columns[0]
                 )
             }
@@ -749,7 +751,9 @@ where
             // This will be checked as settings:{org_id} with PUT permission
             format!(
                 "{}:{}",
-                OFGA_MODELS.get("settings").map_or("settings", |model| model.key),
+                OFGA_MODELS
+                    .get("settings")
+                    .map_or("settings", |model| model.key),
                 path_columns[0]
             )
         } else if path_columns[0].eq(V2_API_PREFIX)
@@ -759,15 +763,19 @@ where
         {
             // Handle v2 alert incident endpoints (5+ parts)
             // Incidents use alert_folders permissions:
-            // - LIST permission on alert_folders → can LIST incidents and get stats and get specific incidents
-            // - POST permission on alert_folders → can POST/PATCH incidents (update status, trigger RCA)
+            // - LIST permission on alert_folders → can LIST incidents and get stats and get
+            //   specific incidents
+            // - POST permission on alert_folders → can POST/PATCH incidents (update status, trigger
+            //   RCA)
 
             if method.eq("GET") && url_len == 5 && path_columns.get(4) == Some(&"stats") {
                 // GET incident stats - requires LIST permission on alert_folders
                 method = "LIST".to_string();
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("alert_folders").map_or("alert_folders", |model| model.key),
+                    OFGA_MODELS
+                        .get("alert_folders")
+                        .map_or("alert_folders", |model| model.key),
                     path_columns[1] // org_id
                 )
             } else if method.eq("GET") && url_len == 5 {
@@ -775,7 +783,9 @@ where
                 method = "LIST".to_string();
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("alert_folders").map_or("alert_folders", |model| model.key),
+                    OFGA_MODELS
+                        .get("alert_folders")
+                        .map_or("alert_folders", |model| model.key),
                     path_columns[1] // org_id
                 )
             } else if url_len == 6 && method.eq("GET") {
@@ -784,7 +794,9 @@ where
                 method = "LIST".to_string();
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("alert_folders").map_or("alert_folders", |model| model.key),
+                    OFGA_MODELS
+                        .get("alert_folders")
+                        .map_or("alert_folders", |model| model.key),
                     path_columns[1] // org_id (check org-level alert_folders permission)
                 )
             } else if url_len == 6 && (method.eq("PATCH") || method.eq("POST")) {
@@ -792,14 +804,18 @@ where
                 method = "POST".to_string();
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("alert_folders").map_or("alert_folders", |model| model.key),
+                    OFGA_MODELS
+                        .get("alert_folders")
+                        .map_or("alert_folders", |model| model.key),
                     path_columns[1] // org_id (check org-level alert_folders permission)
                 )
             } else {
                 // Fallback for other incident operations
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get("alert_folders").map_or("alert_folders", |model| model.key),
+                    OFGA_MODELS
+                        .get("alert_folders")
+                        .map_or("alert_folders", |model| model.key),
                     path_columns[1] // org_id
                 )
             }
