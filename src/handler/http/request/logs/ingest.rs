@@ -20,9 +20,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use config::meta::otlp::OtlpRequestType;
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
+use config::{
+    axum::middlewares::{get_process_time, insert_process_time_header},
+    meta::otlp::OtlpRequestType,
+};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
@@ -41,9 +44,7 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        request::{
-            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
-        },
+        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     },
     service::{
         ingestion::get_thread_id,

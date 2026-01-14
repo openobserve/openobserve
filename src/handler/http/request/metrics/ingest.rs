@@ -19,6 +19,9 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
+use config::axum::middlewares::{
+    HEADER_O2_PROCESS_TIME, get_process_time, insert_process_time_header,
+};
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
 
@@ -31,9 +34,7 @@ use crate::{
     },
     handler::http::{
         extractors::Headers,
-        request::{
-            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HEADER_O2_PROCESS_TIME, get_process_time,
-        },
+        request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     },
     service::metrics,
 };
@@ -79,7 +80,7 @@ pub async fn json(
         return MetaHttpResponse::too_many_requests(e);
     }
 
-    let resp = match metrics::json::ingest(&org_id, body, user).await {
+    let mut resp = match metrics::json::ingest(&org_id, body, user).await {
         Ok(v) => {
             if v.code == StatusCode::OK.as_u16() {
                 MetaHttpResponse::json(v)
@@ -97,16 +98,8 @@ pub async fn json(
         }
     };
 
-    if process_time > 0 {
-        let (mut parts, body) = resp.into_parts();
-        parts.headers.insert(
-            HEADER_O2_PROCESS_TIME,
-            process_time.to_string().parse().unwrap(),
-        );
-        Response::from_parts(parts, body)
-    } else {
-        resp
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
+    resp
 }
 
 /// MetricsIngest
