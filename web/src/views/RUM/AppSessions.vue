@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
           <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
-            <syntax-guide class="syntax-guide-in-toolbar element-box-shadow" />
+            <syntax-guide />
             <div class="flex align-center justify-end metrics-date-time">
               <date-time
                 auto-apply
