@@ -32,20 +32,76 @@
             </q-tooltip>
           </q-select>
 
-          <!-- Search input -->
-          <q-input
-            v-model="searchFilter"
-            borderless
-            dense
-            class="no-border tw:h-[36px] tw:flex-grow"
-            placeholder="Search services..."
-            debounce="300"
-            @update:model-value="applyFilters"
-          >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
+            <!-- Search input -->
+            <q-input
+              v-model="searchFilter"
+              borderless
+              dense
+              class="no-border tw:h-[36px] tw:flex-grow"
+              placeholder="Search services..."
+              debounce="300"
+              @update:model-value="applyFilters"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+          </div>
+          <div class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]">
+            <!-- 1. Time range selector -->
+            <date-time
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="timeRange.type"
+              :default-absolute-time="{
+                startTime: timeRange.startTime,
+                endTime: timeRange.endTime,
+              }"
+              :default-relative-time="timeRange.relativeTimePeriod"
+              data-test="service-graph-date-time-picker"
+              class="tw:h-[2rem]"
+              @on:date-change="updateTimeRange"
+            />
+
+            <!-- 2. Refresh button -->
+            <q-btn
+              data-test="service-graph-refresh-btn"
+              no-caps
+              flat
+              dense
+              icon="refresh"
+              class="tw:border tw:border-solid tw:border-[var(--o2-border-color)] q-px-sm element-box-shadow hover:tw:bg-[var(--o2-hover-accent)]"
+              @click="loadServiceGraph"
+              :loading="loading"
+            >
+              <q-tooltip>Refresh Service Graph</q-tooltip>
+            </q-btn>
+
+            <!-- 3. Graph/Tree view toggle buttons -->
+            <q-btn-toggle
+              v-model="visualizationType"
+              toggle-color="primary"
+              :options="[
+                { label: 'Graph View', value: 'graph', icon: 'hub' },
+                { label: 'Tree View', value: 'tree', icon: 'account_tree' }
+              ]"
+              dense
+              no-caps
+              @update:model-value="setVisualizationType"
+            />
+
+            <!-- 4. Layout dropdown -->
+            <q-select
+              v-model="layoutType"
+              :options="layoutOptions"
+              dense
+              filled
+              class="tw:w-[160px]"
+              emit-value
+              map-options
+              @update:model-value="setLayout"
+            />
+          </div>
         </div>
         <div
           class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]"
@@ -374,11 +430,7 @@ import serviceGraphService from "@/services/service_graph";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import DateTime from "@/components/DateTime.vue";
-import {
-  convertServiceGraphToTree,
-  convertServiceGraphToNetwork,
-} from "@/utils/traces/convertTraceData";
-import useStreams from "@/composables/useStreams";
+import { convertServiceGraphToTree, convertServiceGraphToNetwork } from "@/utils/traces/convertTraceData";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -447,8 +499,8 @@ export default defineComponent({
 
     // Time range state - default to last 15 minutes
     const timeRange = ref({
-      type: "relative",
-      relativeTimePeriod: "15m",
+      type: 'relative',
+      relativeTimePeriod: '15m',
       startTime: Date.now() * 1000 - 15 * 60 * 1000000, // 15 minutes ago in microseconds
       endTime: Date.now() * 1000, // Now in microseconds
     });
@@ -848,28 +900,14 @@ export default defineComponent({
       timeRange.value = {
         startTime: value.startTime,
         endTime: value.endTime,
-        relativeTimePeriod:
-          value.relativeTimePeriod || timeRange.value.relativeTimePeriod,
+        relativeTimePeriod: value.relativeTimePeriod || timeRange.value.relativeTimePeriod,
         type: value.relativeTimePeriod ? "relative" : "absolute",
       };
       // Reload service graph with new time range
       loadServiceGraph();
     };
 
-    // Load trace streams using the same method as the Traces search page
-    const loadTraceStreams = async () => {
-      try {
-        const res = await getStreams("traces", false, false);
-        if (res?.list?.length > 0) {
-          availableStreams.value = res.list.map((stream: any) => stream.name);
-        }
-      } catch (e) {
-        console.error("Error loading trace streams:", e);
-      }
-    };
-
-    onMounted(async () => {
-      await loadTraceStreams();
+    onMounted(() => {
       loadServiceGraph();
     });
 
