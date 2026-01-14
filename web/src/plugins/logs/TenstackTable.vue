@@ -758,7 +758,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 100, // Reduced from 100 to 5 - only pre-render 5 rows above/below viewport
+    overscan: 100,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
