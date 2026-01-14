@@ -533,13 +533,28 @@ impl FromRequest for AuthExtractor {
                         method = "LIST".to_string();
                     }
 
-                    format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(path_columns[1])
-                            .map_or(path_columns[1], |model| model.key),
-                        path_columns[0]
-                    )
+                    // handle service_streams/_grouped - requires settings permissions
+                    if method.eq("GET")
+                        && path_columns[1].eq("service_streams")
+                        && path_columns[2].eq("_grouped")
+                    {
+                        method = "LIST".to_string();
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get("settings")
+                                .map_or("settings", |model| model.key),
+                            path_columns[0]
+                        )
+                    } else {
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[1])
+                                .map_or(path_columns[1], |model| model.key),
+                            path_columns[0]
+                        )
+                    }
                 }
             } else if url_len == 4 {
                 // Handle /v2 alert apis
@@ -643,6 +658,26 @@ impl FromRequest for AuthExtractor {
                             .map_or(path_columns[1], |model| model.key),
                         path_columns[0]
                     )
+                } else if path_columns[1].eq("alerts")
+                    && path_columns[2].eq("deduplication")
+                    && (path_columns[3].eq("semantic-groups") || path_columns[3].eq("config"))
+                {
+                    // alerts/deduplication/config and semantic-groups require settings permissions
+                    // Convert GET to LIST, POST/DELETE to PUT for consistency with other settings
+                    // endpoints
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    } else if method.eq("POST") || method.eq("DELETE") {
+                        method = "PUT".to_string();
+                    }
+                    // This will be checked as settings:{org_id} with appropriate permission
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        path_columns[0]
+                    )
                 } else {
                     // Handles the backfill job creation, which is considered an UPDATE
                     // to the pipeline from the rbac perspective.
@@ -662,6 +697,91 @@ impl FromRequest for AuthExtractor {
                             .get(path_columns[1])
                             .map_or(path_columns[1], |model| model.key),
                         path_columns[2]
+                    )
+                }
+            } else if method.eq("POST")
+                && path_columns.get(1) == Some(&"alerts")
+                && path_columns.get(2) == Some(&"deduplication")
+                && path_columns.get(3) == Some(&"semantic-groups")
+            {
+                // POST to semantic-groups/preview-diff (5 parts) requires settings permissions
+                // Convert POST to PUT for consistency with other settings endpoints
+                method = "PUT".to_string();
+                // This will be checked as settings:{org_id} with PUT permission
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get("settings")
+                        .map_or("settings", |model| model.key),
+                    path_columns[0]
+                )
+            } else if path_columns[0].eq(V2_API_PREFIX)
+                && path_columns.get(2) == Some(&"alerts")
+                && path_columns.get(3) == Some(&"incidents")
+                && url_len >= 5
+            {
+                // Handle v2 alert incident endpoints (5+ parts)
+                // Incidents use alert_folders permissions:
+                // - LIST permission on alert_folders → can LIST incidents and get stats
+                // - GET permission on alert_folders → can GET specific incidents
+                // - POST permission on alert_folders → can POST/PATCH incidents (update status,
+                //   trigger RCA)
+                //
+                // /v2/{org_id}/alerts/incidents - GET LIST incidents
+                // /v2/{org_id}/alerts/incidents/stats - GET incident stats
+                // /v2/{org_id}/alerts/incidents/{incident_id} - GET specific incident
+                // /v2/{org_id}/alerts/incidents/{incident_id}/status - PATCH incident status
+                // /v2/{org_id}/alerts/incidents/{incident_id}/rca - POST RCA analysis
+                // /v2/{org_id}/alerts/incidents/{incident_id}/service_graph - GET service graph
+
+                if method.eq("GET") && url_len == 5 && path_columns.get(4) == Some(&"stats") {
+                    // GET incident stats - requires LIST permission on alert_folders
+                    method = "LIST".to_string();
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("alert_folders")
+                            .map_or("alert_folders", |model| model.key),
+                        path_columns[1] // org_id
+                    )
+                } else if method.eq("GET") && url_len == 5 {
+                    // GET list of incidents - requires LIST permission on alert_folders
+                    method = "LIST".to_string();
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("alert_folders")
+                            .map_or("alert_folders", |model| model.key),
+                        path_columns[1] // org_id
+                    )
+                } else if url_len == 6 && method.eq("GET") {
+                    // GET specific incident or sub-resources (service_graph)
+                    // Requires GET permission on alert_folders
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("alert_folders")
+                            .map_or("alert_folders", |model| model.key),
+                        path_columns[1] // org_id (check org-level alert_folders permission)
+                    )
+                } else if url_len == 6 && (method.eq("PATCH") || method.eq("POST")) {
+                    // PATCH incident status or POST RCA - requires POST permission on alert_folders
+                    method = "POST".to_string();
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("alert_folders")
+                            .map_or("alert_folders", |model| model.key),
+                        path_columns[1] // org_id (check org-level alert_folders permission)
+                    )
+                } else {
+                    // Fallback for other incident operations
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("alert_folders")
+                            .map_or("alert_folders", |model| model.key),
+                        path_columns[1] // org_id
                     )
                 }
             } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
