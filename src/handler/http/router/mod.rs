@@ -526,7 +526,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_xpack", get(organization::es::org_xpack))
         .route("/{org_id}/_ilm/policy", get(organization::es::org_ilm_policy))
         .route("/{org_id}/_ingest/pipeline", get(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
-        
+
         // Streams
         .route("/{org_id}/streams/{stream_name}/schema", get(stream::schema))
         .route("/{org_id}/streams", get(stream::list).post(stream::create))
