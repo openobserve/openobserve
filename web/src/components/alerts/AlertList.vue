@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-4">
             <!-- View Mode Tabs (Alerts / Incidents) -->
             <div class="flex justify-start">
-              <q-tabs v-model="viewMode" inline-label dense @update:model-value="onViewModeChange">
+              <q-tabs v-model="viewMode" inline-label dense @update:model-value="onViewModeChange" data-test="alert-incident-view-tabs">
                 <q-tab
                   name="alerts"
                   :label="t('alerts.header')"
