@@ -47,8 +47,6 @@ use crate::{
 pub struct AlertHistoryQuery {
     /// Filter by specific alert name
     pub alert_id: Option<Ksuid>,
-    /// Folder ID (required for RBAC when filtering by alert_id)
-    pub folder: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
