@@ -387,7 +387,9 @@
     "discoverSessionTitle": "Descubra la reproducción de sesiones para comprender en detalle las interacciones de los usuarios",
     "discoverSessionMessage": "La reproducción de sesiones captura y reproduce las interacciones de los usuarios en su sitio web o aplicación. Esto te permite revisar visualmente cómo navegan los usuarios, dónde hacen clic, qué escriben y cómo interactúan con tu contenido",
     "getStartedRUM": "Comience con Real User Monitoring",
-    "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error."
+    "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error.",
+    "eventID": "ID de evento",
+    "loadingApplicationErrors": "Agárrate fuerte, estamos recibiendo errores de solicitud."
   },
   "about": {
     "name": "Abrir Observe",

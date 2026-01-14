@@ -387,7 +387,9 @@
     "discoverSessionTitle": "세션 리플레이를 통해 사용자 상호작용에 대해 자세히 알아보세요",
     "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
     "getStartedRUM": "실제 사용자 모니터링 시작하기",
-    "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다."
+    "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
+    "eventID": "이벤트 ID",
+    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다."
   },
   "about": {
     "name": "오픈 옵저브",

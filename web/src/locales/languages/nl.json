@@ -387,7 +387,9 @@
     "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
     "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
     "getStartedRUM": "Ga aan de slag met Real User Monitoring",
-    "loadingErrorDetails": "Wacht even, we halen foutgegevens op."
+    "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
+    "eventID": "ID van het evenement",
+    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op."
   },
   "about": {
     "name": "OpenObserve",

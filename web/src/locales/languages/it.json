@@ -387,7 +387,9 @@
     "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
     "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
     "getStartedRUM": "Inizia con Real User Monitoring",
-    "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore."
+    "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
+    "eventID": "ID evento",
+    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione."
   },
   "about": {
     "name": "Apri Observe",

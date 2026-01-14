@@ -387,7 +387,9 @@
     "discoverSessionTitle": "探索会话回放以详细了解用户互动",
     "discoverSessionMessage": "Session Replay 捕获并重播您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
     "getStartedRUM": "开始使用真实用户监控",
-    "loadingErrorDetails": "等一下，我们正在获取错误细节。"
+    "loadingErrorDetails": "等一下，我们正在获取错误细节。",
+    "eventID": "事件 ID",
+    "loadingApplicationErrors": "等一下，我们正在提取应用程序错误。"
   },
   "about": {
     "name": "OpenObserve",
