@@ -1197,12 +1197,14 @@ mod tests {
     #[cfg(feature = "enterprise")]
     fn init_ofga_test() {
         // Initialize OFGA store ID for tests to prevent panics
-        o2_openfga::config::OFGA_STORE_ID
-            .insert("store_id".to_owned(), "test_store_id".to_owned());
+        o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), "test_store_id".to_owned());
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_create_role_enterprise_success() {
         #[cfg(feature = "enterprise")]
         {
@@ -1260,7 +1262,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_delete_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1279,7 +1284,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_roles_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1298,7 +1306,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_update_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1338,7 +1349,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_role_permissions_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1367,7 +1381,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_users_with_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1388,7 +1405,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_roles_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1415,7 +1435,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_groups_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1442,7 +1465,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_create_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1477,7 +1503,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_update_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1521,7 +1550,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_groups_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1540,7 +1572,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_group_details_enterprise() {
         #[cfg(feature = "enterprise")]
         {
@@ -1561,7 +1596,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "enterprise", should_panic(expected = "called `Option::unwrap()` on a `None` value"))]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_delete_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {

@@ -185,7 +185,7 @@ pprof = { version = "0.15.0", features = [
 ], optional = true }
 tokio-stream.workspace = true
 mime = "0.3.17"
-pin-project-lite = "0.2.16"
+pin-project-lite.workspace = true
 futures-core = "0.3.31"
 derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
@@ -335,6 +335,7 @@ opentelemetry-proto = { version = "0.31", features = [
     "trace",
 ] }
 parking_lot = "0.12"
+pin-project-lite = "0.2.16"
 prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14.1"
 prost-wkt-types = "0.7"

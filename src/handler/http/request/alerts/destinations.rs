@@ -82,7 +82,6 @@ pub async fn save_destination(
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
-    log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
