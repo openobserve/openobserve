@@ -129,11 +129,12 @@ describe("backfill service", () => {
 
       const result = await backfill.getBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
       });
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123"
       );
       expect(result).toEqual(mockJob);
     });
@@ -151,12 +152,13 @@ describe("backfill service", () => {
 
       const result = await backfill.enableBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
         enable: true,
       });
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123/enable?value=true"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123/enable?value=true"
       );
       expect(result).toEqual(mockResponse.data);
     });
@@ -172,12 +174,13 @@ describe("backfill service", () => {
 
       const result = await backfill.enableBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
         enable: false,
       });
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123/enable?value=false"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123/enable?value=false"
       );
       expect(result).toEqual(mockResponse.data);
     });
@@ -195,11 +198,12 @@ describe("backfill service", () => {
 
       const result = await backfill.pauseBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
       });
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123/enable?value=false"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123/enable?value=false"
       );
       expect(result).toEqual(mockResponse.data);
     });
@@ -217,11 +221,12 @@ describe("backfill service", () => {
 
       const result = await backfill.resumeBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
       });
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123/enable?value=true"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123/enable?value=true"
       );
       expect(result).toEqual(mockResponse.data);
     });
@@ -239,6 +244,7 @@ describe("backfill service", () => {
 
       const params = {
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
         data: {
           start_time: "2024-01-01T00:00:00Z",
@@ -252,7 +258,7 @@ describe("backfill service", () => {
       const result = await backfill.updateBackfillJob(params);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/${params.org_id}/pipelines/backfill/${params.job_id}`,
+        `/api/${params.org_id}/pipelines/${params.pipeline_id}/backfill/${params.job_id}`,
         params.data
       );
       expect(result).toEqual(mockResponse.data);
@@ -271,11 +277,12 @@ describe("backfill service", () => {
 
       const result = await backfill.deleteBackfillJob({
         org_id: "test-org",
+        pipeline_id: "test-pipeline",
         job_id: "test-job-123",
       });
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/test-org/pipelines/backfill/test-job-123"
+        "/api/test-org/pipelines/test-pipeline/backfill/test-job-123"
       );
       expect(result).toEqual(mockResponse.data);
     });
@@ -314,6 +321,7 @@ describe("backfill service", () => {
       await expect(
         backfill.enableBackfillJob({
           org_id: "test-org",
+          pipeline_id: "test-pipeline",
           job_id: "non-existent",
           enable: true,
         })

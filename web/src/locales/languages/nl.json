@@ -107,7 +107,8 @@
     "manageTheme": "Thema beheren",
     "url": "URL",
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
-    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan."
+    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
+    "id": "ID"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "Geen gecorreleerde sporen gevonden",
     "noTracesDescription": "Geen sporen gevonden voor service {service} in de geselecteerde periode",
     "openTraceInNewWindow": "Open trace in nieuw venster",
-    "filters": "Filters"
+    "filters": "Filters",
+    "semanticFieldGroupsTitle": "Veldtoewijzingen",
+    "semanticFieldGroupsCaption": "Definieer veldnaamtoewijzingen voor correlatie en deduplicatie (bijv. host, hostnaam, knooppunt → 'host'-groep)",
+    "groupsLabel": "groepen",
+    "importFromJson": "Importeren vanuit JSON",
+    "addCustomGroup": "Aangepaste groep toevoegen",
+    "actionNormalize": "Kleine letters en trimwaarden om te matchen",
+    "removeSemanticGroup": "Semantic Group verwijderen",
+    "fieldNamePlaceholder": "Veldnamen (gescheiden door komma's)",
+    "category": "Categorie",
+    "categoryHint": "Groepen per categorie filteren",
+    "noSemanticGroupMessage": "Geen semantische groepen in deze categorie. Selecteer een andere categorie of voeg een aangepaste groep toe.",
+    "showingGroups": "{filterGroupLength} van het totale aantal groepen van {localGroupLength} wordt weergegeven",
+    "deduplicateFields": "Deduplicatievelden",
+    "deduplicateFieldTooltip": "Selecteer welke veldtoewijzingen u wilt gebruiken voor deduplicatie van vingerafdrukken",
+    "alertDeduplicationMessage": "Waarschuwingen met dezelfde waarden voor deze velden worden ontdubbeld (bijvoorbeeld dezelfde vingerafdruk = dezelfde veldwaarden)",
+    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

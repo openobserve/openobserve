@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::HttpResponse;
+use axum::response::Response;
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -24,11 +24,11 @@ pub mod org_usage;
 
 // BillingsError extension
 pub trait IntoHttpResponse {
-    fn into_http_response(self) -> HttpResponse;
+    fn into_http_response(self) -> Response;
 }
 
 impl IntoHttpResponse for o2_cloud_billings::BillingError {
-    fn into_http_response(self) -> HttpResponse {
+    fn into_http_response(self) -> Response {
         match self {
             o2_cloud_billings::BillingError::InfraError(err) => {
                 MetaHttpResponse::internal_error(err)

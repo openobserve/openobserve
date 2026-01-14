@@ -107,7 +107,8 @@
     "manageTheme": "Theme verwalten",
     "url": "URL",
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
-    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
+    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
+    "id": "ID"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -2364,7 +2365,23 @@
     "noTracesFound": "Keine korrelierten Spuren gefunden",
     "noTracesDescription": "Keine Spuren für Service {service} im ausgewählten Zeitraum gefunden",
     "openTraceInNewWindow": "Trace in neuem Fenster öffnen",
-    "filters": "Filter"
+    "filters": "Filter",
+    "semanticFieldGroupsTitle": "Feldzuordnungen",
+    "semanticFieldGroupsCaption": "Definieren Sie Feldnamenzuordnungen für Korrelation und Deduplizierung (z. B. Host, Hostname, Knoten → Hostgruppe)",
+    "groupsLabel": "Gruppen",
+    "importFromJson": "Aus JSON importieren",
+    "addCustomGroup": "Benutzerdefinierte Gruppe hinzufügen",
+    "actionNormalize": "Kleinbuchstaben und Trimmwerte für den Abgleich",
+    "removeSemanticGroup": "Semantische Gruppe entfernen",
+    "fieldNamePlaceholder": "Feldnamen (kommagetrennt)",
+    "category": "Kategorie",
+    "categoryHint": "Gruppen nach Kategorie filtern",
+    "noSemanticGroupMessage": "Keine semantischen Gruppen in dieser Kategorie. Wählen Sie eine andere Kategorie oder fügen Sie eine benutzerdefinierte Gruppe hinzu.",
+    "showingGroups": "{filterGroupLength} von insgesamt {localGroupLength} Gruppen werden angezeigt",
+    "deduplicateFields": "Deduplizierungsfelder",
+    "deduplicateFieldTooltip": "Wählen Sie aus, welche Feldzuordnungen für das Deduplizierungs-Fingerprinting verwendet werden sollen",
+    "alertDeduplicationMessage": "Alarme mit den gleichen Werten für diese Felder werden dedupliziert (z. B. derselbe Fingerabdruck = gleiche Feldwerte)",
+    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, http, http::header, post, web};
+use axum::{
+    body::Bytes,
+    extract::Path,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+};
+use config::axum::middlewares::{
+    HEADER_O2_PROCESS_TIME, get_process_time, insert_process_time_header,
+};
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
 
@@ -35,6 +41,8 @@ use crate::{
 
 /// _json ingestion API
 #[utoipa::path(
+    post,
+    path = "/{org_id}/ingest/metrics/_json",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "MetricsIngestionJson",
@@ -57,54 +65,48 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/{org_id}/ingest/metrics/_json")]
 pub async fn json(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+    body: Bytes,
+) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
-    let org_id = org_id.into_inner();
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        return Ok(
-            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                http::StatusCode::TOO_MANY_REQUESTS,
-                e,
-            )),
-        );
+        return MetaHttpResponse::too_many_requests(e);
     }
 
     let mut resp = match metrics::json::ingest(&org_id, body, user).await {
-        Ok(v) => HttpResponse::Ok().json(v),
+        Ok(v) => {
+            if v.code == StatusCode::OK.as_u16() {
+                MetaHttpResponse::json(v)
+            } else if v.code == StatusCode::TOO_MANY_REQUESTS.as_u16() {
+                (StatusCode::TOO_MANY_REQUESTS, axum::Json(v)).into_response()
+            } else if v.code == StatusCode::SERVICE_UNAVAILABLE.as_u16() {
+                (StatusCode::SERVICE_UNAVAILABLE, axum::Json(v)).into_response()
+            } else {
+                (StatusCode::BAD_REQUEST, axum::Json(v)).into_response()
+            }
+        }
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {e}");
-            HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            MetaHttpResponse::bad_request(e)
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
-
-    Ok(resp)
+    insert_process_time_header(process_time, resp.headers_mut());
+    resp
 }
 
 /// MetricsIngest
 // json example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 #[utoipa::path(
+    post,
+    path = "/{org_id}/v1/metrics",
     context_path = "/api",
     tag = "Metrics",
     operation_id = "PostMetrics",
@@ -121,51 +123,49 @@ pub async fn json(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/{org_id}/v1/metrics")]
 pub async fn otlp_metrics_write(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
-    let org_id = org_id.into_inner();
     let user = IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        return Ok(
-            HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                http::StatusCode::TOO_MANY_REQUESTS,
-                e,
-            )),
-        );
+        return MetaHttpResponse::too_many_requests(e);
     }
 
-    let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
-    let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        metrics::otlp::otlp_proto(&org_id, body, user).await?
+    let content_type = headers
+        .get("Content-Type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let resp = if content_type.eq(CONTENT_TYPE_PROTO) {
+        match metrics::otlp::otlp_proto(&org_id, body, user).await {
+            Ok(v) => v,
+            Err(e) => MetaHttpResponse::internal_error(e),
+        }
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        metrics::otlp::otlp_json(&org_id, body, user).await?
+        match metrics::otlp::otlp_json(&org_id, body, user).await {
+            Ok(v) => v,
+            Err(e) => MetaHttpResponse::internal_error(e),
+        }
     } else {
-        HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Bad Request",
-        ))
+        MetaHttpResponse::bad_request("Bad Request")
     };
 
     if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
+        let (mut parts, body) = resp.into_parts();
+        parts.headers.insert(
+            HEADER_O2_PROCESS_TIME,
+            process_time.to_string().parse().unwrap(),
         );
+        Response::from_parts(parts, body)
+    } else {
+        resp
     }
-
-    Ok(resp)
 }

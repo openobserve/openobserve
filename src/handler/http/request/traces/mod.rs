@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, get, http, http::header, post, web};
+use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    axum::middlewares::{get_process_time, insert_process_time_header},
+    get_config,
     meta::{search::default_use_cache, stream::StreamType},
     metrics,
     utils::json,
@@ -32,7 +32,7 @@ use crate::service::ingestion::check_ingestion_allowed;
 pub use crate::service::traces::service_graph::{self, get_current_topology};
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::http::HttpResponse as MetaHttpResponse,
         utils::{
             auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
@@ -49,6 +49,8 @@ use crate::{
 
 /// TracesIngest
 #[utoipa::path(
+    post,
+    path = "/{org_id}/v1/traces",
     context_path = "/api",
     tag = "Traces",
     operation_id = "PostTraces",
@@ -66,89 +68,74 @@ use crate::{
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/{org_id}/traces")]
 pub async fn traces_write(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
-    handle_req(org_id, user_email, req, body).await
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    handle_req(org_id, user_email, headers, body).await
 }
 
-#[post("/{org_id}/v1/traces")]
 pub async fn otlp_traces_write(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
-    handle_req(org_id, user_email, req, body).await
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    handle_req(org_id, user_email, headers, body).await
 }
 
 async fn handle_req(
-    org_id: web::Path<String>,
+    org_id: String,
     user_email: UserEmail,
-    req: HttpRequest,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
 
-    let org_id = org_id.into_inner();
     let user = crate::common::meta::ingestion::IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
         Ok(_) => {}
         Err(e) => {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
+            return MetaHttpResponse::too_many_requests(e);
         }
     }
 
-    let content_type = req
-        .headers()
+    let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("application/json");
-    let in_stream_name = req
-        .headers()
+    let in_stream_name = headers
         .get(&get_config().grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
-    let mut resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        traces::otlp_proto(&org_id, body, in_stream_name, user).await?
+
+    let result = if content_type.eq(CONTENT_TYPE_PROTO) {
+        traces::otlp_proto(&org_id, body, in_stream_name, user).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        traces::otlp_json(&org_id, body, in_stream_name, user).await?
+        traces::otlp_json(&org_id, body, in_stream_name, user).await
     } else {
-        HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-            http::StatusCode::BAD_REQUEST,
-            "Bad Request",
-        ))
+        return MetaHttpResponse::bad_request("Bad Request");
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
+    match result {
+        Ok(mut resp) => {
+            insert_process_time_header(process_time, resp.headers_mut());
+            resp
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
-
-    Ok(resp)
 }
 
 /// GetLatestTraces
 ///
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
 #[utoipa::path(
+    get,
+    path = "/{org_id}/{stream_name}/traces/latest",
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetLatestTraces",
@@ -186,28 +173,19 @@ async fn handle_req(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[get("/{org_id}/{stream_name}/traces/latest")]
 pub async fn get_latest_traces(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Path((org_id, stream_name)): Path<(String, String)>,
+    axum::extract::Query(query): axum::extract::Query<HashMap<String, String>>,
+    headers: HeaderMap,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
-
-    let (org_id, stream_name) = path.into_inner();
 
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
-            use actix_http::StatusCode;
-
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            );
+            return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
 
@@ -222,11 +200,10 @@ pub async fn get_latest_traces(
 
         (span, uuid_v7_trace_id)
     } else {
-        let trace_id = get_or_create_trace_id(in_req.headers(), &Span::none());
+        let trace_id = get_or_create_trace_id(&headers, &Span::none());
         (Span::none(), trace_id)
     };
     let user_id = &user_email.user_id;
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     // Check permissions on stream
 
@@ -263,7 +240,7 @@ pub async fn get_latest_traces(
             )
             .await
             {
-                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
         // Check permissions on stream ends
@@ -284,13 +261,13 @@ pub async fn get_latest_traces(
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if start_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
+        return MetaHttpResponse::bad_request("start_time is empty");
     }
     let mut end_time = query
         .get("end_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+        return MetaHttpResponse::bad_request("end_time is empty");
     }
     // default/traces/latest?filter=trace_id=%2701990a31c98e72cbb5e38df024e7adef%27&
     // start_time=1756811970952000&end_time=1756812870952000&from=0&size=25
@@ -426,11 +403,11 @@ pub async fn get_latest_traces(
                 ])
                 .inc();
             log::error!("get traces latest data error: {err:?}");
-            return Ok(map_error_to_http_response(&err, Some(trace_id)));
+            return map_error_to_http_response(&err, Some(trace_id));
         }
     };
     if resp_search.hits.is_empty() {
-        return Ok(HttpResponse::Ok().json(resp_search));
+        return MetaHttpResponse::json(resp_search);
     }
 
     let mut traces_data: HashMap<String, TraceResponseItem> =
@@ -516,7 +493,7 @@ pub async fn get_latest_traces(
                     ])
                     .inc();
                 log::error!("get traces latest data error: {err:?}");
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return map_error_to_http_response(&err, Some(trace_id));
             }
         };
 
@@ -610,7 +587,7 @@ pub async fn get_latest_traces(
     if !range_error.is_empty() {
         resp.insert("function_error", json::Value::String(range_error));
     }
-    Ok(HttpResponse::Ok().json(resp))
+    MetaHttpResponse::json(resp)
 }
 
 #[derive(Debug, Serialize)]

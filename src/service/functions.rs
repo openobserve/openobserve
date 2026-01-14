@@ -15,9 +15,9 @@
 
 use std::io::Error;
 
-use actix_web::{
-    HttpResponse,
-    http::{self, StatusCode},
+use axum::{
+    Json, http,
+    response::{IntoResponse, Response as HttpResponse},
 };
 use config::{
     meta::{
@@ -56,17 +56,13 @@ pub enum FunctionDeleteError {
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        )));
+        ));
     }
 
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
-        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
-            FN_ALREADY_EXIST,
-        )))
+        Ok(MetaHttpResponse::bad_request(FN_ALREADY_EXIST))
     } else {
         // Only append "." for VRL functions, not JS
         if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
@@ -77,8 +73,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             0 => {
                 // VRL function
                 if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
-                    return Ok(HttpResponse::BadRequest()
-                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                    return Ok(MetaHttpResponse::bad_request(e));
                 }
             }
             1 => {
@@ -86,15 +81,13 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                 if let Err(e) =
                     crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id)
                 {
-                    return Ok(HttpResponse::BadRequest()
-                        .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                    return Ok(MetaHttpResponse::bad_request(e));
                 }
             }
             _ => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST,
+                return Ok(MetaHttpResponse::bad_request(
                     "Invalid transform type. Use 0 for VRL or 1 for JS.",
-                )));
+                ));
             }
         }
         extract_num_args(&mut func);
@@ -103,10 +96,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
 
-            Ok(
-                HttpResponse::Ok()
-                    .json(MetaHttpResponse::message(http::StatusCode::OK, FN_SUCCESS)),
-            )
+            Ok(MetaHttpResponse::ok(FN_SUCCESS))
         }
     }
 }
@@ -137,19 +127,17 @@ pub async fn test_run_function(
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if trans_type == 1 && org_id != "_meta" {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        return Ok(MetaHttpResponse::bad_request(
             "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        )));
+        ));
     }
 
     match trans_type {
         0 => test_run_vrl_function(org_id, function, events).await,
         1 => test_run_js_function(org_id, function, events).await,
-        _ => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            StatusCode::BAD_REQUEST,
+        _ => Ok(MetaHttpResponse::bad_request(
             "Invalid transform type. Use 0 for VRL or 1 for JS.",
-        ))),
+        )),
     }
 }
 
@@ -176,8 +164,7 @@ async fn test_run_vrl_function(
             program
         }
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            return Ok(MetaHttpResponse::bad_request(e));
         }
     };
 
@@ -199,10 +186,7 @@ async fn test_run_vrl_function(
         );
 
         if err.is_some() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST,
-                err.unwrap(),
-            )));
+            return Ok(MetaHttpResponse::bad_request(err.unwrap()));
         }
 
         ret_val
@@ -254,7 +238,7 @@ async fn test_run_vrl_function(
         results: transformed_events,
     };
 
-    Ok(HttpResponse::Ok().json(results))
+    Ok(MetaHttpResponse::json(results))
 }
 
 #[tracing::instrument(skip(org_id, function))]
@@ -270,8 +254,7 @@ async fn test_run_js_function(
     let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
         Ok(config) => config,
         Err(e) => {
-            return Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            return Ok(MetaHttpResponse::bad_request(e));
         }
     };
 
@@ -335,7 +318,7 @@ async fn test_run_js_function(
         results: transformed_events,
     };
 
-    Ok(HttpResponse::Ok().json(results))
+    Ok(MetaHttpResponse::json(results))
 }
 
 #[tracing::instrument(skip(func))]
@@ -347,12 +330,19 @@ pub async fn update_function(
     let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
-            return Ok(HttpResponse::NotFound()
-                .json(MetaHttpResponse::error(StatusCode::NOT_FOUND, FN_NOT_FOUND)));
+            return Ok(MetaHttpResponse::not_found(FN_NOT_FOUND));
         }
     };
+
+    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
+    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
+        return Ok(MetaHttpResponse::bad_request(
+            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
+        ));
+    }
+
     if func == existing_fn {
-        return Ok(HttpResponse::Ok().json(func));
+        return Ok(MetaHttpResponse::json(func));
     }
 
     // Only append "." for VRL functions, not JS
@@ -364,22 +354,19 @@ pub async fn update_function(
         0 => {
             // VRL function
             if let Err(e) = compile_vrl_function(&func.function, org_id) {
-                return Ok(HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return Ok(MetaHttpResponse::bad_request(e));
             }
         }
         1 => {
             // JS function
             if let Err(e) = crate::service::ingestion::compile_js_function(&func.function, org_id) {
-                return Ok(HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return Ok(MetaHttpResponse::bad_request(e));
             }
         }
         _ => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST,
+            return Ok(MetaHttpResponse::bad_request(
                 "Invalid transform type. Use 0 for VRL or 1 for JS.",
-            )));
+            ));
         }
     }
     extract_num_args(&mut func);
@@ -394,20 +381,23 @@ pub async fn update_function(
             if pipeline.contains_function(&func.name)
                 && let Err(e) = db::pipeline::update(&pipeline, None).await
             {
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((ERROR_HEADER, e.to_string()))
-                    .json(MetaHttpResponse::message(
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(ERROR_HEADER, e.to_string())],
+                    Json(MetaHttpResponse::message(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         format!(
                             "Failed to update associated pipeline({}/{}): {}",
                             pipeline.id, pipeline.name, e
                         ),
-                    )));
+                    )),
+                )
+                    .into_response());
             }
         }
     }
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, FN_SUCCESS)))
+    Ok(MetaHttpResponse::ok(FN_SUCCESS))
 }
 
 pub async fn list_functions(
@@ -431,9 +421,9 @@ pub async fn list_functions(
             }
         }
 
-        Ok(HttpResponse::Ok().json(FunctionList { list: result }))
+        Ok(MetaHttpResponse::json(FunctionList { list: result }))
     } else {
-        Ok(HttpResponse::Ok().json(FunctionList { list: vec![] }))
+        Ok(MetaHttpResponse::json(FunctionList { list: vec![] }))
     }
 }
 
@@ -491,7 +481,7 @@ pub async fn get_pipeline_dependencies(
     func_name: &str,
 ) -> Result<HttpResponse, Error> {
     let list = get_dependencies(org_id, func_name).await;
-    Ok(HttpResponse::Ok().json(PipelineDependencyResponse { list }))
+    Ok(MetaHttpResponse::json(PipelineDependencyResponse { list }))
 }
 
 async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
@@ -530,7 +520,6 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
 
 #[cfg(test)]
 mod tests {
-    use actix_http::body::to_bytes;
     use config::meta::{function::StreamOrder, stream::StreamType};
 
     use super::*;
@@ -581,6 +570,7 @@ mod tests {
 
     #[tokio::test]
     async fn validate_test_function_processing() {
+        use http_body_util::BodyExt;
         use serde_json::json;
 
         let org_id = "test_org";
@@ -604,8 +594,8 @@ mod tests {
             .unwrap(); // VRL function
         assert_eq!(response.status(), http::StatusCode::OK);
 
-        let body: TestVRLResponse =
-            serde_json::from_slice(&to_bytes(response.into_body()).await.unwrap()).unwrap();
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: TestVRLResponse = serde_json::from_slice(&body_bytes).unwrap();
 
         // Validate transformed events
         assert_eq!(body.results.len(), 1);
@@ -635,6 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_js_function_blocked_in_regular_org() {
+        use http_body_util::BodyExt;
         use serde_json::json;
 
         let org_id = "default";
@@ -650,7 +641,7 @@ mod tests {
         assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 
         // Verify error message
-        let body_bytes = to_bytes(response.into_body()).await.unwrap();
+        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(
             body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
@@ -700,7 +691,8 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
 
         // Verify error message
-        let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+        use http_body_util::BodyExt;
+        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
         let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(
             body_str.contains("JavaScript functions are only allowed in the '_meta' organization")

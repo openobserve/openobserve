@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full org-dedup-settings">
-    <div class="tw:mb-6 tw:flex tw:justify-between tw:items-start">
-      <div>
-        <div class="text-h6 tw:mb-2">{{ t('alerts.correlation.title') }}</div>
-        <div class="text-body2 text-grey-7">
-          {{ t('alerts.correlation.description') }}
-        </div>
-        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
-          {{ t('alerts.correlation.semanticFieldNote') }}
-        </div>
+  <div class="tw:w-full org-dedup-settings q-mt-sm">
+    <div class="tw:mb-6">
+      <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
+      <div class="text-body2 text-grey-7">
+        {{ t('alerts.correlation.description') }}
+      </div>
+      <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+        {{ t('alerts.correlation.semanticFieldNote') }}
       </div>
       <q-btn
+        data-test="dedup-settings-refresh-btn"
+        class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         flat
         dense
         color="primary"
-        icon="refresh"
         :label="t('common.refresh')"
         @click="loadConfig"
       />
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Enable Deduplication -->
     <div class="tw:mb-6">
       <q-checkbox
+        data-test="organization-deduplication-enable-checkbox"
         v-model="localConfig.enabled"
         :label="t('alerts.correlation.enableOrgLevel')"
         dense
@@ -55,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cross-Alert Deduplication -->
     <div class="tw:mb-6" v-if="localConfig.enabled">
       <q-checkbox
+        data-test="organizationdeduplication-enable-cross-alert-checkbox"
         v-model="localConfig.alert_dedup_enabled"
         :label="t('alerts.correlation.enableCrossAlert')"
         dense
@@ -92,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-col tw:gap-2">
         <q-checkbox
           v-for="group in localSemanticGroups"
+          :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
           :key="group.id"
           :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
           @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
@@ -131,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('alerts.correlation.defaultWindowDescription') }}
       </div>
       <q-input
+        data-test="orgnaizationdeduplication-default-window-input"
         v-model.number="localConfig.time_window_minutes"
         type="number"
         dense
@@ -166,6 +170,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
+import GroupHeader from "@/components/common/GroupHeader.vue";
 
 const store = useStore();
 const $q = useQuasar();

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::{BufRead, BufReader};
 
-use actix_web::web;
+use axum::body::Bytes;
 use config::{get_config, meta::stream::StreamType, utils::json};
 use hashbrown::HashMap;
 use infra::errors::Result;
@@ -38,7 +38,7 @@ struct HecEntry {
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user_email: &str,
 ) -> Result<HecResponse> {
     // check system resource
@@ -130,7 +130,7 @@ mod tests {
     async fn test_ingest_invalid_json() {
         // Test with invalid JSON data
         let invalid_data = r#"{"invalid": json}"#;
-        let body = web::Bytes::from(invalid_data);
+        let body = Bytes::from(invalid_data);
         let thread_id = 1;
         let org_id = "test-org";
         let user_email = "test@example.com";
