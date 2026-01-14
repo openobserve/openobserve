@@ -27,7 +27,7 @@ pub use tower_http::compression::CompressionLayer;
 
 pub const HEADER_O2_PROCESS_TIME: HeaderName = HeaderName::from_static("o2_process_time");
 
-/// Returns the current time for process tracking, accounting for `ZO_ACTIX_SLOW_LOG_THRESHOLD` env.
+/// Returns the current time for process tracking, accounting for `ZO_HTTP_SLOW_LOG_THRESHOLD` env.
 /// Returns 0 if slow log threshold is not configured, avoiding unnecessary time tracking overhead.
 pub fn get_process_time() -> i64 {
     if crate::get_config().limit.http_slow_log_threshold > 0 {
