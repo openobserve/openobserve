@@ -76,14 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-      <template #separator>
-        <q-avatar
-          color="primary"
-          text-color="white"
-          icon="drag_indicator"
-          class="tw:top-[2rem]! tw:w-[0.75rem] tw:h-[2rem]! tw:text-[2rem]! tw:rounded-[0.325rem]!"
-        />
-      </template>
       <template #after>
         <div class="tw:pr-[0.625rem] tw:h-full">
           <div class="card-container tw:h-full">

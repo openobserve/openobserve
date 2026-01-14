@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-mt-lg">
-    <div class="tags-title text-bold q-mb-sm q-ml-xs">Session Replay</div>
+    <div class="tags-title text-bold q-mb-sm q-ml-xs">{{ t("rum.sessionReplay") }}</div>
     <div class="row">
       <template v-for="(value, tag) in getSessionTags" :key="tag.tag">
         <ErrorTag :tag="{ key: tag, value }" />
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-btn
       class="bg-primary rounded text-white tw:mt-[0.625rem]"
       no-caps
-      title="View Session Replay"
+      :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"
     >
       <q-icon name="play_circle" size="1.125rem" class="q-mr-xs" /> 
-      Play Session Replay
+      {{ t("rum.playSessionReplay") }}
     </q-btn>
   </div>
 </template>
@@ -38,6 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   error: {

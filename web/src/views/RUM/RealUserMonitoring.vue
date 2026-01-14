@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-auto tw:block"
           />
           <div class="text-center full-width">
-            Hold on tight, we're loading RUM data.
+            {{ t("rum.loadingMsg") }}
           </div>
         </div>
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem] q-pt-xs">
+      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <AppTabs
           :show="showTabs"
           :tabs="tabs"
