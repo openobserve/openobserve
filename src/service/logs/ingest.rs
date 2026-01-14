@@ -87,6 +87,9 @@ pub async fn ingest(
     } else {
         format_stream_name(in_stream_name.to_string())
     };
+    if stream_name.is_empty() {
+        return Err(Error::IngestionError("Stream name is empty".to_string()));
+    }
 
     // check system resource
     check_ingestion_allowed(org_id, stream_type, Some(&stream_name)).await?;

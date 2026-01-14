@@ -755,7 +755,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
     let path = req_data
         .uri
         .path()
-        .strip_prefix(format!("{}/rum/v1/", get_config().common.base_uri).as_str())
+        .strip_prefix(format!("{}/v1/", get_config().common.base_uri).as_str())
         .unwrap_or(req_data.uri.path());
 
     // After this previous path clean we should get only the
