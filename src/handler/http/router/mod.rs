@@ -519,19 +519,20 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/rename", put(organization::org::rename_org))
 
         // ES compatibility
+        .route("/{org_id}/", get(organization::es::org_index).head(organization::es::org_index))
         .route("/{org_id}/_index_template", get(organization::es::org_index_template).post(organization::es::org_index_template_create))
         .route("/{org_id}/_data_stream", get(organization::es::org_data_stream).post(organization::es::org_data_stream_create))
         .route("/{org_id}/_license", get(organization::es::org_license))
         .route("/{org_id}/_xpack", get(organization::es::org_xpack))
         .route("/{org_id}/_ilm/policy", get(organization::es::org_ilm_policy))
         .route("/{org_id}/_ingest/pipeline", get(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
-        .route("/{org_id}/{index}", get(organization::es::org_index))
-
+        
         // Streams
         .route("/{org_id}/streams/{stream_name}/schema", get(stream::schema))
         .route("/{org_id}/streams", get(stream::list).post(stream::create))
         .route("/{org_id}/streams/{stream_name}/settings", put(stream::update_settings))
-        .route("/{org_id}/streams/{stream_name}/fields", put(stream::update_fields).delete(stream::delete_fields))
+        .route("/{org_id}/streams/{stream_name}/update_fields", put(stream::update_fields))
+        .route("/{org_id}/streams/{stream_name}/delete_fields", put(stream::delete_fields))
         .route("/{org_id}/streams/{stream_name}", delete(stream::delete))
         .route("/{org_id}/streams/{stream_name}/delete_data", post(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/delete_data/status", get(stream::get_delete_stream_data_status))
