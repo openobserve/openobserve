@@ -136,7 +136,7 @@ pub async fn validator(
         .path()
         .strip_prefix(format!("{}{}", cfg.common.base_uri, path_prefix).as_str())
     {
-        Some(path) => path,
+        Some(path) => path.strip_prefix('/').unwrap_or(path),
         None => req_data.uri.path(),
     };
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
@@ -216,6 +216,8 @@ pub async fn validate_credentials(
     path: &str,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
+    // Strip leading slash if present
+    let path = path.strip_prefix('/').unwrap_or(path);
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
         && v.is_empty()
@@ -429,6 +431,8 @@ pub async fn validate_credentials_ext(
 ) -> Result<TokenValidationResponse, AuthError> {
     let cfg = get_config();
     let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+    // Strip leading slash if present
+    let path = path.strip_prefix('/').unwrap_or(path);
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
         && v.is_empty()
