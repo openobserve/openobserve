@@ -1297,7 +1297,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // Build the router for script server
     let app = create_script_server_router()
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
