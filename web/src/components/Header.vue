@@ -157,6 +157,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
+      <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
+      <q-btn
+        no-caps
+        flat
+        dense
+        class="upgrade-enterprise-btn q-px-sm q-mx-xs"
+        @click="openEnterpriseDialog"
+        data-test="upgrade-to-enterprise-btn"
+      >
+        <div class="row items-center no-wrap">
+          <q-icon name="workspace_premium" size="16px" class="q-mr-xs" />
+          <span class="text-weight-medium">Upgrade to Enterprise for Free</span>
+        </div>
+      </q-btn>
+
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
       <q-btn
         v-if="
@@ -572,13 +587,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-menu>
       </q-btn>
     </div>
+
+    <!-- Enterprise Upgrade Dialog -->
+    <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
   </q-toolbar>
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed } from "vue";
+import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
+import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -586,6 +605,7 @@ export default defineComponent({
   name: "HeaderComponent",
   components: {
     ThemeSwitcher,
+    EnterpriseUpgradeDialog,
   },
   props: {
     // Store instance
@@ -682,6 +702,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
 
+    // Enterprise upgrade dialog state
+    const showEnterpriseDialog = ref(false);
+
     // Computed property for ingestion quota percentage
     const ingestionQuotaPercentage = computed(() => {
       return Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) / 100 || 0;
@@ -748,12 +771,18 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
+    // Open enterprise upgrade dialog
+    const openEnterpriseDialog = () => {
+      showEnterpriseDialog.value = true;
+    };
+
     return {
       t,
       outlinedSettings,
       getImageURL,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
+      showEnterpriseDialog,
       updateOrganization,
       goToHome,
       goToAbout,
@@ -767,12 +796,52 @@ export default defineComponent({
       handleMouseEnter,
       handleMouseLeave,
       handleOrgSelection,
+      openEnterpriseDialog,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
-// Component-specific styles (if any)
-// Note: Most styles are inherited from MainLayout.vue
+.upgrade-enterprise-btn {
+  background: var(--q-primary) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  padding: 0 10px !important;
+  transition: all 0.2s ease !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  vertical-align: middle !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+
+  &:hover {
+    opacity: 0.85;
+    filter: brightness(0.9);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .q-icon {
+    color: white !important;
+    font-size: 14px !important;
+    margin-right: 4px;
+  }
+
+  span {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 28px;
+    display: inline-block;
+  }
+}
 </style>
