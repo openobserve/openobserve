@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.updateTitle") }}
+          {{ t("alerts.updateTitle") }}: {{ formData.name }}
         </div>
         <div v-else class="text-h6" data-test="add-alert-title">
           {{ t("alerts.addTitle") }}
@@ -432,11 +432,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
+            :label="saveButtonLabel"
             type="submit"
             no-caps
             flat
-            :disable="!isLastStep"
+            :disable="!canSaveAlert"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="onSubmit"
           />
@@ -2134,6 +2134,27 @@ export default defineComponent({
       }
     });
 
+    // Allow saving after completing all required steps (1, 2, 4)
+    const canSaveAlert = computed(() => {
+      // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
+      // Optional steps: 3 (Compare Past), 5 (Deduplication), 6 (Advanced)
+      return wizardStep.value >= 4;
+    });
+
+    // Dynamic save button label based on current step
+    const saveButtonLabel = computed(() => {
+      if (wizardStep.value === 6) {
+        // On last step (Advanced) - just "Save"
+        return t('alerts.save');
+      } else if (wizardStep.value >= 4) {
+        // On steps 4-5 - indicate optional steps remain
+        return t('alerts.saveAlert');
+      } else {
+        // On steps 1-3 - not ready to save yet
+        return t('alerts.save');
+      }
+    });
+
     return {
       t,
       q,
@@ -2240,6 +2261,8 @@ export default defineComponent({
       goToNextStep,
       goToPreviousStep,
       isLastStep,
+      canSaveAlert,
+      saveButtonLabel,
       step2Ref,
       step3Ref,
       step4Ref,
