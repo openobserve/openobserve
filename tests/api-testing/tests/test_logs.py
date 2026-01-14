@@ -100,8 +100,8 @@ def test_e2e_invalidstreamname(create_session, base_url):
 
     print(resp.content)
     assert (
-        resp.status_code == 405
-    ), f"Invalid stream name 405, but got {resp.status_code} {resp.content}"
+        resp.status_code == 404
+    ), f"Invalid stream name 404, but got {resp.status_code} {resp.content}"
 
 
 def test_e2e_vrl(create_session, base_url):
