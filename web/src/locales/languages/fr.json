@@ -1607,6 +1607,29 @@
       "alertSettings": "Définissez vos règles d'alerte et choisissez la manière dont vous souhaitez être averti.",
       "deduplication": "Évitez d'envoyer plusieurs fois la même alerte en regroupant les alertes similaires.",
       "advanced": "Variables de contexte, description et modèle de ligne"
+    },
+    "saveAlert": "Enregistrer l'alerte",
+    "thresholdDynamic": {
+      "alertMeWhen": "Avertissez-moi quand",
+      "metricTypes": {
+        "resultsPassedFilter": "les résultats ont passé les filtres",
+        "distinctGroupsAffected": "des groupes distincts sont touchés",
+        "metricsMatchCriteria": "les métriques correspondent aux critères",
+        "matchingLogsFound": "journaux correspondants trouvés",
+        "groupsPassFilter": "les groupes répondent aux critères de filtrage",
+        "distinctGroups": "groupes distincts trouvés",
+        "resultRows": "lignes de résultats renvoyées",
+        "timeSeries": "série chronologique active trouvée",
+        "matchingRecords": "enregistrements correspondants trouvés",
+        "groupsWithHaving": "conditions des matchs de groupe",
+        "uniqueGroups": "groupes uniques",
+        "events": "conditions de match des événements",
+        "aggregatedValue": "conditions du match"
+      },
+      "contextLabels": {
+        "groupedBy": "Regroupés par :",
+        "havingConditions": "CONDITIONS D'UTILISATION :"
+      }
     }
   },
   "alert_templates": {

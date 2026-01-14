@@ -1603,6 +1603,29 @@
       "alertSettings": "设置警报规则并选择您希望以何种方式收到通知。",
       "deduplication": "通过将相似的警报分组在一起，避免多次发送相同的警报。",
       "advanced": "上下文变量、描述和行模板"
+    },
+    "saveAlert": "保存提醒",
+    "thresholdDynamic": {
+      "alertMeWhen": "什么时候提醒我",
+      "metricTypes": {
+        "resultsPassedFilter": "结果已通过过滤器",
+        "distinctGroupsAffected": "不同的群体受到影响",
+        "metricsMatchCriteria": "指标匹配标准",
+        "matchingLogsFound": "已找到匹配日志",
+        "groupsPassFilter": "群组通过筛选标准",
+        "distinctGroups": "找到了不同的群体",
+        "resultRows": "返回的结果行",
+        "timeSeries": "已找到活跃的时间序列",
+        "matchingRecords": "找到了匹配的记录",
+        "groupsWithHaving": "小组比赛条件",
+        "uniqueGroups": "独特的群组",
+        "events": "赛事匹配条件",
+        "aggregatedValue": "比赛条件"
+      },
+      "contextLabels": {
+        "groupedBy": "分组依据：",
+        "havingConditions": "有条件："
+      }
     }
   },
   "alert_templates": {

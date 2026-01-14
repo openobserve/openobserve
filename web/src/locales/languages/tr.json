@@ -1607,6 +1607,29 @@
       "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
       "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
       "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
+    },
+    "saveAlert": "Uyarıyı Kaydet",
+    "thresholdDynamic": {
+      "alertMeWhen": "Ne zaman beni uyar",
+      "metricTypes": {
+        "resultsPassedFilter": "sonuçlar filtreleri geçti",
+        "distinctGroupsAffected": "Farklı gruplar etkilenir",
+        "metricsMatchCriteria": "metrikler eşleştirme kriterleri",
+        "matchingLogsFound": "eşleşen günlükler bulundu",
+        "groupsPassFilter": "gruplar filtre kriterlerini geçer",
+        "distinctGroups": "farklı gruplar bulundu",
+        "resultRows": "döndürülen sonuç satırları",
+        "timeSeries": "aktif zaman serileri bulundu",
+        "matchingRecords": "eşleşen kayıtlar bulundu",
+        "groupsWithHaving": "gruplar maç koşulları",
+        "uniqueGroups": "benzersiz gruplar",
+        "events": "etkinlikler maç koşulları",
+        "aggregatedValue": "maç koşulları"
+      },
+      "contextLabels": {
+        "groupedBy": "Şunlara göre gruplandırılmıştır:",
+        "havingConditions": "SAHIP olma koşulları:"
+      }
     }
   },
   "alert_templates": {
