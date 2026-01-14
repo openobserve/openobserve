@@ -67,7 +67,7 @@ impl From<TemplateError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert template"}))
+        ("x-o2-mcp" = json!({"description": "Create alert template", "category": "alerts"}))
     )
 )]
 pub async fn save_template(Path(org_id): Path<String>, Json(tmpl): Json<Template>) -> Response {
@@ -108,7 +108,7 @@ pub async fn save_template(Path(org_id): Path<String>, Json(tmpl): Json<Template
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update alert template"}))
+        ("x-o2-mcp" = json!({"description": "Update alert template", "category": "alerts"}))
     )
 )]
 pub async fn update_template(
@@ -147,7 +147,7 @@ pub async fn update_template(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get template details"}))
+        ("x-o2-mcp" = json!({"description": "Get template details", "category": "alerts"}))
     )
 )]
 pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Response {
@@ -181,7 +181,7 @@ pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Respo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert templates"}))
+        ("x-o2-mcp" = json!({"description": "List all alert templates", "category": "alerts"}))
     )
 )]
 pub async fn list_templates(
@@ -242,7 +242,7 @@ pub async fn list_templates(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert template"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts"}))
     )
 )]
 pub async fn delete_template(Path((org_id, name)): Path<(String, String)>) -> Response {
