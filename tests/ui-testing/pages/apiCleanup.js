@@ -1007,7 +1007,7 @@ class APICleanup {
      */
     async deleteMetricsStream(streamName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics`, {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1017,11 +1017,11 @@ class APICleanup {
 
             if (!response.ok) {
                 testLogger.error('Failed to delete metrics stream', { streamName, status: response.status });
-                return { code: response.status, error: `HTTP ${response.status}` };
+                return { code: response.status, message: 'Failed to delete metrics stream' };
             }
 
-            const data = await response.json();
-            return data;
+            const result = await response.json();
+            return result;
         } catch (error) {
             testLogger.error('Failed to delete metrics stream', { streamName, error: error.message });
             return { code: 500, error: error.message };
