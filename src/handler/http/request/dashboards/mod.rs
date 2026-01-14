@@ -113,7 +113,10 @@ impl From<DashboardError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new dashboard", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "Create a dashboard with panels on a 192-column grid. Each panel needs layout: {x, y, w, h, i}. x=column position (0-191), y=row position, w=width, h=height, i=panel ID. Rules: (1) panels in same row must have same height, (2) side-by-side widths sum to ~192. Common sizes: full-width w=192, half w=96, third w=64, quarter w=48. Stack rows by adding previous h to y value.",
+            "category": "dashboards"
+        }))
     )
 )]
 pub async fn create_dashboard(
