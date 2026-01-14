@@ -1271,8 +1271,6 @@ pub struct Limit {
     pub mem_total: usize,
     pub disk_total: usize,
     pub disk_free: usize,
-    #[env_config(name = "ZO_JSON_LIMIT", default = 209715200)]
-    pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds

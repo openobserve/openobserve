@@ -13,6 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod org_blocking;
-
-pub use org_blocking::blocked_orgs_middleware;
+pub mod middlewares;
