@@ -162,8 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
-name="warning" class="q-mr-xs" />
+              <q-icon size="xs" name="warning" class="q-mr-xs" />
               {{ errMsg }}
             </div>
           </td>
@@ -359,6 +358,7 @@ name="warning" class="q-mr-xs" />
                     @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
+
                 <span
                   v-if="
                     processedResults[`${cell.column.id}_${virtualRow.index}`]
@@ -561,8 +561,8 @@ watch(
         props.columns,
         true,
         props.highlightQuery,
-        200,
-        selectedStreamFtsKeys.value
+        100,
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -588,7 +588,7 @@ watch(
         false,
         props.highlightQuery,
         100,
-        selectedStreamFtsKeys.value
+        selectedStreamFtsKeys.value,
       );
     }
 
@@ -758,7 +758,7 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : 24; // Fixed collapsed height
     },
-    overscan: 20,
+    overscan: 100,
     measureElement:
       typeof window !== "undefined" && !isFirefox.value
         ? (element: any) => {
