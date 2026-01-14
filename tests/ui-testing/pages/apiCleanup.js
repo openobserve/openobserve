@@ -1039,6 +1039,12 @@ class APICleanup {
             protectedStreams
         });
 
+        // Safety check: If no patterns provided, don't delete anything
+        if (patterns.length === 0) {
+            testLogger.info('No patterns provided for metrics cleanup - skipping');
+            return;
+        }
+
         try {
             // Fetch all metrics streams
             const streams = await this.fetchMetricsStreams();
