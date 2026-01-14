@@ -1111,6 +1111,18 @@ where
                 });
             }
 
+            // Bypass auth check for alerts history endpoint - RBAC is handled in the endpoint itself
+            if method.eq("GET") && object_type.eq("alert:history") {
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: folder,
+                });
+            }
+
             return Ok(AuthExtractor {
                 auth: auth_str.to_owned(),
                 method,

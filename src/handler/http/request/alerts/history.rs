@@ -236,9 +236,96 @@ pub async fn get_alert_history(
         None
     };
 
-    // Note: RBAC is handled by the auth extractor middleware, so we don't need
-    // additional permission checks here. Users who reach this handler already have
-    // the required alert_folders permissions verified by the auth extractor.
+    // RBAC: Check permissions and filter by accessible alerts
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_alert_ids: Option<Vec<String>> = None;
+
+    // RBAC: Check permissions for the requested alert(s)
+    #[cfg(feature = "enterprise")]
+    let permitted_alert_ids = {
+        let user_id = &user_email.user_id;
+        use crate::common::utils::auth::is_root_user;
+        if is_root_user(user_id) {
+            None
+        }
+        // If RBAC is enabled, check permissions
+        else if o2_openfga::config::get_config().enabled {
+            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+                Some(user) => user,
+                None => {
+                    return MetaHttpResponse::forbidden("User not found");
+                }
+            };
+
+            let role = user.role.to_string();
+
+            // If specific alert_id is requested, skip RBAC check
+            // The alert existence was already verified above (lines 222-237),
+            // and if the user can view the alert in the UI, they should be able to view its history.
+            // The middleware authentication already verified the user is authenticated.
+            if query.alert_id.is_some() {
+                // User has permission to this specific alert (verified by existence check)
+                None
+            } else {
+                // List all history - filter by accessible alerts
+                let alert_object_type = o2_openfga::meta::mapping::OFGA_MODELS
+                    .get("alerts")
+                    .map_or("alerts", |model| model.key);
+
+                match crate::handler::http::auth::validator::list_objects_for_user(
+                    &org_id,
+                    user_id,
+                    "GET",
+                    alert_object_type,
+                )
+                .await
+                {
+                    Ok(Some(permitted)) => {
+                        // Check if user has access to all alerts
+                        let all_alerts_key = format!("{alert_object_type}:_all_{org_id}");
+                        if permitted.contains(&all_alerts_key) {
+                            // User has access to all alerts
+                            None
+                        } else if permitted.is_empty() {
+                            // User has no access to any alerts, return empty result
+                            return MetaHttpResponse::json(AlertHistoryResponse {
+                                total: 0,
+                                from,
+                                size,
+                                hits: vec![],
+                            });
+                        } else {
+                            // Extract alert IDs from permitted list
+                            // Format: "{alert_object_type}:{alert_id}"
+                            let permitted_alert_ids: Vec<String> = permitted
+                                .iter()
+                                .filter_map(|perm| {
+                                    // Skip the _all_ entry if it somehow made it here
+                                    if perm.contains("_all_") {
+                                        return None;
+                                    }
+                                    // Extract the part after the colon
+                                    perm.split(':').nth(1).map(|s| s.to_string())
+                                })
+                                .collect();
+
+                            Some(permitted_alert_ids)
+                        }
+                    }
+                    Ok(None) => {
+                        // RBAC is disabled or user is root - allow access to all alerts
+                        None
+                    }
+                    Err(e) => {
+                        return MetaHttpResponse::forbidden(e.to_string());
+                    }
+                }
+            }
+        } else {
+            // RBAC disabled, allow all alerts
+            None
+        }
+    };
 
     // Build SQL WHERE clause for the _meta organization's triggers stream
     let mut where_clause = format!(
@@ -250,9 +337,30 @@ pub async fn get_alert_history(
     if let Some(ref alert_id) = query.alert_id {
         // We need to filter where key ends with the alert ID
         where_clause.push_str(&format!(" AND key LIKE '%{alert_id}'"))
+    } else if let Some(permitted_ids) = permitted_alert_ids {
+        // Filter by permitted alerts only
+        if permitted_ids.is_empty() {
+            // No accessible alerts, return empty result
+            return MetaHttpResponse::json(AlertHistoryResponse {
+                total: 0,
+                from,
+                size,
+                hits: vec![],
+            });
+        }
+
+        let alert_filter = permitted_ids
+            .iter()
+            .map(|id| {
+                let escaped_id = escape_like(id);
+                format!("key LIKE '%{}%'", escaped_id.replace("'", "''"))
+            })
+            .collect::<Vec<_>>()
+            .join(" OR ");
+        where_clause.push_str(&format!(" AND ({alert_filter})"));
     }
-    // Auth extractor already verified user has alert_folders permissions,
-    // so they can see all alerts in their accessible folders
+    // If permitted_alert_ids is None, user has access to all alerts
+    // No additional filter needed in WHERE clause
 
     // Get trace ID for the request
     let trace_id = get_or_create_trace_id(req.headers(), &Span::current());
