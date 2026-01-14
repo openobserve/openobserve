@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
         <div class="card-container">
           <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
-            <syntax-guide class="q-mr-sm" />
+            <syntax-guide class="syntax-guide-in-toolbar element-box-shadow" />
             <div class="flex align-center justify-end metrics-date-time">
               <date-time
                 auto-apply
@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="metrics-explorer-run-query-button"
                 data-cy="metrics-explorer-run-query-button"
                 dense
-                title="Run query"
+                :title="t('metrics.runQuery')"
                 class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow"
                 @click="runQuery"
                 no-caps
               >
-                Run query
+                {{ t("metrics.runQuery") }}
               </q-btn>
             </div>
           </div>
