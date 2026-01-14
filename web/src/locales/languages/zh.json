@@ -108,7 +108,8 @@
     "url": "网址",
     "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
     "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
-    "id": "身份证"
+    "id": "身份证",
+    "getStarted": "开始吧"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -373,7 +374,20 @@
     "viewURL": "查看网址",
     "events": "事件",
     "location": "地点",
-    "frustrationCount": "挫折"
+    "frustrationCount": "挫折",
+    "loadingMsg": "等一下，我们正在加载 RUM 数据。",
+    "breadcrumbs": "面包屑",
+    "tags": "标签",
+    "searchEvents": "搜索活动",
+    "loadingSessions": "等一下，我们正在获取会话。",
+    "errorStack": "错误堆栈",
+    "sessionReplay": "会话重播",
+    "viewSessionReplay": "查看会话重播",
+    "playSessionReplay": "播放会话重播",
+    "discoverSessionTitle": "探索会话回放以详细了解用户互动",
+    "discoverSessionMessage": "Session Replay 捕获并重播您的网站或应用程序上的用户互动。这使您可以直观地查看用户的导航方式、点击的位置、键入的内容以及他们如何与您的内容互动",
+    "getStartedRUM": "开始使用真实用户监控",
+    "loadingErrorDetails": "等一下，我们正在获取错误细节。"
   },
   "about": {
     "name": "OpenObserve",

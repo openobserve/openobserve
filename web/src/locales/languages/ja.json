@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
     "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "始めよう"
   },
   "search": {
     "metrics": "メトリクス",
@@ -373,7 +374,20 @@
     "viewURL": "ビューURL",
     "events": "イベント",
     "location": "ロケーション",
-    "frustrationCount": "フラストレーション"
+    "frustrationCount": "フラストレーション",
+    "loadingMsg": "ちょっと待ってください。RUMデータをロードしています。",
+    "breadcrumbs": "ブレッドクラム",
+    "tags": "[タグ]",
+    "searchEvents": "イベント検索",
+    "loadingSessions": "しっかりつかまって。セッションを引っ張ってるから。",
+    "errorStack": "エラースタック",
+    "sessionReplay": "セッションリプレイ",
+    "viewSessionReplay": "セッションリプレイを表示",
+    "playSessionReplay": "セッションリプレイを再生",
+    "discoverSessionTitle": "ユーザーインタラクションを詳細に理解するためのセッションリプレイをご覧ください",
+    "discoverSessionMessage": "セッションリプレイは、ウェブサイトまたはアプリケーションでのユーザーインタラクションをキャプチャして再生します。これにより、ユーザーがどのようにナビゲートしたか、どこをクリックしたか、何を入力したか、コンテンツにどのように反応したかを視覚的に確認できます。",
+    "getStartedRUM": "リアルユーザーモニタリングを始める",
+    "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。"
   },
   "about": {
     "name": "OpenObserve",

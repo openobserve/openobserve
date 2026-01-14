@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
     "chunkLoadErrorMsg": "Hay disponible una nueva versión de la aplicación. Actualice la página para continuar.",
-    "id": "CARNÉ DE IDENTIDAD"
+    "id": "CARNÉ DE IDENTIDAD",
+    "getStarted": "Comenzar"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -373,7 +374,20 @@
     "viewURL": "Ver URL",
     "events": "Eventos",
     "location": "Ubicación",
-    "frustrationCount": "Frustraciones"
+    "frustrationCount": "Frustraciones",
+    "loadingMsg": "Agárrate fuerte, estamos cargando datos de RUM.",
+    "breadcrumbs": "Pan rallado",
+    "tags": "Etiquetas",
+    "searchEvents": "Buscar eventos",
+    "loadingSessions": "Agárrate fuerte, estamos atrayendo sesiones.",
+    "errorStack": "Pila de errores",
+    "sessionReplay": "Reproducción de sesión",
+    "viewSessionReplay": "Ver reproducción de sesión",
+    "playSessionReplay": "Reproducir la reproducción de la sesión",
+    "discoverSessionTitle": "Descubra la reproducción de sesiones para comprender en detalle las interacciones de los usuarios",
+    "discoverSessionMessage": "La reproducción de sesiones captura y reproduce las interacciones de los usuarios en su sitio web o aplicación. Esto te permite revisar visualmente cómo navegan los usuarios, dónde hacen clic, qué escriben y cómo interactúan con tu contenido",
+    "getStartedRUM": "Comience con Real User Monitoring",
+    "loadingErrorDetails": "Agárrate fuerte, estamos buscando los detalles del error."
   },
   "about": {
     "name": "Abrir Observe",

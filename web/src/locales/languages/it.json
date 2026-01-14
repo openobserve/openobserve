@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Inizia"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -373,7 +374,20 @@
     "viewURL": "Visualizza URL",
     "events": "Eventi",
     "location": "Posizione",
-    "frustrationCount": "Frustrazioni"
+    "frustrationCount": "Frustrazioni",
+    "loadingMsg": "Tieni duro, stiamo caricando i dati RUM.",
+    "breadcrumbs": "Pangrattato",
+    "tags": "Etichette",
+    "searchEvents": "Cerca eventi",
+    "loadingSessions": "Resisti, stiamo andando a prendere delle sedute.",
+    "errorStack": "Stack di errori",
+    "sessionReplay": "Replay della sessione",
+    "viewSessionReplay": "Visualizza il replay della sessione",
+    "playSessionReplay": "Riproduci sessione",
+    "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
+    "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
+    "getStartedRUM": "Inizia con Real User Monitoring",
+    "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore."
   },
   "about": {
     "name": "Apri Observe",

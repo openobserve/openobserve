@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Ga aan de slag"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -373,7 +374,20 @@
     "viewURL": "URL bekijken",
     "events": "Evenementen",
     "location": "Locatie",
-    "frustrationCount": "Frustraties"
+    "frustrationCount": "Frustraties",
+    "loadingMsg": "Wacht even, we zijn RUM-gegevens aan het laden.",
+    "breadcrumbs": "Broodkruimels",
+    "tags": "Labels",
+    "searchEvents": "Gebeurtenissen zoeken",
+    "loadingSessions": "Wacht even, we zijn bezig met het ophalen van sessies.",
+    "errorStack": "Foutstapel",
+    "sessionReplay": "Sessie opnieuw afspelen",
+    "viewSessionReplay": "Bekijk de herhaling van de sessie",
+    "playSessionReplay": "Sessie opnieuw afspelen",
+    "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
+    "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
+    "getStartedRUM": "Ga aan de slag met Real User Monitoring",
+    "loadingErrorDetails": "Wacht even, we halen foutgegevens op."
   },
   "about": {
     "name": "OpenObserve",
