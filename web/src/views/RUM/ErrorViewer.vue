@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-auto tw:block"
           />
           <div class="text-center full-width">
-            Hold on tight, we're fetching error details.
+            {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
       </div>
@@ -62,6 +62,9 @@ import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const isLoading = ref<boolean[]>([]);
 const router = useRouter();
