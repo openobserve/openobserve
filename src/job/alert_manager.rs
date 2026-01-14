@@ -250,10 +250,21 @@ async fn run_rca_job() -> Result<(), anyhow::Error> {
         .into_iter()
         .filter(|i| {
             // Check if topology_context exists and has suggested_root_cause
-            i.topology_context
-                .as_ref()
-                .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx.clone()).ok())
-                .is_some_and(|topology| topology.suggested_root_cause.is_none())
+            match i.topology_context.as_ref() {
+                Some(ctx) => match serde_json::from_value::<IncidentTopology>(ctx.clone()) {
+                    Ok(topology) => topology.suggested_root_cause.is_none(),
+                    Err(e) => {
+                        log::error!(
+                            "[INCIDENTS::RCA] Failed to deserialize topology_context for incident {} during filter: {}. Raw value: {:?}",
+                            i.id,
+                            e,
+                            ctx
+                        );
+                        false // Skip this incident if we can't parse it
+                    }
+                },
+                None => false, // No topology_context, skip
+            }
         })
         .collect();
 
@@ -284,18 +295,40 @@ async fn run_rca_job() -> Result<(), anyhow::Error> {
                 );
 
                 // Update topology_context with suggested_root_cause
-                let mut topology = incident
-                    .topology_context
-                    // .as_ref()
-                    .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
-                    .unwrap_or_default();
+                let mut topology = match incident.topology_context.as_ref() {
+                    Some(ctx) => match serde_json::from_value::<IncidentTopology>(ctx.clone()) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!(
+                                "[INCIDENTS::RCA] Failed to deserialize existing topology_context for incident {incident_id}: {e}. Creating default. Raw value: {ctx:?}",
+                            );
+                            IncidentTopology::default()
+                        }
+                    },
+                    None => {
+                        log::warn!(
+                            "[INCIDENTS::RCA] No topology_context found for incident {incident_id}. Creating default."
+                        );
+                        IncidentTopology::default()
+                    }
+                };
 
                 topology.suggested_root_cause = Some(rca_result);
+
+                let serialized_topology = match serde_json::to_value(&topology) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "[INCIDENTS::RCA] Failed to serialize topology for incident {incident_id}: {e}"
+                        );
+                        continue;
+                    }
+                };
 
                 if let Err(e) = infra::table::alert_incidents::update_topology(
                     org_id,
                     incident_id,
-                    serde_json::to_value(&topology)?,
+                    serialized_topology,
                 )
                 .await
                 {
