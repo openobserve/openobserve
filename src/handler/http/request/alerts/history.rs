@@ -250,19 +250,18 @@ pub async fn get_alert_history(
         }
         // If RBAC is enabled, check permissions
         else if o2_openfga::config::get_config().enabled {
-            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+            let _user = match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
                     return MetaHttpResponse::forbidden("User not found");
                 }
             };
 
-            let role = user.role.to_string();
-
             // If specific alert_id is requested, skip RBAC check
             // The alert existence was already verified above (lines 222-237),
-            // and if the user can view the alert in the UI, they should be able to view its history.
-            // The middleware authentication already verified the user is authenticated.
+            // and if the user can view the alert in the UI, they should be able to view its
+            // history. The middleware authentication already verified the user is
+            // authenticated.
             if query.alert_id.is_some() {
                 // User has permission to this specific alert (verified by existence check)
                 None

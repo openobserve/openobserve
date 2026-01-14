@@ -46,13 +46,6 @@ pub async fn set_with_expiry(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    log::info!(
-        "[DB] Attempting to insert/update session: id={}, expires_at={}, now={}",
-        session_id,
-        expires_at,
-        now
-    );
-
     // Use atomic upsert to avoid race conditions
     let active_model = ActiveModel {
         session_id: Set(session_id.to_string()),
@@ -72,14 +65,7 @@ pub async fn set_with_expiry(
         .await;
 
     match result {
-        Ok(res) => {
-            log::info!(
-                "[DB] Successfully inserted/updated session: id={}, result={:?}",
-                session_id,
-                res
-            );
-            Ok(())
-        }
+        Ok(_) => Ok(()),
         Err(e) => {
             log::error!(
                 "[DB] Failed to insert/update session: id={}, error={}",
