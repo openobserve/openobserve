@@ -2696,99 +2696,255 @@ async fn handle_backfill_triggers(
     };
 
     // Track whether data was found and ingested successfully
-    let has_data = results.data.is_some();
+    let has_data = results.data.as_ref().is_some_and(|d| !d.is_empty());
     let mut ingestion_error: Option<String> = None;
 
     if let Some(data) = results.data {
         let records: Vec<json::Value> = data.into_iter().map(json::Value::Object).collect();
-        if let Err(e) = executable_pipeline
+        match executable_pipeline
             .process_batch(&trigger.org, records, None)
             .await
         {
-            log::error!(
-                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to process batch: {e}",
-                &job_id
-            );
-
-            let error_msg = e.to_string();
-            // Store the ingestion error
-            ingestion_error = Some(error_msg.clone());
-
-            // Increment retries
-            let new_retries = trigger.retries + 1;
-
-            // Clone org before moving trigger
-            let org = trigger.org.clone();
-
-            let next_run_at;
-            if new_retries >= max_retries {
-                // Max retries reached, report error and reset retries for next scheduled run
-                log::warn!(
-                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
-                    &job_id,
-                    config.pipeline_id
+            Err(e) => {
+                log::error!(
+                    "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to process batch: {e}",
+                    &job_id
                 );
 
-                // Calculate next run time with delay
-                let delay = config.delay_between_chunks_secs.unwrap_or(0);
-                next_run_at = now + (delay * 1_000_000);
+                let error_msg = e.to_string();
+                // Store the ingestion error
+                ingestion_error = Some(error_msg.clone());
 
-                // Update trigger with reset retries and scheduled next run
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
-                        retries: 0, // Reset retries for next attempt
-                        next_run_at,
-                        status: db::scheduler::TriggerStatus::Waiting,
-                        ..trigger
-                    },
-                    true,
-                    trace_id,
-                )
-                .await?;
-            } else {
-                // Increment retries but don't update next_run_at - let scheduler pick it up
-                // immediately
-                next_run_at = now; // Will retry immediately
+                // Increment retries
+                let new_retries = trigger.retries + 1;
 
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
-                        retries: new_retries,
-                        status: db::scheduler::TriggerStatus::Waiting,
-                        ..trigger
-                    },
-                    true,
-                    trace_id,
-                )
-                .await?;
+                // Clone org before moving trigger
+                let org = trigger.org.clone();
+
+                let next_run_at;
+                if new_retries >= max_retries {
+                    // Max retries reached, report error and reset retries for next scheduled run
+                    log::warn!(
+                        "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
+                        &job_id,
+                        config.pipeline_id
+                    );
+
+                    // Calculate next run time with delay
+                    let delay = config.delay_between_chunks_secs.unwrap_or(0);
+                    next_run_at = now + (delay * 1_000_000);
+
+                    // Update trigger with reset retries and scheduled next run
+                    db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            retries: 0, // Reset retries for next attempt
+                            next_run_at,
+                            status: db::scheduler::TriggerStatus::Waiting,
+                            ..trigger
+                        },
+                        true,
+                        trace_id,
+                    )
+                    .await?;
+                } else {
+                    // Increment retries but don't update next_run_at - let scheduler pick it up
+                    // immediately
+                    next_run_at = now; // Will retry immediately
+
+                    db::scheduler::update_trigger(
+                        db::scheduler::Trigger {
+                            retries: new_retries,
+                            status: db::scheduler::TriggerStatus::Waiting,
+                            ..trigger
+                        },
+                        true,
+                        trace_id,
+                    )
+                    .await?;
+                }
+
+                // Publish trigger usage for failed batch processing
+                let trigger_data_stream = TriggerData {
+                    _timestamp: now,
+                    org,
+                    module: TriggerDataType::Backfill,
+                    key: job_id.clone(),
+                    next_run_at,
+                    is_realtime: false,
+                    is_silenced: false,
+                    status: TriggerDataStatus::Failed,
+                    start_time: query_start_time,
+                    end_time: query_end_time,
+                    retries: new_retries,
+                    error: Some(format!("Failed to process batch: {}", error_msg)),
+                    success_response: None,
+                    evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    time_in_queue_ms: Some(
+                        Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                    ),
+                    ..Default::default()
+                };
+                publish_triggers_usage(trigger_data_stream);
+
+                return Err(anyhow::anyhow!("Failed to process batch: {}", error_msg));
             }
+            Ok(pl_results) => {
+                // Collect results by stream for ingestion
+                use std::collections::HashMap;
+                let mut json_data_by_stream: HashMap<StreamParams, Vec<json::Value>> =
+                    HashMap::new();
 
-            // Publish trigger usage for failed batch processing
-            let trigger_data_stream = TriggerData {
-                _timestamp: now,
-                org,
-                module: TriggerDataType::Backfill,
-                key: job_id.clone(),
-                next_run_at,
-                is_realtime: false,
-                is_silenced: false,
-                status: TriggerDataStatus::Failed,
-                start_time: query_start_time,
-                end_time: query_end_time,
-                retries: new_retries,
-                error: Some(format!("Failed to process batch: {}", error_msg)),
-                success_response: None,
-                evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
-                source_node: Some(LOCAL_NODE.name.clone()),
-                scheduler_trace_id: Some(scheduler_trace_id.clone()),
-                time_in_queue_ms: Some(
-                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
-                ),
-                ..Default::default()
-            };
-            publish_triggers_usage(trigger_data_stream);
+                for (stream_params, stream_pl_results) in pl_results {
+                    if matches!(
+                        stream_params.stream_type,
+                        StreamType::Logs
+                            | StreamType::EnrichmentTables
+                            | StreamType::Metrics
+                            | StreamType::Traces
+                    ) {
+                        let (_, results): (Vec<_>, Vec<_>) = stream_pl_results.into_iter().unzip();
+                        json_data_by_stream
+                            .entry(stream_params.clone())
+                            .or_default()
+                            .extend(results);
+                    }
+                }
 
-            return Err(anyhow::anyhow!("Failed to process batch: {}", error_msg));
+                // Ingest results into destination streams
+                for (dest_stream, records) in json_data_by_stream {
+                    let mut request_metadata = pipeline
+                        .get_metadata_by_stream_params(&dest_stream)
+                        .map(|meta| {
+                            let mut meta = meta;
+                            meta.insert("is_backfill".to_string(), "true".to_string());
+                            cluster_rpc::IngestRequestMetadata { data: meta }
+                        });
+                    if request_metadata.is_none() {
+                        let mut metadata = HashMap::new();
+                        metadata.insert("is_backfill".to_string(), "true".to_string());
+                        request_metadata =
+                            Some(cluster_rpc::IngestRequestMetadata { data: metadata });
+                    }
+
+                    let (org_id, stream_name, stream_type): (String, String, String) = (
+                        dest_stream.org_id.into(),
+                        dest_stream.stream_name.into(),
+                        dest_stream.stream_type.to_string(),
+                    );
+                    let records_len = records.len();
+
+                    let req = cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: stream_name.clone(),
+                        stream_type: stream_type.clone(),
+                        data: Some(cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                        metadata: request_metadata,
+                    };
+
+                    match ingestion_service::ingest(req).await {
+                        Ok(resp) if resp.status_code == 200 => {
+                            log::info!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill data ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}",
+                                &job_id
+                            );
+                        }
+                        error => {
+                            let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                            log::error!(
+                                "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to ingest backfill data to destination {org_id}/{stream_name}/{stream_type}: {err}",
+                                &job_id
+                            );
+                            ingestion_error = Some(format!(
+                                "Failed to ingest to {org_id}/{stream_name}/{stream_type}: {err}"
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    // Check if there was an ingestion error and handle retries
+    if let Some(error_msg) = &ingestion_error {
+        // Increment retries
+        let new_retries = trigger.retries + 1;
+
+        // Clone org before moving trigger
+        let org = trigger.org.clone();
+
+        let next_run_at;
+        if new_retries >= max_retries {
+            // Max retries reached, report error and reset retries for next scheduled run
+            log::warn!(
+                "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on ingestion.",
+                &job_id,
+                config.pipeline_id
+            );
+
+            // Calculate next run time with delay
+            let delay = config.delay_between_chunks_secs.unwrap_or(0);
+            next_run_at = now + (delay * 1_000_000);
+
+            // Update trigger with reset retries and scheduled next run
+            db::scheduler::update_trigger(
+                db::scheduler::Trigger {
+                    retries: 0, // Reset retries for next attempt
+                    next_run_at,
+                    status: db::scheduler::TriggerStatus::Waiting,
+                    ..trigger
+                },
+                true,
+                trace_id,
+            )
+            .await?;
+        } else {
+            // Increment retries but don't update next_run_at - let scheduler pick it up
+            // immediately
+            next_run_at = now; // Will retry immediately
+
+            db::scheduler::update_trigger(
+                db::scheduler::Trigger {
+                    retries: new_retries,
+                    next_run_at,
+                    status: db::scheduler::TriggerStatus::Waiting,
+                    ..trigger
+                },
+                true,
+                trace_id,
+            )
+            .await?;
+        }
+
+        // Publish trigger usage for failed ingestion
+        let trigger_data_stream = TriggerData {
+            _timestamp: now,
+            org,
+            module: TriggerDataType::Backfill,
+            key: job_id.clone(),
+            next_run_at,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerDataStatus::Failed,
+            start_time: query_start_time,
+            end_time: query_end_time,
+            retries: new_retries,
+            error: Some(format!("Failed to ingest data: {}", error_msg)),
+            success_response: None,
+            evaluation_took_in_secs: Some(((now - trigger_start_time) / 1_000_000) as f64),
+            source_node: Some(LOCAL_NODE.name.clone()),
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(
+                Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+            ),
+            ..Default::default()
+        };
+        publish_triggers_usage(trigger_data_stream);
+
+        return Err(anyhow::anyhow!("Failed to ingest data: {}", error_msg));
     }
 
     // 9. Update progress or complete
