@@ -750,9 +750,17 @@ export class LogsPage {
         await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
+        // Click to focus the editor
+        await this.page.locator(this.queryEditor).click();
+        await this.page.waitForTimeout(500);
+
+        // Select all existing content
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.waitForTimeout(300);
+
         // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
         // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
-        // The .fill() method automatically clears existing content before filling
+        // The .fill() method will replace the selected content
         const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
         await inputArea.waitFor({ state: 'visible', timeout: 5000 });
         await inputArea.fill(query);
