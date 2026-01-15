@@ -636,8 +636,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
-        .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/dedup_stats", get(alerts::dedup_stats::get_dedup_summary))
+        .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
