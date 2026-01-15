@@ -55,7 +55,6 @@ pub struct Session {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
-    #[schema(value_type = Object)]
     pub query: Query,
     #[serde(default)]
     pub encoding: RequestEncoding,

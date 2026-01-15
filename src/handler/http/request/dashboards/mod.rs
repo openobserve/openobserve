@@ -113,7 +113,10 @@ impl From<DashboardError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new dashboard"}))
+        ("x-o2-mcp" = json!({
+            "description": "Create a dashboard with panels on a 192-column grid. Each panel needs layout: {x, y, w, h, i}. x=column position (0-191), y=row position, w=width, h=height, i=panel ID. Rules: (1) panels in same row must have same height, (2) side-by-side widths sum to ~192. Common sizes: full-width w=192, half w=96, third w=64, quarter w=48. Stack rows by adding previous h to y value. IMPORTANT: you MUST set the correct queryType based on the stream type.",
+            "category": "dashboards"
+        }))
     )
 )]
 pub async fn create_dashboard(
@@ -163,7 +166,7 @@ pub async fn create_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an existing dashboard"}))
+        ("x-o2-mcp" = json!({"description": "Update an existing dashboard", "category": "dashboards"}))
     )
 )]
 pub async fn update_dashboard(
@@ -210,7 +213,7 @@ pub async fn update_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all dashboards in organization"}))
+        ("x-o2-mcp" = json!({"description": "List all dashboards in organization", "category": "dashboards"}))
     )
 )]
 pub async fn list_dashboards(
@@ -254,7 +257,7 @@ pub async fn list_dashboards(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get dashboard details by ID", "category": "dashboards"}))
     )
 )]
 pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
@@ -290,7 +293,7 @@ pub async fn get_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>)
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON"}))
+        ("x-o2-mcp" = json!({"description": "Export dashboard as JSON", "category": "dashboards"}))
     )
 )]
 pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
@@ -327,7 +330,7 @@ pub async fn export_dashboard(Path((org_id, dashboard_id)): Path<(String, String
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete a dashboard by ID", "category": "dashboards"}))
     )
 )]
 pub async fn delete_dashboard(Path((org_id, dashboard_id)): Path<(String, String)>) -> Response {
@@ -445,7 +448,7 @@ pub async fn delete_dashboard_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder"}))
+        ("x-o2-mcp" = json!({"description": "Move dashboard to another folder", "category": "dashboards"}))
     )
 )]
 pub async fn move_dashboard(
@@ -491,7 +494,7 @@ pub async fn move_dashboard(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder"}))
+        ("x-o2-mcp" = json!({"description": "Move multiple dashboards to folder", "category": "dashboards"}))
     )
 )]
 pub async fn move_dashboards(

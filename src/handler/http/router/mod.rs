@@ -24,7 +24,10 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    decompression::RequestDecompressionLayer,
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -54,6 +57,7 @@ use crate::{
     },
 };
 
+pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
 pub mod ui;
@@ -78,8 +82,8 @@ pub fn cors_layer() -> CorsLayer {
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
-        .allow_origin(Any)
-        .allow_credentials(false)
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }
 
@@ -373,8 +377,6 @@ pub fn proxy_routes(enable_auth: bool) -> Router {
 
 /// Create basic routes (health, auth, etc.)
 pub fn basic_routes() -> Router {
-    let cors = cors_layer();
-
     let mut router = Router::new()
         .route("/healthz", get(status::healthz).head(status::healthz_head))
         .route("/schedulez", get(status::schedulez))
@@ -399,8 +401,7 @@ pub fn basic_routes() -> Router {
         .route("/login", post(users::authentication).get(users::get_auth))
         .route("/presigned-url", get(users::get_presigned_url))
         .route("/invites", get(users::list_invitations))
-        .route("/invites/{token}", delete(users::decline_invitation))
-        .layer(cors.clone());
+        .route("/invites/{token}", delete(users::decline_invitation));
     router = router.nest("/auth", auth_routes);
 
     // Node routes with auth
@@ -424,8 +425,7 @@ pub fn basic_routes() -> Router {
             post(status::refresh_user_sessions),
         )
         .route("/cache_reload", post(status::cache_reload))
-        .layer(middleware::from_fn(auth_middleware))
-        .layer(cors.clone());
+        .layer(middleware::from_fn(auth_middleware));
 
     router = router.nest("/node", node_routes);
 
@@ -437,7 +437,7 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
-    router
+    router.layer(cors_layer())
 }
 
 /// Create config routes
@@ -527,12 +527,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_ingest/pipeline", get(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
 
         // Streams
+        .route("/{org_id}/streams", get(stream::list))
         .route("/{org_id}/streams/{stream_name}/schema", get(stream::schema))
-        .route("/{org_id}/streams", get(stream::list).post(stream::create))
         .route("/{org_id}/streams/{stream_name}/settings", put(stream::update_settings))
         .route("/{org_id}/streams/{stream_name}/update_fields", put(stream::update_fields))
         .route("/{org_id}/streams/{stream_name}/delete_fields", put(stream::delete_fields))
-        .route("/{org_id}/streams/{stream_name}", delete(stream::delete))
+        .route("/{org_id}/streams/{stream_name}", post(stream::create).delete(stream::delete))
         .route("/{org_id}/streams/{stream_name}/delete_data", post(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/delete_data/status", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/streams/{stream_name}/cache", delete(stream::delete_stream_cache))
@@ -679,7 +679,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
-        .route("/{org_id}/pipelines/bulk/enable", put(pipeline::enable_pipeline_bulk))
+        .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
         .route("/{org_id}/pipelines/streams", get(pipeline::list_streams_with_pipeline))
         .route("/{org_id}/pipelines/history", get(pipelines::history::get_pipeline_history))
 
@@ -701,7 +701,6 @@ pub fn service_routes() -> Router {
         // Service accounts
         .route("/{org_id}/service_accounts", get(service_accounts::list).post(service_accounts::save))
         .route("/{org_id}/service_accounts/bulk", delete(service_accounts::delete_bulk))
-        // TODO: service_accounts::get function doesn't exist, removing for now
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
@@ -837,7 +836,11 @@ pub fn service_routes() -> Router {
             );
     }
 
-    // Apply middlewares in order: cors -> server header -> auth -> audit -> blocked orgs
+    // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
+    // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
+    // header before tower_http sees it. This prevents 415 errors while allowing handlers to
+    // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
+    // deflate, and brotli.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -856,35 +859,47 @@ pub fn service_routes() -> Router {
             },
         ))
         .layer(cors_layer())
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
-    let cors = cors_layer();
-
-    // AWS routes
+    // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
             "/{org_id}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
-        .layer(cors.clone());
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
-    // GCP routes
+    // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
         .route("/{org_id}/_sub", post(logs::ingest::handle_gcp_request))
         .layer(middleware::from_fn(gcp_auth_middleware))
-        .layer(cors.clone());
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
-    // RUM routes
+    // RUM routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(cors);
+        .layer(cors_layer())
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
     Router::new()
         .nest("/aws", aws_routes)
@@ -948,7 +963,9 @@ pub fn create_app_router() -> Router {
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
-    app = app.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
+    app = app
+        .layer(cors_layer())
+        .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     app
 }

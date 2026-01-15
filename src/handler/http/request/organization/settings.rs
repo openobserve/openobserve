@@ -61,7 +61,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create/update org settings"}))
+        ("x-o2-mcp" = json!({"description": "Create/update org settings", "category": "users"}))
     )
 )]
 pub async fn create(
@@ -180,7 +180,7 @@ pub async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get organization settings"}))
+        ("x-o2-mcp" = json!({"description": "Get organization settings", "category": "users"}))
     )
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {

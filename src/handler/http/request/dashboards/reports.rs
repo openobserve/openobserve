@@ -97,7 +97,7 @@ impl From<ReportError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a scheduled report"}))
+        ("x-o2-mcp" = json!({"description": "Create a scheduled report", "category": "dashboards"}))
     )
 )]
 pub async fn create_report(
@@ -146,7 +146,7 @@ pub async fn create_report(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a report"}))
+        ("x-o2-mcp" = json!({"description": "Update a report", "category": "dashboards"}))
     )
 )]
 pub async fn update_report(
@@ -186,7 +186,7 @@ pub async fn update_report(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all reports"}))
+        ("x-o2-mcp" = json!({"description": "List all reports", "category": "dashboards"}))
     )
 )]
 pub async fn list_reports(
@@ -287,7 +287,7 @@ pub async fn list_reports(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get report details"}))
+        ("x-o2-mcp" = json!({"description": "Get report details", "category": "dashboards"}))
     )
 )]
 pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Response {
@@ -323,7 +323,7 @@ pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Respons
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a report"}))
+        ("x-o2-mcp" = json!({"description": "Delete a report", "category": "dashboards"}))
     )
 )]
 pub async fn delete_report(Path((org_id, name)): Path<(String, String)>) -> Response {
