@@ -45,10 +45,8 @@ const useEnvRoutes = () => {
           // Save token for after login - Login.vue will check this
           sessionStorage.setItem("azure_marketplace_token", token);
         }
-        // Redirect to login page (normal flow, Login.vue handles token check)
-        next("/login");
       },
-    }
+    },
   ];
 
   const homeChildRoutes = [

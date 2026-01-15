@@ -231,7 +231,7 @@ export default defineComponent({
        // Check for Azure Marketplace token - redirect to setup if present
       const azureMarketplaceToken = window.sessionStorage.getItem("azure_marketplace_token");
       if (azureMarketplaceToken) {
-        router.push({ path: "/marketplace/azure/setup" });
+        router.push({ path: "/marketplace/azure/register" });
         return;
       }
 
