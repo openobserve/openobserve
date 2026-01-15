@@ -24,7 +24,10 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    decompression::RequestDecompressionLayer,
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -836,7 +839,7 @@ pub fn service_routes() -> Router {
             );
     }
 
-    // Apply middlewares in order: cors -> server header -> auth -> audit -> blocked orgs
+    // Apply middlewares in order: decompression -> cors -> server header -> auth -> audit -> blocked orgs
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -855,6 +858,7 @@ pub fn service_routes() -> Router {
             },
         ))
         .layer(cors_layer())
+        .layer(RequestDecompressionLayer::new())
 }
 
 /// Create other service routes (AWS, GCP, RUM)
@@ -868,13 +872,15 @@ pub fn other_service_routes() -> Router {
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
-        .layer(cors.clone());
+        .layer(cors.clone())
+        .layer(RequestDecompressionLayer::new());
 
     // GCP routes
     let gcp_routes = Router::new()
         .route("/{org_id}/_sub", post(logs::ingest::handle_gcp_request))
         .layer(middleware::from_fn(gcp_auth_middleware))
-        .layer(cors.clone());
+        .layer(cors.clone())
+        .layer(RequestDecompressionLayer::new());
 
     // RUM routes
     let rum_routes = Router::new()
@@ -883,7 +889,8 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(cors);
+        .layer(cors)
+        .layer(RequestDecompressionLayer::new());
 
     Router::new()
         .nest("/aws", aws_routes)
