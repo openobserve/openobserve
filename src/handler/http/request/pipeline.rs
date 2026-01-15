@@ -68,7 +68,7 @@ impl From<PipelineError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline", "category": "pipelines"}))
     )
 )]
 pub async fn save_pipeline(
@@ -116,7 +116,7 @@ pub async fn save_pipeline(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List all pipelines", "category": "pipelines"}))
     )
 )]
 pub async fn list_pipelines(
@@ -209,7 +209,7 @@ pub async fn list_pipelines(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines", "category": "pipelines"}))
     )
 )]
 pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response {
@@ -242,7 +242,7 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines"}))
     )
 )]
 pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
@@ -341,7 +341,7 @@ pub async fn delete_pipeline_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Update a pipeline", "category": "pipelines"}))
     )
 )]
 pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Response {
@@ -379,7 +379,7 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline", "category": "pipelines"}))
     )
 )]
 pub async fn enable_pipeline(

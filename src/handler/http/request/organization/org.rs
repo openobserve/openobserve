@@ -67,7 +67,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get user organizations"}))
+        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
     )
 )]
 pub async fn organizations(
@@ -244,7 +244,7 @@ pub async fn all_organizations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Summary", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get organization summary"}))
+        ("x-o2-mcp" = json!({"description": "Get organization summary", "category": "organizations"}))
     )
 )]
 pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
@@ -477,7 +477,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization"}))
+        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
     )
 )]
 pub async fn create_org(
