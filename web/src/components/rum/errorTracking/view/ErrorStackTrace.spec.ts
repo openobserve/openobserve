@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
+import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -52,6 +53,9 @@ describe("ErrorStackTrace Component", () => {
       props: {
         error_stack: mockErrorStack,
         error: mockError,
+      },
+      global: {
+        plugins: [i18n],
       },
     });
 
