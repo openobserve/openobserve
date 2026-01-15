@@ -448,6 +448,10 @@ pub async fn get_incident_with_alerts(
 
     let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
 
+    // Get topology using centralized method
+    let topology_context =
+        infra::table::alert_incidents::get_topology(&incident.org_id, &incident.id).await?;
+
     // Convert to config types
     let incident_data = config::meta::alerts::incidents::Incident {
         id: incident.id,
@@ -456,20 +460,7 @@ pub async fn get_incident_with_alerts(
         status: incident.status.parse().unwrap_or_default(),
         severity: incident.severity.parse().unwrap_or_default(),
         stable_dimensions: serde_json::from_value(incident.stable_dimensions).unwrap_or_default(),
-        topology_context: incident.topology_context.and_then(|v| {
-            match serde_json::from_value(v.clone()) {
-                Ok(topology) => Some(topology),
-                Err(e) => {
-                    log::error!(
-                        "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
-                        incident_id,
-                        e,
-                        v
-                    );
-                    None
-                }
-            }
-        }),
+        topology_context,
         first_alert_at: incident.first_alert_at,
         last_alert_at: incident.last_alert_at,
         resolved_at: incident.resolved_at,
@@ -666,13 +657,8 @@ pub async fn enrich_with_topology(
         suggested_root_cause: None,
     };
 
-    // Update incident with topology context
-    infra::table::alert_incidents::update_topology(
-        org_id,
-        incident_id,
-        serde_json::to_value(&enriched_topology)?,
-    )
-    .await?;
+    // Update incident with topology context using typed API
+    infra::table::alert_incidents::update_topology(org_id, incident_id, &enriched_topology).await?;
 
     log::info!(
         "[incidents] Enriched incident {} with {} services, {} upstream, {} downstream",
@@ -739,22 +725,8 @@ pub async fn get_service_graph(
     // Primary service is first from FQN priority
     let incident_service = get_primary_service(&all_services);
 
-    // Get topology context if available
-    let topology: Option<config::meta::alerts::incidents::IncidentTopology> =
-        incident.topology_context.and_then(|v| {
-            match serde_json::from_value(v.clone()) {
-                Ok(topology) => Some(topology),
-                Err(e) => {
-                    log::error!(
-                        "[incidents] Failed to deserialize topology_context in get_service_graph for incident {}: {}. Raw value: {:?}",
-                        incident_id,
-                        e,
-                        v
-                    );
-                    None
-                }
-            }
-        });
+    // Get topology context using centralized method
+    let topology = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
 
     // Get all alerts for this incident to count by service
     let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
@@ -774,10 +746,8 @@ pub async fn get_service_graph(
             .or_insert(0) += 1;
     }
 
-    // Build nodes and edges based on topology
-    let root_cause_service = topology
-        .as_ref()
-        .and_then(|t| t.suggested_root_cause.clone());
+    // Note: suggested_root_cause contains RCA markdown, not a service name
+    // Service graph doesn't highlight root cause
 
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
@@ -817,16 +787,12 @@ pub async fn get_service_graph(
     // Build nodes for all services
     for service in &all_services {
         let alert_count = *service_alert_counts.get(service).unwrap_or(&0);
-        let is_root_cause = root_cause_service
-            .as_ref()
-            .map(|r| r == service)
-            .unwrap_or(false);
         let is_primary = service == &incident_service;
 
         nodes.push(IncidentServiceNode {
             service_name: service.clone(),
             alert_count,
-            is_root_cause,
+            is_root_cause: false, // Not using root cause detection
             is_primary,
         });
     }
@@ -840,7 +806,7 @@ pub async fn get_service_graph(
 
     Ok(Some(IncidentServiceGraph {
         incident_service,
-        root_cause_service,
+        root_cause_service: None, // Not using root cause detection
         nodes,
         edges,
         stats: IncidentGraphStats {
@@ -874,6 +840,9 @@ pub async fn update_status(
         log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
     }
 
+    // Get topology using centralized method
+    let topology_context = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
+
     Ok(config::meta::alerts::incidents::Incident {
         id: updated.id.clone(),
         org_id: updated.org_id,
@@ -881,20 +850,7 @@ pub async fn update_status(
         status: updated.status.parse().unwrap_or_default(),
         severity: updated.severity.parse().unwrap_or_default(),
         stable_dimensions: serde_json::from_value(updated.stable_dimensions).unwrap_or_default(),
-        topology_context: updated.topology_context.and_then(|v| {
-            match serde_json::from_value(v.clone()) {
-                Ok(topology) => Some(topology),
-                Err(e) => {
-                    log::error!(
-                        "[incidents] Failed to deserialize topology_context in update_status for incident {}: {}. Raw value: {:?}",
-                        updated.id,
-                        e,
-                        v
-                    );
-                    None
-                }
-            }
-        }),
+        topology_context,
         first_alert_at: updated.first_alert_at,
         last_alert_at: updated.last_alert_at,
         resolved_at: updated.resolved_at,

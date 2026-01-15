@@ -243,10 +243,13 @@ pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Er
 }
 
 /// Update topology context for an incident
+///
+/// Accepts typed IncidentTopology and handles serialization internally.
+/// This is the SINGLE SOURCE OF TRUTH for topology serialization.
 pub async fn update_topology(
     org_id: &str,
     id: &str,
-    topology_context: serde_json::Value,
+    topology: &config::meta::alerts::incidents::IncidentTopology,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -255,8 +258,16 @@ pub async fn update_topology(
         .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
+    // Serialize topology to JSON - ONLY place this happens
+    let topology_json = serde_json::to_value(topology).map_err(|e| {
+        Error::DbError(DbError::SeaORMError(format!(
+            "Failed to serialize topology: {}",
+            e
+        )))
+    })?;
+
     let mut active: alert_incidents::ActiveModel = incident.into();
-    active.topology_context = Set(Some(topology_context));
+    active.topology_context = Set(Some(topology_json));
     active.updated_at = Set(now);
 
     active
@@ -265,6 +276,40 @@ pub async fn update_topology(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(())
+}
+
+/// Get topology context from incident with proper deserialization
+///
+/// This is the SINGLE SOURCE OF TRUTH for topology deserialization.
+/// Returns None if incident doesn't exist, has no topology, or deserialization fails.
+pub async fn get_topology(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<config::meta::alerts::incidents::IncidentTopology>, errors::Error> {
+    let incident = get(org_id, id).await?;
+
+    match incident {
+        Some(inc) => match inc.topology_context {
+            Some(json_value) => {
+                match serde_json::from_value::<config::meta::alerts::incidents::IncidentTopology>(
+                    json_value.clone(),
+                ) {
+                    Ok(topology) => Ok(Some(topology)),
+                    Err(e) => {
+                        log::error!(
+                            "[DB::alert_incidents] Failed to deserialize topology_context for incident {}: {}. Raw JSON: {:?}",
+                            id,
+                            e,
+                            json_value
+                        );
+                        Ok(None)
+                    }
+                }
+            }
+            None => Ok(None),
+        },
+        None => Ok(None),
+    }
 }
 
 /// Update incident metadata (alert_count, last_alert_at, optionally stable_dimensions)
