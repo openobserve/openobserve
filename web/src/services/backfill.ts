@@ -44,6 +44,7 @@ export interface BackfillJob {
   current_position: number; // microseconds
   progress_percent: number; // 0-100
   status: "running" | "completed" | "failed" | "pending" | "canceled" | "paused" | "waiting";
+  enabled: boolean;
   deletion_status?: DeletionStatus;
   deletion_job_ids?: string[]; // Multiple deletion job IDs for tracking
   created_at?: number; // microseconds

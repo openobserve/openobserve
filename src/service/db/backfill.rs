@@ -134,3 +134,73 @@ pub async fn update(job: &BackfillJob) -> Result<()> {
 
     Ok(())
 }
+
+/// Update the enabled status of a backfill job
+pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()> {
+    use chrono::Utc;
+
+    use super::scheduler;
+
+    // Update the enabled field in the backfill_jobs table
+    infra::table::backfill_jobs::update_enabled(org, job_id, enabled).await?;
+
+    // If enabling, also set the trigger status to Waiting so it runs immediately
+    if enabled {
+        let trigger_result = scheduler::get(org, scheduler::TriggerModule::Backfill, job_id).await;
+
+        if let Ok(trigger) = trigger_result {
+            // Only update if the trigger is in Completed status
+            if trigger.status == scheduler::TriggerStatus::Completed {
+                let now = Utc::now().timestamp_micros();
+                let _ = scheduler::update_trigger(
+                    scheduler::Trigger {
+                        status: scheduler::TriggerStatus::Waiting,
+                        next_run_at: now, // Start immediately
+                        ..trigger
+                    },
+                    true,
+                    &format!("enable_backfill_{}", job_id),
+                )
+                .await;
+            }
+        }
+    }
+
+    // Super cluster support
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        // Fetch the updated job to send to super cluster
+        if let Ok(job) = get(org, job_id).await {
+            let key = format!("{BACKFILL_JOBS_KEY}/{}/{}", org, job_id);
+            match config::utils::json::to_vec(&job) {
+                Err(e) => {
+                    log::error!(
+                        "[BACKFILL] error serializing backfill job {}/{} for super_cluster enable/disable event: {e}",
+                        org,
+                        job_id
+                    );
+                }
+                Ok(value_vec) => {
+                    if let Err(e) =
+                        o2_enterprise::enterprise::super_cluster::queue::backfill_update(
+                            &key,
+                            value_vec.into(),
+                        )
+                        .await
+                    {
+                        log::error!(
+                            "[BACKFILL] error sending backfill job {}/{} enable/disable to super_cluster: {e}",
+                            org,
+                            job_id
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
