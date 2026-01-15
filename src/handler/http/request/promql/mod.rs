@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     extract::{Path, Query},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -68,7 +68,7 @@ pub async fn remote_write(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
     headers: HeaderMap,
-    body: axum::body::Bytes,
+    body: Bytes,
 ) -> Response {
     let user = IngestUser::from_user_email(&user_email.user_id);
     let content_type = headers
