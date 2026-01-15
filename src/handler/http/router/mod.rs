@@ -24,7 +24,7 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -78,8 +78,10 @@ pub fn cors_layer() -> CorsLayer {
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
-        .allow_origin(Any)
-        .allow_credentials(false)
+        // Use mirror_request() to echo the Origin header back, allowing credentials
+        // with any origin (CORS spec doesn't allow `*` with credentials)
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }
 
