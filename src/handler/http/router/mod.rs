@@ -633,7 +633,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/export", get(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
-        .route("/v2/{org_id}/alerts/bulk/enable", put(alerts::enable_alert_bulk))
+        .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
@@ -680,7 +680,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
-        .route("/{org_id}/pipelines/bulk/enable", put(pipeline::enable_pipeline_bulk))
+        .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
         .route("/{org_id}/pipelines/streams", get(pipeline::list_streams_with_pipeline))
         .route("/{org_id}/pipelines/history", get(pipelines::history::get_pipeline_history))
 
