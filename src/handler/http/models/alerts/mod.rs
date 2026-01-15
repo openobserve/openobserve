@@ -27,34 +27,52 @@ use serde_json::Value as JsonValue;
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
+/// Alert configuration for monitoring streams and triggering notifications.
+///
+/// An alert watches a stream (logs, metrics, or traces) using SQL or PromQL queries,
+/// and sends notifications to configured destinations when trigger conditions are met.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
+    /// Unique identifier for the alert. Auto-generated on creation.
     #[serde(default)]
     #[schema(read_only)]
     #[schema(value_type = Option<String>)]
     pub id: Option<Ksuid>,
 
+    /// Human-readable name for the alert. Must be unique within the organization.
     #[serde(default)]
+    #[schema(example = "High Error Rate Alert")]
     pub name: String,
 
+    /// Organization ID. Usually set automatically from the request context.
     #[serde(default)]
     pub org_id: String,
 
+    /// Type of stream to monitor: logs, metrics, or traces.
     #[serde(default)]
     pub stream_type: StreamType,
 
+    /// Name of the stream to monitor.
     #[serde(default)]
+    #[schema(example = "default")]
     pub stream_name: String,
 
+    /// If true, alert evaluates in real-time as data arrives.
+    /// If false, alert runs on a schedule defined by trigger_condition.frequency.
     #[serde(default)]
     pub is_real_time: bool,
 
+    /// Query configuration: SQL query or PromQL expression to evaluate.
     #[serde(default)]
     pub query_condition: QueryCondition,
 
+    /// Trigger configuration: when and how often to evaluate, thresholds.
     #[serde(default)]
     pub trigger_condition: TriggerCondition,
 
+    /// List of destination names to notify when alert fires.
+    /// Destinations must be pre-configured in the system.
+    #[schema(example = json!(["slack-alerts", "pagerduty"]))]
     pub destinations: Vec<String>,
 
     /// Optional template name. When specified, this template is used for all
@@ -63,86 +81,121 @@ pub struct Alert {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
 
+    /// Optional key-value attributes to include in alert notifications.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
 
+    /// Template for formatting individual rows in the alert message.
     #[serde(default)]
     pub row_template: String,
 
+    /// Format type for the row template.
     #[serde(default)]
     pub row_template_type: meta_alerts::alert::RowTemplateType,
 
+    /// Human-readable description of what this alert monitors.
     #[serde(default)]
+    #[schema(example = "Fires when error count exceeds threshold in the specified time window")]
     pub description: String,
 
+    /// Whether the alert is active. Disabled alerts are not evaluated.
     #[serde(default)]
     pub enabled: bool,
 
-    /// Timezone offset in minutes. Negative seconds means the western
-    /// hemisphere
+    /// Timezone offset in minutes. Negative values for western hemisphere.
     #[serde(default)]
     pub tz_offset: i32,
 
-    /// Time when alert was last triggered. Unix timestamp.
+    /// Unix timestamp of when alert was last triggered.
     #[serde(default)]
     #[schema(read_only)]
     pub last_triggered_at: Option<i64>,
 
-    /// Time when alert was last satisfied. Unix timestamp.
+    /// Unix timestamp of when alert condition was last satisfied.
     #[serde(default)]
     #[schema(read_only)]
     pub last_satisfied_at: Option<i64>,
 
+    /// Username of the alert owner.
     #[serde(default)]
     pub owner: Option<String>,
 
-    /// Time when alert was last updated. Unix timestamp.
+    /// Unix timestamp of last modification.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(read_only)]
     pub updated_at: Option<i64>,
 
+    /// Username who last edited the alert.
     #[serde(default)]
     #[schema(read_only)]
     pub last_edited_by: Option<String>,
 
-    /// Optional deduplication configuration
+    /// Optional deduplication configuration to prevent alert spam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduplication: Option<DeduplicationConfig>,
 }
 
+/// Configuration for when and how an alert should be triggered.
+///
+/// ## Example
+/// ```json
+/// {
+///     "period": 15,
+///     "operator": ">=",
+///     "threshold": 100,
+///     "frequency": 5,
+///     "frequency_type": "minutes",
+///     "silence": 60
+/// }
+/// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
+    /// Time window in minutes to evaluate. The query looks back this many minutes.
     #[serde(rename = "period")]
+    #[schema(example = 15)]
     pub period_minutes: i64,
 
+    /// Comparison operator for threshold: =, !=, >, >=, <, <=
     #[serde(default)]
     pub operator: Operator,
 
+    /// Threshold value to compare against the query result.
     #[serde(rename = "threshold")]
     #[serde(default)]
+    #[schema(example = 100)]
     pub threshold_count: i64,
 
+    /// How often (in minutes) to run the alert query. Used with frequency_type="minutes".
     #[serde(rename = "frequency")]
     #[serde(default)]
+    #[schema(example = 5)]
     pub frequency_minutes: i64,
 
+    /// Cron expression for scheduling. Used with frequency_type="cron".
     #[serde(default)]
+    #[schema(example = "0 */5 * * *")]
     pub cron: String,
 
+    /// Schedule type: "minutes" for interval-based or "cron" for cron expressions.
     #[serde(default)]
     pub frequency_type: FrequencyType,
 
+    /// Silence period in minutes after an alert fires before it can fire again.
     #[serde(rename = "silence")]
     #[serde(default)]
+    #[schema(example = 60)]
     pub silence_minutes: i64,
 
+    /// Timezone for cron scheduling (e.g., "America/New_York").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
 
+    /// Tolerance in seconds for time-based comparisons.
     #[serde(rename = "tolerance_in_secs")]
     #[serde(default)]
     pub tolerance_seconds: Option<i64>,
 
+    /// Whether to align query time windows to period boundaries.
     #[serde(default = "default_align_time")]
     pub align_time: bool,
 }
@@ -163,21 +216,84 @@ pub enum FrequencyType {
     Minutes,
 }
 
+/// Query configuration for alert evaluation.
+///
+/// Supports three query types:
+/// - **sql**: Use a SQL query that returns aggregated results
+/// - **promql**: Use a PromQL expression for metrics
+/// - **custom**: Use UI-defined conditions with optional aggregation
+///
+/// ## SQL Example
+/// ```json
+/// {
+///     "type": "sql",
+///     "sql": "SELECT count(*) as count FROM \"default\" WHERE level = 'error'"
+/// }
+/// ```
+///
+/// ## PromQL Example
+/// ```json
+/// {
+///     "type": "promql",
+///     "promql": "rate(http_requests_total{status=\"500\"}[5m])",
+///     "promql_condition": {
+///         "column": "value",
+///         "operator": ">",
+///         "value": 10
+///     }
+/// }
+/// ```
+///
+/// ## Custom with Aggregation Example
+/// ```json
+/// {
+///     "type": "custom",
+///     "aggregation": {
+///         "group_by": ["service"],
+///         "function": "count",
+///         "having": {
+///             "column": "count",
+///             "operator": ">=",
+///             "value": 100
+///         }
+///     }
+/// }
+/// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct QueryCondition {
+    /// Type of query: "sql", "promql", or "custom"
     #[serde(default)]
     #[serde(rename = "type")]
     pub query_type: QueryType,
+
+    /// Filter conditions for "custom" query type. Supports both V1 (flat) and V2 (nested) formats.
     #[schema(value_type = Option<Object>)]
     pub conditions: Option<meta_alerts::AlertConditionParams>,
+
+    /// SQL query string. Used with type="sql". Query should return aggregated results
+    /// that can be compared against the trigger threshold.
+    #[schema(example = "SELECT count(*) as count FROM \"default\" WHERE level = 'error'")]
     pub sql: Option<String>,
+
+    /// PromQL expression. Used with type="promql".
+    #[schema(example = "rate(http_requests_total{status=\"500\"}[5m])")]
     pub promql: Option<String>,
+
+    /// Condition to apply to PromQL results. Required with type="promql".
     pub promql_condition: Option<Condition>,
+
+    /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
+
+    /// Optional VRL (Vector Remap Language) function for data transformation.
     #[serde(default)]
     pub vrl_function: Option<String>,
+
+    /// Search event type classification.
     #[serde(default)]
     pub search_event_type: Option<SearchEventType>,
+
+    /// Historical comparison periods for anomaly detection.
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
