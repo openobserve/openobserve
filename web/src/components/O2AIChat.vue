@@ -780,7 +780,6 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
-
                   // Handle tool_call events - show spinner, don't add to chat yet
                   if (data && data.type === 'tool_call') {
                     // If there's already an active tool call, complete it first
@@ -801,15 +800,16 @@ export default defineComponent({
                     }
 
                     // Set new active tool call (shows spinner indicator)
-                    activeToolCall.value = {
+                  // Handle tool_call events - add as content block for interleaved display
+                  if (data && data.type === 'tool_call') {
+                    const toolCallBlock: ContentBlock = {
+                      type: 'tool_call',
                       tool: data.tool,
                       message: data.message,
                       context: data.context || {}
                     };
 
-                    // Reset text segment - next text will start a new block
-                    currentTextSegment.value = '';
-
+                    // Show active indicator
                     await scrollToBottom();
                     continue;
                   }
@@ -1627,6 +1627,12 @@ export default defineComponent({
         blocks: processMessageContent(message.content),
         contentBlocks: message.contentBlocks || []
       }));
+    });
+
+    // Check if there's an assistant message in progress (for loading indicator positioning)
+    const hasAssistantMessage = computed(() => {
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      return lastMessage?.role === 'assistant';
     });
 
     const retryGeneration = async (message: any) => {
