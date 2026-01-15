@@ -1085,7 +1085,7 @@ const fn default_size() -> i64 {
 /// SearchStreamMulti HTTP2 streaming endpoint
 #[utoipa::path(
     post,
-    path = "/{org_id}/_multi_search_stream",
+    path = "/{org_id}/_search_multi_stream",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamMultiHttp2",
@@ -1130,7 +1130,7 @@ pub async fn search_multi_stream(
     let cfg = get_config();
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!("/api/{org_id}/_multi_search_stream")
+        tracing::info_span!("/api/{org_id}/_search_multi_stream")
     } else {
         Span::none()
     };
@@ -1198,7 +1198,7 @@ pub async fn search_multi_stream(
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-                    format!("/api/{}/_{}", org_id, "multi_search_stream"),
+                    format!("/api/{}/_{}", org_id, "search_multi_stream"),
                     query_string,
                     body_bytes,
                 )
@@ -1235,7 +1235,7 @@ pub async fn search_multi_stream(
                             http_response.status().into(),
                             Some(error_message),
                             "POST".to_string(),
-                            format!("/api/{}/_{}", org_id, "multi_search_stream"),
+                            format!("/api/{}/_{}", org_id, "search_multi_stream"),
                             query
                                 .iter()
                                 .map(|(k, v)| format!("{}={}", k, v))
@@ -1293,7 +1293,7 @@ pub async fn search_multi_stream(
                                 http_response.status().into(),
                                 Some(error_message),
                                 "POST".to_string(),
-                                format!("/api/{}/_multi_search_stream", org_id),
+                                format!("/api/{}/_search_multi_stream", org_id),
                                 query
                                     .iter()
                                     .map(|(k, v)| format!("{}={}", k, v))
@@ -1340,7 +1340,7 @@ pub async fn search_multi_stream(
                             403,
                             Some(format!("Unauthorized Access to stream: {stream_name}")),
                             "POST".to_string(),
-                            format!("/api/{}/_multi_search_stream", org_id),
+                            format!("/api/{}/_search_multi_stream", org_id),
                             query
                                 .iter()
                                 .map(|(k, v)| format!("{}={}", k, v))
@@ -1387,7 +1387,7 @@ pub async fn search_multi_stream(
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-                    format!("/api/{}/_{}", org_id, "multi_search_stream"),
+                    format!("/api/{}/_{}", org_id, "search_multi_stream"),
                     query
                         .iter()
                         .map(|(k, v)| format!("{}={}", k, v))
@@ -1407,7 +1407,7 @@ pub async fn search_multi_stream(
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
         method: "POST".to_string(),
-        path: format!("/api/{}/_{}", org_id, "multi_search_stream"),
+        path: format!("/api/{}/_{}", org_id, "search_multi_stream"),
         query_params: query
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
@@ -1420,7 +1420,7 @@ pub async fn search_multi_stream(
 
     let search_span = setup_tracing_with_trace_id(
         &trace_id,
-        tracing::info_span!("service::search::multi_search_stream_h2"),
+        tracing::info_span!("service::search::search_multi_stream_h2"),
     )
     .await;
 

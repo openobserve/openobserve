@@ -50,7 +50,7 @@ export async function waitForStreamComplete(page, timeout = 15000) {
         if (url.includes('_search_stream') ||
             url.includes('_histogram_stream') ||
             url.includes('_values_stream') ||
-            url.includes('_multi_search_stream') ||
+            url.includes('_search_multi_stream') ||
             url.includes('_pagecount_stream')) {
 
           try {
@@ -235,7 +235,7 @@ export async function waitForMultipleStreams(page, expectedCount, timeout = 2000
       if (url.includes('_search_stream') ||
           url.includes('_histogram_stream') ||
           url.includes('_values_stream') ||
-          url.includes('_multi_search_stream') ||
+          url.includes('_search_multi_stream') ||
           url.includes('_pagecount_stream')) {
 
         try {
@@ -330,7 +330,7 @@ export function trackStreamingResponses(page) {
     if (url.includes('_search_stream') ||
         url.includes('_histogram_stream') ||
         url.includes('_values_stream') ||
-        url.includes('_multi_search_stream') ||
+        url.includes('_search_multi_stream') ||
         url.includes('_pagecount_stream')) {
 
       responses.push({

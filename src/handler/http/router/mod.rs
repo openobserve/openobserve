@@ -82,8 +82,8 @@ pub fn cors_layer() -> CorsLayer {
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
-        .allow_credentials(false)
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }
 
@@ -895,13 +895,13 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
+        .layer(cors_layer())
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ));
 
     Router::new()
-        .layer(cors_layer())
         .nest("/aws", aws_routes)
         .nest("/gcp", gcp_routes)
         .nest("/rum", rum_routes)
@@ -915,7 +915,7 @@ pub fn create_app_router() -> Router {
         // Router node: use proxy routes that dispatch to backend nodes
         // All routes under base_uri will be proxied to backend nodes
 
-        let mut router_routes = Router::new().layer(cors_layer());
+        let mut router_routes = Router::new();
         router_routes = router_routes
             .merge(crate::router::http::create_router_routes())
             .nest("/config", config_routes())
@@ -945,7 +945,6 @@ pub fn create_app_router() -> Router {
     } else {
         // Non-router node: use direct service routes
         Router::new()
-            .layer(cors_layer())
             .merge(basic_routes())
             .nest("/config", config_routes())
             .nest("/api", service_routes())
@@ -964,7 +963,9 @@ pub fn create_app_router() -> Router {
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
-    app = app.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
+    app = app
+        .layer(cors_layer())
+        .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     app
 }
