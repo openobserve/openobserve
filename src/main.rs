@@ -85,7 +85,7 @@ use tonic::{
     metadata::{MetadataKey, MetadataMap, MetadataValue},
     transport::{Identity, ServerTlsConfig},
 };
-use tower_http::{compression::CompressionLayer, timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
@@ -765,18 +765,14 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     // Build the router
     let app = create_app_router()
-        .layer(middlewares::AccessLogLayer::new(
-            middlewares::get_http_access_log_format(),
+        .layer(config::axum::middlewares::AccessLogLayer::new(
+            config::axum::middlewares::get_http_access_log_format(),
         ))
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
         .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(TraceLayer::new_for_http());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -837,14 +833,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     // Build the router without tracing
     let app = create_app_router()
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(CompressionLayer::new());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1297,14 +1289,10 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // Build the router for script server
     let app = create_script_server_router()
-        .layer(middlewares::SlowLogLayer::new(
+        .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
-        .layer(CompressionLayer::new())
-        .layer(TimeoutLayer::with_status_code(
-            http::StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(max(1, cfg.limit.http_request_timeout)),
-        ));
+        .layer(CompressionLayer::new());
 
     if cfg.http.tls_enabled {
         // TLS server using axum-server
@@ -1359,7 +1347,9 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 pub fn create_script_server_router() -> axum::Router {
     use axum::{
-        Router, middleware,
+        Router,
+        extract::DefaultBodyLimit,
+        middleware,
         routing::{delete, get, patch, post},
     };
     use openobserve::handler::http::{request::script_server, router::cors_layer};
@@ -1379,12 +1369,15 @@ pub fn create_script_server_router() -> axum::Router {
         ))
         .layer(cors_layer());
 
-    // Nest under base URI
-    if base_uri.is_empty() || base_uri == "/" {
+    // Nest under base URI and set request body size limit
+    let router = if base_uri.is_empty() || base_uri == "/" {
         Router::new().nest("/api", api_routes)
     } else {
         Router::new().nest(&format!("{}/api", base_uri), api_routes)
-    }
+    };
+
+    // Set request body size limit (equivalent to actix-web's PayloadConfig)
+    router.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit))
 }
 
 /// Initializes enterprise features.

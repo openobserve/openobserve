@@ -30,17 +30,3 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
             .unwrap(),
     )
 });
-
-pub static METRICS_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
-    let cfg = get_config();
-    let thread_num = std::cmp::min(cfg.limit.cpu_num, cfg.limit.http_worker_num);
-    Arc::new(
-        tokio::runtime::Builder::new_multi_thread()
-            .thread_name("metrics_runtime")
-            .worker_threads(thread_num)
-            .thread_stack_size(16 * 1024 * 1024)
-            .enable_all()
-            .build()
-            .unwrap(),
-    )
-});

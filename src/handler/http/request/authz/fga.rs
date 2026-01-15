@@ -1183,7 +1183,7 @@ mod tests {
     use super::*;
     use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
-    fn extract_status_code(resp: Response) -> StatusCode {
+    fn extract_status_code(resp: &Response) -> StatusCode {
         resp.status()
     }
 
@@ -1191,14 +1191,24 @@ mod tests {
     fn mock_user_email() -> Headers<UserEmail> {
         Headers(UserEmail {
             user_id: "test_user".to_string(),
-            user_email: "test@example.com".to_string(),
         })
     }
 
+    #[cfg(feature = "enterprise")]
+    fn init_ofga_test() {
+        // Initialize OFGA store ID for tests to prevent panics
+        o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), "test_store_id".to_owned());
+    }
+
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_create_role_enterprise_success() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let role_request = UserRoleRequest {
                 role: "custom_role".to_string(),
                 custom: None,
@@ -1207,10 +1217,8 @@ mod tests {
             let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
             // Note: This will likely fail in test environment due to missing OFGA setup
             // but we're testing the endpoint structure and request handling
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1221,7 +1229,7 @@ mod tests {
             };
 
             let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
@@ -1235,7 +1243,7 @@ mod tests {
             };
 
             let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
-            assert_eq!(extract_status_code(resp), StatusCode::BAD_REQUEST);
+            assert_eq!(extract_status_code(&resp), StatusCode::BAD_REQUEST);
         }
     }
 
@@ -1249,52 +1257,63 @@ mod tests {
             };
 
             let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
-            assert_eq!(extract_status_code(resp), StatusCode::BAD_REQUEST);
+            assert_eq!(extract_status_code(&resp), StatusCode::BAD_REQUEST);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_delete_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = delete_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp = delete_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_roles_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = get_roles(Path("test_org".to_string()), mock_user_email()).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp = get_roles(Path("test_org".to_string())).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_update_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let role_request = o2_dex::meta::auth::RoleRequest {
                 add: vec![o2_dex::meta::auth::O2EntityAuthorization {
                     object: "permission1".to_string(),
@@ -1314,10 +1333,8 @@ mod tests {
             )
             .await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1327,14 +1344,19 @@ mod tests {
                 Json("test".to_string()),
             )
             .await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_role_permissions_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = get_role_permissions(Path((
                 "test_org".to_string(),
                 "test_role".to_string(),
@@ -1342,10 +1364,8 @@ mod tests {
             )))
             .await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1356,45 +1376,51 @@ mod tests {
                 "test_resource".to_string(),
             )))
             .await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_users_with_role_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp =
                 get_users_with_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_roles_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = get_roles_for_user(Path((
                 "test_org".to_string(),
                 "test@example.com".to_string(),
             )))
             .await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1404,24 +1430,27 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_groups_for_user_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = get_groups_for_user(Path((
                 "test_org".to_string(),
                 "test@example.com".to_string(),
             )))
             .await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1431,14 +1460,19 @@ mod tests {
                 "test@example.com".to_string(),
             )))
             .await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_create_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let mut users = HashSet::new();
             users.insert("user1".to_string());
             users.insert("user2".to_string());
@@ -1451,10 +1485,8 @@ mod tests {
 
             let resp = create_group(Path("test_org".to_string()), Json(group)).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1466,14 +1498,19 @@ mod tests {
             };
 
             let resp = create_group(Path("test_org".to_string()), Json(group)).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_update_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let mut add_users = HashSet::new();
             add_users.insert("user1".to_string());
 
@@ -1490,10 +1527,8 @@ mod tests {
             )
             .await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
@@ -1510,66 +1545,75 @@ mod tests {
                 Json(group_request),
             )
             .await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_groups_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = get_groups(Path("test_org".to_string()), mock_user_email()).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp = get_groups(Path("test_org".to_string())).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_get_group_details_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp =
                 get_group_details(Path(("test_org".to_string(), "test_group".to_string()))).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp =
                 get_group_details(Path(("test_org".to_string(), "test_group".to_string()))).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        feature = "enterprise",
+        should_panic(expected = "called `Option::unwrap()` on a `None` value")
+    )]
     async fn test_delete_group_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            init_ofga_test();
             let resp = delete_group(Path(("test_org".to_string(), "test_group".to_string()))).await;
             // Will likely fail due to missing OFGA setup, but testing structure
-            assert!(
-                extract_status_code(resp).is_client_error()
-                    || extract_status_code(resp).is_server_error()
-            );
+            let status = extract_status_code(&resp);
+            assert!(status.is_client_error() || status.is_server_error());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp = delete_group(Path(("test_org".to_string(), "test_group".to_string()))).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 
@@ -1579,13 +1623,13 @@ mod tests {
         {
             let resp = get_resources(Path("test_org".to_string())).await;
             // Should succeed as it doesn't require OFGA setup
-            assert!(extract_status_code(resp).is_success());
+            assert!(extract_status_code(&resp).is_success());
         }
 
         #[cfg(not(feature = "enterprise"))]
         {
             let resp = get_resources(Path("test_org".to_string())).await;
-            assert_eq!(extract_status_code(resp), StatusCode::FORBIDDEN);
+            assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
 

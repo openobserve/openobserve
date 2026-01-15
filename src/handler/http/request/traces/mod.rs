@@ -15,7 +15,9 @@
 
 use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    TIMESTAMP_COL_NAME,
+    axum::middlewares::{get_process_time, insert_process_time_header},
+    get_config,
     meta::{search::default_use_cache, stream::StreamType},
     metrics,
     utils::json,
@@ -39,8 +41,7 @@ use crate::{
     handler::http::{
         extractors::Headers,
         request::{
-            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, get_process_time, insert_process_time_header,
-            search::error_utils::map_error_to_http_response,
+            CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, search::error_utils::map_error_to_http_response,
         },
     },
     service::{search as SearchService, traces},

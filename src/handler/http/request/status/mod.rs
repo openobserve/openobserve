@@ -1038,9 +1038,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_expires(
-        time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
-    );
+    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");

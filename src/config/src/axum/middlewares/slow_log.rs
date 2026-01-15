@@ -21,11 +21,10 @@ use std::{
 };
 
 use axum::{body::Body, http::Request, response::Response};
-use config::utils::time::now_micros;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
-use crate::handler::http::request::HEADER_O2_PROCESS_TIME;
+use super::HEADER_O2_PROCESS_TIME;
 
 /// Layer that logs slow requests
 #[derive(Clone)]
@@ -72,7 +71,7 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let start = Instant::now();
-        let start_time = now_micros();
+        let start_time = crate::utils::time::now_micros();
 
         // Extract request info before moving req
         let remote_addr = req

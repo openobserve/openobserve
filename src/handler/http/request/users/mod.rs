@@ -1151,6 +1151,6 @@ mod tests {
         let result = check_role_available(&UserRole::Admin);
         assert!(result.is_some());
         let role_response = result.unwrap();
-        assert_eq!(role_response.value, "Admin");
+        assert_eq!(role_response.value, "admin");
     }
 }

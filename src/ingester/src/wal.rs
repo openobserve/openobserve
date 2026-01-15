@@ -20,10 +20,9 @@ use std::{
     sync::Arc,
 };
 
-use async_walkdir::WalkDir;
 use config::{
     get_config, metrics,
-    utils::{schema::infer_json_schema_from_values, schema_ext::SchemaExt},
+    utils::{async_walkdir::WalkDir, schema::infer_json_schema_from_values, schema_ext::SchemaExt},
 };
 use futures::StreamExt;
 use hashbrown::HashMap;

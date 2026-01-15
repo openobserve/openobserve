@@ -15,6 +15,7 @@
 
 #![feature(macro_metavar_expr_concat)]
 
+pub mod axum;
 pub mod cluster;
 pub mod config;
 pub mod config_path_manager;
