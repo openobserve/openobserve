@@ -213,6 +213,7 @@ jobs:
           - testfolder: "Functions"
             browser: "chrome"
             run_files: [
+                "enrichment-table-url.spec.js",
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
               ]
