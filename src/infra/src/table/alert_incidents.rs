@@ -425,7 +425,12 @@ mod tests {
         assert_eq!(json["service"], "test-service");
         assert_eq!(json["upstream_services"][0], "upstream1");
         assert_eq!(json["downstream_services"][0], "downstream1");
-        assert!(json["suggested_root_cause"].as_str().unwrap().contains("RCA Analysis"));
+        assert!(
+            json["suggested_root_cause"]
+                .as_str()
+                .unwrap()
+                .contains("RCA Analysis")
+        );
     }
 
     #[tokio::test]
@@ -446,7 +451,12 @@ mod tests {
         assert_eq!(topology.service, "api-gateway");
         assert_eq!(topology.upstream_services.len(), 1);
         assert_eq!(topology.downstream_services.len(), 2);
-        assert!(topology.suggested_root_cause.unwrap().contains("Database connection"));
+        assert!(
+            topology
+                .suggested_root_cause
+                .unwrap()
+                .contains("Database connection")
+        );
     }
 
     #[tokio::test]
