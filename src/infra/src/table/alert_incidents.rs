@@ -406,4 +406,77 @@ mod tests {
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
         assert_eq!(id.len(), 27);
     }
+
+    #[tokio::test]
+    async fn test_topology_serialization() {
+        // Test that update_topology properly serializes typed IncidentTopology
+        let topology = config::meta::alerts::incidents::IncidentTopology {
+            service: "test-service".to_string(),
+            upstream_services: vec!["upstream1".to_string(), "upstream2".to_string()],
+            downstream_services: vec!["downstream1".to_string()],
+            related_incident_ids: vec![],
+            suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_value(&topology).unwrap();
+
+        // Verify structure
+        assert_eq!(json["service"], "test-service");
+        assert_eq!(json["upstream_services"][0], "upstream1");
+        assert_eq!(json["downstream_services"][0], "downstream1");
+        assert!(json["suggested_root_cause"].as_str().unwrap().contains("RCA Analysis"));
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization() {
+        // Test that get_topology properly deserializes JSON to typed IncidentTopology
+        let json = serde_json::json!({
+            "service": "api-gateway",
+            "upstream_services": ["frontend"],
+            "downstream_services": ["database", "cache"],
+            "related_incident_ids": [],
+            "suggested_root_cause": "# Root Cause\n\nDatabase connection pool exhausted"
+        });
+
+        // Deserialize
+        let topology: config::meta::alerts::incidents::IncidentTopology =
+            serde_json::from_value(json).unwrap();
+
+        assert_eq!(topology.service, "api-gateway");
+        assert_eq!(topology.upstream_services.len(), 1);
+        assert_eq!(topology.downstream_services.len(), 2);
+        assert!(topology.suggested_root_cause.unwrap().contains("Database connection"));
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization_handles_missing_fields() {
+        // Test backward compatibility - old data without suggested_root_cause
+        let json = serde_json::json!({
+            "service": "api-gateway",
+            "upstream_services": [],
+            "downstream_services": [],
+            "related_incident_ids": []
+        });
+
+        let topology: config::meta::alerts::incidents::IncidentTopology =
+            serde_json::from_value(json).unwrap();
+
+        assert_eq!(topology.service, "api-gateway");
+        assert_eq!(topology.suggested_root_cause, None);
+    }
+
+    #[tokio::test]
+    async fn test_topology_deserialization_rejects_invalid_json() {
+        // Test that malformed JSON is properly rejected
+        let json = serde_json::json!({
+            "invalid_field": "value",
+            "service": 123  // Wrong type
+        });
+
+        let result: Result<config::meta::alerts::incidents::IncidentTopology, _> =
+            serde_json::from_value(json);
+
+        assert!(result.is_err(), "Should reject malformed JSON");
+    }
 }
