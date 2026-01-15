@@ -715,7 +715,7 @@ export default defineComponent({
       } else if (isEnterprise) {
         return 'Edition: Enterprise (Free)';
       } else {
-        return 'Get OpenObserve Enterprise for Free';
+        return 'Get OpenObserve Enterprise (Free)';
       }
     });
 
