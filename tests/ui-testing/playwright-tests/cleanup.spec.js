@@ -6,7 +6,7 @@ test.describe("Pre-Test Cleanup", () => {
   /**
    * This cleanup test runs before all UI integration tests
    * It removes all test data from previous runs using API calls
-   * This ensures a clean state for all subsequent tests 
+   * This ensures a clean state for all subsequent tests  
    */
   test('Clean up all test data via API', {
     tag: ['@cleanup', '@all']
@@ -30,7 +30,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_user_update_dest_',
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
-        'incident_e2e_dest_'
+        'incident_e2e_dest_',
+        'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
       ],
       // Template prefixes to clean up
       [
@@ -47,7 +48,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_user_delete_tmpl_',
         'rbac_viewer_delete_tmpl_',
         'rbac_viewer_update_tmpl_',
-        'incident_e2e_template_'
+        'incident_e2e_template_',
+        'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_']
