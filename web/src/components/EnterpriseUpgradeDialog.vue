@@ -634,7 +634,7 @@ export default defineComponent({
   overflow: hidden;
 
   .features-header {
-    padding: 20px 32px 16px 32px;
+    padding: 16px 32px 12px 32px;
     background: white;
     position: sticky;
     top: 0;
@@ -646,28 +646,28 @@ export default defineComponent({
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
       border-radius: 12px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
 
       .header-icon {
         color: white;
-        font-size: 20px;
+        font-size: 18px;
       }
     }
 
     h4 {
-      font-size: 19px;
+      font-size: 18px;
       font-weight: 800;
-      margin: 0 0 5px 0;
+      margin: 0 0 4px 0;
       color: rgba(0, 0, 0, 0.9);
       letter-spacing: -0.3px;
     }
 
     .header-subtitle {
-      font-size: 12.5px;
+      font-size: 12px;
       color: rgba(0, 0, 0, 0.6);
       margin: 0;
       font-weight: 500;
@@ -677,7 +677,7 @@ export default defineComponent({
   .features-list {
     flex: 1;
     overflow-y: auto;
-    padding: 10px 32px 16px 32px;
+    padding: 8px 32px 16px 32px;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 7px 14px;
@@ -689,10 +689,12 @@ export default defineComponent({
     gap: 10px;
     padding: 8px 12px;
     border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     transition: all 0.2s ease;
 
     &:hover {
       background: rgba(0, 0, 0, 0.03);
+      border-color: rgba(0, 0, 0, 0.12);
     }
 
     .feature-icon-badge {
