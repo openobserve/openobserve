@@ -39,7 +39,7 @@ pub struct LinkSubscriptionResponse {
     pub message: Option<String>,
 }
 
-/// LinkAwsMarketplaceSubscription
+/// LinkAzureMarketplaceSubscription
 #[utoipa::path(
     context_path = "/api",
     tag = "Azure Marketplace",
@@ -123,6 +123,8 @@ pub async fn link_subscription(
             }));
         }
     }
+
+    return HttpResponse::Created().finish();
 
     let res = match billings::azure_utils::process_token(&req.token).await {
         Ok(r) => r,
