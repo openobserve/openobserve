@@ -104,7 +104,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
           </div>
 
-          <div class="features-list">
+          <!-- Cloud 3-column layout -->
+          <div v-if="dialogConfig.isCloudLayout" class="features-list cloud-three-column">
+            <!-- Column 1: Core Features -->
+            <div
+              v-for="feature in coreFeatures"
+              :key="feature.name"
+              class="feature-list-item"
+            >
+              <div class="feature-icon-badge">
+                <q-icon :name="feature.icon" size="15px" />
+              </div>
+              <div class="feature-content">
+                <div class="feature-name">
+                  {{ feature.name }}
+                </div>
+                <div class="feature-desc">{{ feature.note }}</div>
+              </div>
+            </div>
+
+            <!-- Columns 2 & 3: Enterprise Features -->
+            <div
+              v-for="feature in enterpriseFeatures"
+              :key="feature.name"
+              class="feature-list-item"
+            >
+              <div class="feature-icon-badge">
+                <q-icon :name="feature.icon" size="15px" />
+              </div>
+              <div class="feature-content">
+                <div class="feature-name">
+                  {{ feature.name }}
+                </div>
+                <div class="feature-desc">{{ feature.note }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Standard 2-column layout for non-Cloud -->
+          <div v-else class="features-list">
             <div
               v-for="feature in enterpriseFeatures"
               :key="feature.name"
@@ -227,6 +265,65 @@ export default defineComponent({
         showPrimaryButton: true,
       };
     });
+
+    // Core features list - available in all versions (for Cloud 3-column layout)
+    const coreFeatures = [
+      {
+        name: "Logs, Metrics, Traces",
+        note: "Full observability data ingestion and analysis",
+        icon: "storage",
+      },
+      {
+        name: "RUM",
+        note: "Real User Monitoring for frontend performance",
+        icon: "visibility",
+      },
+      {
+        name: "Alerts",
+        note: "Real-time alerting and notifications",
+        icon: "notifications_active",
+      },
+      {
+        name: "Dashboards",
+        note: "Customizable visualization dashboards",
+        icon: "dashboard",
+      },
+      {
+        name: "Reports",
+        note: "Scheduled and on-demand reporting",
+        icon: "description",
+      },
+      {
+        name: "VRL Functions",
+        note: "Vector Remap Language for data transformation",
+        icon: "functions",
+      },
+      {
+        name: "Pipelines",
+        note: "Data processing and transformation pipelines",
+        icon: "account_tree",
+      },
+      {
+        name: "High Availability",
+        note: "Distributed architecture for reliability",
+        icon: "cloud_done",
+      },
+      {
+        name: "Multitenancy",
+        note: "Organization-based data isolation",
+        icon: "corporate_fare",
+      },
+      {
+        name: "Dynamic Schema",
+        note: "Automatic schema detection and evolution",
+        icon: "schema",
+      },
+      {
+        name: "Multilingual GUI",
+        note: "Advanced internationalization support",
+        icon: "language",
+      },
+    ];
 
     // Enterprise features list - all 21 features
     const enterpriseFeatures = [
@@ -456,6 +553,7 @@ export default defineComponent({
     return {
       showDialog,
       dialogConfig,
+      coreFeatures,
       enterpriseFeatures,
       onDialogHide,
       openDownloadPage,
@@ -696,6 +794,10 @@ export default defineComponent({
     grid-template-columns: repeat(2, 1fr);
     gap: 7px 14px;
     align-content: start;
+
+    &.cloud-three-column {
+      grid-template-columns: repeat(3, 1fr);
+    }
   }
 
   .feature-list-item {
