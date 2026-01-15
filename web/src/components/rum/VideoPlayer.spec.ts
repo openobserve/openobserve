@@ -245,7 +245,7 @@ describe("VideoPlayer Component", () => {
     it("should display loading message when loading", async () => {
       await wrapper.setProps({ isLoading: true });
       expect(wrapper.text()).toContain(
-        "Hold on tight, we're fetching session.",
+        "Hold on tight, we're fetching sessions.",
       );
     });
 
