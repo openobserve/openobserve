@@ -41,31 +41,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <!-- Filters -->
-            <q-select
-              v-model="filters.status"
-              :options="statusOptions"
-              label="Status"
-              outlined
-              dense
-              clearable
-              style="width: 150px"
-              data-test="status-filter"
-            />
-            <q-select
-              v-model="filters.pipelineId"
-              :options="pipelineOptions"
-              option-label="label"
-              option-value="value"
-              label="Pipeline"
-              outlined
-              dense
-              clearable
-              use-input
-              input-debounce="300"
-              @filter="filterPipelines"
-              style="width: 250px"
-              data-test="pipeline-filter"
-            />
+            <div class="tw:flex tw:gap-2">
+              <q-select
+                v-model="filters.status"
+                :options="statusOptions"
+                color="input-border"
+                bg-color="input-bg"
+                placeholder="Status"
+                use-input
+                fill-input
+                hide-selected
+                borderless
+                dense
+                clearable
+                input-debounce="300"
+                @filter="filterStatuses"
+                style="width: 150px"
+                data-test="status-filter"
+              />
+              <q-select
+                v-model="filters.pipelineId"
+                :options="pipelineOptions"
+                option-label="label"
+                option-value="value"
+                color="input-border"
+                bg-color="input-bg"
+                placeholder="Pipeline"
+                map-options
+                use-input
+                emit-value
+                fill-input
+                hide-selected
+                borderless
+                dense
+                clearable
+                input-debounce="300"
+                @filter="filterPipelines"
+                style="width: 250px"
+                data-test="pipeline-filter"
+              />
+            </div>
             <q-btn
               label="Clear Filters"
               outline
@@ -181,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props">
               <div class="tw:flex tw:items-center tw:justify-center">
                 <q-btn
-                  v-if="canPauseJob(props.row.status)"
+                  v-if="canPauseJob(props.row)"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -194,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tooltip>Pause Job</q-tooltip>
                 </q-btn>
                 <q-btn
-                  v-if="canResumeJob(props.row.status)"
+                  v-if="canResumeJob(props.row)"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -465,7 +480,8 @@ const columns = [
   },
 ];
 
-const statusOptions = ["running", "completed", "paused"];
+const allStatusOptions = ["running", "completed", "paused", "failed"];
+const statusOptions = ref<string[]>([...allStatusOptions]);
 const pipelineOptions = ref<any[]>([]);
 const allPipelineOptions = ref<any[]>([]);
 
@@ -517,6 +533,15 @@ const filterPipelines = (val: string, update: any) => {
   });
 };
 
+const filterStatuses = (val: string, update: any) => {
+  update(() => {
+    const needle = val.toLowerCase();
+    statusOptions.value = allStatusOptions.filter(
+      (v) => v.toLowerCase().indexOf(needle) > -1
+    );
+  });
+};
+
 const filteredJobs = computed(() => {
   let filtered = jobs.value;
 
@@ -533,7 +558,7 @@ const filteredJobs = computed(() => {
   }
 
   if (filters.value.pipelineId) {
-    filtered = filtered.filter((job) => job.pipeline_id === filters.value.pipelineId.value);
+    filtered = filtered.filter((job) => job.pipeline_id === filters.value.pipelineId);
   }
 
   return filtered;
@@ -569,12 +594,14 @@ const onJobUpdated = () => {
   loadJobs();
 };
 
-const canPauseJob = (status: string) => {
-  return status === "running" || status === "waiting";
+const canPauseJob = (job: BackfillJob) => {
+  // Can pause if enabled and not completed/failed
+  return job.enabled && job.status !== "completed" && job.status !== "failed";
 };
 
-const canResumeJob = (status: string) => {
-  return status === "paused";
+const canResumeJob = (job: BackfillJob) => {
+  // Can resume if disabled and not completed/failed
+  return !job.enabled && job.status !== "completed" && job.status !== "failed";
 };
 
 const canEditJob = (status: string) => {

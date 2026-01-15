@@ -15,6 +15,7 @@ pub struct Model {
     pub delay_between_chunks_secs: Option<i64>,
     pub delete_before_backfill: bool,
     pub created_at: i64,
+    pub enabled: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
