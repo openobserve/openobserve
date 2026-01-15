@@ -82,8 +82,8 @@ pub fn cors_layer() -> CorsLayer {
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
-        .allow_origin(AllowOrigin::any())
-        .allow_credentials(false)
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }
 
