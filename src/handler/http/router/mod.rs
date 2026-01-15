@@ -24,7 +24,10 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    decompression::RequestDecompressionLayer,
+};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -54,6 +57,7 @@ use crate::{
     },
 };
 
+pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
 pub mod ui;
@@ -78,7 +82,7 @@ pub fn cors_layer() -> CorsLayer {
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
         ])
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::any())
         .allow_credentials(false)
         .max_age(Duration::from_secs(3600))
 }
@@ -373,8 +377,6 @@ pub fn proxy_routes(enable_auth: bool) -> Router {
 
 /// Create basic routes (health, auth, etc.)
 pub fn basic_routes() -> Router {
-    let cors = cors_layer();
-
     let mut router = Router::new()
         .route("/healthz", get(status::healthz).head(status::healthz_head))
         .route("/schedulez", get(status::schedulez))
@@ -399,8 +401,7 @@ pub fn basic_routes() -> Router {
         .route("/login", post(users::authentication).get(users::get_auth))
         .route("/presigned-url", get(users::get_presigned_url))
         .route("/invites", get(users::list_invitations))
-        .route("/invites/{token}", delete(users::decline_invitation))
-        .layer(cors.clone());
+        .route("/invites/{token}", delete(users::decline_invitation));
     router = router.nest("/auth", auth_routes);
 
     // Node routes with auth
@@ -424,8 +425,7 @@ pub fn basic_routes() -> Router {
             post(status::refresh_user_sessions),
         )
         .route("/cache_reload", post(status::cache_reload))
-        .layer(middleware::from_fn(auth_middleware))
-        .layer(cors.clone());
+        .layer(middleware::from_fn(auth_middleware));
 
     router = router.nest("/node", node_routes);
 
@@ -437,7 +437,7 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
-    router
+    router.layer(cors_layer())
 }
 
 /// Create config routes
@@ -495,7 +495,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
         .route("/invites", get(users::list_invitations))
         .route("/invites/{invite_id}", delete(users::decline_invitation))
-        .route("/{org_id}/roles", get(users::list_roles))
+        .route("/{org_id}/users/roles", get(users::list_roles))
 
         // Organizations
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
@@ -505,10 +505,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/logo_text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
 
         // System settings v2
-        .route("/{org_id}/system_settings/{key}", get(organization::system_settings::get_setting))
-        .route("/{org_id}/system_settings", get(organization::system_settings::list_settings))
-        .route("/{org_id}/system_settings/org/{key}", post(organization::system_settings::set_org_setting).delete(organization::system_settings::delete_org_setting))
-        .route("/{org_id}/system_settings/user/{key}", post(organization::system_settings::set_user_setting).delete(organization::system_settings::delete_user_setting))
+        .route("/{org_id}/settings/v2/{key}", get(organization::system_settings::get_setting).delete(organization::system_settings::delete_org_setting))
+        .route("/{org_id}/settings/v2", get(organization::system_settings::list_settings).post(organization::system_settings::set_org_setting))
+        .route("/{org_id}/settings/v2/user/{user_id}/{key}", post(organization::system_settings::set_user_setting).delete(organization::system_settings::delete_user_setting))
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
@@ -528,12 +527,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/_ingest/pipeline", get(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
 
         // Streams
+        .route("/{org_id}/streams", get(stream::list))
         .route("/{org_id}/streams/{stream_name}/schema", get(stream::schema))
-        .route("/{org_id}/streams", get(stream::list).post(stream::create))
         .route("/{org_id}/streams/{stream_name}/settings", put(stream::update_settings))
         .route("/{org_id}/streams/{stream_name}/update_fields", put(stream::update_fields))
         .route("/{org_id}/streams/{stream_name}/delete_fields", put(stream::delete_fields))
-        .route("/{org_id}/streams/{stream_name}", delete(stream::delete))
+        .route("/{org_id}/streams/{stream_name}", post(stream::create).delete(stream::delete))
         .route("/{org_id}/streams/{stream_name}/delete_data", post(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/delete_data/status", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/streams/{stream_name}/cache", delete(stream::delete_stream_cache))
@@ -633,7 +632,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/export", get(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
-        .route("/v2/{org_id}/alerts/bulk/enable", put(alerts::enable_alert_bulk))
+        .route("/v2/{org_id}/alerts/bulk/enable", post(alerts::enable_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/trigger", patch(alerts::trigger_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
@@ -660,10 +659,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/enrichment_tables", get(enrichment_table::get_all_enrichment_table_statuses))
 
         // Authz/FGA
-        .route("/{org_id}/roles", post(authz::fga::create_role))
-        .route("/{org_id}/roles/{role_id}", get(authz::fga::get_roles).put(authz::fga::update_role).delete(authz::fga::delete_role))
-        .route("/{org_id}/roles/{role_id}/permissions", get(authz::fga::get_role_permissions))
+        .route("/{org_id}/roles", get(authz::fga::get_roles).post(authz::fga::create_role))
         .route("/{org_id}/roles/bulk", delete(authz::fga::delete_role_bulk))
+        .route("/{org_id}/roles/{role_id}", put(authz::fga::update_role).delete(authz::fga::delete_role))
+        .route("/{org_id}/roles/{role_id}/permissions/{resource}", get(authz::fga::get_role_permissions))
         .route("/{org_id}/groups", get(authz::fga::get_groups).post(authz::fga::create_group))
         .route("/{org_id}/groups/{group_name}", get(authz::fga::get_group_details).put(authz::fga::update_group).delete(authz::fga::delete_group))
         .route("/{org_id}/groups/bulk", delete(authz::fga::delete_group_bulk))
@@ -680,7 +679,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/pipelines/{pipeline_id}", delete(pipeline::delete_pipeline))
         .route("/{org_id}/pipelines/bulk", delete(pipeline::delete_pipeline_bulk))
         .route("/{org_id}/pipelines/{pipeline_id}/enable", put(pipeline::enable_pipeline))
-        .route("/{org_id}/pipelines/bulk/enable", put(pipeline::enable_pipeline_bulk))
+        .route("/{org_id}/pipelines/bulk/enable", post(pipeline::enable_pipeline_bulk))
         .route("/{org_id}/pipelines/streams", get(pipeline::list_streams_with_pipeline))
         .route("/{org_id}/pipelines/history", get(pipelines::history::get_pipeline_history))
 
@@ -702,7 +701,6 @@ pub fn service_routes() -> Router {
         // Service accounts
         .route("/{org_id}/service_accounts", get(service_accounts::list).post(service_accounts::save))
         .route("/{org_id}/service_accounts/bulk", delete(service_accounts::delete_bulk))
-        // TODO: service_accounts::get function doesn't exist, removing for now
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
@@ -710,9 +708,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/mcp/{*mcp_path}", get(mcp::handle_mcp_get))
 
         // Deduplication
-        .route("/{org_id}/alerts/deduplication", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
-        .route("/{org_id}/alerts/deduplication/semantic_groups", get(alerts::deduplication::get_semantic_groups).post(alerts::deduplication::save_semantic_groups))
-        .route("/{org_id}/alerts/deduplication/semantic_groups/preview", post(alerts::deduplication::preview_semantic_groups_diff));
+        .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
+        .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
+        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
     #[cfg(feature = "enterprise")]
     {
@@ -780,7 +778,7 @@ pub fn service_routes() -> Router {
             // Service streams
             .route("/{org_id}/service_streams/dimension_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/correlate", post(service_streams::correlate_streams))
-            .route("/{org_id}/service_streams/grouped", get(service_streams::get_services_grouped));
+            .route("/{org_id}/service_streams/_grouped", get(service_streams::get_services_grouped));
     }
 
     #[cfg(feature = "cloud")]
@@ -838,7 +836,11 @@ pub fn service_routes() -> Router {
             );
     }
 
-    // Apply middlewares in order: cors -> server header -> auth -> audit -> blocked orgs
+    // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
+    // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
+    // header before tower_http sees it. This prevents 415 errors while allowing handlers to
+    // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
+    // deflate, and brotli.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -857,37 +859,49 @@ pub fn service_routes() -> Router {
             },
         ))
         .layer(cors_layer())
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ))
 }
 
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
-    let cors = cors_layer();
-
-    // AWS routes
+    // AWS routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let aws_routes = Router::new()
         .route(
             "/{org_id}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
         .layer(middleware::from_fn(aws_auth_middleware))
-        .layer(cors.clone());
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
-    // GCP routes
+    // GCP routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let gcp_routes = Router::new()
         .route("/{org_id}/_sub", post(logs::ingest::handle_gcp_request))
         .layer(middleware::from_fn(gcp_auth_middleware))
-        .layer(cors.clone());
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
-    // RUM routes
+    // RUM routes - with standard decompression (gzip/deflate/brotli) + snappy preprocessing
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
-        .layer(cors);
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ));
 
     Router::new()
+        .layer(cors_layer())
         .nest("/aws", aws_routes)
         .nest("/gcp", gcp_routes)
         .nest("/rum", rum_routes)
@@ -901,7 +915,7 @@ pub fn create_app_router() -> Router {
         // Router node: use proxy routes that dispatch to backend nodes
         // All routes under base_uri will be proxied to backend nodes
 
-        let mut router_routes = Router::new();
+        let mut router_routes = Router::new().layer(cors_layer());
         router_routes = router_routes
             .merge(crate::router::http::create_router_routes())
             .nest("/config", config_routes())
@@ -931,6 +945,7 @@ pub fn create_app_router() -> Router {
     } else {
         // Non-router node: use direct service routes
         Router::new()
+            .layer(cors_layer())
             .merge(basic_routes())
             .nest("/config", config_routes())
             .nest("/api", service_routes())

@@ -48,7 +48,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get value by key"}))
+        ("x-o2-mcp" = json!({"description": "Get value by key", "category": "kv-store"}))
     )
 )]
 pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
@@ -94,7 +94,7 @@ pub async fn get(Path((org_id, key)): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Set key-value pair"}))
+        ("x-o2-mcp" = json!({"description": "Set key-value pair", "category": "kv-store"}))
     )
 )]
 pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Response {
@@ -143,7 +143,7 @@ pub async fn set(Path((org_id, key)): Path<(String, String)>, body: Bytes) -> Re
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete key-value pair"}))
+        ("x-o2-mcp" = json!({"description": "Delete key-value pair", "category": "kv-store"}))
     )
 )]
 pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
@@ -187,7 +187,7 @@ pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all keys"}))
+        ("x-o2-mcp" = json!({"description": "List all keys", "category": "kv-store"}))
     )
 )]
 pub async fn list(

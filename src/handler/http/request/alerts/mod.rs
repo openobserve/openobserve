@@ -131,7 +131,7 @@ impl From<AlertError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(
@@ -183,7 +183,7 @@ pub async fn create_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get alert details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
 pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
@@ -224,7 +224,7 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Respo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export alert as JSON"}))
+        ("x-o2-mcp" = json!({"description": "Export alert as JSON", "category": "alerts"}))
     )
 )]
 pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
@@ -266,7 +266,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Re
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an existing alert"}))
+        ("x-o2-mcp" = json!({"description": "Update an existing alert", "category": "alerts"}))
     )
 )]
 pub async fn update_alert(
@@ -308,7 +308,7 @@ pub async fn update_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete an alert by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
     )
 )]
 pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
@@ -420,7 +420,7 @@ pub async fn delete_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alerts"}))
+        ("x-o2-mcp" = json!({"description": "List all alerts", "category": "alerts"}))
     )
 )]
 pub async fn list_alerts(
@@ -485,7 +485,7 @@ pub async fn list_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable an alert"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable an alert", "category": "alerts"}))
     )
 )]
 pub async fn enable_alert(
@@ -600,7 +600,7 @@ pub async fn enable_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Manually trigger an alert"}))
+        ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
 pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
@@ -635,7 +635,7 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> R
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move alerts to another folder"}))
+        ("x-o2-mcp" = json!({"description": "Move alerts to another folder", "category": "alerts"}))
     )
 )]
 pub async fn move_alerts(
@@ -690,7 +690,7 @@ pub async fn move_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
-        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language"}))
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts"}))
     )
 )]
 pub async fn generate_sql(

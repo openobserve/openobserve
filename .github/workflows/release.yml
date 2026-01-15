@@ -171,7 +171,7 @@ jobs:
   release:
     name: Release artifacts
     needs: [build]
-    runs-on: repo-openobserve-standard-4
+    runs-on: ubicloud-standard-4
     permissions:
       id-token: write
       contents: write
