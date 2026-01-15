@@ -17,18 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-dialog v-model="showDialog" @hide="onDialogHide">
     <q-card class="enterprise-dialog-v3" style="min-width: 850px; max-width: 950px">
+      <!-- Close Button -->
+      <q-btn
+        icon="close"
+        flat
+        round
+        dense
+        v-close-popup
+        class="close-btn-top-right"
+      />
+
       <div class="dialog-split-layout">
         <!-- Left Panel - Hero Section -->
         <div class="hero-panel">
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            v-close-popup
-            class="close-btn"
-            color="white"
-          />
 
           <div class="hero-content">
             <div class="hero-icon">
@@ -73,8 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel - Features List -->
         <div class="features-panel">
           <div class="features-header">
-            <h4>What's Included</h4>
-            <p>8 powerful enterprise features</p>
+            <div v-if="false" class="header-icon-wrapper">
+              <q-icon name="stars" size="24px" class="header-icon" />
+            </div>
+            <h4>Unlock All Enterprise Features</h4>
+            <p class="header-subtitle">Everything you need for production-ready observability</p>
           </div>
 
           <div class="features-list">
@@ -84,10 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="feature-list-item"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="18px" />
+                <q-icon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
-                <div class="feature-name">{{ feature.name }}</div>
+                <div class="feature-name">
+                  {{ feature.name }}
+                  <span v-if="feature.requiresHA" class="ha-badge">HA</span>
+                </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
             </div>
@@ -113,47 +120,133 @@ export default defineComponent({
   setup(props, { emit }) {
     const showDialog = ref(props.modelValue);
 
-    // Enterprise features list based on the comparison table
+    // Enterprise features list - all 21 features
     const enterpriseFeatures = [
       {
         name: "Single Sign On",
-        note: "Seamless authentication with SSO providers (requires HA mode)",
+        note: "Seamless authentication with SSO providers",
         icon: "key",
+        requiresHA: true,
       },
       {
         name: "Role Based Access Control",
-        note: "Granular permissions and user management (requires HA mode)",
+        note: "Granular permissions and user management",
         icon: "admin_panel_settings",
+        requiresHA: true,
       },
       {
-        name: "Federated Search",
+        name: "Federated Search / Supercluster",
         note: "Distribute queries across multiple clusters",
         icon: "hub",
+        requiresHA: true,
       },
       {
         name: "Query Management",
         note: "Advanced query monitoring and optimization",
         icon: "insights",
+        requiresHA: false,
       },
       {
         name: "Workload Management",
         note: "Priority-based resource allocation and QoS",
         icon: "speed",
+        requiresHA: false,
       },
       {
         name: "Audit Trail",
         note: "Complete activity logging for compliance",
         icon: "fact_check",
+        requiresHA: false,
       },
       {
         name: "Action Scripts",
         note: "Automate responses to events and alerts",
         icon: "code",
+        requiresHA: true,
       },
       {
-        name: "Data Redaction",
+        name: "Sensitive Data Redaction",
         note: "Protect PII and sensitive information",
         icon: "shield",
+        requiresHA: false,
+      },
+      {
+        name: "Pipeline Remote Destinations",
+        note: "Send data to remote destinations",
+        icon: "alt_route",
+        requiresHA: false,
+      },
+      {
+        name: "Query Optimizer / Aggregation Cache",
+        note: "TopK aggregation and query optimization",
+        icon: "memory",
+        requiresHA: false,
+      },
+      {
+        name: "Incident Management",
+        note: "Track and manage incidents efficiently",
+        icon: "emergency",
+        requiresHA: true,
+      },
+      {
+        name: "SRE Agent",
+        note: "Automated SRE operations and insights",
+        icon: "smart_toy",
+        requiresHA: true,
+      },
+      {
+        name: "AI Assistant",
+        note: "Intelligent query and analysis assistance",
+        icon: "psychology",
+        requiresHA: true,
+      },
+      {
+        name: "Anomaly Detection",
+        note: "Automatically detect anomalies in data",
+        icon: "query_stats",
+        requiresHA: false,
+      },
+      {
+        name: "Metrics Auto Downsampling",
+        note: "Automatic metrics aggregation over time",
+        icon: "compress",
+        requiresHA: false,
+      },
+      {
+        name: "Log Patterns",
+        note: "Discover patterns in log data",
+        icon: "pattern",
+        requiresHA: false,
+      },
+      {
+        name: "MCP Server",
+        note: "Model Context Protocol server integration",
+        icon: "dns",
+        requiresHA: true,
+      },
+      {
+        name: "Rate Limiting",
+        note: "Control query and ingestion rates",
+        icon: "speed",
+        requiresHA: false,
+      },
+      {
+        name: "Broadcast Join",
+        note: "Optimized distributed join operations",
+        icon: "join",
+        requiresHA: true,
+      },
+      {
+        name: "Logs, Metrics & Traces Correlation",
+        note: "Automated detection and correlation",
+        icon: "auto_graph",
+        requiresHA: false,
+      },
+      {
+        name: "Service Maps",
+        note: "Visualize service dependencies",
+        icon: "account_tree",
+        requiresHA: false,
       },
     ];
 
@@ -193,11 +286,25 @@ export default defineComponent({
 <style scoped lang="scss">
 .enterprise-dialog-v3 {
   overflow: hidden;
+  position: relative;
+}
+
+.close-btn-top-right {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  color: rgba(0, 0, 0, 0.6);
+
+  &:hover {
+    color: rgba(0, 0, 0, 0.87);
+  }
 }
 
 .dialog-split-layout {
   display: flex;
-  min-height: 600px;
+  height: 600px;
+  max-height: 80vh;
 }
 
 // Left Panel - Hero Section
@@ -209,19 +316,14 @@ export default defineComponent({
   flex-direction: column;
   position: relative;
   color: white;
-
-  .close-btn {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    z-index: 10;
-  }
+  overflow: hidden;
 
   .hero-content {
     flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: flex-start;
     max-width: 400px;
   }
 
@@ -337,38 +439,65 @@ export default defineComponent({
 // Right Panel - Features List
 .features-panel {
   flex: 1;
-  padding: 40px;
   background: white;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   .features-header {
-    margin-bottom: 24px;
+    padding: 32px 32px 24px 32px;
+    background: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    text-align: center;
 
-    h4 {
-      font-size: 20px;
-      font-weight: 700;
-      margin: 0 0 4px 0;
-      color: rgba(0, 0, 0, 0.87);
+    .header-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
+      border-radius: 12px;
+      margin-bottom: 16px;
+
+      .header-icon {
+        color: white;
+      }
     }
 
-    p {
+    h4 {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 8px 0;
+      color: rgba(0, 0, 0, 0.9);
+      letter-spacing: -0.3px;
+    }
+
+    .header-subtitle {
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.6);
       margin: 0;
-      font-size: 13px;
-      color: rgba(0, 0, 0, 0.5);
+      font-weight: 500;
     }
   }
 
   .features-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 32px 30px 32px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 7px;
   }
 
   .feature-list-item {
     display: flex;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 8px;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
     transition: all 0.2s ease;
 
     &:hover {
@@ -377,9 +506,9 @@ export default defineComponent({
 
     .feature-icon-badge {
       flex-shrink: 0;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
       background: rgba(var(--q-primary-rgb), 0.1);
       display: flex;
       align-items: center;
@@ -393,33 +522,60 @@ export default defineComponent({
     }
 
     .feature-name {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: rgba(0, 0, 0, 0.87);
       margin-bottom: 2px;
       line-height: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ha-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 6px;
+      background: rgba(var(--q-primary-rgb), 0.15);
+      color: var(--q-primary);
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      line-height: 1;
     }
 
     .feature-desc {
-      font-size: 12px;
+      font-size: 11px;
       color: rgba(0, 0, 0, 0.55);
-      line-height: 1.4;
+      line-height: 1.3;
     }
   }
 }
 
 // Dark mode
 body.body--dark {
+  .close-btn-top-right {
+    color: rgba(255, 255, 255, 0.7);
+
+    &:hover {
+      color: rgba(255, 255, 255, 0.95);
+    }
+  }
+
   .features-panel {
     background: #1e1e1e;
 
     .features-header {
+      background: #1e1e1e;
+      border-bottom-color: rgba(255, 255, 255, 0.1);
+
       h4 {
         color: rgba(255, 255, 255, 0.95);
       }
 
-      p {
-        color: rgba(255, 255, 255, 0.5);
+      .header-subtitle {
+        color: rgba(255, 255, 255, 0.6);
       }
     }
 
@@ -434,6 +590,11 @@ body.body--dark {
 
       .feature-name {
         color: rgba(255, 255, 255, 0.95);
+      }
+
+      .ha-badge {
+        background: rgba(var(--q-primary-rgb), 0.2);
+        color: var(--q-primary);
       }
 
       .feature-desc {
