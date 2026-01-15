@@ -203,11 +203,20 @@ pub async fn test_destination(
     tag = "Alerts",
     operation_id = "CreateDestination",
     summary = "Create alert or pipeline destination",
-    description = "Creates a new destination configuration for an organization. Destinations define where notifications \
-                   are sent (for alerts) or where data is routed (for pipelines). For alert destinations, this includes \
-                   webhooks, email addresses, Slack channels, PagerDuty integrations, and other notification services. \
+    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
+                   notifications are sent when alert conditions are met, including webhooks, email addresses, and SNS topics.\n\n\
+                   IMPORTANT: The `template` field is REQUIRED to create an alert destination. Use 'Default' for the built-in \
+                   template. Without a template, the destination becomes a pipeline destination and cannot be used with alerts.\n\n\
                    For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
-                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'. \
+                   Example HTTP destination:\n\
+                   ```json\n\
+                   {\"name\": \"my_webhook\", \"url\": \"https://example.com/webhook\", \"method\": \"post\", \"type\": \"http\", \"template\": \"Default\"}\n\
+                   ```\n\n\
+                   Example Email destination:\n\
+                   ```json\n\
+                   {\"name\": \"my_email\", \"type\": \"email\", \"emails\": [\"alerts@example.com\"], \"template\": \"Default\"}\n\
+                   ```",
     security(
         ("Authorization"= [])
     ),
@@ -215,7 +224,7 @@ pub async fn test_destination(
         ("org_id" = String, Path, description = "Organization name"),
         ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
-    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
+    request_body(content = inline(Destination), description = "Alert destination data. The 'template' field is required (use 'Default' for the built-in template).", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
