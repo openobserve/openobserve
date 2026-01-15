@@ -21,21 +21,26 @@ class MetricsIngestion {
             endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
         }
 
+        // Require environment variables - no fallback credentials
+        if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
+            throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+        }
+
         this.config = {
             endpoint: endpoint,
-            username: process.env.ZO_ROOT_USER_EMAIL || 'root@example.com',
-            password: process.env.ZO_ROOT_USER_PASSWORD || 'Complexpass#123',
+            username: process.env.ZO_ROOT_USER_EMAIL,
+            password: process.env.ZO_ROOT_USER_PASSWORD,
             orgId: orgName,
             streamName: 'default'
         };
 
-        // External configuration (if needed)
+        // External configuration (if needed) - requires env vars
         this.externalConfig = {
-            endpoint: 'https://api.openobserve.ai/api/36EX3BNFQrXU42jN6TOYh03Mbnf/v1/metrics',
-            username: 'pryabrata@openobserve.ai',
+            endpoint: process.env.METRICS_EXTERNAL_ENDPOINT || '',
+            username: process.env.METRICS_EXTERNAL_USERNAME || '',
             password: process.env.METRICS_EXTERNAL_PASSWORD || '',
-            orgId: '36EX3BNFQrXU42jN6TOYh03Mbnf',
-            streamName: 'test_uds_metrics_test'
+            orgId: process.env.METRICS_EXTERNAL_ORG_ID || '',
+            streamName: process.env.METRICS_EXTERNAL_STREAM || 'default'
         };
     }
 
@@ -536,6 +541,7 @@ class MetricsIngestion {
 
     /**
      * Continuous metrics ingestion
+     * Uses while loop with await to prevent overlapping executions
      */
     async ingestContinuously(durationMs = 60000, intervalMs = 5000) {
         testLogger.info('Starting continuous OTLP metrics ingestion', {
@@ -547,34 +553,34 @@ class MetricsIngestion {
         let batchCount = 0;
         let successCount = 0;
 
-        return new Promise((resolve) => {
-            const intervalId = setInterval(async () => {
-                if (Date.now() - startTime >= durationMs) {
-                    clearInterval(intervalId);
-                    testLogger.info('Continuous metrics ingestion completed', {
-                        batches: batchCount,
-                        successful: successCount
-                    });
-                    resolve({
-                        success: successCount > 0,
-                        totalBatches: batchCount,
-                        successfulBatches: successCount
-                    });
-                    return;
-                }
+        while (Date.now() - startTime < durationMs) {
+            batchCount++;
+            const metricsData = this.generateOTLPMetrics();
+            const result = await this.sendMetrics(metricsData);
 
-                batchCount++;
-                const metricsData = this.generateOTLPMetrics();
-                const result = await this.sendMetrics(metricsData);
+            if (result.success) {
+                successCount++;
+                testLogger.debug(`Continuous batch ${batchCount} sent successfully`);
+            } else {
+                testLogger.error(`Continuous batch ${batchCount} failed`);
+            }
 
-                if (result.success) {
-                    successCount++;
-                    testLogger.debug(`Continuous batch ${batchCount} sent successfully`);
-                } else {
-                    testLogger.error(`Continuous batch ${batchCount} failed`);
-                }
-            }, intervalMs);
+            // Wait for interval before next iteration (only if we're not done)
+            if (Date.now() - startTime < durationMs) {
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+            }
+        }
+
+        testLogger.info('Continuous metrics ingestion completed', {
+            batches: batchCount,
+            successful: successCount
         });
+
+        return {
+            success: successCount > 0,
+            totalBatches: batchCount,
+            successfulBatches: successCount
+        };
     }
 
     /**
