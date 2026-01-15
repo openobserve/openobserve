@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="row items-center no-wrap">
           <q-icon name="workspace_premium" size="16px" class="q-mr-xs" />
-          <span class="text-weight-medium">Upgrade to Enterprise for Free</span>
+          <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
         </div>
       </q-btn>
 
@@ -705,6 +705,20 @@ export default defineComponent({
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
 
+    // Computed property for enterprise button text based on deployment type
+    const enterpriseButtonText = computed(() => {
+      const isEnterprise = props.config.isEnterprise === 'true';
+      const isCloud = props.config.isCloud === 'true';
+
+      if (isCloud) {
+        return 'OpenObserve Features';
+      } else if (isEnterprise) {
+        return 'Edition: Enterprise (Free)';
+      } else {
+        return 'Get OpenObserve Enterprise for Free';
+      }
+    });
+
     // Computed property for ingestion quota percentage
     const ingestionQuotaPercentage = computed(() => {
       return Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) / 100 || 0;
@@ -780,6 +794,7 @@ export default defineComponent({
       t,
       outlinedSettings,
       getImageURL,
+      enterpriseButtonText,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
