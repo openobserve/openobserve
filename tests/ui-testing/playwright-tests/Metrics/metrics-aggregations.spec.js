@@ -4,70 +4,9 @@ const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 // Helper function to verify data is actually visible on the UI
-async function verifyDataOnUI(page, testName) {
-  // Wait for chart/data rendering
-  await page.waitForTimeout(2000);
-
-  // Check for canvas elements (charts)
-  const canvas = page.locator('canvas');
-  const canvasCount = await canvas.count();
-  const hasCanvas = canvasCount > 0;
-
-  if (hasCanvas) {
-    testLogger.info(`${testName} - Found ${canvasCount} canvas elements`);
-  }
-
-  // Check for SVG elements (alternative chart format)
-  const svg = page.locator('svg').filter({ has: page.locator('path, rect, circle, line') });
-  const svgCount = await svg.count();
-  const hasSvg = svgCount > 0;
-
-  if (hasSvg) {
-    testLogger.info(`${testName} - Found ${svgCount} SVG elements`);
-  }
-
-  // Check for table data
-  const tableRows = page.locator('table tbody tr, .data-table tr, [role="row"]');
-  const rowCount = await tableRows.count();
-  const hasTable = rowCount > 0;
-
-  if (hasTable) {
-    testLogger.info(`${testName} - Found table with ${rowCount} rows`);
-  }
-
-  // Check for result panels or data cards
-  const resultPanels = page.locator('.result-panel, .chart-panel, .metric-card, [class*="result"], [class*="chart"]');
-  const panelCount = await resultPanels.count();
-  const hasPanels = panelCount > 0;
-
-  if (hasPanels) {
-    testLogger.info(`${testName} - Found ${panelCount} result/chart panels`);
-  }
-
-  // Verify at least one visualization method has data
-  const hasVisualization = hasCanvas || hasSvg || hasTable || hasPanels;
-
-  if (hasVisualization) {
-    testLogger.info(`${testName} - Data visualization confirmed`);
-  } else {
-    testLogger.warn(`${testName} - No data visualization found`);
-  }
-
-  // Check for actual data values
-  const dataValues = page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
-  const hasDataValues = await dataValues.count() > 0;
-
-  if (hasDataValues) {
-    const valueText = await dataValues.textContent();
-    // Check if we have actual metric names in the data
-    const metricNames = ['cpu_usage', 'memory_usage', 'request_count', 'request_duration', 'up'];
-    const hasMetricData = metricNames.some(metric => valueText.toLowerCase().includes(metric));
-
-    if (hasMetricData) {
-      testLogger.info(`${testName} - Data value found: ${valueText.substring(0, 100)}`);
-    }
-  }
-
+// Uses page object methods to comply with POM pattern
+async function verifyDataOnUI(pm, testName) {
+  const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
   // Final assertion - ensure we have some form of data visualization
   expect(hasVisualization).toBeTruthy();
 }
@@ -121,7 +60,7 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
       expect(hasError).toBe(false);
 
       // Verify data is visible on UI
-      await verifyDataOnUI(page, `Single label grouping: ${query}`);
+      await verifyDataOnUI(pm, `Single label grouping: ${query}`);
 
       await page.waitForTimeout(1000);
     }
@@ -152,7 +91,7 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
       expect(hasError).toBe(false);
 
       // Verify data is visible on UI
-      await verifyDataOnUI(page, `Multi-label grouping: ${query}`);
+      await verifyDataOnUI(pm, `Multi-label grouping: ${query}`);
     }
   });
 
@@ -181,16 +120,13 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
       await page.waitForTimeout(1500);
 
       // Check for single value result
-      const valueElement = page.locator('.metric-value, .single-stat, .result-value, [class*="value"]').first();
-      const hasValue = await valueElement.isVisible().catch(() => false);
-
-      if (hasValue) {
-        const value = await valueElement.textContent().catch(() => '');
+      const value = await pm.metricsPage.getMetricValue();
+      if (value) {
         testLogger.info(`Aggregation result: ${value}`);
       }
 
       // Verify data is visible on UI
-      await verifyDataOnUI(page, `Aggregation: ${query}`);
+      await verifyDataOnUI(pm, `Aggregation: ${query}`);
     }
   });
 
@@ -216,15 +152,13 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
       await page.waitForTimeout(2000);
 
       // Check if multiple series are shown
-      const legendItems = page.locator('.legend-item, .series-label, [class*="legend"]');
-      const legendCount = await legendItems.count();
-
+      const legendCount = await pm.metricsPage.getLegendItemCount();
       if (legendCount > 0) {
         testLogger.info(`Query returned ${legendCount} series`);
       }
 
       // Verify data is visible on UI
-      await verifyDataOnUI(page, `TopK/BottomK: ${query}`);
+      await verifyDataOnUI(pm, `TopK/BottomK: ${query}`);
     }
   });
 
@@ -358,9 +292,8 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
       await page.waitForTimeout(2000);
 
       // Check for boolean result
-      const resultValue = page.locator('.result-value, .metric-value, [class*="value"]').first();
-      if (await resultValue.isVisible().catch(() => false)) {
-        const value = await resultValue.textContent();
+      const value = await pm.metricsPage.getResultValue();
+      if (value) {
         testLogger.info(`Absent/present result: ${value}`);
       }
     }

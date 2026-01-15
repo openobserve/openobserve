@@ -5,70 +5,9 @@ const metricsTestData = require('../utils/metrics-test-data.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 // Helper function to verify data is actually visible on the UI
-async function verifyDataOnUI(page, testName) {
-  // Wait for chart/data rendering
-  await page.waitForTimeout(2000);
-
-  // Check for canvas elements (charts)
-  const canvas = page.locator('canvas');
-  const canvasCount = await canvas.count();
-  const hasCanvas = canvasCount > 0;
-
-  if (hasCanvas) {
-    testLogger.info(`${testName} - Found ${canvasCount} canvas elements`);
-  }
-
-  // Check for SVG elements (alternative chart format)
-  const svg = page.locator('svg').filter({ has: page.locator('path, rect, circle, line') });
-  const svgCount = await svg.count();
-  const hasSvg = svgCount > 0;
-
-  if (hasSvg) {
-    testLogger.info(`${testName} - Found ${svgCount} SVG elements`);
-  }
-
-  // Check for table data
-  const tableRows = page.locator('table tbody tr, .data-table tr, [role="row"]');
-  const rowCount = await tableRows.count();
-  const hasTable = rowCount > 0;
-
-  if (hasTable) {
-    testLogger.info(`${testName} - Found table with ${rowCount} rows`);
-  }
-
-  // Check for result panels or data cards
-  const resultPanels = page.locator('.result-panel, .chart-panel, .metric-card, [class*="result"], [class*="chart"]');
-  const panelCount = await resultPanels.count();
-  const hasPanels = panelCount > 0;
-
-  if (hasPanels) {
-    testLogger.info(`${testName} - Found ${panelCount} result/chart panels`);
-  }
-
-  // Verify at least one visualization method has data
-  const hasVisualization = hasCanvas || hasSvg || hasTable || hasPanels;
-
-  if (hasVisualization) {
-    testLogger.info(`${testName} - Data visualization confirmed`);
-  } else {
-    testLogger.warn(`${testName} - No data visualization found`);
-  }
-
-  // Check for actual data values
-  const dataValues = page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
-  const hasDataValues = await dataValues.count() > 0;
-
-  if (hasDataValues) {
-    const valueText = await dataValues.textContent();
-    // Check if we have actual metric names in the data
-    const metricNames = ['cpu_usage', 'memory_usage', 'request_count', 'request_duration', 'up'];
-    const hasMetricData = metricNames.some(metric => valueText.toLowerCase().includes(metric));
-
-    if (hasMetricData) {
-      testLogger.info(`${testName} - Data value found: ${valueText.substring(0, 100)}`);
-    }
-  }
-
+// Uses page object methods to comply with POM pattern
+async function verifyDataOnUI(pm, testName) {
+  const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
   // Final assertion - ensure we have some form of data visualization
   expect(hasVisualization).toBeTruthy();
 }
@@ -105,16 +44,15 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     testLogger.info('Testing metric stream selection');
 
     // Try to select a stream if the selector is available
-    const streamSelector = page.locator(pm.metricsPage.selectStream);
+    const streamSelector = await pm.metricsPage.getStreamSelector();
 
     if (await streamSelector.isVisible().catch(() => false)) {
       // Click to open stream dropdown
-      await streamSelector.click();
-      await page.waitForTimeout(500);
+      await pm.metricsPage.clickStreamSelector();
 
       // Look for stream options
-      const streamOption = page.locator('.q-item, [role="option"]').first();
-      if (await streamOption.isVisible().catch(() => false)) {
+      if (await pm.metricsPage.isStreamOptionVisible()) {
+        const streamOption = await pm.metricsPage.getStreamOption();
         const streamName = await streamOption.textContent();
         testLogger.info(`Selecting stream: ${streamName}`);
         await streamOption.click();
@@ -126,7 +64,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         await pm.metricsPage.waitForMetricsResults();
 
         // Verify data is visible
-        await verifyDataOnUI(page, 'Stream selection query');
+        await verifyDataOnUI(pm, 'Stream selection query');
 
         testLogger.info('Stream selection and query completed');
       } else {
@@ -137,7 +75,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await pm.metricsPage.executeQuery('up');
 
       // Verify data is visible
-      await verifyDataOnUI(page, 'Default stream query');
+      await verifyDataOnUI(pm, 'Default stream query');
     }
   });
 
@@ -152,25 +90,14 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     for (const range of timeRanges) {
       testLogger.info(`Testing time range: ${range}`);
 
-      // Open date picker
-      await pm.metricsPage.openDatePicker();
-      await page.waitForTimeout(500);
+      // Use page object method to select date range
+      const selected = await pm.metricsPage.selectDateRange(range);
 
-      // Look for time range options
-      const rangeOption = page.locator(`.q-item:has-text("${range}"), button:has-text("${range}")`).first();
-
-      if (await rangeOption.isVisible().catch(() => false)) {
-        await rangeOption.click();
+      if (selected) {
         testLogger.info(`Selected time range: ${range}`);
       } else {
-        // Try relative time options
-        const relativeOption = page.locator('button').filter({ hasText: range }).first();
-        if (await relativeOption.isVisible().catch(() => false)) {
-          await relativeOption.click();
-        } else {
-          await page.keyboard.press('Escape');
-          testLogger.info(`Time range option "${range}" not found`);
-        }
+        await page.keyboard.press('Escape');
+        testLogger.info(`Time range option "${range}" not found`);
       }
 
       // Run a query with the selected time range
@@ -235,13 +162,12 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await pm.metricsPage.executeQuery(queryData.query);
 
       // Verify query executed without critical errors
-      const errorNotification = page.locator('.q-notification__message:has-text("Error")');
-      const hasError = await errorNotification.isVisible().catch(() => false);
+      const hasError = await pm.metricsPage.isErrorNotificationVisible();
 
       if (!hasError) {
         testLogger.info(`Function "${queryData.name}" executed successfully`);
       } else {
-        const errorText = await errorNotification.textContent().catch(() => 'Unknown error');
+        const errorText = await pm.metricsPage.getErrorNotificationText() || 'Unknown error';
         testLogger.info(`Function "${queryData.name}" returned: ${errorText}`);
       }
 
@@ -264,8 +190,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await pm.metricsPage.executeQuery(query);
 
       // Check if results are displayed (chart or table)
-      const resultsArea = page.locator('.chart-container, .results-table, [class*="results"], canvas').first();
-      const hasResults = await resultsArea.isVisible().catch(() => false);
+      const hasResults = await pm.metricsPage.isResultsAreaVisible();
 
       if (hasResults) {
         testLogger.info(`P${parseFloat(quantile) * 100} quantile calculated`);
@@ -327,7 +252,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await page.waitForTimeout(2000);
 
       // Check if any visualization is shown
-      const hasVisualization = await page.locator('canvas, .chart-container, svg').first().isVisible().catch(() => false);
+      const hasVisualization = await pm.metricsPage.isChartOrVisualizationVisible();
 
       if (hasVisualization) {
         testLogger.info('Comparison query rendered visualization');
@@ -379,7 +304,7 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await page.waitForTimeout(2000);
 
       // Check for any results
-      const resultsVisible = await page.locator('[class*="result"], [class*="value"], .query-result').first().isVisible().catch(() => false);
+      const resultsVisible = await pm.metricsPage.areResultsVisible();
 
       if (resultsVisible) {
         testLogger.info(`Alert condition "${name}" evaluated`);

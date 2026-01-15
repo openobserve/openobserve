@@ -1021,10 +1021,11 @@ class APICleanup {
             }
 
             const result = await response.json();
-            return result;
+            // Ensure success response has code: 200 for consistency
+            return { code: 200, ...result };
         } catch (error) {
             testLogger.error('Failed to delete metrics stream', { streamName, error: error.message });
-            return { code: 500, error: error.message };
+            return { code: 500, message: error.message };
         }
     }
 

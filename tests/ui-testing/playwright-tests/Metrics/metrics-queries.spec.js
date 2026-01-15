@@ -3,89 +3,12 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
+
 // Helper function to verify data is displayed on UI
-async function verifyDataOnUI(page, testName) {
-  // Wait a bit for chart to render
-  await page.waitForTimeout(2000);
-
-  // Check for canvas (chart visualization) - look for any canvas element
-  const canvas = page.locator('canvas');
-  const canvasCount = await canvas.count();
-  const hasCanvas = canvasCount > 0;
-
-  if (hasCanvas) {
-    testLogger.info(`${testName} - Found ${canvasCount} canvas elements`);
-  }
-
-  // Check for SVG charts - broaden the search
-  const svg = page.locator('svg');
-  const svgCount = await svg.count();
-  const hasSvg = svgCount > 0;
-
-  if (hasSvg) {
-    testLogger.info(`${testName} - Found ${svgCount} SVG elements`);
-  }
-
-  // Check for data table - look for any table with rows
-  const tableRows = page.locator('table tbody tr, table tr');
-  const rowCount = await tableRows.count();
-  const hasTable = rowCount > 0;
-
-  if (hasTable) {
-    testLogger.info(`${testName} - Found table with ${rowCount} rows`);
-  }
-
-  // Check for result container/panel
-  const resultPanel = page.locator('.result-panel, .chart-panel, [class*="result"], [class*="chart"], .q-panel');
-  const panelCount = await resultPanel.count();
-  const hasResultPanel = panelCount > 0;
-
-  if (hasResultPanel) {
-    testLogger.info(`${testName} - Found ${panelCount} result/chart panels`);
-  }
-
-  // At least one visualization should be present
-  const hasVisualization = hasCanvas || hasSvg || hasTable || hasResultPanel;
-
-  if (!hasVisualization) {
-    // Log all visible elements to help debug
-    const allElements = page.locator('*:visible');
-    const elementCount = await allElements.count();
-    testLogger.info(`${testName} - Total visible elements on page: ${elementCount}`);
-
-    // Log any div with data or chart in class name
-    const dataElements = page.locator('div[class*="data"], div[class*="chart"], div[class*="metric"], div[class*="result"]');
-    const dataElementCount = await dataElements.count();
-    testLogger.info(`${testName} - Found ${dataElementCount} potential data elements`);
-
-    // Check if "No Data" message is present
-    const noDataMessage = page.locator('text=/No [Dd]ata|No results?|No metrics/i');
-    const hasNoData = await noDataMessage.count() > 0;
-
-    if (hasNoData) {
-      const noDataText = await noDataMessage.first().textContent();
-      testLogger.warn(`${testName} - "No Data" message found: ${noDataText}`);
-
-      // This indicates the query executed but returned no data
-      // We should still consider this a successful test execution
-      testLogger.info(`${testName} - Query executed successfully but returned no data (might need more ingested data)`);
-      return { hasCanvas: false, hasSvg: false, hasTable: false, hasNoData: true };
-    }
-  }
-
-  expect(hasVisualization, `${testName}: No data visualization found (Canvas: ${hasCanvas}, SVG: ${hasSvg}, Table: ${hasTable}, Panels: ${hasResultPanel})`).toBeTruthy();
-  testLogger.info(`${testName} - Data visualization confirmed`);
-
-  // Check for data values in any format
-  const dataValues = page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
-  const hasDataValues = await dataValues.count() > 0;
-
-  if (hasDataValues) {
-    const valueText = await dataValues.textContent();
-    testLogger.info(`${testName} - Data value found: ${valueText}`);
-  }
-
-  return { hasCanvas, hasSvg, hasTable, hasResultPanel, hasDataValues };
+// Uses page object methods to comply with POM pattern
+async function verifyDataOnUI(pm, testName) {
+  const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
+  return { hasVisualization, hasNoData: !hasVisualization };
 }
 
 test.describe("Metrics PromQL and SQL Query testcases", () => {
@@ -133,7 +56,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await expect(errorMessage).not.toBeVisible();
 
       // Verify actual data is displayed on UI
-      await verifyDataOnUI(page, 'PromQL rate query');
+      await verifyDataOnUI(pm, 'PromQL rate query');
 
       testLogger.info('PromQL rate query executed successfully with data visualization');
     });
@@ -155,7 +78,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await expect(errorMessage).not.toBeVisible();
 
       // Verify actual data is displayed on UI
-      await verifyDataOnUI(page, 'PromQL aggregation query');
+      await verifyDataOnUI(pm, 'PromQL aggregation query');
 
       testLogger.info('PromQL aggregation query executed successfully');
     });
@@ -196,7 +119,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await expect(errorMessage).not.toBeVisible();
 
       // Verify actual data is displayed on UI
-      await verifyDataOnUI(page, 'PromQL with label filters');
+      await verifyDataOnUI(pm, 'PromQL with label filters');
 
       testLogger.info('PromQL with label filters executed successfully');
     });
@@ -218,7 +141,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await expect(errorMessage).not.toBeVisible();
 
       // Verify actual data is displayed on UI
-      await verifyDataOnUI(page, 'PromQL comparison operator');
+      await verifyDataOnUI(pm, 'PromQL comparison operator');
 
       testLogger.info('PromQL comparison operator query executed successfully');
     });

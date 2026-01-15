@@ -3,75 +3,13 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
-// Helper function to verify data is actually visible on the UI
-async function verifyDataOnUI(page, testName) {
-  // Wait for chart/data rendering
-  await page.waitForTimeout(2000);
 
-  // Check for canvas elements (charts)
-  const canvas = page.locator('canvas');
-  const canvasCount = await canvas.count();
-  const hasCanvas = canvasCount > 0;
-
-  if (hasCanvas) {
-    testLogger.info(`${testName} - Found ${canvasCount} canvas elements`);
-  }
-
-  // Check for SVG elements (alternative chart format)
-  const svg = page.locator('svg').filter({ has: page.locator('path, rect, circle, line') });
-  const svgCount = await svg.count();
-  const hasSvg = svgCount > 0;
-
-  if (hasSvg) {
-    testLogger.info(`${testName} - Found ${svgCount} SVG elements`);
-  }
-
-  // Check for table data
-  const tableRows = page.locator('table tbody tr, .data-table tr, [role="row"]');
-  const rowCount = await tableRows.count();
-  const hasTable = rowCount > 0;
-
-  if (hasTable) {
-    testLogger.info(`${testName} - Found table with ${rowCount} rows`);
-  }
-
-  // Check for result panels or data cards
-  const resultPanels = page.locator('.result-panel, .chart-panel, .metric-card, [class*="result"], [class*="chart"]');
-  const panelCount = await resultPanels.count();
-  const hasPanels = panelCount > 0;
-
-  if (hasPanels) {
-    testLogger.info(`${testName} - Found ${panelCount} result/chart panels`);
-  }
-
-  // Verify at least one visualization method has data
-  const hasVisualization = hasCanvas || hasSvg || hasTable || hasPanels;
-
-  if (hasVisualization) {
-    testLogger.info(`${testName} - Data visualization confirmed`);
-  } else {
-    testLogger.warn(`${testName} - No data visualization found`);
-  }
-
-  // Check for actual data values
-  const dataValues = page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
-  const hasDataValues = await dataValues.count() > 0;
-
-  if (hasDataValues) {
-    const valueText = await dataValues.textContent();
-    // Check if we have actual metric names in the data
-    const metricNames = ['cpu_usage', 'memory_usage', 'request_count', 'request_duration', 'up'];
-    const hasMetricData = metricNames.some(metric => valueText.toLowerCase().includes(metric));
-
-    if (hasMetricData) {
-      testLogger.info(`${testName} - Data value found: ${valueText.substring(0, 100)}`);
-    }
-  }
-
-  // Final assertion - ensure we have some form of data visualization
-  expect(hasVisualization).toBeTruthy();
+// Helper function to verify data is displayed on UI
+// Uses page object methods to comply with POM pattern
+async function verifyDataOnUI(pm, testName) {
+  const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
+  return { hasVisualization, hasNoData: !hasVisualization };
 }
-
 test.describe("Metrics Visualization and Chart Tests", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -130,7 +68,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     }
 
     // Verify actual data is displayed
-    await verifyDataOnUI(page, 'Line chart visualization');
+    await verifyDataOnUI(pm, 'Line chart visualization');
 
     testLogger.info('Line chart visualization verified');
   });
@@ -157,7 +95,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     }
 
     // Verify actual data is displayed
-    await verifyDataOnUI(page, 'Multi-series line chart');
+    await verifyDataOnUI(pm, 'Multi-series line chart');
 
     // Check for tooltips on hover
     const chartArea = page.locator('canvas, svg, .chart-container').first();
