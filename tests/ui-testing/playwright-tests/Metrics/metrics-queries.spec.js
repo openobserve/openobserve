@@ -36,372 +36,226 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // PromQL Query Tests
-  test.describe("PromQL Queries", () => {
+  // CONSOLIDATED TEST 1: Execute various PromQL query types (7 tests → 1 test)
+  test("Execute various PromQL query types and functions", {
+    tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing multiple PromQL query types in consolidated test');
 
-    test("Execute basic PromQL rate query", {
-      tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL rate query');
-
-      // Enter rate query
-      await pm.metricsPage.enterMetricsQuery('rate(request_count[5m])');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      // Verify actual data is displayed on UI
-      await verifyDataOnUI(pm, 'PromQL rate query');
-
-      testLogger.info('PromQL rate query executed successfully with data visualization');
-    });
-
-    test("Execute PromQL aggregation query with sum", {
-      tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL aggregation with sum');
-
-      // Enter aggregation query
-      await pm.metricsPage.enterMetricsQuery('sum(rate(request_count[5m])) by (service)');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      // Verify actual data is displayed on UI
-      await verifyDataOnUI(pm, 'PromQL aggregation query');
-
-      testLogger.info('PromQL aggregation query executed successfully');
-    });
-
-    test("Execute PromQL histogram quantile query", {
-      tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL histogram quantile');
-
-      // Enter histogram quantile query
-      await pm.metricsPage.enterMetricsQuery('histogram_quantile(0.95, rate(request_duration_bucket[5m]))');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      testLogger.info('PromQL histogram quantile query executed successfully');
-    });
-
-    test("Execute PromQL with label filters", {
-      tag: ['@metrics', '@promql', '@functional', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL with label filters');
-
-      // Enter query with label filters
-      await pm.metricsPage.enterMetricsQuery('request_count{service="api-gateway", region=~"us-.*"}');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      // Verify actual data is displayed on UI
-      await verifyDataOnUI(pm, 'PromQL with label filters');
-
-      testLogger.info('PromQL with label filters executed successfully');
-    });
-
-    test("Execute PromQL comparison operators", {
-      tag: ['@metrics', '@promql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL comparison operators');
-
-      // Enter query with comparison
-      await pm.metricsPage.enterMetricsQuery('up == 1');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      // Verify actual data is displayed on UI
-      await verifyDataOnUI(pm, 'PromQL comparison operator');
-
-      testLogger.info('PromQL comparison operator query executed successfully');
-    });
-
-    test("Execute PromQL with math expressions", {
-      tag: ['@metrics', '@promql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL math expressions');
-
-      // Enter query with math expression
-      await pm.metricsPage.enterMetricsQuery('(memory_usage / cpu_usage) * 100');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      testLogger.info('PromQL math expression executed successfully');
-    });
-
-    test("Invalid PromQL syntax shows error", {
-      tag: ['@metrics', '@promql', '@edge', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing invalid PromQL syntax error handling');
-
-      // Enter invalid PromQL
-      await pm.metricsPage.enterMetricsQuery('sum(rate(');
-
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-
-      // Wait for error response
-      await page.waitForTimeout(2000);
-
-      // Check for error indication (could be notification or inline error)
-      const hasError = await page.locator('.q-notification--negative, .error-message, [class*="error"]').first().isVisible().catch(() => false);
-
-      if (hasError) {
-        testLogger.info('Error message displayed for invalid PromQL syntax');
-      } else {
-        testLogger.info('System handled invalid syntax - may show empty results');
+    const queries = [
+      {
+        name: 'Basic rate query',
+        query: 'rate(request_count[5m])',
+        expectData: true
+      },
+      {
+        name: 'Aggregation with sum',
+        query: 'sum(rate(request_count[5m])) by (service)',
+        expectData: true
+      },
+      {
+        name: 'Histogram quantile',
+        query: 'histogram_quantile(0.95, rate(request_duration_bucket[5m]))',
+        expectData: false
+      },
+      {
+        name: 'Label filters',
+        query: 'request_count{service="api-gateway", region=~"us-.*"}',
+        expectData: true
+      },
+      {
+        name: 'Comparison operators',
+        query: 'up == 1',
+        expectData: true
+      },
+      {
+        name: 'Math expressions',
+        query: '(memory_usage / cpu_usage) * 100',
+        expectData: false
       }
-    });
+    ];
+
+    for (const q of queries) {
+      testLogger.info(`Testing ${q.name}: ${q.query}`);
+
+      // Enter query
+      await pm.metricsPage.enterMetricsQuery(q.query);
+
+      // Execute query
+      await pm.metricsPage.clickApplyButton();
+      await pm.metricsPage.waitForMetricsResults();
+
+      // Verify no error
+      await pm.metricsPage.expectNoErrorNotification();
+
+      // Verify data visualization if expected
+      if (q.expectData) {
+        await verifyDataOnUI(pm, `PromQL ${q.name}`);
+      }
+
+      testLogger.info(`${q.name} executed successfully`);
+    }
+
+    testLogger.info('All PromQL query types tested successfully');
   });
 
-  // SQL Query Tests (if SQL mode is available)
-  test.describe("SQL Queries", () => {
+  // CONSOLIDATED TEST 2: Execute SQL queries (4 tests → 1 test)
+  test("Execute SQL queries if SQL mode is available", {
+    tag: ['@metrics', '@sql', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing SQL query functionality');
 
-    test("Switch to SQL mode if available", {
-      tag: ['@metrics', '@sql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing SQL mode switch');
+    // Check if SQL mode is available
+    const sqlToggle = await pm.metricsPage.getSqlToggle();
+    const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
 
-      // Look for SQL mode toggle/button
-      const sqlToggle = page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
-      const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
+    if (!hasSqlMode) {
+      testLogger.info('SQL mode not available in current metrics implementation - skipping SQL tests');
+      return;
+    }
 
-      if (hasSqlMode) {
+    testLogger.info('SQL mode available - testing SQL queries');
+
+    const sqlQueries = [
+      {
+        name: 'SQL mode switch',
+        action: 'switch',
+        query: null
+      },
+      {
+        name: 'Basic SELECT query',
+        query: 'SELECT * FROM metrics WHERE name = "cpu_usage" LIMIT 100'
+      },
+      {
+        name: 'SQL aggregation query',
+        query: 'SELECT AVG(value) as avg_value, MAX(value) as max_value FROM metrics GROUP BY host'
+      },
+      {
+        name: 'SQL with WHERE clause',
+        query: 'SELECT * FROM metrics WHERE value > 0.5 AND timestamp >= now() - interval "1 hour"'
+      }
+    ];
+
+    for (const q of sqlQueries) {
+      testLogger.info(`Testing ${q.name}`);
+
+      if (q.action === 'switch') {
+        // Test SQL mode switch
         await sqlToggle.click();
-        testLogger.info('Switched to SQL mode');
+        await page.waitForTimeout(500);
 
-        // Verify mode switched (look for SQL indicators)
-        const sqlIndicator = page.locator('.sql-mode, text=/SQL Mode/i').first();
+        const sqlIndicator = await pm.metricsPage.getSqlIndicator();
         const isSqlMode = await sqlIndicator.isVisible().catch(() => false);
 
         if (isSqlMode) {
           testLogger.info('SQL mode activated successfully');
         }
       } else {
-        testLogger.info('SQL mode not available in current metrics implementation');
-      }
-    });
-
-    test("Execute basic SQL SELECT query", {
-      tag: ['@metrics', '@sql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing SQL SELECT query');
-
-      // Check if SQL mode is available
-      const sqlToggle = page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
-      const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
-
-      if (hasSqlMode) {
-        await sqlToggle.click();
-        await page.waitForTimeout(500);
-
-        // Enter SQL query
-        await pm.metricsPage.enterMetricsQuery('SELECT * FROM metrics WHERE name = "cpu_usage" LIMIT 100');
-
-        // Execute query
-        await pm.metricsPage.clickApplyButton();
-        await pm.metricsPage.waitForMetricsResults();
-
-        // Verify no error
-        const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-        await expect(errorMessage).not.toBeVisible();
-
-        testLogger.info('SQL SELECT query executed successfully');
-      } else {
-        testLogger.info('SQL mode not available, skipping SQL query test');
-      }
-    });
-
-    test("Execute SQL aggregation query", {
-      tag: ['@metrics', '@sql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing SQL aggregation query');
-
-      // Check if SQL mode is available
-      const sqlToggle = page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
-      const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
-
-      if (hasSqlMode) {
-        await sqlToggle.click();
-        await page.waitForTimeout(500);
-
-        // Enter SQL aggregation query
-        await pm.metricsPage.enterMetricsQuery('SELECT AVG(value) as avg_value, MAX(value) as max_value FROM metrics GROUP BY host');
-
-        // Execute query
-        await pm.metricsPage.clickApplyButton();
-        await pm.metricsPage.waitForMetricsResults();
-
-        // Verify no error
-        const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-        await expect(errorMessage).not.toBeVisible();
-
-        testLogger.info('SQL aggregation query executed successfully');
-      } else {
-        testLogger.info('SQL mode not available, skipping SQL aggregation test');
-      }
-    });
-
-    test("Execute SQL with WHERE clause and time range", {
-      tag: ['@metrics', '@sql', '@functional', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing SQL with WHERE clause');
-
-      // Check if SQL mode is available
-      const sqlToggle = page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
-      const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
-
-      if (hasSqlMode) {
-        await sqlToggle.click();
-        await page.waitForTimeout(500);
-
-        // Enter SQL with WHERE clause
-        await pm.metricsPage.enterMetricsQuery('SELECT * FROM metrics WHERE value > 0.5 AND timestamp >= now() - interval "1 hour"');
-
-        // Execute query
-        await pm.metricsPage.clickApplyButton();
-        await pm.metricsPage.waitForMetricsResults();
-
-        // Verify no error
-        const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-        await expect(errorMessage).not.toBeVisible();
-
-        testLogger.info('SQL WHERE clause query executed successfully');
-      } else {
-        testLogger.info('SQL mode not available, skipping SQL WHERE clause test');
-      }
-    });
-
-    test("Invalid SQL syntax shows error", {
-      tag: ['@metrics', '@sql', '@edge', '@P3', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing invalid SQL syntax error handling');
-
-      // Check if SQL mode is available
-      const sqlToggle = page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
-      const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
-
-      if (hasSqlMode) {
-        await sqlToggle.click();
-        await page.waitForTimeout(500);
-
-        // Enter invalid SQL
-        await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
-
-        // Execute query
-        await pm.metricsPage.clickApplyButton();
-
-        // Wait for error response
-        await page.waitForTimeout(2000);
-
-        // Check for error indication
-        const hasError = await page.locator('.q-notification--negative, .error-message, [class*="error"]').first().isVisible().catch(() => false);
-
-        if (hasError) {
-          testLogger.info('Error message displayed for invalid SQL syntax');
-        } else {
-          testLogger.info('System handled invalid SQL syntax');
+        // Ensure SQL mode is active
+        const currentlyInSqlMode = await pm.metricsPage.getSqlIndicator().then(i => i.isVisible().catch(() => false));
+        if (!currentlyInSqlMode) {
+          await sqlToggle.click();
+          await page.waitForTimeout(500);
         }
-      } else {
-        testLogger.info('SQL mode not available, skipping invalid SQL test');
+
+        // Enter and execute SQL query
+        await pm.metricsPage.enterMetricsQuery(q.query);
+        await pm.metricsPage.clickApplyButton();
+        await pm.metricsPage.waitForMetricsResults();
+
+        // Verify no error
+        await pm.metricsPage.expectNoErrorNotification();
+
+        testLogger.info(`${q.name} executed successfully`);
       }
-    });
+    }
+
+    testLogger.info('All SQL queries tested successfully');
   });
 
-  // Advanced PromQL Tests
-  test.describe("Advanced PromQL Features", () => {
+  // CONSOLIDATED TEST 3: Advanced PromQL features (3 tests → 1 test)
+  test("Execute advanced PromQL features and complex queries", {
+    tag: ['@metrics', '@promql', '@advanced', '@P3', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing advanced PromQL features');
 
-    test("Execute PromQL subquery", {
-      tag: ['@metrics', '@promql', '@advanced', '@P3', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL subquery');
+    const advancedQueries = [
+      {
+        name: 'PromQL subquery',
+        query: 'max_over_time(rate(request_count[5m])[30m:])'
+      },
+      {
+        name: 'PromQL offset modifier',
+        query: 'request_count offset 5m'
+      },
+      {
+        name: 'PromQL vector matching',
+        query: 'method:http_requests:rate5m{method="GET"} / ignoring(method) group_left method:http_requests:rate5m'
+      }
+    ];
 
-      // Enter subquery
-      await pm.metricsPage.enterMetricsQuery('max_over_time(rate(request_count[5m])[30m:])');
+    for (const q of advancedQueries) {
+      testLogger.info(`Testing ${q.name}: ${q.query}`);
 
-      // Execute query
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
-
-      testLogger.info('PromQL subquery executed successfully');
-    });
-
-    test("Execute PromQL with offset modifier", {
-      tag: ['@metrics', '@promql', '@advanced', '@P3', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL offset modifier');
-
-      // Enter query with offset
-      await pm.metricsPage.enterMetricsQuery('request_count offset 5m');
+      // Enter query
+      await pm.metricsPage.enterMetricsQuery(q.query);
 
       // Execute query
       await pm.metricsPage.clickApplyButton();
       await pm.metricsPage.waitForMetricsResults();
 
       // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
+      await pm.metricsPage.expectNoErrorNotification();
 
-      testLogger.info('PromQL offset modifier query executed successfully');
-    });
+      testLogger.info(`${q.name} executed successfully`);
+    }
 
-    test("Execute PromQL vector matching", {
-      tag: ['@metrics', '@promql', '@advanced', '@P3', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing PromQL vector matching');
+    testLogger.info('All advanced PromQL features tested successfully');
+  });
 
-      // Enter vector matching query
-      await pm.metricsPage.enterMetricsQuery('method:http_requests:rate5m{method="GET"} / ignoring(method) group_left method:http_requests:rate5m');
+  // CONSOLIDATED TEST 4: Error handling for invalid queries (2 tests → 1 test)
+  test("Verify error handling for invalid queries and edge cases", {
+    tag: ['@metrics', '@promql', '@sql', '@edge', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing error handling for invalid queries');
 
-      // Execute query
+    // Test 1: Invalid PromQL syntax
+    testLogger.info('Testing invalid PromQL syntax');
+    await pm.metricsPage.enterMetricsQuery('sum(rate(');
+    await pm.metricsPage.clickApplyButton();
+    await page.waitForTimeout(2000);
+
+    let hasError = await pm.metricsPage.hasErrorIndicator();
+    if (hasError) {
+      testLogger.info('Error message displayed for invalid PromQL syntax');
+    } else {
+      testLogger.info('System handled invalid PromQL syntax - may show empty results');
+    }
+
+    // Test 2: Invalid SQL syntax (if SQL mode available)
+    const sqlToggle = await pm.metricsPage.getSqlToggle();
+    const hasSqlMode = await sqlToggle.isVisible().catch(() => false);
+
+    if (hasSqlMode) {
+      testLogger.info('Testing invalid SQL syntax');
+
+      await sqlToggle.click();
+      await page.waitForTimeout(500);
+
+      await pm.metricsPage.enterMetricsQuery('SELECT FROM WHERE');
       await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
+      await page.waitForTimeout(2000);
 
-      // Verify no error
-      const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-      await expect(errorMessage).not.toBeVisible();
+      hasError = await pm.metricsPage.hasErrorIndicator();
+      if (hasError) {
+        testLogger.info('Error message displayed for invalid SQL syntax');
+      } else {
+        testLogger.info('System handled invalid SQL syntax');
+      }
+    } else {
+      testLogger.info('SQL mode not available - skipping invalid SQL test');
+    }
 
-      testLogger.info('PromQL vector matching executed successfully');
-    });
+    testLogger.info('Error handling tests completed');
   });
 });

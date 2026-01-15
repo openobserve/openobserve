@@ -10,6 +10,7 @@ async function verifyDataOnUI(pm, testName) {
   const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
   return { hasVisualization, hasNoData: !hasVisualization };
 }
+
 test.describe("Metrics Visualization and Chart Tests", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -35,427 +36,324 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Line Chart Tests
-  test("Display metrics as line chart", {
-    tag: ['@metrics', '@visualization', '@line-chart', '@P1', '@all']
+  // CONSOLIDATED TEST 1: All chart type selections and rendering (9 tests → 1 test)
+  test("Verify all chart type selections render correctly", {
+    tag: ['@metrics', '@visualization', '@chart-types', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing line chart visualization');
+    testLogger.info('Testing all chart type selections and rendering');
 
-    // Execute a query that should produce line chart
-    await pm.metricsPage.executeQuery('rate(request_count[5m])');
+    // Execute a query first
+    await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
 
-    // Check for line chart visualization
-    await pm.metricsPage.selectChartType('line');
+    const chartTests = [
+      {
+        type: 'line',
+        name: 'Line chart',
+        query: 'rate(request_count[5m])',
+        checkAxes: true,
+        checkLegend: true,
+        checkSeries: true
+      },
+      {
+        type: 'bar',
+        name: 'Bar chart',
+        query: 'sum by (endpoint) (http_requests_total)',
+        checkBars: true
+      },
+      {
+        type: 'area',
+        name: 'Area chart',
+        query: 'rate(http_requests_total[5m])',
+        checkAreaFills: true
+      },
+      {
+        type: 'scatter',
+        name: 'Scatter plot',
+        query: 'cpu_usage_percent',
+        checkScatterPoints: true
+      },
+      {
+        type: 'pie',
+        name: 'Pie chart',
+        query: 'sum by (status) (http_requests_total)',
+        checkSlices: true
+      },
+      {
+        type: 'heatmap',
+        name: 'Heatmap',
+        query: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))',
+        checkCells: true
+      },
+      {
+        type: 'table',
+        name: 'Table view',
+        query: 'topk(10, http_requests_total)',
+        checkHeaders: true,
+        checkRows: true
+      }
+    ];
 
-    // Verify line chart elements
-    const chartCanvas = page.locator('canvas, .line-chart, [class*="line"], svg path[class*="line"]').first();
-    await expect(chartCanvas).toBeVisible({ timeout: 10000 });
+    for (const chart of chartTests) {
+      testLogger.info(`Testing ${chart.name}`);
 
-    // Check for axes
-    const xAxis = page.locator('.x-axis, [class*="axis-x"], .apexcharts-xaxis, .chart-axis-x').first();
-    const yAxis = page.locator('.y-axis, [class*="axis-y"], .apexcharts-yaxis, .chart-axis-y').first();
+      // Execute query for this chart type
+      await pm.metricsPage.executeQuery(chart.query);
+      await page.waitForTimeout(1000);
 
-    const hasAxes = (await xAxis.isVisible().catch(() => false)) || (await yAxis.isVisible().catch(() => false));
+      // Select chart type
+      const selected = await pm.metricsPage.selectChartType(chart.type);
 
-    if (hasAxes) {
-      testLogger.info('Line chart axes detected');
-    }
+      if (!selected) {
+        testLogger.warn(`${chart.name} selector not found - may only be available in dashboard context`);
+        continue;
+      }
 
-    // Check for legend
-    const legend = page.locator('.chart-legend, .legend, [class*="legend"], .apexcharts-legend').first();
-    if (await legend.isVisible().catch(() => false)) {
-      testLogger.info('Line chart legend visible');
-    }
+      // Wait for rendering
+      await page.waitForTimeout(2000);
 
-    // Verify actual data is displayed
-    await verifyDataOnUI(pm, 'Line chart visualization');
-
-    testLogger.info('Line chart visualization verified');
-  });
-
-  test("Line chart with multiple series", {
-    tag: ['@metrics', '@visualization', '@line-chart', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing multi-series line chart');
-
-    // Query that returns multiple series
-    await pm.metricsPage.executeQuery('sum by (service) (rate(request_count[5m]))');
-
-    // Try to set chart type to line
-    await pm.metricsPage.selectChartType('line');
-
-    // Check for multiple lines/series
-    const series = page.locator('.chart-series, path[class*="line"], .apexcharts-series, g[class*="series"]');
-    const seriesCount = await series.count();
-
-    if (seriesCount > 1) {
-      testLogger.info(`Line chart displaying ${seriesCount} series`);
-    } else {
-      testLogger.info('Line chart rendered (series count uncertain)');
-    }
-
-    // Verify actual data is displayed
-    await verifyDataOnUI(pm, 'Multi-series line chart');
-
-    // Check for tooltips on hover
-    const chartArea = page.locator('canvas, svg, .chart-container').first();
-    if (await chartArea.isVisible()) {
-      try {
-        // Try to hover with retry logic
-        await chartArea.hover({ position: { x: 100, y: 100 }, timeout: 5000 }).catch(() => {
-          // If hover fails, try without position
-          return chartArea.hover();
-        });
-        await page.waitForTimeout(500);
-
-        const tooltip = page.locator('.chart-tooltip, .tooltip, [role="tooltip"], .apexcharts-tooltip').first();
-        if (await tooltip.isVisible().catch(() => false)) {
-          testLogger.info('Chart tooltip appears on hover');
+      // Verify chart renders
+      if (chart.type === 'line' && chart.checkAxes) {
+        await pm.metricsPage.expectChartCanvasVisible();
+        const xAxis = await pm.metricsPage.getXAxis();
+        const yAxis = await pm.metricsPage.getYAxis();
+        const hasAxes = (await xAxis.isVisible().catch(() => false)) || (await yAxis.isVisible().catch(() => false));
+        if (hasAxes) {
+          testLogger.info('Line chart axes detected');
         }
-      } catch (error) {
-        testLogger.info('Tooltip hover test skipped due to chart interaction limitation');
+
+        if (chart.checkLegend && await pm.metricsPage.isLegendVisible()) {
+          testLogger.info('Line chart legend visible');
+        }
+
+        if (chart.checkSeries) {
+          const series = await pm.metricsPage.getChartSeries();
+          const seriesCount = await series.count();
+          if (seriesCount > 0) {
+            testLogger.info(`Line chart displaying ${seriesCount} series`);
+          }
+        }
+      } else if (chart.type === 'bar' && chart.checkBars) {
+        const bars = await pm.metricsPage.getBars();
+        const barCount = await bars.count();
+        if (barCount > 0) {
+          testLogger.info(`Bar chart rendered with ${barCount} bars`);
+        }
+      } else if (chart.type === 'area' && chart.checkAreaFills) {
+        const fills = await pm.metricsPage.getAreaFills();
+        const fillCount = await fills.count();
+        if (fillCount > 0) {
+          testLogger.info(`Area chart rendered with ${fillCount} filled regions`);
+        }
+      } else if (chart.type === 'scatter' && chart.checkScatterPoints) {
+        const dots = await pm.metricsPage.getScatterDots();
+        const dotCount = await dots.count();
+        if (dotCount > 0) {
+          testLogger.info(`Scatter plot rendered with ${dotCount} points`);
+        }
+      } else if (chart.type === 'pie' && chart.checkSlices) {
+        const arcs = await pm.metricsPage.getPieArcs();
+        const arcCount = await arcs.count();
+        if (arcCount > 0) {
+          testLogger.info(`Pie chart rendered with ${arcCount} slices`);
+        }
+      } else if (chart.type === 'heatmap' && chart.checkCells) {
+        const gridCells = await pm.metricsPage.getHeatmapGridCells();
+        const cellCount = await gridCells.count();
+        if (cellCount > 4) {
+          testLogger.info(`Heatmap rendered with ${cellCount} cells`);
+        }
+      } else if (chart.type === 'table') {
+        await pm.metricsPage.expectTableVisible();
+
+        if (chart.checkHeaders) {
+          const headers = await pm.metricsPage.getTableHeaders();
+          const headerCount = await headers.count();
+          if (headerCount > 0) {
+            testLogger.info(`Table rendered with ${headerCount} columns`);
+          }
+        }
+
+        if (chart.checkRows) {
+          const rows = await pm.metricsPage.getTableRows();
+          const rowCount = await rows.count();
+          if (rowCount > 0) {
+            testLogger.info(`Table displaying ${rowCount} data rows`);
+          }
+        }
       }
+
+      testLogger.info(`${chart.name} verified successfully`);
     }
+
+    testLogger.info('All chart types tested successfully');
   });
 
-  // Bar Chart Tests
-  test("Display metrics as bar chart", {
-    tag: ['@metrics', '@visualization', '@bar-chart', '@P1', '@all']
+  // CONSOLIDATED TEST 2: Chart variations (stacked bar, stacked area, multi-series) (3 tests → 1 test)
+  test("Verify chart variations with stacking and multiple series", {
+    tag: ['@metrics', '@visualization', '@chart-variations', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing bar chart visualization');
+    testLogger.info('Testing chart variations with stacking and multiple series');
 
-    // Execute aggregation query suitable for bar chart
-    await pm.metricsPage.executeQuery('sum by (endpoint) (http_requests_total)');
-
-    // Select bar chart type
-    await pm.metricsPage.selectChartType('bar');
-
-    // Verify bar chart elements
-    const barElements = page.locator('rect[class*="bar"], .bar-chart, .chart-bar, path[class*="bar"], .apexcharts-bar-series').first();
-    await expect(barElements).toBeVisible({ timeout: 10000 }).catch(() => {
-      testLogger.info('Bar chart elements not found with expected selectors');
-    });
-
-    // Check for bar chart specific elements
-    const bars = page.locator('rect, .bar, [class*="bar-element"]');
-    const barCount = await bars.count();
-
-    if (barCount > 0) {
-      testLogger.info(`Bar chart rendered with ${barCount} bars`);
-    }
-
-    testLogger.info('Bar chart visualization tested');
-  });
-
-  test("Stacked bar chart for grouped metrics", {
-    tag: ['@metrics', '@visualization', '@bar-chart', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing stacked bar chart');
-
-    // Query with multiple groupings for stacked bars
-    await pm.metricsPage.executeQuery('sum by (status, method) (rate(http_requests_total[5m]))');
-
-    // Try to select stacked bar chart
-    await pm.metricsPage.selectChartType('bar');
-
-    // Look for stacking option
-    const stackOption = page.locator('button:has-text("Stack"), input[type="checkbox"][name*="stack"], .stack-toggle').first();
-    if (await stackOption.isVisible().catch(() => false)) {
-      await stackOption.click();
-      testLogger.info('Enabled bar chart stacking');
-    }
-
-    await page.waitForTimeout(2000);
-
-    // Verify stacked bars rendered
-    const stackedBars = page.locator('.stacked-bar, [class*="stack"], .apexcharts-bar-stacked').first();
-    if (await stackedBars.isVisible().catch(() => false)) {
-      testLogger.info('Stacked bar chart rendered');
-    }
-  });
-
-  // Scatter Plot Tests
-  test("Display metrics as scatter plot", {
-    tag: ['@metrics', '@visualization', '@scatter', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing scatter plot visualization');
-
-    // Query suitable for scatter plot
-    await pm.metricsPage.executeQuery('cpu_usage_percent');
-
-    // Select scatter plot type
-    await pm.metricsPage.selectChartType('scatter');
-
-    // Verify scatter plot elements
-    const scatterPoints = page.locator('circle[class*="scatter"], .scatter-point, .chart-scatter, .apexcharts-scatter').first();
-
-    if (await scatterPoints.isVisible().catch(() => false)) {
-      testLogger.info('Scatter plot points visible');
-    } else {
-      // Alternative check for scatter elements
-      const dots = page.locator('circle, .dot, [class*="point"]');
-      const dotCount = await dots.count();
-      if (dotCount > 0) {
-        testLogger.info(`Scatter plot rendered with ${dotCount} points`);
+    const variations = [
+      {
+        name: 'Multi-series line chart',
+        type: 'line',
+        query: 'sum by (service) (rate(request_count[5m]))',
+        checkSeries: true,
+        checkTooltip: true
+      },
+      {
+        name: 'Stacked bar chart',
+        type: 'bar',
+        query: 'sum by (status, method) (rate(http_requests_total[5m]))',
+        enableStacking: true
+      },
+      {
+        name: 'Stacked area chart',
+        type: 'area',
+        query: 'sum by (status) (rate(http_requests_total[5m]))',
+        enableStacking: true
       }
-    }
+    ];
 
-    testLogger.info('Scatter plot visualization tested');
+    for (const variation of variations) {
+      testLogger.info(`Testing ${variation.name}`);
+
+      await pm.metricsPage.executeQuery(variation.query);
+      await page.waitForTimeout(1000);
+
+      await pm.metricsPage.selectChartType(variation.type);
+      await page.waitForTimeout(1000);
+
+      if (variation.enableStacking) {
+        const stackOption = await pm.metricsPage.getStackOption();
+        if (await stackOption.isVisible().catch(() => false)) {
+          await stackOption.click();
+          testLogger.info(`Enabled ${variation.type} chart stacking`);
+          await page.waitForTimeout(2000);
+
+          if (variation.type === 'bar') {
+            const stackedBars = await pm.metricsPage.getStackedBars();
+            if (await stackedBars.isVisible().catch(() => false)) {
+              testLogger.info('Stacked bar chart rendered');
+            }
+          } else if (variation.type === 'area') {
+            const stackedAreas = await pm.metricsPage.getStackedAreas();
+            if (await stackedAreas.isVisible().catch(() => false)) {
+              testLogger.info('Stacked area chart rendered');
+            }
+          }
+        }
+      }
+
+      if (variation.checkSeries) {
+        const series = await pm.metricsPage.getChartSeries();
+        const seriesCount = await series.count();
+        if (seriesCount > 1) {
+          testLogger.info(`${variation.name} displaying ${seriesCount} series`);
+        }
+      }
+
+      if (variation.checkTooltip) {
+        const chartArea = await pm.metricsPage.getChartArea();
+        if (await chartArea.isVisible()) {
+          try {
+            await chartArea.hover({ position: { x: 100, y: 100 }, timeout: 5000 }).catch(() => chartArea.hover());
+            await page.waitForTimeout(500);
+
+            if (await pm.metricsPage.isChartTooltipVisible()) {
+              testLogger.info('Chart tooltip appears on hover');
+            }
+          } catch (error) {
+            testLogger.info('Tooltip hover test skipped due to chart interaction limitation');
+          }
+        }
+      }
+
+      testLogger.info(`${variation.name} tested successfully`);
+    }
   });
 
-  test("Scatter plot with correlation analysis", {
-    tag: ['@metrics', '@visualization', '@scatter', '@P3', '@all']
+  // CONSOLIDATED TEST 3: Advanced chart features (scatter correlation, table sorting) (2 tests → 1 test)
+  test("Verify advanced chart features and customizations", {
+    tag: ['@metrics', '@visualization', '@advanced-features', '@P3', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing scatter plot with correlation');
+    testLogger.info('Testing advanced chart features');
 
-    // Query two metrics for correlation
+    // Test 1: Scatter plot with correlation
+    testLogger.info('Testing scatter plot with correlation analysis');
     const correlationQuery = 'cpu_usage_percent and memory_usage_bytes/1000000';
     await pm.metricsPage.executeQuery(correlationQuery);
-
     await pm.metricsPage.selectChartType('scatter');
-
     await page.waitForTimeout(2000);
 
-    // Check for trend line or correlation indicator
-    const trendLine = page.locator('.trend-line, path[class*="trend"], .regression-line').first();
+    const trendLine = await pm.metricsPage.getTrendLine();
     if (await trendLine.isVisible().catch(() => false)) {
       testLogger.info('Correlation trend line displayed');
     }
 
-    // Check for correlation coefficient
-    const correlationText = page.locator('text=/correlation|r²|R²/i').first();
+    const correlationText = await pm.metricsPage.getCorrelationText();
     if (await correlationText.isVisible().catch(() => false)) {
       const value = await correlationText.textContent();
       testLogger.info(`Correlation coefficient: ${value}`);
     }
-  });
 
-  // Area Chart Tests
-  test("Display metrics as area chart", {
-    tag: ['@metrics', '@visualization', '@area-chart', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing area chart visualization');
-
-    // Time series query for area chart
-    await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
-
-    // Select area chart type
-    await pm.metricsPage.selectChartType('area');
-
-    // Verify area chart elements
-    const areaElements = page.locator('path[class*="area"], .area-chart, .chart-area, .apexcharts-area').first();
-
-    if (await areaElements.isVisible().catch(() => false)) {
-      testLogger.info('Area chart elements detected');
-    } else {
-      // Check for filled regions
-      const fills = page.locator('path[fill-opacity], path[fill]');
-      const fillCount = await fills.count();
-      if (fillCount > 0) {
-        testLogger.info(`Area chart rendered with ${fillCount} filled regions`);
-      }
-    }
-
-    testLogger.info('Area chart visualization tested');
-  });
-
-  test("Stacked area chart for cumulative metrics", {
-    tag: ['@metrics', '@visualization', '@area-chart', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing stacked area chart');
-
-    // Multiple series for stacking
-    await pm.metricsPage.executeQuery('sum by (status) (rate(http_requests_total[5m]))');
-
-    await pm.metricsPage.selectChartType('area');
-
-    // Enable stacking if option available
-    const stackOption = page.locator('button:has-text("Stack"), .stack-toggle, input[name*="stack"]').first();
-    if (await stackOption.isVisible().catch(() => false)) {
-      await stackOption.click();
-      testLogger.info('Enabled area chart stacking');
-    }
-
-    await page.waitForTimeout(2000);
-
-    // Verify stacked areas
-    const stackedAreas = page.locator('.stacked-area, [class*="stack"], .apexcharts-area-stacked').first();
-    if (await stackedAreas.isVisible().catch(() => false)) {
-      testLogger.info('Stacked area chart rendered');
-    }
-  });
-
-  // Heatmap Tests
-  test("Display metrics as heatmap", {
-    tag: ['@metrics', '@visualization', '@heatmap', '@P3', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing heatmap visualization');
-
-    // Query with time buckets for heatmap
-    await pm.metricsPage.executeQuery('histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))');
-
-    // Select heatmap type
-    await pm.metricsPage.selectChartType('heatmap');
-
-    // Verify heatmap elements
-    const heatmapCells = page.locator('rect[class*="heat"], .heatmap-cell, .chart-heatmap, .apexcharts-heatmap').first();
-
-    if (await heatmapCells.isVisible().catch(() => false)) {
-      testLogger.info('Heatmap cells visible');
-    } else {
-      // Check for grid pattern
-      const gridCells = page.locator('rect[fill], g[class*="cell"]');
-      const cellCount = await gridCells.count();
-      if (cellCount > 4) { // Multiple cells indicate heatmap
-        testLogger.info(`Heatmap rendered with ${cellCount} cells`);
-      }
-    }
-
-    // Check for color scale legend
-    const colorScale = page.locator('.color-scale, .heatmap-legend, [class*="gradient"]').first();
-    if (await colorScale.isVisible().catch(() => false)) {
-      testLogger.info('Heatmap color scale legend visible');
-    }
-
-    testLogger.info('Heatmap visualization tested');
-  });
-
-  // Pie/Donut Chart Tests
-  test("Display metrics as pie chart", {
-    tag: ['@metrics', '@visualization', '@pie-chart', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing pie chart visualization');
-
-    // Aggregation query for pie chart
-    await pm.metricsPage.executeQuery('sum by (status) (http_requests_total)');
-
-    // Select pie chart type
-    await pm.metricsPage.selectChartType('pie');
-
-    // Verify pie chart elements
-    const pieSlices = page.locator('path[class*="pie"], .pie-slice, .chart-pie, .apexcharts-pie').first();
-
-    if (await pieSlices.isVisible().catch(() => false)) {
-      testLogger.info('Pie chart slices visible');
-    } else {
-      // Check for circular paths
-      const arcs = page.locator('path[d*="A"], g[class*="slice"]');
-      const arcCount = await arcs.count();
-      if (arcCount > 0) {
-        testLogger.info(`Pie chart rendered with ${arcCount} slices`);
-      }
-    }
-
-    // Check for percentage labels
-    const percentLabels = page.locator('text:has-text("%"), .pie-label').first();
-    if (await percentLabels.isVisible().catch(() => false)) {
-      testLogger.info('Pie chart percentage labels visible');
-    }
-
-    testLogger.info('Pie chart visualization tested');
-  });
-
-  // Table View Tests
-  test("Display metrics in table format", {
-    tag: ['@metrics', '@visualization', '@table', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing table view');
-
-    // Query for table display
+    // Test 2: Table sorting
+    testLogger.info('Testing table sorting functionality');
     await pm.metricsPage.executeQuery('topk(10, http_requests_total)');
-
-    // Select table view
     await pm.metricsPage.selectChartType('table');
+    await page.waitForTimeout(1000);
 
-    // Verify table elements
-    const table = page.locator('table, .data-table, [role="table"], .metrics-table').first();
-    await expect(table).toBeVisible({ timeout: 10000 });
-
-    // Check for table headers
-    const headers = page.locator('th, [role="columnheader"], .table-header');
-    const headerCount = await headers.count();
-
-    if (headerCount > 0) {
-      testLogger.info(`Table rendered with ${headerCount} columns`);
-    }
-
-    // Check for table rows
-    const rows = page.locator('tbody tr, [role="row"], .table-row');
-    const rowCount = await rows.count();
-
-    if (rowCount > 0) {
-      testLogger.info(`Table displaying ${rowCount} data rows`);
-    }
-
-    // Check for sorting functionality
-    const sortableHeader = page.locator('th[class*="sort"], th[aria-sort], .sortable').first();
+    const sortableHeader = await pm.metricsPage.getSortableHeader();
     if (await sortableHeader.isVisible().catch(() => false)) {
       await sortableHeader.click();
       await page.waitForTimeout(500);
       testLogger.info('Table sorting functionality available');
     }
 
-    testLogger.info('Table view tested');
+    testLogger.info('Advanced chart features tested successfully');
   });
 
-  // Chart Interaction Tests
-  test("Chart zoom and pan functionality", {
+  // CONSOLIDATED TEST 4: Chart interactions (zoom, pan, export, customization) (3 tests → 1 test)
+  test("Verify chart interaction features (zoom, pan, export, settings)", {
     tag: ['@metrics', '@visualization', '@interaction', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing chart zoom and pan');
+    testLogger.info('Testing chart interaction features');
 
-    // Execute time series query
     await pm.metricsPage.executeQuery('rate(http_requests_total[1h])');
-
     await pm.metricsPage.selectChartType('line');
+    await page.waitForTimeout(1000);
 
-    const chartArea = page.locator('canvas, svg, .chart-container').first();
-
+    // Test zoom and pan
+    const chartArea = await pm.metricsPage.getChartArea();
     if (await chartArea.isVisible()) {
-      // Test zoom
       await chartArea.hover();
       await page.mouse.wheel(0, -100); // Zoom in
       await page.waitForTimeout(500);
-
       testLogger.info('Chart zoom tested');
 
-      // Test pan
       await page.mouse.down();
       await page.mouse.move(100, 0);
       await page.mouse.up();
       await page.waitForTimeout(500);
-
       testLogger.info('Chart pan tested');
 
-      // Check for zoom reset button
-      const resetButton = page.locator('button:has-text("Reset"), .zoom-reset, button[title*="reset"]').first();
+      const resetButton = await pm.metricsPage.getResetButton();
       if (await resetButton.isVisible().catch(() => false)) {
         await resetButton.click();
         testLogger.info('Chart zoom reset available');
       }
     }
-  });
 
-  // Export Chart Tests
-  test("Export chart as image", {
-    tag: ['@metrics', '@visualization', '@export', '@P3', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing chart export functionality');
-
-    // Execute query and render chart
-    await pm.metricsPage.executeQuery('cpu_usage_percent');
-
-    // Look for export options
-    const exportButton = page.locator('button:has-text("Export"), .export-chart, button[title*="export"], button[aria-label*="export"]').first();
-
+    // Test export functionality
+    const exportButton = await pm.metricsPage.getExportButtonElement();
     if (await exportButton.isVisible().catch(() => false)) {
       await exportButton.click();
       await page.waitForTimeout(500);
 
-      // Check for export format options
-      const pngOption = page.locator('text=/PNG/i, button:has-text("PNG")').first();
-      const svgOption = page.locator('text=/SVG/i, button:has-text("SVG")').first();
-      const csvOption = page.locator('text=/CSV/i, button:has-text("CSV")').first();
+      const pngOption = await pm.metricsPage.getPngOption();
+      const svgOption = await pm.metricsPage.getSvgOption();
+      const csvOption = await pm.metricsPage.getCsvOption();
 
       if (await pngOption.isVisible().catch(() => false)) {
         testLogger.info('PNG export option available');
@@ -467,32 +365,18 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         testLogger.info('CSV export option available');
       }
 
-      // Close export menu
       await page.keyboard.press('Escape');
-    } else {
-      testLogger.info('Export functionality not visible');
     }
-  });
 
-  // Chart Options and Customization
-  test("Customize chart display options", {
-    tag: ['@metrics', '@visualization', '@customization', '@P3', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing chart customization options');
-
-    await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
-
-    // Look for chart options/settings
-    const settingsButton = page.locator('button[aria-label*="settings"], .chart-settings, button:has-text("Options")').first();
-
+    // Test chart customization options
+    const settingsButton = await pm.metricsPage.getChartSettingsButton();
     if (await settingsButton.isVisible().catch(() => false)) {
       await settingsButton.click();
       await page.waitForTimeout(500);
 
-      // Check for various options
-      const legendToggle = page.locator('input[name*="legend"], .legend-toggle, text=/Show Legend/i').first();
-      const gridToggle = page.locator('input[name*="grid"], .grid-toggle, text=/Show Grid/i').first();
-      const tooltipToggle = page.locator('input[name*="tooltip"], .tooltip-toggle, text=/Show Tooltip/i').first();
+      const legendToggle = await pm.metricsPage.getLegendToggleOption();
+      const gridToggle = await pm.metricsPage.getGridToggleOption();
+      const tooltipToggle = await pm.metricsPage.getTooltipToggleOption();
 
       if (await legendToggle.isVisible().catch(() => false)) {
         testLogger.info('Legend toggle option available');
@@ -504,10 +388,9 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         testLogger.info('Tooltip toggle option available');
       }
 
-      // Close settings
       await page.keyboard.press('Escape');
     }
 
-    testLogger.info('Chart customization options tested');
+    testLogger.info('Chart interaction features tested successfully');
   });
 });

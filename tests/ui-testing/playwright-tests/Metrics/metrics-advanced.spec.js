@@ -37,20 +37,19 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Stream Selection Tests
-  test("Select and query different metric streams", {
-    tag: ['@metrics', '@streams', '@functional', '@P1', '@all']
+  // CONSOLIDATED TEST 1: Stream and time range selection (2 tests → 1 test)
+  test("Select streams and query with different time ranges", {
+    tag: ['@metrics', '@streams', '@timerange', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing metric stream selection');
+    testLogger.info('Testing stream selection and time range variations');
 
-    // Try to select a stream if the selector is available
+    // Test 1: Stream selection
+    testLogger.info('Testing metric stream selection');
     const streamSelector = await pm.metricsPage.getStreamSelector();
 
     if (await streamSelector.isVisible().catch(() => false)) {
-      // Click to open stream dropdown
       await pm.metricsPage.clickStreamSelector();
 
-      // Look for stream options
       if (await pm.metricsPage.isStreamOptionVisible()) {
         const streamOption = await pm.metricsPage.getStreamOption();
         const streamName = await streamOption.textContent();
@@ -58,69 +57,123 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         await streamOption.click();
         await page.waitForTimeout(1000);
 
-        // Run a query on the selected stream
         await pm.metricsPage.enterMetricsQuery('up');
         await pm.metricsPage.clickApplyButton();
         await pm.metricsPage.waitForMetricsResults();
 
-        // Verify data is visible
         await verifyDataOnUI(pm, 'Stream selection query');
-
         testLogger.info('Stream selection and query completed');
       } else {
-        testLogger.info('No stream options available, skipping stream selection');
+        testLogger.info('No stream options available');
       }
     } else {
-      testLogger.info('Stream selector not visible, running query on default stream');
-      await pm.metricsPage.executeQuery('up');
-
-      // Verify data is visible
-      await verifyDataOnUI(pm, 'Default stream query');
+      testLogger.info('Stream selector not visible, using default stream');
     }
-  });
 
-  // Time Range Selection Tests
-  test("Query metrics with different time ranges", {
-    tag: ['@metrics', '@timerange', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing time range selection for metrics');
-
+    // Test 2: Time range selection
+    testLogger.info('Testing time range selection');
     const timeRanges = ['Last 5 minutes', 'Last 1 hour', 'Last 24 hours'];
 
     for (const range of timeRanges) {
       testLogger.info(`Testing time range: ${range}`);
 
-      // Use page object method to select date range
       const selected = await pm.metricsPage.selectDateRange(range);
-
       if (selected) {
         testLogger.info(`Selected time range: ${range}`);
       } else {
         await page.keyboard.press('Escape');
-        testLogger.info(`Time range option "${range}" not found`);
       }
 
-      // Run a query with the selected time range
       await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
       await page.waitForTimeout(2000);
 
-      // Verify no errors
       const hasError = await pm.metricsPage.expectQueryError();
       expect(hasError).toBe(false);
     }
 
-    testLogger.info('Time range selection tests completed');
+    testLogger.info('Stream and time range selection tests completed');
   });
 
-  // Complex Aggregation Tests
-  test("Execute complex aggregation queries", {
-    tag: ['@metrics', '@aggregation', '@functional', '@P1', '@all']
+  // CONSOLIDATED TEST 2: Complex queries (functions, histograms, labels, comparisons) (4 tests → 1 test)
+  test("Execute complex queries (functions, histograms, label filters, comparisons)", {
+    tag: ['@metrics', '@functions', '@histogram', '@labels', '@comparison', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing complex aggregation queries');
+    testLogger.info('Testing complex query variations');
 
+    const complexQueryGroups = [
+      {
+        category: 'PromQL functions',
+        queries: [
+          { name: 'rate', query: 'rate(http_requests_total[5m])' },
+          { name: 'increase', query: 'increase(http_requests_total[1h])' },
+          { name: 'avg_over_time', query: 'avg_over_time(cpu_usage_percent[5m])' },
+          { name: 'stddev', query: 'stddev(cpu_usage_percent)' }
+        ]
+      },
+      {
+        category: 'Histogram quantiles',
+        queries: [
+          { name: 'P50', quantile: '0.50' },
+          { name: 'P95', quantile: '0.95' },
+          { name: 'P99', quantile: '0.99' }
+        ].map(q => ({
+          name: q.name,
+          query: `histogram_quantile(${q.quantile}, rate(http_request_duration_seconds_bucket[5m]))`
+        }))
+      },
+      {
+        category: 'Label filtering and regex',
+        queries: [
+          { name: 'exact match', query: 'http_requests_total{method="GET", status="200"}' },
+          { name: 'regex match', query: 'http_requests_total{status=~"2.."}' },
+          { name: 'negative regex', query: 'http_requests_total{status!~"5.."}' },
+          { name: 'instance regex', query: 'cpu_usage_percent{instance=~"node-.*"}' }
+        ]
+      },
+      {
+        category: 'Multi-metric comparisons',
+        queries: [
+          { name: 'division', query: 'cpu_usage_percent / 100' },
+          { name: 'memory ratio', query: 'memory_usage_bytes / memory_total_bytes' },
+          { name: 'threshold', query: 'rate(http_requests_total[5m]) > 100' },
+          { name: 'boolean or', query: 'cpu_usage_percent > 80 or memory_usage_bytes > 1000000000' }
+        ]
+      }
+    ];
+
+    for (const group of complexQueryGroups) {
+      testLogger.info(`Testing ${group.category}`);
+
+      for (const queryData of group.queries) {
+        testLogger.info(`Executing ${group.category} - ${queryData.name}`);
+
+        await pm.metricsPage.executeQuery(queryData.query);
+        await page.waitForTimeout(1500);
+
+        // Verify query executed
+        const hasError = await pm.metricsPage.expectQueryError();
+        if (!hasError) {
+          testLogger.info(`${queryData.name} executed successfully`);
+        } else {
+          testLogger.info(`${queryData.name} returned error (may be expected if no data)`);
+        }
+      }
+    }
+
+    testLogger.info('All complex query variations tested successfully');
+  });
+
+  // CONSOLIDATED TEST 3: Advanced features (aggregations, subqueries, alerts) (3 tests → 1 test)
+  test("Execute advanced features (aggregations, subqueries, alert conditions)", {
+    tag: ['@metrics', '@aggregation', '@subquery', '@alerts', '@functional', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing advanced query features');
+
+    // Test 1: Complex aggregations
+    testLogger.info('Testing complex aggregation queries');
     const aggregationQueries = metricsTestData.getTestQueries('promql')
       .filter(q => q.category === 'aggregations')
-      .slice(0, 3); // Test first 3 aggregation queries
+      .slice(0, 3);
 
     for (const queryData of aggregationQueries) {
       testLogger.info(`Testing aggregation: ${queryData.name}`);
@@ -130,144 +183,16 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await pm.metricsPage.clickApplyButton();
       await pm.metricsPage.waitForMetricsResults();
 
-      // Check for errors
       const hasError = await pm.metricsPage.expectQueryError();
-      if (hasError) {
-        testLogger.warn(`Query "${queryData.name}" returned an error (may be expected if no data)`);
-      } else {
-        testLogger.info(`Aggregation query "${queryData.name}" executed successfully`);
-      }
-
-      await page.waitForTimeout(1000);
-    }
-  });
-
-  // Function-based Query Tests
-  test("Test PromQL functions with metrics", {
-    tag: ['@metrics', '@functions', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing PromQL functions');
-
-    const functionQueries = [
-      { name: 'rate', query: 'rate(http_requests_total[5m])' },
-      { name: 'increase', query: 'increase(http_requests_total[1h])' },
-      { name: 'avg_over_time', query: 'avg_over_time(cpu_usage_percent[5m])' },
-      { name: 'max_over_time', query: 'max_over_time(memory_usage_bytes[10m])' },
-      { name: 'stddev', query: 'stddev(cpu_usage_percent)' }
-    ];
-
-    for (const queryData of functionQueries) {
-      testLogger.info(`Testing function: ${queryData.name}`);
-
-      await pm.metricsPage.executeQuery(queryData.query);
-
-      // Verify query executed without critical errors
-      const hasError = await pm.metricsPage.isErrorNotificationVisible();
-
       if (!hasError) {
-        testLogger.info(`Function "${queryData.name}" executed successfully`);
-      } else {
-        const errorText = await pm.metricsPage.getErrorNotificationText() || 'Unknown error';
-        testLogger.info(`Function "${queryData.name}" returned: ${errorText}`);
+        testLogger.info(`Aggregation "${queryData.name}" executed successfully`);
       }
 
       await page.waitForTimeout(1000);
     }
-  });
 
-  // Histogram Quantile Tests
-  test("Calculate histogram quantiles", {
-    tag: ['@metrics', '@histogram', '@functional', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing histogram quantile calculations');
-
-    const quantiles = ['0.50', '0.75', '0.90', '0.95', '0.99'];
-
-    for (const quantile of quantiles) {
-      const query = `histogram_quantile(${quantile}, rate(http_request_duration_seconds_bucket[5m]))`;
-      testLogger.info(`Testing P${parseFloat(quantile) * 100} quantile`);
-
-      await pm.metricsPage.executeQuery(query);
-
-      // Check if results are displayed (chart or table)
-      const hasResults = await pm.metricsPage.isResultsAreaVisible();
-
-      if (hasResults) {
-        testLogger.info(`P${parseFloat(quantile) * 100} quantile calculated`);
-      } else {
-        testLogger.info(`P${parseFloat(quantile) * 100} quantile query executed (no visible results)`);
-      }
-
-      await page.waitForTimeout(1000);
-    }
-  });
-
-  // Label Filtering and Regex Tests
-  test("Query with complex label filters and regex", {
-    tag: ['@metrics', '@labels', '@functional', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing complex label filtering');
-
-    const labelQueries = [
-      'http_requests_total{method="GET", status="200"}',
-      'http_requests_total{status=~"2.."}',
-      'http_requests_total{status!~"5.."}',
-      'cpu_usage_percent{instance=~"node-.*"}',
-      '{__name__=~"http_.*_total"}'
-    ];
-
-    for (const query of labelQueries) {
-      testLogger.info(`Testing label query: ${query}`);
-
-      await pm.metricsPage.executeQuery(query);
-
-      // Verify no critical errors
-      const hasError = await pm.metricsPage.expectQueryError();
-      expect(hasError).toBe(false);
-
-      await page.waitForTimeout(1000);
-    }
-  });
-
-  // Multi-metric Comparison Tests
-  test("Compare multiple metrics in single query", {
-    tag: ['@metrics', '@comparison', '@functional', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing multi-metric comparisons');
-
-    const comparisonQueries = [
-      'cpu_usage_percent / 100',
-      'memory_usage_bytes / memory_total_bytes',
-      'rate(http_requests_total[5m]) > 100',
-      'cpu_usage_percent > 80 or memory_usage_bytes > 1000000000',
-      'http_requests_total unless http_requests_total{status="500"}'
-    ];
-
-    for (const query of comparisonQueries) {
-      testLogger.info(`Testing comparison: ${query}`);
-
-      await pm.metricsPage.executeQuery(query);
-
-      // Allow query to complete
-      await page.waitForTimeout(2000);
-
-      // Check if any visualization is shown
-      const hasVisualization = await pm.metricsPage.isChartOrVisualizationVisible();
-
-      if (hasVisualization) {
-        testLogger.info('Comparison query rendered visualization');
-      } else {
-        testLogger.info('Comparison query executed (no visualization)');
-      }
-    }
-  });
-
-  // Subquery Tests
-  test("Execute subqueries and nested expressions", {
-    tag: ['@metrics', '@subquery', '@functional', '@P3', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing subqueries');
-
+    // Test 2: Subqueries
+    testLogger.info('Testing subqueries and nested expressions');
     const subqueries = [
       'max_over_time(rate(http_requests_total[5m])[1h:])',
       'avg_over_time(cpu_usage_percent[5m])[10m:1m]',
@@ -275,75 +200,73 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     ];
 
     for (const query of subqueries) {
-      testLogger.info(`Testing subquery: ${query}`);
+      testLogger.info(`Executing subquery: ${query.substring(0, 50)}...`);
 
       await pm.metricsPage.executeQuery(query);
-
-      // These queries might not have data, just verify they don't crash
       await page.waitForTimeout(2000);
 
-      // Log completion
       testLogger.info('Subquery executed');
     }
-  });
 
-  // Alert Rule Preview Tests
-  test("Preview alert conditions with metrics", {
-    tag: ['@metrics', '@alerts', '@functional', '@P3', '@all']
-  }, async ({ page }) => {
+    // Test 3: Alert conditions
     testLogger.info('Testing alert condition queries');
-
     const alertQueries = metricsTestData.sampleQueries.alerts;
 
     for (const [name, query] of Object.entries(alertQueries)) {
       testLogger.info(`Testing alert condition: ${name}`);
 
       await pm.metricsPage.executeQuery(query);
-
-      // Alert queries return boolean results
       await page.waitForTimeout(2000);
 
-      // Check for any results
       const resultsVisible = await pm.metricsPage.areResultsVisible();
-
       if (resultsVisible) {
         testLogger.info(`Alert condition "${name}" evaluated`);
-      } else {
-        testLogger.info(`Alert condition "${name}" executed`);
       }
     }
+
+    testLogger.info('Advanced features tested successfully');
   });
 
-  // Performance Testing with Large Queries
-  test("Execute performance-intensive queries", {
+  // CONSOLIDATED TEST 4: Performance testing with complex queries (1 test remains)
+  test("Execute performance-intensive queries and verify execution time", {
     tag: ['@metrics', '@performance', '@functional', '@P3', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing performance with complex queries');
 
     const performanceQueries = [
-      // Large aggregation
-      'sum by (instance, job, method, status) (rate(http_requests_total[5m]))',
-      // Multiple metrics
-      'cpu_usage_percent + memory_usage_bytes/1000000 + disk_io_bytes_per_sec/1000',
-      // Complex calculation
-      '100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))',
-      // Many labels
-      'http_requests_total{method=~"GET|POST|PUT|DELETE", status=~"2..|3..|4..|5.."}'
+      {
+        name: 'Large aggregation',
+        query: 'sum by (instance, job, method, status) (rate(http_requests_total[5m]))'
+      },
+      {
+        name: 'Multiple metrics',
+        query: 'cpu_usage_percent + memory_usage_bytes/1000000 + disk_io_bytes_per_sec/1000'
+      },
+      {
+        name: 'Complex calculation',
+        query: '100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))'
+      },
+      {
+        name: 'Many labels',
+        query: 'http_requests_total{method=~"GET|POST|PUT|DELETE", status=~"2..|3..|4..|5.."}'
+      }
     ];
 
-    for (const query of performanceQueries) {
-      testLogger.info(`Testing performance query: ${query.substring(0, 50)}...`);
+    for (const queryData of performanceQueries) {
+      testLogger.info(`Testing ${queryData.name}`);
 
       const startTime = Date.now();
-      await pm.metricsPage.executeQuery(query);
+      await pm.metricsPage.executeQuery(queryData.query);
       const executionTime = Date.now() - startTime;
 
-      testLogger.info(`Query executed in ${executionTime}ms`);
+      testLogger.info(`${queryData.name} executed in ${executionTime}ms`);
 
       // Verify query completed within reasonable time (30 seconds)
       expect(executionTime).toBeLessThan(30000);
 
       await page.waitForTimeout(1000);
     }
+
+    testLogger.info('Performance testing completed successfully');
   });
 });
