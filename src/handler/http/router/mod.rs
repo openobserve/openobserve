@@ -495,7 +495,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
         .route("/invites", get(users::list_invitations))
         .route("/invites/{invite_id}", delete(users::decline_invitation))
-        .route("/{org_id}/roles", get(users::list_roles))
+        .route("/{org_id}/users/roles", get(users::list_roles))
 
         // Organizations
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
@@ -505,10 +505,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/logo_text", post(organization::settings::set_logo_text).delete(organization::settings::delete_logo_text))
 
         // System settings v2
-        .route("/{org_id}/system_settings/{key}", get(organization::system_settings::get_setting))
-        .route("/{org_id}/system_settings", get(organization::system_settings::list_settings))
-        .route("/{org_id}/system_settings/org/{key}", post(organization::system_settings::set_org_setting).delete(organization::system_settings::delete_org_setting))
-        .route("/{org_id}/system_settings/user/{key}", post(organization::system_settings::set_user_setting).delete(organization::system_settings::delete_user_setting))
+        .route("/{org_id}/settings/v2/{key}", get(organization::system_settings::get_setting).delete(organization::system_settings::delete_org_setting))
+        .route("/{org_id}/settings/v2", get(organization::system_settings::list_settings).post(organization::system_settings::set_org_setting))
+        .route("/{org_id}/settings/v2/user/{user_id}/{key}", post(organization::system_settings::set_user_setting).delete(organization::system_settings::delete_user_setting))
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
@@ -660,10 +659,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/enrichment_tables", get(enrichment_table::get_all_enrichment_table_statuses))
 
         // Authz/FGA
-        .route("/{org_id}/roles", post(authz::fga::create_role))
-        .route("/{org_id}/roles/{role_id}", get(authz::fga::get_roles).put(authz::fga::update_role).delete(authz::fga::delete_role))
-        .route("/{org_id}/roles/{role_id}/permissions", get(authz::fga::get_role_permissions))
+        .route("/{org_id}/roles", get(authz::fga::get_roles).post(authz::fga::create_role))
         .route("/{org_id}/roles/bulk", delete(authz::fga::delete_role_bulk))
+        .route("/{org_id}/roles/{role_id}", put(authz::fga::update_role).delete(authz::fga::delete_role))
+        .route("/{org_id}/roles/{role_id}/permissions/{resource}", get(authz::fga::get_role_permissions))
         .route("/{org_id}/groups", get(authz::fga::get_groups).post(authz::fga::create_group))
         .route("/{org_id}/groups/{group_name}", get(authz::fga::get_group_details).put(authz::fga::update_group).delete(authz::fga::delete_group))
         .route("/{org_id}/groups/bulk", delete(authz::fga::delete_group_bulk))
@@ -702,7 +701,6 @@ pub fn service_routes() -> Router {
         // Service accounts
         .route("/{org_id}/service_accounts", get(service_accounts::list).post(service_accounts::save))
         .route("/{org_id}/service_accounts/bulk", delete(service_accounts::delete_bulk))
-        // TODO: service_accounts::get function doesn't exist, removing for now
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
@@ -710,9 +708,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/mcp/{*mcp_path}", get(mcp::handle_mcp_get))
 
         // Deduplication
-        .route("/{org_id}/alerts/deduplication", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
-        .route("/{org_id}/alerts/deduplication/semantic_groups", get(alerts::deduplication::get_semantic_groups).post(alerts::deduplication::save_semantic_groups))
-        .route("/{org_id}/alerts/deduplication/semantic_groups/preview", post(alerts::deduplication::preview_semantic_groups_diff));
+        .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
+        .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
+        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
 
     #[cfg(feature = "enterprise")]
     {
@@ -780,7 +778,7 @@ pub fn service_routes() -> Router {
             // Service streams
             .route("/{org_id}/service_streams/dimension_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/correlate", post(service_streams::correlate_streams))
-            .route("/{org_id}/service_streams/grouped", get(service_streams::get_services_grouped));
+            .route("/{org_id}/service_streams/_grouped", get(service_streams::get_services_grouped));
     }
 
     #[cfg(feature = "cloud")]
