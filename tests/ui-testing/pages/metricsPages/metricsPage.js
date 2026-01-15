@@ -1339,4 +1339,225 @@ export class MetricsPage {
         return null; // Not found
     }
 
+    // ============================================
+    // VISUALIZATION METHODS (for metrics-visualizations.spec.js)
+    // ============================================
+
+    // Chart canvas and elements
+    async getChartCanvas() {
+        return this.page.locator('canvas, .line-chart, [class*="line"], svg path[class*="line"]').first();
+    }
+
+    async expectChartCanvasVisible() {
+        await expect(this.page.locator('canvas, .line-chart, [class*="line"], svg path[class*="line"]').first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async getXAxis() {
+        return this.page.locator('.x-axis, [class*="axis-x"], .apexcharts-xaxis, .chart-axis-x').first();
+    }
+
+    async getYAxis() {
+        return this.page.locator('.y-axis, [class*="axis-y"], .apexcharts-yaxis, .chart-axis-y').first();
+    }
+
+    async getLegendElement() {
+        return this.page.locator('.chart-legend, .legend, [class*="legend"], .apexcharts-legend').first();
+    }
+
+    async isLegendVisible() {
+        return await this.page.locator('.chart-legend, .legend, [class*="legend"], .apexcharts-legend').first().isVisible().catch(() => false);
+    }
+
+    async getChartSeries() {
+        return this.page.locator('.chart-series, path[class*="line"], .apexcharts-series, g[class*="series"]');
+    }
+
+    async getChartArea() {
+        return this.page.locator('canvas, svg, .chart-container').first();
+    }
+
+    async getChartTooltip() {
+        return this.page.locator('.chart-tooltip, .tooltip, [role="tooltip"], .apexcharts-tooltip').first();
+    }
+
+    async isChartTooltipVisible() {
+        return await this.page.locator('.chart-tooltip, .tooltip, [role="tooltip"], .apexcharts-tooltip').first().isVisible().catch(() => false);
+    }
+
+    // Bar chart elements
+    async getBarElements() {
+        return this.page.locator('rect[class*="bar"], .bar-chart, .chart-bar, path[class*="bar"], .apexcharts-bar-series').first();
+    }
+
+    async getBars() {
+        return this.page.locator('rect, .bar, [class*="bar-element"]');
+    }
+
+    async getStackOption() {
+        return this.page.locator('button:has-text("Stack"), input[type="checkbox"][name*="stack"], .stack-toggle').first();
+    }
+
+    async getStackedBars() {
+        return this.page.locator('.stacked-bar, [class*="stack"], .apexcharts-bar-stacked').first();
+    }
+
+    // Scatter plot elements
+    async getScatterPoints() {
+        return this.page.locator('circle[class*="scatter"], .scatter-point, .chart-scatter, .apexcharts-scatter').first();
+    }
+
+    async getScatterDots() {
+        return this.page.locator('circle, .dot, [class*="point"]');
+    }
+
+    async getTrendLine() {
+        return this.page.locator('.trend-line, path[class*="trend"], .regression-line').first();
+    }
+
+    async getCorrelationText() {
+        return this.page.locator('text=/correlation|r²|R²/i').first();
+    }
+
+    // Area chart elements
+    async getAreaElements() {
+        return this.page.locator('path[class*="area"], .area-chart, .chart-area, .apexcharts-area').first();
+    }
+
+    async getAreaFills() {
+        return this.page.locator('path[fill-opacity], path[fill]');
+    }
+
+    async getStackedAreas() {
+        return this.page.locator('.stacked-area, [class*="stack"], .apexcharts-area-stacked').first();
+    }
+
+    // Heatmap elements
+    async getHeatmapCells() {
+        return this.page.locator('rect[class*="heat"], .heatmap-cell, .chart-heatmap, .apexcharts-heatmap').first();
+    }
+
+    async getHeatmapGridCells() {
+        return this.page.locator('rect[fill], g[class*="cell"]');
+    }
+
+    async getColorScale() {
+        return this.page.locator('.color-scale, .heatmap-legend, [class*="gradient"]').first();
+    }
+
+    // Pie chart elements
+    async getPieSlices() {
+        return this.page.locator('path[class*="pie"], .pie-slice, .chart-pie, .apexcharts-pie').first();
+    }
+
+    async getPieArcs() {
+        return this.page.locator('path[d*="A"], g[class*="slice"]');
+    }
+
+    async getPercentLabels() {
+        return this.page.locator('text:has-text("%"), .pie-label').first();
+    }
+
+    // Table elements
+    async getTableElement() {
+        return this.page.locator('table, .data-table, [role="table"], .metrics-table').first();
+    }
+
+    async expectTableVisible() {
+        await expect(this.page.locator('table, .data-table, [role="table"], .metrics-table').first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async getTableHeaders() {
+        return this.page.locator('th, [role="columnheader"], .table-header');
+    }
+
+    async getTableRows() {
+        return this.page.locator('tbody tr, [role="row"], .table-row');
+    }
+
+    async getSortableHeader() {
+        return this.page.locator('th[class*="sort"], th[aria-sort], .sortable').first();
+    }
+
+    // Chart interaction elements
+    async getResetButton() {
+        return this.page.locator('button:has-text("Reset"), .zoom-reset, button[title*="reset"]').first();
+    }
+
+    async getExportButtonElement() {
+        return this.page.locator('button:has-text("Export"), .export-chart, button[title*="export"], button[aria-label*="export"]').first();
+    }
+
+    async getPngOption() {
+        return this.page.locator('text=/PNG/i, button:has-text("PNG")').first();
+    }
+
+    async getSvgOption() {
+        return this.page.locator('text=/SVG/i, button:has-text("SVG")').first();
+    }
+
+    async getCsvOption() {
+        return this.page.locator('text=/CSV/i, button:has-text("CSV")').first();
+    }
+
+    // Chart customization elements
+    async getChartSettingsButton() {
+        return this.page.locator('button[aria-label*="settings"], .chart-settings, button:has-text("Options")').first();
+    }
+
+    async getLegendToggleOption() {
+        return this.page.locator('input[name*="legend"], .legend-toggle, text=/Show Legend/i').first();
+    }
+
+    async getGridToggleOption() {
+        return this.page.locator('input[name*="grid"], .grid-toggle, text=/Show Grid/i').first();
+    }
+
+    async getTooltipToggleOption() {
+        return this.page.locator('input[name*="tooltip"], .tooltip-toggle, text=/Show Tooltip/i').first();
+    }
+
+    // ============================================
+    // QUERY METHODS (for metrics-queries.spec.js)
+    // ============================================
+
+    // Error notification methods
+    async getErrorNotificationMessage() {
+        return this.page.locator('.q-notification__message:has-text("Error")');
+    }
+
+    async expectNoErrorNotification() {
+        await expect(this.page.locator('.q-notification__message:has-text("Error")')).not.toBeVisible();
+    }
+
+    async hasErrorIndicator() {
+        return await this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first().isVisible().catch(() => false);
+    }
+
+    async getErrorIndicators() {
+        return this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+    }
+
+    // SQL mode methods
+    async getSqlToggle() {
+        return this.page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
+    }
+
+    async getSqlIndicator() {
+        return this.page.locator('.sql-mode, text=/SQL Mode/i').first();
+    }
+
+    // ============================================
+    // CONFIG METHODS (for metrics-config.spec.js)
+    // ============================================
+
+    // Preset selection method
+    async getPresetOptionByText(presetText) {
+        return this.page.locator(`text="${presetText}"`).first();
+    }
+
+    // Setting element method
+    async getSettingElementByText(optionText) {
+        return this.page.locator(`text=/${optionText}/i`).first();
+    }
+
 }
