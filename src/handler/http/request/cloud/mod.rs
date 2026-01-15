@@ -22,6 +22,7 @@ pub mod aws_marketplace;
 pub mod billings;
 pub mod marketing;
 pub mod org_usage;
+pub mod azure_marketplace;
 
 // BillingsError extension
 pub trait IntoHttpResponse {

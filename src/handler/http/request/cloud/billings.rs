@@ -457,3 +457,58 @@ pub async fn handle_stripe_event(
         Err(err) => err.into_http_response(),
     }
 }
+
+/// StripeWebhookEvent
+#[utoipa::path(
+    context_path = "/webhook",
+    tag = "Billings",
+    summary = "Handle Azure webhook events",
+    description = "Processes webhook events from Azure for subscription changes and payments",
+    request_body(content = String, description = "Raw Azure webhook payload"),
+    responses(
+        (status = 200, description="Status OK", content_type = "application/json", body = ())
+    )
+)]
+#[post("/azure")]
+pub async fn handle_azure_event(
+    req: HttpRequest,
+    payload: web::Bytes, // Raw body bytes
+) -> impl Responder {
+    log::info!("Azure Saas webhook received");
+    let headers = req.headers();
+    let Some(auth_header) = headers.get("Authorization").and_then(|v| v.to_str().ok()) else {
+        return o2_cloud_billings::BillingError::AzureWebhookError("invalid auth header".into())
+            .into_http_response();
+    };
+
+    match o2_cloud_billings::azure_utils::handle_azure_wh(auth_header, &payload).await {
+        Ok(_) => {
+            log::info!("successfully handled azure saas webhook");
+            HttpResponse::Ok().json(json::json!({
+                "status": "success"
+            }))
+        }
+        Err(e) => {
+            log::error!("error while handling azure saas webhook : {e}");
+            o2_cloud_billings::BillingError::AzureWebhookError("internal error".into())
+                .into_http_response()
+        }
+    }
+
+    // TODO: send event for this
+    // for (org_id, sub_type) in orgs {
+    //             let org = match organization::get_org(&org_id).await {
+    //                 None => continue,
+    //                 Some(org) => org,
+    //             };
+    //             enqueue_cloud_event(CloudEvent {
+    //                 org_id: org.identifier.clone(),
+    //                 org_name: org.name.clone(),
+    //                 org_type: org.org_type.clone(),
+    //                 user: None,
+    //                 event: EventType::SubscriptionDeleted,
+    //                 subscription_type: Some(sub_type.to_string()),
+    //                 stream_name: None,
+    //             })
+    //             .await;
+}
