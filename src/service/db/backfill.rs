@@ -144,15 +144,13 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
     // Update the enabled field in the backfill_jobs table
     infra::table::backfill_jobs::update_enabled(org, job_id, enabled).await?;
 
-    // If enabling, also set the trigger status to Waiting so it runs immediately
+    // If enabling, set the trigger status to Waiting so it runs immediately
     if enabled {
-        let trigger_result = scheduler::get(org, scheduler::TriggerModule::Backfill, job_id).await;
-
-        if let Ok(trigger) = trigger_result {
-            // Only update if the trigger is in Completed status
-            if trigger.status == scheduler::TriggerStatus::Completed {
-                let now = Utc::now().timestamp_micros();
-                let _ = scheduler::update_trigger(
+        let now = Utc::now().timestamp_micros();
+        match scheduler::get(org, scheduler::TriggerModule::Backfill, job_id).await {
+            Ok(trigger) => {
+                // Trigger exists, update it to Waiting
+                if let Err(e) = scheduler::update_trigger(
                     scheduler::Trigger {
                         status: scheduler::TriggerStatus::Waiting,
                         next_run_at: now, // Start immediately
@@ -161,7 +159,81 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
                     true,
                     &format!("enable_backfill_{}", job_id),
                 )
-                .await;
+                .await
+                {
+                    log::error!(
+                        "[BACKFILL] Failed to update trigger status when enabling backfill job {}/{}: {}",
+                        org,
+                        job_id,
+                        e
+                    );
+                }
+            }
+            Err(_) => {
+                // Trigger doesn't exist, create a new one
+                // First, get the backfill job to initialize trigger data
+                match get(org, job_id).await {
+                    Ok(backfill_job) => {
+                        // Create trigger data with backfill job state
+                        let trigger_data = config::meta::triggers::ScheduledTriggerData {
+                            period_end_time: None,
+                            tolerance: 0,
+                            last_satisfied_at: None,
+                            backfill_job: Some(config::meta::triggers::BackfillJob {
+                                current_position: backfill_job.start_time,
+                                deletion_status:
+                                    config::meta::triggers::DeletionStatus::NotRequired,
+                                deletion_job_ids: vec![],
+                                error: None,
+                            }),
+                        };
+
+                        let data = match config::utils::json::to_string(&trigger_data) {
+                            Ok(d) => d,
+                            Err(e) => {
+                                log::error!(
+                                    "[BACKFILL] Failed to serialize trigger data for {}/{}: {}",
+                                    org,
+                                    job_id,
+                                    e
+                                );
+                                String::new()
+                            }
+                        };
+
+                        let trigger = scheduler::Trigger {
+                            id: 0, // Will be auto-generated
+                            org: org.to_string(),
+                            module: scheduler::TriggerModule::Backfill,
+                            module_key: job_id.to_string(),
+                            next_run_at: now,
+                            is_realtime: false,
+                            is_silenced: false,
+                            status: scheduler::TriggerStatus::Waiting,
+                            start_time: None,
+                            end_time: None,
+                            retries: 0,
+                            data,
+                        };
+
+                        if let Err(e) = scheduler::push(trigger).await {
+                            log::error!(
+                                "[BACKFILL] Failed to create trigger when enabling backfill job {}/{}: {}",
+                                org,
+                                job_id,
+                                e
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[BACKFILL] Failed to get backfill job when creating trigger for {}/{}: {}",
+                            org,
+                            job_id,
+                            e
+                        );
+                    }
+                }
             }
         }
     }
