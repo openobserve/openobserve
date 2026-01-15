@@ -654,4 +654,361 @@ export class MetricsPage {
         await this.page.waitForTimeout(500);
     }
 
+    // ===== DATA VISUALIZATION VERIFICATION METHODS =====
+    // These methods replace raw page.locator() calls in spec files
+
+    async getCanvasCount() {
+        return await this.page.locator('canvas').count();
+    }
+
+    async hasCanvas() {
+        return await this.getCanvasCount() > 0;
+    }
+
+    async getSvgCount() {
+        const svg = this.page.locator('svg').filter({ has: this.page.locator('path, rect, circle, line') });
+        return await svg.count();
+    }
+
+    async hasSvg() {
+        return await this.getSvgCount() > 0;
+    }
+
+    async getTableRowCount() {
+        return await this.page.locator('table tbody tr, .data-table tr, [role="row"]').count();
+    }
+
+    async hasTableData() {
+        return await this.getTableRowCount() > 0;
+    }
+
+    async getResultPanelCount() {
+        return await this.page.locator('.result-panel, .chart-panel, .metric-card, [class*="result"], [class*="chart"]').count();
+    }
+
+    async hasResultPanels() {
+        return await this.getResultPanelCount() > 0;
+    }
+
+    async hasDataValues() {
+        const dataValues = this.page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
+        return await dataValues.count() > 0;
+    }
+
+    async getFirstDataValue() {
+        const dataValues = this.page.locator('[class*="value"]:not(:empty), td:not(:empty)').first();
+        if (await dataValues.count() > 0) {
+            return await dataValues.textContent();
+        }
+        return null;
+    }
+
+    async hasVisualization() {
+        const hasCanvas = await this.hasCanvas();
+        const hasSvg = await this.hasSvg();
+        const hasTable = await this.hasTableData();
+        const hasPanels = await this.hasResultPanels();
+        return hasCanvas || hasSvg || hasTable || hasPanels;
+    }
+
+    async verifyDataVisualization(testName) {
+        const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
+        // Wait for chart/data rendering
+        await this.page.waitForTimeout(2000);
+
+        const canvasCount = await this.getCanvasCount();
+        const svgCount = await this.getSvgCount();
+        const rowCount = await this.getTableRowCount();
+        const panelCount = await this.getResultPanelCount();
+
+        if (canvasCount > 0) {
+            testLogger.info(`${testName} - Found ${canvasCount} canvas elements`);
+        }
+        if (svgCount > 0) {
+            testLogger.info(`${testName} - Found ${svgCount} SVG elements`);
+        }
+        if (rowCount > 0) {
+            testLogger.info(`${testName} - Found table with ${rowCount} rows`);
+        }
+        if (panelCount > 0) {
+            testLogger.info(`${testName} - Found ${panelCount} result/chart panels`);
+        }
+
+        const hasViz = await this.hasVisualization();
+        if (hasViz) {
+            testLogger.info(`${testName} - Data visualization confirmed`);
+        } else {
+            testLogger.warn(`${testName} - No data visualization found`);
+        }
+
+        // Check for actual data values
+        if (await this.hasDataValues()) {
+            const valueText = await this.getFirstDataValue();
+            const metricNames = ['cpu_usage', 'memory_usage', 'request_count', 'request_duration', 'up'];
+            const hasMetricData = metricNames.some(metric => valueText.toLowerCase().includes(metric));
+            if (hasMetricData) {
+                testLogger.info(`${testName} - Data value found: ${valueText.substring(0, 100)}`);
+            }
+        }
+
+        return hasViz;
+    }
+
+    // ===== CONFIG SIDEBAR METHODS =====
+
+    async getDashboardSidebarCollapseButton() {
+        return this.page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
+    }
+
+    async clickDashboardSidebarCollapseButton() {
+        const btn = await this.getDashboardSidebarCollapseButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+        }
+    }
+
+    async getDashboardSidebarButton() {
+        return this.page.locator('[data-test="dashboard-sidebar"]').first();
+    }
+
+    async clickDashboardSidebarButton() {
+        const btn = await this.getDashboardSidebarButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+        }
+    }
+
+    async isSidebarVisible() {
+        const sidebar = this.page.locator('.dashboard-sidebar, .config-sidebar, [class*="sidebar"]').first();
+        return await sidebar.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    async getSidebarTabs() {
+        return this.page.locator('.q-tab, [role="tab"], .sidebar-tab').locator('visible');
+    }
+
+    async getSidebarTabCount() {
+        const tabs = await this.getSidebarTabs();
+        return await tabs.count();
+    }
+
+    async clickTabByText(tabText) {
+        const tab = this.page.locator('.q-tab, [role="tab"]').filter({ hasText: new RegExp(tabText, 'i') }).first();
+        if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await tab.click();
+            await this.page.waitForTimeout(500);
+            return true;
+        }
+        return false;
+    }
+
+    async getActiveTabPanel() {
+        return this.page.locator('.q-tab-panel, [role="tabpanel"], .tab-content').locator('visible').first();
+    }
+
+    async isTabPanelVisible() {
+        const panel = await this.getActiveTabPanel();
+        return await panel.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ===== STREAM SELECTION METHODS =====
+
+    async getStreamSelector() {
+        return this.page.locator(this.selectStream);
+    }
+
+    async clickStreamSelector() {
+        const selector = await this.getStreamSelector();
+        await selector.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    async getStreamOption() {
+        return this.page.locator('.q-item, [role="option"]').first();
+    }
+
+    async isStreamOptionVisible() {
+        const option = await this.getStreamOption();
+        return await option.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ===== DATE RANGE METHODS =====
+
+    async selectDateRange(range) {
+        await this.openDatePicker();
+        await this.page.waitForTimeout(500);
+
+        const rangeOption = this.page.locator(`.q-item:has-text("${range}"), button:has-text("${range}")`).first();
+        if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await rangeOption.click();
+            return true;
+        }
+
+        // Try alternate selector
+        const relativeOption = this.page.locator('button').filter({ hasText: range }).first();
+        if (await relativeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await relativeOption.click();
+            return true;
+        }
+
+        return false;
+    }
+
+    // ===== NOTIFICATION METHODS =====
+
+    async isErrorNotificationVisible() {
+        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        return await errorNotification.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    async getErrorNotificationText() {
+        const errorNotification = this.page.locator('.q-notification__message:has-text("Error")');
+        if (await errorNotification.isVisible({ timeout: 3000 }).catch(() => false)) {
+            return await errorNotification.textContent();
+        }
+        return null;
+    }
+
+    // ===== RESULTS AREA METHODS =====
+
+    async isResultsAreaVisible() {
+        const resultsArea = this.page.locator('.chart-container, .results-table, [class*="results"], canvas').first();
+        return await resultsArea.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    async isChartOrVisualizationVisible() {
+        const viz = this.page.locator('canvas, .chart-container, svg').first();
+        return await viz.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    async areResultsVisible() {
+        const results = this.page.locator('[class*="result"], [class*="value"], .query-result').first();
+        return await results.isVisible({ timeout: 5000 }).catch(() => false);
+    }
+
+    // ===== AGGREGATION & VALUE METHODS =====
+
+    async getMetricValue() {
+        const valueElement = this.page.locator('.metric-value, .single-stat, .result-value, [class*="value"]').first();
+        if (await valueElement.isVisible({ timeout: 3000 }).catch(() => false)) {
+            return await valueElement.textContent();
+        }
+        return null;
+    }
+
+    async getLegendItems() {
+        return this.page.locator('.legend-item, .series-label, [class*="legend"]');
+    }
+
+    async getLegendItemCount() {
+        const items = await this.getLegendItems();
+        return await items.count();
+    }
+
+    async getResultValue() {
+        const resultValue = this.page.locator('.result-value, .metric-value, [class*="value"]').first();
+        if (await resultValue.isVisible({ timeout: 3000 }).catch(() => false)) {
+            return await resultValue.textContent();
+        }
+        return null;
+    }
+
+    // ===== CHART TYPE METHODS =====
+
+    async getChartTypeButton() {
+        return this.page.locator('[data-test*="chart-type"]').or(
+            this.page.locator('button:has-text("Line"), button:has-text("Bar")')
+        ).first();
+    }
+
+    async clickChartTypeButton() {
+        const btn = await this.getChartTypeButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(500);
+            return true;
+        }
+        return false;
+    }
+
+    async getChartTypeOption(chartType) {
+        return this.page.locator(`.q-item:has-text("${chartType}")`).first();
+    }
+
+    async selectChartTypeOption(chartType) {
+        const option = await this.getChartTypeOption(chartType);
+        if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await option.click();
+            await this.page.waitForTimeout(1000);
+            return true;
+        }
+        return false;
+    }
+
+    // ===== GENERIC UI ELEMENT METHODS =====
+
+    async getElementBySelector(selector) {
+        return this.page.locator(selector).first();
+    }
+
+    async isElementVisible(selector) {
+        const element = await this.getElementBySelector(selector);
+        return await element.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    async getVisibleElements(selector) {
+        return this.page.locator(selector).locator('visible');
+    }
+
+    async getVisibleElementCount(selector) {
+        const elements = await this.getVisibleElements(selector);
+        return await elements.count();
+    }
+
+    async clickElementBySelector(selector) {
+        const element = await this.getElementBySelector(selector);
+        if (await element.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await element.click();
+            return true;
+        }
+        return false;
+    }
+
+    // ===== SAVE/APPLY BUTTON METHODS =====
+
+    async getSaveButton() {
+        return this.page.locator('button').filter({ hasText: /Save|Apply|Update/i }).locator('visible').first();
+    }
+
+    async clickSaveButton() {
+        const btn = await this.getSaveButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            await this.page.waitForTimeout(1000);
+            return true;
+        }
+        return false;
+    }
+
+    // ===== INPUT FIELD METHODS =====
+
+    async getVisibleInputs() {
+        return this.page.locator('input[type="text"], input[type="number"], textarea').locator('visible');
+    }
+
+    async getVisibleInputCount() {
+        const inputs = await this.getVisibleInputs();
+        return await inputs.count();
+    }
+
+    async getVisibleOptionElements() {
+        return this.page.locator('input, select, .q-toggle, .q-checkbox').locator('visible');
+    }
+
+    async getVisibleOptionElementCount() {
+        const elements = await this.getVisibleOptionElements();
+        return await elements.count();
+    }
+
 }

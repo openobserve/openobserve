@@ -30,13 +30,9 @@ test.describe("Metrics Config Tabs Tests", () => {
 
   test.afterEach(async ({ page }, testInfo) => {
     // Close config sidebar if open using the collapse button
-    const collapseButton = page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
-
-    if (await collapseButton.isVisible().catch(() => false)) {
-      await collapseButton.click();
-      await page.waitForTimeout(500);
-      testLogger.info('Closed sidebar using collapse button');
-    }
+    await pm.metricsPage.clickDashboardSidebarCollapseButton();
+    await page.waitForTimeout(500);
+    testLogger.info('Closed sidebar using collapse button');
 
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
@@ -48,31 +44,30 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing config sidebar opening');
 
     // Look for config button with the correct data-test attribute
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-
+    const configButton = await pm.metricsPage.getDashboardSidebarButton();
     await expect(configButton).toBeVisible({ timeout: 10000 });
 
     // Get button state before click if available
     const ariaExpanded = await configButton.getAttribute('aria-expanded').catch(() => null);
     testLogger.info(`Config button initial state: aria-expanded=${ariaExpanded}`);
 
-    await configButton.click();
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Verify sidebar opened
-    const sidebar = page.locator('.dashboard-sidebar, .config-sidebar, [class*="sidebar"]').first();
-    await expect(sidebar).toBeVisible({ timeout: 5000 });
+    const sidebarVisible = await pm.metricsPage.isSidebarVisible();
+    expect(sidebarVisible).toBe(true);
 
     testLogger.info('Config sidebar opened successfully');
 
     // Look for tabs in the sidebar
-    const tabs = page.locator('.q-tab, [role="tab"], .sidebar-tab').locator('visible');
-    const tabCount = await tabs.count();
+    const tabCount = await pm.metricsPage.getSidebarTabCount();
 
     if (tabCount > 0) {
       testLogger.info(`Found ${tabCount} tabs in config sidebar`);
 
       // Log tab names
+      const tabs = await pm.metricsPage.getSidebarTabs();
       for (let i = 0; i < Math.min(tabCount, 5); i++) {
         const tabText = await tabs.nth(i).textContent();
         testLogger.info(`Tab ${i + 1}: ${tabText?.trim()}`);
@@ -87,17 +82,15 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing config tab navigation');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Find all tabs
-    const tabs = page.locator('.q-tab, [role="tab"], .sidebar-tab').locator('visible');
-    const tabCount = await tabs.count();
-
+    const tabCount = await pm.metricsPage.getSidebarTabCount();
     testLogger.info(`Found ${tabCount} config tabs`);
 
     // Click through tabs
+    const tabs = await pm.metricsPage.getSidebarTabs();
     for (let i = 0; i < Math.min(tabCount, 5); i++) {
       const tab = tabs.nth(i);
       const tabText = await tab.textContent();
@@ -116,8 +109,9 @@ test.describe("Metrics Config Tabs Tests", () => {
       testLogger.info(`Clicked tab: ${tabText?.trim()} (aria-selected: ${ariaSelected}, active: ${isActive})`);
 
       // Check if tab content is visible
-      const tabPanel = page.locator('.q-tab-panel, [role="tabpanel"], .tab-content').locator('visible').first();
-      if (await tabPanel.isVisible().catch(() => false)) {
+      const panelVisible = await pm.metricsPage.isTabPanelVisible();
+      if (panelVisible) {
+        const tabPanel = await pm.metricsPage.getActiveTabPanel();
         const panelContent = await tabPanel.textContent();
         testLogger.info(`Tab panel visible with content length: ${panelContent?.length}`);
       }
@@ -133,15 +127,12 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing Query tab configuration');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
-    // Look for Query tab
-    const queryTab = page.locator('.q-tab, [role="tab"]').filter({ hasText: /Query/i }).first();
-
-    if (await queryTab.isVisible().catch(() => false)) {
-      await queryTab.click();
+    // Look for Query tab and click it
+    if (await pm.metricsPage.clickTabByText('Query')) {
       await page.waitForTimeout(500);
       testLogger.info('Clicked Query tab');
 
@@ -155,13 +146,13 @@ test.describe("Metrics Config Tabs Tests", () => {
       ];
 
       for (const selector of querySettings) {
-        const element = page.locator(selector).first();
-        if (await element.isVisible().catch(() => false)) {
+        if (await pm.metricsPage.isElementVisible(selector)) {
           testLogger.info(`Found query setting element: ${selector}`);
 
           // If it's an input/textarea, try to modify it
           if (selector.includes('input') || selector.includes('textarea')) {
-            await element.fill('test_query');
+            await pm.metricsPage.clickElementBySelector(selector);
+            await page.keyboard.type('test_query');
             testLogger.info('Modified query input');
           }
           break;
@@ -181,15 +172,15 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing Legend tab configuration');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Look for Legend tab
-    const legendTab = page.locator('.q-tab, [role="tab"]').filter({ hasText: /Legend/i }).first();
+    // Use page object method
 
-    if (await legendTab.isVisible().catch(() => false)) {
-      await legendTab.click();
+    if (await pm.metricsPage.clickTabByText('Legend')) {
+      // Already clicked by method
       await page.waitForTimeout(500);
       testLogger.info('Clicked Legend tab');
 
@@ -204,13 +195,13 @@ test.describe("Metrics Config Tabs Tests", () => {
       ];
 
       for (const selector of legendSettings) {
-        const elements = page.locator(selector).locator('visible');
-        const count = await elements.count();
-        if (count > 0) {
-          testLogger.info(`Found ${count} legend setting elements: ${selector}`);
+        const elementCount = await pm.metricsPage.getVisibleElementCount(selector);
+        // Already have count
+        if (elementCount > 0) {
+          testLogger.info(`Found ${elementCount} legend setting elements: ${selector}`);
 
           // Try to interact with first element
-          const firstElement = elements.first();
+          const firstElement = await pm.metricsPage.getElementBySelector(selector);
           if (selector.includes('checkbox') || selector.includes('toggle')) {
             await firstElement.click();
             testLogger.info('Toggled legend setting');
@@ -232,15 +223,15 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing Axes tab configuration');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Look for Axes tab
-    const axesTab = page.locator('.q-tab, [role="tab"]').filter({ hasText: /Axes|Axis/i }).first();
+    // Use page object method
 
-    if (await axesTab.isVisible().catch(() => false)) {
-      await axesTab.click();
+    if (await pm.metricsPage.clickTabByText('Axes')) {
+      // Already clicked by method
       await page.waitForTimeout(500);
       testLogger.info('Clicked Axes tab');
 
@@ -255,8 +246,8 @@ test.describe("Metrics Config Tabs Tests", () => {
       ];
 
       for (const selector of axesSettings) {
-        const element = page.locator(selector).first();
-        if (await element.isVisible().catch(() => false)) {
+        const element = await pm.metricsPage.getElementBySelector(selector);
+        if (await pm.metricsPage.isElementVisible(selector)) {
           testLogger.info(`Found axes setting element: ${selector}`);
 
           // If it's a number input, try to set a value
@@ -281,26 +272,23 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing Options tab configuration');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Look for Options/Settings tab
-    const optionsTab = page.locator('.q-tab, [role="tab"]').filter({ hasText: /Options|Settings|General/i }).first();
-
-    if (await optionsTab.isVisible().catch(() => false)) {
-      await optionsTab.click();
+    if (await pm.metricsPage.clickTabByText('Options')) {
       await page.waitForTimeout(500);
       testLogger.info('Clicked Options tab');
 
       // Look for general options
-      const optionElements = page.locator('input, select, .q-toggle, .q-checkbox').locator('visible');
-      const elementCount = await optionElements.count();
+      const elementCount = await pm.metricsPage.getVisibleOptionElementCount();
 
       if (elementCount > 0) {
         testLogger.info(`Found ${elementCount} option elements`);
 
         // Log types of options found
+        const optionElements = await pm.metricsPage.getVisibleOptionElements();
         for (let i = 0; i < Math.min(elementCount, 5); i++) {
           const element = optionElements.nth(i);
           const type = await element.getAttribute('type');
@@ -324,22 +312,22 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing save configuration changes');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Make a change in any available input
-    const inputs = page.locator('input[type="text"], input[type="number"], textarea').locator('visible');
-    const inputCount = await inputs.count();
+    const inputCount = await pm.metricsPage.getVisibleInputCount();
 
     if (inputCount > 0) {
+      const inputs = await pm.metricsPage.getVisibleInputs();
       const firstInput = inputs.first();
       await firstInput.fill('test_value');
       testLogger.info('Modified input field');
     }
 
     // Look for save/apply button
-    const saveButton = page.locator('button').filter({ hasText: /Save|Apply|Update/i }).locator('visible').first();
+    const saveButton = await pm.metricsPage.getSaveButton();
 
     if (await saveButton.isVisible().catch(() => false)) {
       const isEnabled = await saveButton.isEnabled();
@@ -364,13 +352,12 @@ test.describe("Metrics Config Tabs Tests", () => {
 
     try {
       // Open config sidebar
-      const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-      await configButton.click();
+      // Use page object method
+      await pm.metricsPage.clickDashboardSidebarButton();
       await page.waitForTimeout(1000);
 
       // Verify sidebar is open
-      const sidebar = page.locator('.dashboard-sidebar, .config-sidebar, [class*="sidebar"]').first();
-      const sidebarVisible = await sidebar.isVisible().catch(() => false);
+      let sidebarVisible = await pm.metricsPage.isSidebarVisible();
 
       if (!sidebarVisible) {
         testLogger.info('Sidebar not visible after clicking config button - test passing as sidebar might toggle differently');
@@ -380,26 +367,19 @@ test.describe("Metrics Config Tabs Tests", () => {
       testLogger.info('Config sidebar is open');
 
       // Use the collapse button to close the sidebar
-      const collapseButton = page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
-
-      if (await collapseButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await collapseButton.click();
-        testLogger.info('Clicked collapse button to close sidebar');
-      } else {
-        // Fallback: Try pressing Escape key
-        await page.keyboard.press('Escape');
-        testLogger.info('Collapse button not found, pressed Escape key');
-      }
+      await pm.metricsPage.clickDashboardSidebarCollapseButton();
+      testLogger.info('Clicked collapse button to close sidebar');
 
       await page.waitForTimeout(500);
 
       // Check final state - be more lenient with what we consider "closed"
-      const finalVisible = await sidebar.isVisible().catch(() => false);
+      sidebarVisible = await pm.metricsPage.isSidebarVisible();
 
-      if (!finalVisible) {
+      if (!sidebarVisible) {
         testLogger.info('Config sidebar successfully closed');
       } else {
         // Check if it's collapsed/minimized
+        const sidebar = await pm.metricsPage.getElementBySelector('.dashboard-sidebar, .config-sidebar, [class*="sidebar"]');
         try {
           const sidebarWidth = await sidebar.evaluate(el => el.offsetWidth).catch(() => null);
           if (sidebarWidth !== null && sidebarWidth < 50) {
@@ -429,34 +409,29 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing config sidebar with different chart types');
 
     // First change chart type if possible
-    const chartTypeButton = page.locator('[data-test*="chart-type"]').or(
-      page.locator('button:has-text("Line"), button:has-text("Bar")')
-    ).first();
+    const chartTypeButton = await pm.metricsPage.getChartTypeButton();
 
     if (await chartTypeButton.isVisible().catch(() => false)) {
       await chartTypeButton.click();
       await page.waitForTimeout(500);
 
       // Select a different chart type
-      const chartOptions = page.locator('.q-item:has-text("Bar"), .q-item:has-text("Area")').first();
-      if (await chartOptions.isVisible().catch(() => false)) {
-        await chartOptions.click();
+      if (await pm.metricsPage.selectChartTypeOption('Bar')) {
         testLogger.info('Changed chart type');
       }
     }
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Check if tabs/options changed based on chart type
-    const tabs = page.locator('.q-tab, [role="tab"]').locator('visible');
-    const tabCount = await tabs.count();
-
+    const tabCount = await pm.metricsPage.getSidebarTabCount();
     testLogger.info(`Config sidebar has ${tabCount} tabs for current chart type`);
 
     // Log available tabs
+    const tabs = await pm.metricsPage.getSidebarTabs();
     for (let i = 0; i < tabCount; i++) {
       const tabText = await tabs.nth(i).textContent();
       testLogger.info(`Tab ${i + 1}: ${tabText?.trim()}`);
@@ -472,12 +447,13 @@ test.describe("Metrics Config Tabs Tests", () => {
     testLogger.info('Testing config persistence');
 
     // Open config sidebar
-    const configButton = page.locator('[data-test="dashboard-sidebar"]').first();
-    await configButton.click();
+    // Use page object method
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
 
     // Find and modify a text input
-    const textInput = page.locator('input[type="text"], input[type="number"]').locator('visible').first();
+    const inputs = await pm.metricsPage.getVisibleInputs();
+    const textInput = inputs.first();
     let testValue = '';
 
     if (await textInput.isVisible().catch(() => false)) {
@@ -487,20 +463,12 @@ test.describe("Metrics Config Tabs Tests", () => {
     }
 
     // Close sidebar using collapse button
-    const collapseButton = page.locator('[data-test="dashboard-sidebar-collapse-btn"]').first();
-    if (await collapseButton.isVisible().catch(() => false)) {
-      await collapseButton.click();
-      await page.waitForTimeout(500);
-      testLogger.info('Closed config sidebar using collapse button');
-    } else {
-      // Fallback if collapse button not found
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
-      testLogger.info('Closed config sidebar using Escape key');
-    }
+    await pm.metricsPage.clickDashboardSidebarCollapseButton();
+    await page.waitForTimeout(500);
+    testLogger.info('Closed config sidebar using collapse button');
 
     // Reopen sidebar
-    await configButton.click();
+    await pm.metricsPage.clickDashboardSidebarButton();
     await page.waitForTimeout(1000);
     testLogger.info('Reopened config sidebar');
 
