@@ -206,7 +206,9 @@ export default defineComponent({
           badgeIcon: "verified",
           featuresTitle: "Active Enterprise Features",
           featuresSubtitle: "All features unlocked and ready to use",
-          showPrimaryButton: false,
+          primaryButtonText: "Manage License",
+          primaryButtonIcon: "key",
+          showPrimaryButton: true,
           showContactSales: true,
         };
       }
@@ -435,6 +437,10 @@ export default defineComponent({
       // Cloud - open download page
       if (isCloud) {
         openDownloadPage();
+      }
+      // Enterprise with license - navigate to license page
+      else if (isEnterprise && hasLicense) {
+        navigateToLicense();
       }
       // Enterprise without license - navigate to license page
       else if (isEnterprise && !hasLicense) {
