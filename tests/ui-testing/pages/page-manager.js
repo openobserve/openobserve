@@ -122,6 +122,7 @@ class PageManager {
     this.sanityPage = new SanityPage(page);
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
+    this.enrichmentTablesPage = this.enrichmentPage; // Alias for URL enrichment table tests
     this.themePage = new ThemePage(page);
     this.languagePage = new LanguagePage(page);
     this.schemaPage = new SchemaPage(page);

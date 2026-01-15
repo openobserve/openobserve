@@ -769,6 +769,210 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.getByRole('button', { name: 'OK' }).click();
         await this.page.waitForLoadState('networkidle');
     }
+
+    // ==================== URL Enrichment Table Methods ====================
+
+    async clickAddEnrichmentTableButton() {
+        await this.page.getByRole('button', { name: 'Add Enrichment Table' }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Clicked Add Enrichment Table button');
+    }
+
+    async fillTableName(tableName) {
+        await this.page.locator('[data-test="add-enrichment-table-name-input"]').fill(tableName);
+        testLogger.debug('Filled table name', { tableName });
+    }
+
+    async selectFromUrlOption() {
+        await this.page.getByText('From URL').click();
+        await this.page.waitForTimeout(500);
+        testLogger.debug('Selected From URL option');
+    }
+
+    async selectUploadFileOption() {
+        await this.page.getByText('Upload File').click();
+        await this.page.waitForTimeout(500);
+        testLogger.debug('Selected Upload File option');
+    }
+
+    async fillUrl(url) {
+        await this.page.locator('[data-test="enrichment-table-url-input"]').fill(url);
+        testLogger.debug('Filled URL', { url });
+    }
+
+    async clickSave() {
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.debug('Clicked Save button');
+    }
+
+    async clickCancel() {
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Clicked Cancel button');
+    }
+
+    async expectValidationError(message) {
+        await expect(this.page.getByText(message)).toBeVisible();
+        testLogger.debug('Validation error verified', { message });
+    }
+
+    async createEnrichmentTableFromUrl(tableName, url) {
+        testLogger.info('Creating enrichment table from URL', { tableName, url });
+
+        await this.clickAddEnrichmentTableButton();
+        await this.fillTableName(tableName);
+        await this.selectFromUrlOption();
+        await this.fillUrl(url);
+        await this.clickSave();
+
+        // Wait for background job to complete
+        await this.waitForBackgroundJob(tableName);
+
+        testLogger.info('Enrichment table created from URL', { tableName });
+    }
+
+    async waitForBackgroundJob(tableName, timeoutMs = 60000) {
+        testLogger.info('Waiting for background job to complete', { tableName, timeoutMs });
+
+        const startTime = Date.now();
+        let completed = false;
+
+        while (!completed && (Date.now() - startTime) < timeoutMs) {
+            await this.page.waitForTimeout(3000);
+
+            // Check if table appears in list and doesn't have "Processing" status
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const isVisible = await row.count() > 0;
+
+            if (isVisible) {
+                // Check if there's a processing indicator
+                const hasProcessing = await row.getByText(/processing|loading/i).count() > 0;
+                if (!hasProcessing) {
+                    completed = true;
+                    testLogger.info('Background job completed', { tableName });
+                }
+            }
+        }
+
+        if (!completed) {
+            testLogger.warn('Background job did not complete within timeout', { tableName, timeoutMs });
+        }
+    }
+
+    async verifyTableVisibleInList(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(row).toBeVisible();
+        testLogger.debug('Table visible in list', { tableName });
+    }
+
+    async expectTableHasType(tableName, type) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(row.getByText(type, { exact: false })).toBeVisible();
+        testLogger.debug('Table has expected type', { tableName, type });
+    }
+
+    async expectTableInList(tableName) {
+        await this.verifyTableVisibleInList(tableName);
+    }
+
+    async expectTableNotInList(tableName) {
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(row).not.toBeVisible();
+        testLogger.debug('Table not in list', { tableName });
+    }
+
+    async deleteEnrichmentTableBulk(tableName) {
+        testLogger.info('Deleting enrichment table', { tableName });
+        await this.clickDeleteButton(tableName);
+        await this.verifyDeleteConfirmationDialog();
+        await this.clickDeleteOK();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Enrichment table deleted', { tableName });
+    }
+
+    async deleteEnrichmentTable(tableName) {
+        await this.deleteEnrichmentTableBulk(tableName);
+    }
+
+    async searchEnrichmentTable(searchText) {
+        await this.page.locator('[data-test="enrichment-tables-search-input"]').fill(searchText);
+        await this.page.waitForTimeout(1000);
+        testLogger.debug('Searched enrichment table', { searchText });
+    }
+
+    async selectReplaceFailedMode() {
+        await this.page.getByLabel('Replace Failed').check();
+        await this.page.waitForTimeout(500);
+        testLogger.debug('Selected Replace Failed mode');
+    }
+
+    async updateEnrichmentTableReload(tableName, newUrl) {
+        testLogger.info('Updating enrichment table - Reload mode', { tableName, newUrl });
+
+        await this.clickEditButton(tableName);
+        await this.verifyUpdateMode();
+
+        // Clear and fill new URL
+        await this.page.locator('[data-test="enrichment-table-url-input"]').clear();
+        await this.fillUrl(newUrl);
+
+        // Select Reload option (default)
+        await this.page.getByLabel('Reload').check();
+
+        await this.clickSave();
+        await this.waitForBackgroundJob(tableName);
+
+        testLogger.info('Enrichment table updated - Reload mode', { tableName });
+    }
+
+    async updateEnrichmentTableAppend(tableName, newUrl) {
+        testLogger.info('Updating enrichment table - Append mode', { tableName, newUrl });
+
+        await this.clickEditButton(tableName);
+        await this.verifyUpdateMode();
+
+        // Clear and fill new URL
+        await this.page.locator('[data-test="enrichment-table-url-input"]').clear();
+        await this.fillUrl(newUrl);
+
+        // Select Append option
+        await this.page.getByLabel('Append').check();
+
+        await this.clickSave();
+        await this.waitForBackgroundJob(tableName);
+
+        testLogger.info('Enrichment table updated - Append mode', { tableName });
+    }
+
+    async updateEnrichmentTableReplaceAll(tableName, newUrl) {
+        testLogger.info('Updating enrichment table - Replace All mode', { tableName, newUrl });
+
+        await this.clickEditButton(tableName);
+        await this.verifyUpdateMode();
+
+        // Clear and fill new URL
+        await this.page.locator('[data-test="enrichment-table-url-input"]').clear();
+        await this.fillUrl(newUrl);
+
+        // Select Replace All option
+        await this.page.getByLabel('Replace All').check();
+
+        await this.clickSave();
+        await this.waitForBackgroundJob(tableName);
+
+        testLogger.info('Enrichment table updated - Replace All mode', { tableName });
+    }
+
+    async expectUrlInputVisible() {
+        await expect(this.page.locator('[data-test="enrichment-table-url-input"]')).toBeVisible();
+        testLogger.debug('URL input is visible');
+    }
+
+    async expectUrlInputHidden() {
+        await expect(this.page.locator('[data-test="enrichment-table-url-input"]')).not.toBeVisible();
+        testLogger.debug('URL input is hidden');
+    }
 }
 
 module.exports = { EnrichmentPage };
