@@ -54,31 +54,15 @@ test.describe("Metrics testcases", () => {
     testLogger.info('Setting time range to Last 15 minutes');
     await pm.metricsPage.openDatePicker();
 
-    // Look for "Last 15 minutes" option in the date picker
-    const last15MinutesOption = page.locator('.q-item__label, .q-item, [role="option"]').filter({ hasText: /Last 15 minutes|15m|15 min/i }).first();
-    const hasOption = await last15MinutesOption.isVisible({ timeout: 3000 }).catch(() => false);
+    // Look for "Last 15 minutes" option using page object method
+    const selected = await pm.metricsPage.selectLast15Minutes();
 
-    if (hasOption) {
-      await last15MinutesOption.click();
+    if (selected) {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
-      // Try alternate approach - look for relative time options
-      const relativeTimeButton = page.locator('button, [role="button"]').filter({ hasText: /Relative|Last/i }).first();
-      if (await relativeTimeButton.isVisible().catch(() => false)) {
-        await relativeTimeButton.click();
-        await page.waitForTimeout(500);
-      }
-
-      // Try to find any 15 minute option
-      const anyTimeOption = page.locator('text=/15.*min/i').first();
-      if (await anyTimeOption.isVisible().catch(() => false)) {
-        await anyTimeOption.click();
-        testLogger.info('Selected 15 minute time range via alternate method');
-      } else {
-        // If we can't find the option, close the picker and continue
-        await page.keyboard.press('Escape');
-        testLogger.warn('Could not select specific time range, using default');
-      }
+      // If we can't find the option, close the picker and continue
+      await page.keyboard.press('Escape');
+      testLogger.warn('Could not select specific time range, using default');
     }
 
     // Wait a moment for time range to be applied
@@ -101,17 +85,16 @@ test.describe("Metrics testcases", () => {
     // Additional wait for data to render
     await page.waitForTimeout(2000);
 
-    // Verify no error messages
-    const errorMessage = page.locator('.q-notification__message:has-text("Error")');
-    const hasError = await errorMessage.isVisible().catch(() => false);
+    // Verify no error messages using page object
+    const hasError = await pm.metricsPage.isErrorNotificationVisible();
     if (hasError) {
-      const errorText = await errorMessage.textContent();
+      const errorText = await pm.metricsPage.getErrorNotificationText();
       testLogger.error(`Query returned error: ${errorText}`);
     }
-    await expect(errorMessage).not.toBeVisible();
+    expect(hasError).toBe(false);
 
-    // Check for "No data" message
-    const noDataMessage = page.locator('text=/no data|No results|Empty/i').first();
+    // Check for "No data" message using page object
+    const noDataMessage = await pm.metricsPage.getNoDataMessage();
     const hasNoData = await noDataMessage.isVisible().catch(() => false);
     if (hasNoData) {
       testLogger.warn('No data message found - metrics may not be properly indexed yet');
@@ -125,17 +108,11 @@ test.describe("Metrics testcases", () => {
       await page.waitForTimeout(2000);
     }
 
-    // Check for actual data in the results - expanded selectors
-    const chartCanvas = page.locator('canvas, svg.chart, .apexcharts-canvas, .chart-container canvas, [class*="chart"] canvas').first();
-    const dataTable = page.locator('.results-table, .data-table, table.q-table, [class*="table"], .q-table__middle, table').first();
-    const resultValue = page.locator('.metric-value, .result-value, [class*="value"], .metrics-value, .query-result-value').first();
-    const jsonResult = page.locator('pre, .json-viewer, .result-json, [class*="json"]').first();
-
-    // At least one of these should be visible showing data
-    const hasChart = await chartCanvas.isVisible().catch(() => false);
-    const hasTable = await dataTable.isVisible().catch(() => false);
-    const hasValue = await resultValue.isVisible().catch(() => false);
-    const hasJson = await jsonResult.isVisible().catch(() => false);
+    // Check for actual data in the results using page object methods
+    const hasChart = await pm.metricsPage.hasCanvas();
+    const hasTable = await pm.metricsPage.hasTable();
+    const hasValue = await pm.metricsPage.hasValue();
+    const hasJson = await pm.metricsPage.hasJson();
 
     if (hasChart) {
       testLogger.info('Chart visualization found for metrics data');
@@ -143,12 +120,12 @@ test.describe("Metrics testcases", () => {
     if (hasTable) {
       testLogger.info('Data table found with metrics results');
       // Check that table has actual data rows (not just headers)
-      const dataRows = await page.locator('tbody tr, .q-table__middle tr, .table-row').count();
+      const dataRows = await pm.metricsPage.getTableRowCount();
       testLogger.info(`Found ${dataRows} data rows in table`);
 
       if (dataRows > 0) {
         // Try to find cells with data
-        const cells = await page.locator('tbody td, .q-table__middle td, .table-cell').allTextContents();
+        const cells = await pm.metricsPage.getTableCells();
         testLogger.info(`Cell contents: ${JSON.stringify(cells.slice(0, 10))}`);
 
         // Check if any cell contains the expected values
@@ -161,7 +138,7 @@ test.describe("Metrics testcases", () => {
           testLogger.info('Found "up" metric name in table');
         } else {
           // If no text found, try looking at the page content more broadly
-          const pageText = await page.locator('.q-page, main, .metrics-results').textContent().catch(() => '');
+          const pageText = await pm.metricsPage.getResultsPageText();
           testLogger.info(`Page results section contains: ${pageText.substring(0, 200)}`);
         }
 
@@ -170,13 +147,13 @@ test.describe("Metrics testcases", () => {
       }
     }
     if (hasValue) {
-      const value = await resultValue.textContent();
+      const value = await pm.metricsPage.getMetricValueText();
       testLogger.info(`Metric value found: ${value}`);
       // The 'up' metric should be 1 (since we're ingesting it as 1)
       expect(value).toMatch(/1/);
     }
     if (hasJson) {
-      const jsonText = await jsonResult.textContent();
+      const jsonText = await pm.metricsPage.getJsonResultText();
       testLogger.info(`JSON result found: ${jsonText.substring(0, 200)}`);
       expect(jsonText).toContain('up');
     }
@@ -204,8 +181,8 @@ test.describe("Metrics testcases", () => {
     // Open date picker
     await pm.metricsPage.openDatePicker();
 
-    // Verify date picker dropdown opens
-    const datePickerDropdown = page.locator('.date-time-picker-dropdown, .q-menu');
+    // Verify date picker dropdown opens using page object
+    const datePickerDropdown = await pm.metricsPage.getDatePickerDropdown();
     await expect(datePickerDropdown).toBeVisible({ timeout: 5000 });
 
     // Close date picker by clicking outside
@@ -221,73 +198,26 @@ test.describe("Metrics testcases", () => {
     testLogger.info('Testing auto-refresh interval configuration');
 
     try {
-      // Look for auto-refresh button/selector - try multiple possible selectors
-      const refreshSelectors = [
-        '[data-test*="refresh"]',
-        '[data-cy*="refresh"]',
-        'button[aria-label*="refresh" i]',
-        '.refresh-interval',
-        '[class*="refresh-btn"]',
-        '[class*="auto-refresh"]',
-        'button:has-text("Off")', // Common label for refresh interval
-        'button:has([class*="timer"])',
-        'button:has([class*="clock"])'
-      ];
-
-      let refreshButton = null;
-      for (const selector of refreshSelectors) {
-        const element = page.locator(selector).first();
-        if (await element.isVisible().catch(() => false)) {
-          refreshButton = element;
-          testLogger.info(`Found refresh button with selector: ${selector}`);
-          break;
-        }
-      }
-
-      if (!refreshButton) {
-        // If no refresh button found, look for any time-related dropdown
-        const timeDropdown = page.locator('select, [role="combobox"]').filter({ hasText: /sec|min|hour|off/i }).first();
-        if (await timeDropdown.isVisible().catch(() => false)) {
-          refreshButton = timeDropdown;
-          testLogger.info('Found time dropdown for refresh interval');
-        }
-      }
+      // Look for auto-refresh button using page object
+      const refreshButton = await pm.metricsPage.getRefreshButton();
 
       if (refreshButton) {
         // Click the refresh button/dropdown
         await refreshButton.click();
         await page.waitForTimeout(500); // Wait for dropdown to open
 
-        // Look for interval options in the dropdown
-        const intervalSelectors = [
-          '.q-item:has-text("10")',
-          '[role="option"]:has-text("10")',
-          '.dropdown-item:has-text("10")',
-          'li:has-text("10 sec")',
-          'option:has-text("10")'
-        ];
+        // Look for interval options using page object
+        const intervalOptions = await pm.metricsPage.getIntervalOptions();
+        const optionCount = await intervalOptions.count();
 
-        let intervalOption = null;
-        for (const selector of intervalSelectors) {
-          const element = page.locator(selector).first();
-          if (await element.isVisible().catch(() => false)) {
-            intervalOption = element;
-            await intervalOption.click();
-            testLogger.info(`Selected refresh interval: ${await intervalOption.textContent()}`);
-            break;
-          }
-        }
-
-        if (!intervalOption) {
-          // If no specific interval found, try to select any visible option
-          const anyOption = page.locator('.q-item, [role="option"], .dropdown-item').first();
-          if (await anyOption.isVisible().catch(() => false)) {
-            await anyOption.click();
-            testLogger.info('Selected first available refresh interval option');
-          } else {
-            // Just verify the dropdown opened
-            testLogger.info('Auto-refresh dropdown opened successfully');
-          }
+        if (optionCount > 0) {
+          const firstOption = intervalOptions.first();
+          await firstOption.click();
+          const optionText = await firstOption.textContent();
+          testLogger.info(`Selected refresh interval: ${optionText}`);
+        } else {
+          // Just verify the dropdown opened
+          testLogger.info('Auto-refresh dropdown opened successfully');
         }
 
         // Verify the selection was made (button text might change)
@@ -314,33 +244,10 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing field list collapse/expand');
 
-    // Look for any collapsible panels or sections in the metrics page
-    const collapsibleSelectors = [
-      '[data-test="metrics-field-list-collapsed-icon"]',
-      '[data-cy*="collapse"]',
-      '[class*="collapse-btn"]',
-      '[class*="toggle-btn"]',
-      'button[aria-expanded]',
-      '.q-expansion-item__toggle',
-      '.collapsible-header',
-      '[data-test*="collapse"]',
-      '[data-test*="expand"]',
-      '.sidebar-toggle',
-      '.panel-toggle'
-    ];
-
-    let toggleElement = null;
-
-    // Try to find any collapsible element
-    for (const selector of collapsibleSelectors) {
-      const elements = page.locator(selector);
-      const count = await elements.count();
-
-      if (count > 0) {
-        toggleElement = elements.first();
-        testLogger.info(`Found collapsible element with selector: ${selector}`);
-        break;
-      }
+    // Try to find any collapsible element using page object
+    const toggleElement = await pm.metricsPage.getCollapsibleToggle();
+    if (await toggleElement.count() > 0) {
+      testLogger.info('Found collapsible element');
     }
 
     if (!toggleElement) {
@@ -350,25 +257,10 @@ test.describe("Metrics testcases", () => {
     }
 
     try {
-      // Find the associated panel that should toggle
-      const panelSelectors = [
-        '.field-list-panel',
-        '[class*="field-list"]',
-        '.fields-panel',
-        '.sidebar-panel',
-        '.collapsible-content',
-        '.q-expansion-item__content',
-        '[class*="panel-content"]'
-      ];
-
-      let panel = null;
-      for (const panelSelector of panelSelectors) {
-        const potentialPanel = page.locator(panelSelector).first();
-        if (await potentialPanel.count() > 0) {
-          panel = potentialPanel;
-          testLogger.info(`Found associated panel: ${panelSelector}`);
-          break;
-        }
+      // Find the associated panel using page object
+      const panel = await pm.metricsPage.getCollapsiblePanel();
+      if (await panel.count() > 0) {
+        testLogger.info('Found associated panel');
       }
 
       if (!panel) {
@@ -422,65 +314,11 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing metrics search in field list');
 
-    // Look for various search input selectors that might be present
-    const searchSelectors = [
-      pm.metricsPage.fieldSearchInput,
-      'input[placeholder*="search" i]',
-      'input[placeholder*="filter" i]',
-      'input[placeholder*="metric" i]',
-      '[data-test*="search-input"]',
-      '[data-cy*="search"]',
-      '.search-input',
-      '.filter-input',
-      '[class*="search-field"]',
-      '[role="searchbox"]'
-    ];
+    // Find search input using page object method
+    const searchInput = await pm.metricsPage.findSearchInput();
 
-    let searchInput = null;
-
-    // Try to find a search input field
-    for (const selector of searchSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        searchInput = element;
-        testLogger.info(`Found search input with selector: ${selector}`);
-        break;
-      }
-    }
-
-    // If no visible search input, check if we need to expand something first
-    if (!searchInput) {
-      testLogger.info('Search input not immediately visible, looking for expandable sections');
-
-      // Try to expand any collapsible sections that might contain the search
-      const expandableSelectors = [
-        '[data-test="metrics-field-list-collapsed-icon"]',
-        '[aria-expanded="false"]',
-        '.collapsed',
-        '.q-expansion-item:not(.q-expansion-item--expanded)',
-        '[class*="toggle"]:not(.expanded)'
-      ];
-
-      for (const expandSelector of expandableSelectors) {
-        const expandElement = page.locator(expandSelector).first();
-        if (await expandElement.count() > 0) {
-          await expandElement.click();
-          await page.waitForTimeout(500);
-          testLogger.info(`Clicked expandable element: ${expandSelector}`);
-
-          // Check again for search input
-          for (const selector of searchSelectors) {
-            const element = page.locator(selector).first();
-            if (await element.isVisible().catch(() => false)) {
-              searchInput = element;
-              testLogger.info(`Found search input after expansion: ${selector}`);
-              break;
-            }
-          }
-
-          if (searchInput) break;
-        }
-      }
+    if (searchInput) {
+      testLogger.info('Found search input');
     }
 
     if (!searchInput) {
@@ -499,16 +337,16 @@ test.describe("Metrics testcases", () => {
       await searchInput.fill(testSearchTerm);
       await page.waitForTimeout(1000); // Wait for search/filter to apply
 
-      // Verify search has some effect (check if any elements are filtered or highlighted)
-      const highlightedElements = page.locator('.highlighted, [class*="match"], [class*="filtered"]');
+      // Verify search has some effect using page object methods
+      const highlightedElements = await pm.metricsPage.getHighlightedElements();
       const highlightCount = await highlightedElements.count();
 
       if (highlightCount > 0) {
         testLogger.info(`Search highlighted ${highlightCount} elements`);
       }
 
-      // Also check if any metric items are visible
-      const metricItems = page.locator('[class*="metric-item"], [class*="field-item"], .metric-name');
+      // Also check if any metric items are visible using page object
+      const metricItems = await pm.metricsPage.getMetricItems();
       const visibleMetrics = await metricItems.count();
       testLogger.info(`${visibleMetrics} metric items visible after search`);
 
@@ -537,18 +375,18 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.clickApplyButton();
     await pm.metricsPage.waitForMetricsResults();
 
-    // Look for Add to Dashboard button (may appear after query)
-    const addToDashboardBtn = page.locator('button:has-text("Add to Dashboard"), [aria-label*="dashboard"]').first();
+    // Look for Add to Dashboard button using page object
+    const addToDashboardBtn = await pm.metricsPage.getAddToDashboardButton();
 
     if (await addToDashboardBtn.isVisible().catch(() => false)) {
       await addToDashboardBtn.click();
 
-      // Wait for modal to appear
-      const modal = page.locator('.q-dialog, [role="dialog"]').filter({ hasText: 'Dashboard' });
+      // Wait for modal to appear using page object
+      const modal = await pm.metricsPage.getDashboardModal();
       await expect(modal).toBeVisible({ timeout: 5000 });
 
       // Click cancel button
-      const cancelButton = page.locator(pm.metricsPage.schemaCancel).or(page.locator(pm.metricsPage.schemaCancelButton));
+      const cancelButton = await pm.metricsPage.getCancelButton();
       if (await cancelButton.isVisible().catch(() => false)) {
         await cancelButton.click();
 
@@ -598,8 +436,8 @@ test.describe("Metrics testcases", () => {
     // Wait for error response
     await page.waitForTimeout(2000);
 
-    // Check for error notification or message
-    const errorIndicator = page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+    // Check for error notification using page object
+    const errorIndicator = await pm.metricsPage.getErrorIndicator();
     const hasError = await errorIndicator.isVisible().catch(() => false);
 
     if (hasError) {
@@ -623,8 +461,8 @@ test.describe("Metrics testcases", () => {
     // Wait for results
     await pm.metricsPage.waitForMetricsResults();
 
-    // Check for "No data" or empty result indication
-    const noDataIndicator = page.locator('text=/no data|no results|empty/i').first();
+    // Check for "No data" or empty result indication using page object
+    const noDataIndicator = await pm.metricsPage.getNoDataIndicator();
     const hasNoDataMessage = await noDataIndicator.isVisible().catch(() => false);
 
     // For non-existent metrics, the system might show:
@@ -635,9 +473,9 @@ test.describe("Metrics testcases", () => {
     if (hasNoDataMessage) {
       testLogger.info('No data message displayed for non-existent metric - test passed');
     } else {
-      // Check if there's any actual data displayed
+      // Check if there's any actual data displayed using page object
       // Look for data rows specifically, not header rows
-      const dataRows = page.locator('tbody tr').filter({ hasText: /\d+/ }); // Look for rows with numbers
+      const dataRows = await pm.metricsPage.getDataRowsWithNumbers();
       const rowCount = await dataRows.count();
 
       if (rowCount === 0) {
