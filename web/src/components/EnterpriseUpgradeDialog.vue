@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="close-btn-top-right"
       />
 
-      <div class="dialog-split-layout">
-        <!-- Left Panel - Hero Section -->
-        <div class="hero-panel">
+      <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
+        <!-- Left Panel - Hero Section (hidden for Cloud) -->
+        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel">
 
           <div class="hero-content">
             <div class="hero-icon">
@@ -172,11 +172,12 @@ export default defineComponent({
           offerText: "Get all enterprise features completely free when you self-host OpenObserve",
           badgeText: "Free up to 200GB / day",
           badgeIcon: "bolt",
-          featuresTitle: "Unlock All Enterprise Features",
-          featuresSubtitle: "Everything you need for production-ready observability",
+          featuresTitle: "OpenObserve Cloud Features",
+          featuresSubtitle: "All features included in your cloud subscription",
           primaryButtonText: "Download Now",
           primaryButtonIcon: "download",
           showPrimaryButton: true,
+          isCloudLayout: true,
         };
       }
 
@@ -499,6 +500,13 @@ export default defineComponent({
   display: flex;
   height: 780px;
   max-height: 92vh;
+
+  &.cloud-layout {
+    .features-panel {
+      flex: 1;
+      max-width: 100%;
+    }
+  }
 }
 
 // Left Panel - Hero Section
