@@ -15,16 +15,35 @@
 
 import http from "./http";
 
+export interface ServiceGraphParams {
+  streamName?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
 const serviceGraphService = {
   /**
    * Get current service graph topology in JSON format
    * Stream-only implementation - NO in-memory metrics
    * @param orgId - Organization ID
-   * @param streamName - Optional stream name to filter topology
+   * @param options - Optional parameters (streamName, startTime, endTime)
    */
-  getCurrentTopology: (orgId: string, streamName?: string) => {
-    const params = streamName && streamName !== 'all' ? { stream_name: streamName } : {};
-    return http().get(`/api/${orgId}/traces/service_graph/topology/current`, { params });
+  getCurrentTopology: (orgId: string, options?: ServiceGraphParams) => {
+    const params: Record<string, string | number> = {};
+
+    if (options?.streamName && options.streamName !== "all") {
+      params.stream_name = options.streamName;
+    }
+    if (options?.startTime) {
+      params.start_time = options.startTime;
+    }
+    if (options?.endTime) {
+      params.end_time = options.endTime;
+    }
+
+    return http().get(`/api/${orgId}/traces/service_graph/topology/current`, {
+      params,
+    });
   },
 };
 
