@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-dialog v-model="showDialog" @hide="onDialogHide">
-    <q-card class="enterprise-dialog-v3" style="min-width: 850px; max-width: 950px">
+    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
       <!-- Close Button -->
       <q-btn
         icon="close"
@@ -36,30 +36,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="workspace_premium" size="48px" />
             </div>
 
-            <h2 class="hero-title">Enterprise Features</h2>
-            <h3 class="hero-subtitle">100% Free</h3>
+            <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
+
+            <p class="offer-text">
+              {{ dialogConfig.offerText }}
+            </p>
 
             <div class="hero-offer">
+              <q-circular-progress
+                v-if="dialogConfig.showUsageIndicator"
+                :value="dialogConfig.usagePercentage"
+                size="40px"
+                :thickness="0.18"
+                color="white"
+                track-color="rgba(255, 255, 255, 0.3)"
+                class="usage-indicator"
+                show-value
+                font-size="10px"
+              >
+                <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
+              </q-circular-progress>
               <div class="offer-badge">
-                <q-icon name="bolt" size="20px" class="q-mr-xs" />
-                <span>Up to 200GB/day</span>
+                <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                <span>{{ dialogConfig.badgeText }}</span>
               </div>
-              <p class="offer-text">
-                Get all enterprise features completely free when you self-host OpenObserve
-              </p>
             </div>
 
             <div class="hero-actions">
               <q-btn
+                v-if="dialogConfig.showPrimaryButton"
                 unelevated
-                label="Download Now"
-                @click="openDownloadPage"
-                icon-right="download"
+                :label="dialogConfig.primaryButtonText"
+                @click="handlePrimaryButtonClick"
+                :icon-right="dialogConfig.primaryButtonIcon"
                 no-caps
-                size="lg"
                 class="download-btn"
               />
               <q-btn
+                v-if="dialogConfig.showContactSales"
+                flat
+                label="Contact Sales"
+                @click="contactSales"
+                no-caps
+                class="learn-more-btn"
+                color="white"
+              />
+              <q-btn
+                v-else
                 flat
                 label="Learn More"
                 @click="openDocsLink"
@@ -74,11 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel - Features List -->
         <div class="features-panel">
           <div class="features-header">
-            <div v-if="false" class="header-icon-wrapper">
+            <div class="header-icon-wrapper">
               <q-icon name="stars" size="24px" class="header-icon" />
             </div>
-            <h4>Unlock All Enterprise Features</h4>
-            <p class="header-subtitle">Everything you need for production-ready observability</p>
+            <h4>{{ dialogConfig.featuresTitle }}</h4>
+            <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
           </div>
 
           <div class="features-list">
@@ -106,7 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed, PropType } from "vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { useQuasar } from "quasar";
+import config from "@/aws-exports";
+import { siteURL } from "@/constants/config";
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
@@ -119,6 +147,83 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const showDialog = ref(props.modelValue);
+    const store = useStore();
+    const router = useRouter();
+    const $q = useQuasar();
+
+    // Dialog configuration based on deployment type
+    const dialogConfig = computed(() => {
+      const isEnterprise = config.isEnterprise === 'true';
+      const isCloud = config.isCloud === 'true';
+      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+
+      // Calculate ingestion quota limit for non-licensed enterprise
+      // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
+      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 100; // Use nullish coalescing to allow 0
+      const ingestionQuotaText = `Free up to ${ingestionQuota}GB/day`;
+
+      // Get usage percentage for circular indicator (this is already a percentage)
+      const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
+
+      // Cloud (check this first because Cloud has both isCloud=true and isEnterprise=true)
+      if (isCloud) {
+        return {
+          heroTitle: "Enterprise Features",
+          offerText: "Get all enterprise features completely free when you self-host OpenObserve",
+          badgeText: "Free up to 200GB/day",
+          badgeIcon: "bolt",
+          featuresTitle: "Unlock All Enterprise Features",
+          featuresSubtitle: "Everything you need for production-ready observability",
+          primaryButtonText: "Download Now",
+          primaryButtonIcon: "download",
+          showPrimaryButton: true,
+        };
+      }
+
+      // Enterprise without license
+      if (isEnterprise && !hasLicense) {
+        return {
+          heroTitle: "Enterprise Features",
+          offerText: "Request a free license to maximize your OpenObserve deployment",
+          badgeText: ingestionQuotaText,
+          badgeIcon: "data_usage",
+          showUsageIndicator: true,
+          usagePercentage: usagePercentage,
+          featuresTitle: "Available Enterprise Features",
+          featuresSubtitle: "Get a free license to unlock unlimited capabilities",
+          primaryButtonText: "Get Free License",
+          primaryButtonIcon: "key",
+          showPrimaryButton: true,
+        };
+      }
+
+      // Enterprise with license
+      if (isEnterprise && hasLicense) {
+        return {
+          heroTitle: "Your Enterprise Edition",
+          offerText: "You're running OpenObserve Enterprise with all features enabled",
+          badgeText: "Licensed & Active",
+          badgeIcon: "verified",
+          featuresTitle: "Active Enterprise Features",
+          featuresSubtitle: "All features unlocked and ready to use",
+          showPrimaryButton: false,
+          showContactSales: true,
+        };
+      }
+
+      // Open Source (both false) - Default fallback
+      return {
+        heroTitle: "Enterprise Features",
+        offerText: "Get all enterprise features completely free when you self-host OpenObserve",
+        badgeText: "Free up to 200GB/day",
+        badgeIcon: "bolt",
+        featuresTitle: "Unlock All Enterprise Features",
+        featuresSubtitle: "Everything you need for production-ready observability",
+        primaryButtonText: "Download Now",
+        primaryButtonIcon: "download",
+        showPrimaryButton: true,
+      };
+    });
 
     // Enterprise features list - all 21 features
     const enterpriseFeatures = [
@@ -233,7 +338,7 @@ export default defineComponent({
       {
         name: "Broadcast Join",
         note: "Optimized distributed join operations",
-        icon: "join",
+        icon: "call_merge",
         requiresHA: true,
       },
       {
@@ -259,15 +364,98 @@ export default defineComponent({
     };
 
     const openDocsLink = () => {
-      window.open("https://openobserve.ai/docs/", "_blank");
+      const isEnterprise = config.isEnterprise === 'true';
+      const isCloud = config.isCloud === 'true';
+      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+
+      let docsUrl = "https://openobserve.ai/docs/";
+
+      // Enterprise without license - redirect to license docs
+      if (isEnterprise && !hasLicense) {
+        docsUrl = "https://openobserve.ai/docs/user-guide/management/lincense/";
+      }
+      // Open Source or Cloud - redirect to enterprise edition installation guide
+      else if (!isEnterprise || isCloud) {
+        docsUrl = "https://openobserve.ai/docs/openobserve-enterprise-edition-installation-guide/";
+      }
+
+      window.open(docsUrl, "_blank");
+    };
+
+    const contactSales = () => {
+      window.open(siteURL.contactSales, "_blank");
+    };
+
+    const navigateToLicense = () => {
+      // Get meta org identifier
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+
+      // Find the meta org from the organizations list
+      const metaOrg = store.state.organizations?.find(
+        (org: any) => org.identifier === metaOrgIdentifier
+      );
+
+      if (metaOrg) {
+        // Create the org option object so that it will be used to switch to meta org
+        const metaOrgOption = {
+          label: metaOrg.name,
+          id: metaOrg.id,
+          identifier: metaOrg.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: metaOrg.ingest_threshold,
+          search_threshold: metaOrg.search_threshold,
+        };
+
+        // Set the selected organization using dispatch
+        store.dispatch("setSelectedOrganization", metaOrgOption);
+
+        // Close the dialog
+        emit("update:modelValue", false);
+
+        // Navigate to license page with the meta org identifier
+        router.push({
+          name: 'license',
+          query: { org_identifier: metaOrgIdentifier }
+        });
+      } else {
+        // Show error notification when user doesn't have access to meta org
+        $q.notify({
+          message: "You are not authorized to manage the license.",
+          color: 'negative',
+          timeout: 5000,
+        });
+      }
+    };
+
+    const handlePrimaryButtonClick = () => {
+      const isEnterprise = config.isEnterprise === 'true';
+      const isCloud = config.isCloud === 'true';
+      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+
+      // Cloud - open download page
+      if (isCloud) {
+        openDownloadPage();
+      }
+      // Enterprise without license - navigate to license page
+      else if (isEnterprise && !hasLicense) {
+        navigateToLicense();
+      }
+      // Open Source - open download page
+      else {
+        openDownloadPage();
+      }
     };
 
     return {
       showDialog,
+      dialogConfig,
       enterpriseFeatures,
       onDialogHide,
       openDownloadPage,
       openDocsLink,
+      contactSales,
+      navigateToLicense,
+      handlePrimaryButtonClick,
     };
   },
   watch: {
@@ -303,13 +491,13 @@ export default defineComponent({
 
 .dialog-split-layout {
   display: flex;
-  height: 600px;
-  max-height: 80vh;
+  height: 780px;
+  max-height: 92vh;
 }
 
 // Left Panel - Hero Section
 .hero-panel {
-  flex: 0 0 45%;
+  flex: 0 0 35%;
   background: linear-gradient(135deg, var(--q-primary) 0%, color-mix(in srgb, var(--q-primary) 85%, black 15%) 100%);
   padding: 40px;
   display: flex;
@@ -323,8 +511,9 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     max-width: 400px;
+    width: 100%;
   }
 
   .hero-icon {
@@ -346,23 +535,30 @@ export default defineComponent({
   .hero-title {
     font-size: 32px;
     font-weight: 700;
-    margin: 0 0 8px 0;
+    margin: 0 0 16px 0;
     line-height: 1.2;
+    text-align: center;
   }
 
-  .hero-subtitle {
-    font-size: 48px;
-    font-weight: 800;
-    margin: 0 0 32px 0;
-    line-height: 1;
-    background: linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .offer-text {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    opacity: 0.95;
+    text-align: center;
   }
 
   .hero-offer {
     margin-bottom: 32px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+
+    .usage-indicator {
+      flex-shrink: 0;
+    }
 
     .offer-badge {
       display: inline-flex;
@@ -371,19 +567,11 @@ export default defineComponent({
       padding: 8px 16px;
       border-radius: 20px;
       font-weight: 600;
-      margin-bottom: 16px;
       backdrop-filter: blur(10px);
 
       .q-icon {
         color: #ffd700;
       }
-    }
-
-    .offer-text {
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.6;
-      opacity: 0.95;
     }
   }
 
@@ -391,13 +579,14 @@ export default defineComponent({
     display: flex;
     flex-direction: column;
     gap: 12px;
+    width: 100%;
 
     .download-btn {
       background: white !important;
       color: var(--q-primary) !important;
       font-weight: 700;
-      padding: 14px 36px;
-      font-size: 16px;
+      padding: 10px 32px;
+      font-size: 15px;
       border-radius: 8px !important;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -445,7 +634,7 @@ export default defineComponent({
   overflow: hidden;
 
   .features-header {
-    padding: 32px 32px 24px 32px;
+    padding: 20px 32px 16px 32px;
     background: white;
     position: sticky;
     top: 0;
@@ -457,27 +646,28 @@ export default defineComponent({
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 48px;
-      height: 48px;
+      width: 40px;
+      height: 40px;
       background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
       border-radius: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
 
       .header-icon {
         color: white;
+        font-size: 20px;
       }
     }
 
     h4 {
-      font-size: 22px;
+      font-size: 19px;
       font-weight: 800;
-      margin: 0 0 8px 0;
+      margin: 0 0 5px 0;
       color: rgba(0, 0, 0, 0.9);
       letter-spacing: -0.3px;
     }
 
     .header-subtitle {
-      font-size: 14px;
+      font-size: 12.5px;
       color: rgba(0, 0, 0, 0.6);
       margin: 0;
       font-weight: 500;
@@ -487,16 +677,17 @@ export default defineComponent({
   .features-list {
     flex: 1;
     overflow-y: auto;
-    padding: 18px 32px 30px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
+    padding: 10px 32px 16px 32px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px 14px;
+    align-content: start;
   }
 
   .feature-list-item {
     display: flex;
     gap: 10px;
-    padding: 6px 10px;
+    padding: 8px 12px;
     border-radius: 6px;
     transition: all 0.2s ease;
 
@@ -506,14 +697,18 @@ export default defineComponent({
 
     .feature-icon-badge {
       flex-shrink: 0;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
       background: rgba(var(--q-primary-rgb), 0.1);
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--q-primary);
+
+      .q-icon {
+        font-size: 15px;
+      }
     }
 
     .feature-content {
@@ -526,7 +721,7 @@ export default defineComponent({
       font-weight: 600;
       color: rgba(0, 0, 0, 0.87);
       margin-bottom: 2px;
-      line-height: 1.3;
+      line-height: 1.25;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -535,7 +730,7 @@ export default defineComponent({
     .ha-badge {
       display: inline-flex;
       align-items: center;
-      padding: 2px 6px;
+      padding: 2px 7px;
       background: rgba(var(--q-primary-rgb), 0.15);
       color: var(--q-primary);
       border-radius: 4px;
@@ -548,7 +743,7 @@ export default defineComponent({
     .feature-desc {
       font-size: 11px;
       color: rgba(0, 0, 0, 0.55);
-      line-height: 1.3;
+      line-height: 1.25;
     }
   }
 }
