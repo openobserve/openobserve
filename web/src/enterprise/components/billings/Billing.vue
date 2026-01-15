@@ -176,7 +176,7 @@ export default defineComponent({
 
     // Check if invoice tab should be shown (only for Stripe, and only after loading)
     const showInvoiceTab = computed(() => {
-      return billingInfoLoaded.value && billingProvider.value !== "aws";
+      return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
@@ -191,7 +191,6 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
-
       if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
         billingtab.value = "plans";
         router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
