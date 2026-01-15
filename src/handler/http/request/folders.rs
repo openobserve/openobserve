@@ -88,7 +88,7 @@ impl From<FolderError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new folder"}))
+        ("x-o2-mcp" = json!({"description": "Create a new folder", "category": "folders"}))
     ),
 )]
 pub async fn create_folder(
@@ -136,7 +136,7 @@ pub async fn create_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update folder properties"}))
+        ("x-o2-mcp" = json!({"description": "Update folder properties", "category": "folders"}))
     ),
 )]
 pub async fn update_folder(
@@ -171,7 +171,7 @@ pub async fn update_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all folders"}))
+        ("x-o2-mcp" = json!({"description": "List all folders", "category": "folders"}))
     ),
 )]
 #[allow(unused_variables)]
@@ -217,7 +217,7 @@ pub async fn list_folders(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get folder details by ID", "category": "folders"}))
     ),
 )]
 pub async fn get_folder(
@@ -255,7 +255,7 @@ pub async fn get_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder by name"}))
+        ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
 pub async fn get_folder_by_name(
@@ -294,7 +294,7 @@ pub async fn get_folder_by_name(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a folder by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders"}))
     ),
 )]
 pub async fn delete_folder(

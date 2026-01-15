@@ -56,7 +56,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a role"}))
+        ("x-o2-mcp" = json!({"description": "Create a role", "category": "authorization"}))
     )
 )]
 pub async fn create_role(
@@ -140,7 +140,7 @@ pub async fn create_role(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a role"}))
+        ("x-o2-mcp" = json!({"description": "Delete a role", "category": "authorization"}))
     )
 )]
 pub async fn delete_role(Path((org_id, role_name)): Path<(String, String)>) -> Response {
@@ -303,7 +303,7 @@ pub async fn delete_role(Path(_path): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all roles"}))
+        ("x-o2-mcp" = json!({"description": "List all roles", "category": "authorization"}))
     )
 )]
 pub async fn get_roles(
@@ -401,7 +401,7 @@ pub async fn get_roles(Path(_org_id): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a role"}))
+        ("x-o2-mcp" = json!({"description": "Update a role", "category": "authorization"}))
     )
 )]
 pub async fn update_role(
