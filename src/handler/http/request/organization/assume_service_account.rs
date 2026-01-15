@@ -79,6 +79,10 @@ use crate::{
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal server error"),
         (status = 501, description = "Not available in non-enterprise builds"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "assume"})),
+        ("x-o2-mcp" = json!({"description": "Assume service account identity", "category": "users"}))
+    )
 )]
 #[cfg(feature = "enterprise")]
 pub async fn assume_service_account(

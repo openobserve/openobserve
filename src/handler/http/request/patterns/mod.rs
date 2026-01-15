@@ -60,7 +60,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Extract log patterns"}))
+        ("x-o2-mcp" = json!({"description": "Extract log patterns", "category": "patterns"}))
     )
 )]
 #[axum::debug_handler]
