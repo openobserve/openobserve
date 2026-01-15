@@ -1420,7 +1420,7 @@ pub async fn search_multi_stream(
 
     let search_span = setup_tracing_with_trace_id(
         &trace_id,
-        tracing::info_span!("service::search::multi_search_stream_h2"),
+        tracing::info_span!("service::search::search_multi_stream_h2"),
     )
     .await;
 
