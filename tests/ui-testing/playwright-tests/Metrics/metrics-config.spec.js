@@ -34,26 +34,21 @@ test.describe("Metrics Configuration Tests", () => {
   }, async ({ page }) => {
     testLogger.info('Testing custom date range configuration');
 
-    // Open date picker
-    const datePicker = page.locator('[data-test="date-time-picker"]').or(
-      page.locator('[data-test="metrics-date-picker"]')
-    ).or(
-      page.locator('[data-cy="date-time-btn"]')
-    );
+    // Open date picker using page object
+    const opened = await pm.metricsPage.clickDateTimePicker();
 
-    if (await datePicker.isVisible()) {
-      await datePicker.click();
+    if (opened) {
       testLogger.info('Date picker opened');
 
       // Look for custom range option
-      const customRange = page.locator('text=/custom|relative|absolute/i').first();
+      const customRange = await pm.metricsPage.getCustomRangeOption();
       if (await customRange.isVisible()) {
         await customRange.click();
         testLogger.info('Custom date range option selected');
       }
 
       // Verify date picker UI elements
-      const dateInput = page.locator('input[type="date"], input[placeholder*="date"]').first();
+      const dateInput = await pm.metricsPage.getDateInput();
       if (await dateInput.isVisible()) {
         testLogger.info('Date input field is visible');
       }
@@ -67,19 +62,15 @@ test.describe("Metrics Configuration Tests", () => {
   }, async ({ page }) => {
     testLogger.info('Testing auto-refresh interval configuration');
 
-    // Look for refresh button/dropdown
-    const refreshButton = page.locator('[data-test*="refresh"]').or(
-      page.locator('[data-cy*="refresh"]')
-    ).or(
-      page.locator('button:has-text("Off")')
-    ).first();
+    // Look for refresh button/dropdown using page object
+    const refreshButton = await pm.metricsPage.getRefreshButton();
 
     if (await refreshButton.isVisible()) {
       await refreshButton.click();
       await page.waitForTimeout(500);
 
-      // Look for interval options
-      const intervalOptions = page.locator('.q-item, [role="option"]');
+      // Look for interval options using page object
+      const intervalOptions = await pm.metricsPage.getIntervalOptions();
       const optionCount = await intervalOptions.count();
 
       if (optionCount > 0) {
@@ -104,31 +95,16 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('up');
     await page.waitForTimeout(2000);
 
-    // Look for chart type selector
-    const chartTypeSelectors = [
-      '[data-test*="chart-type"]',
-      '[data-cy*="chart-type"]',
-      'button:has-text("Line")',
-      'button:has-text("Bar")',
-      '[class*="chart-type"]'
-    ];
+    // Look for chart type selector using page object
+    const chartTypeButton = await pm.metricsPage.getChartTypeButton();
 
-    let chartTypeButton = null;
-    for (const selector of chartTypeSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        chartTypeButton = element;
-        testLogger.info(`Found chart type selector: ${selector}`);
-        break;
-      }
-    }
-
-    if (chartTypeButton) {
+    if (await chartTypeButton.isVisible().catch(() => false)) {
       await chartTypeButton.click();
       await page.waitForTimeout(500);
+      testLogger.info('Chart type selector clicked');
 
-      // Look for chart type options
-      const chartOptions = page.locator('.q-item:visible, [role="option"]:visible');
+      // Look for chart type options using page object
+      const chartOptions = await pm.metricsPage.getVisibleChartOptions();
       const optionCount = await chartOptions.count();
 
       if (optionCount > 0) {
@@ -156,25 +132,12 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('up');
     await page.waitForTimeout(2000);
 
-    // Look for legend toggle
-    const legendSelectors = [
-      '[data-test*="legend"]',
-      '[data-cy*="legend"]',
-      'button:has-text("Legend")',
-      '[class*="legend-toggle"]'
-    ];
+    // Look for legend toggle using page object
+    const legendToggle = await pm.metricsPage.getLegendToggle();
 
-    let legendToggle = null;
-    for (const selector of legendSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        legendToggle = element;
-        testLogger.info(`Found legend toggle: ${selector}`);
-        break;
-      }
-    }
+    if (await legendToggle.isVisible().catch(() => false)) {
+      testLogger.info('Found legend toggle');
 
-    if (legendToggle) {
       // Check initial state
       const initialState = await legendToggle.getAttribute('aria-pressed') || 'false';
 
@@ -188,8 +151,8 @@ test.describe("Metrics Configuration Tests", () => {
       }
     }
 
-    // Check if legend is visible
-    const legend = page.locator('.legend, [class*="legend-container"]').first();
+    // Check if legend is visible using page object
+    const legend = await pm.metricsPage.getLegendElement();
     if (await legend.isVisible().catch(() => false)) {
       testLogger.info('Legend is visible on chart');
     }
@@ -203,10 +166,8 @@ test.describe("Metrics Configuration Tests", () => {
   }, async ({ page }) => {
     testLogger.info('Testing time range presets');
 
-    // Open date picker
-    const datePicker = page.locator('[data-test="date-time-picker"]').or(
-      page.locator('[data-cy="date-time-btn"]')
-    ).first();
+    // Open date picker using page object
+    const datePicker = await pm.metricsPage.getDateTimePicker();
 
     if (await datePicker.isVisible()) {
       await datePicker.click();
@@ -247,33 +208,18 @@ test.describe("Metrics Configuration Tests", () => {
   }, async ({ page }) => {
     testLogger.info('Testing query builder configuration');
 
-    // Look for query mode toggle (PromQL vs SQL)
-    const queryModeSelectors = [
-      '[data-test*="query-mode"]',
-      'button:has-text("PromQL")',
-      'button:has-text("SQL")',
-      '[class*="query-mode"]'
-    ];
+    // Look for query mode toggle (PromQL vs SQL) using page object
+    const queryModeToggle = await pm.metricsPage.getQueryModeToggle();
 
-    let queryModeToggle = null;
-    for (const selector of queryModeSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        queryModeToggle = element;
-        testLogger.info(`Found query mode selector: ${selector}`);
-        break;
-      }
-    }
-
-    if (queryModeToggle) {
+    if (await queryModeToggle.isVisible().catch(() => false)) {
       const currentMode = await queryModeToggle.textContent();
       testLogger.info(`Current query mode: ${currentMode}`);
 
       await queryModeToggle.click();
       await page.waitForTimeout(500);
 
-      // Check if mode options appear
-      const modeOptions = page.locator('.q-item:has-text("SQL"), .q-item:has-text("PromQL")');
+      // Check if mode options appear using page object
+      const modeOptions = await pm.metricsPage.getModeOptions();
       if (await modeOptions.count() > 0) {
         testLogger.info('Query mode options are available');
       }
@@ -292,30 +238,16 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('cpu_usage');
     await page.waitForTimeout(2000);
 
-    // Look for panel settings button
-    const settingsSelectors = [
-      '[data-test*="panel-settings"]',
-      '[data-test*="chart-settings"]',
-      'button[aria-label*="settings"]',
-      '[class*="settings-btn"]'
-    ];
+    // Look for panel settings button using page object
+    const settingsButton = await pm.metricsPage.getSettingsButton();
 
-    let settingsButton = null;
-    for (const selector of settingsSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        settingsButton = element;
-        testLogger.info(`Found settings button: ${selector}`);
-        break;
-      }
-    }
-
-    if (settingsButton) {
+    if (await settingsButton.isVisible().catch(() => false)) {
       await settingsButton.click();
       await page.waitForTimeout(500);
+      testLogger.info('Settings button clicked');
 
-      // Look for settings panel/modal
-      const settingsPanel = page.locator('.settings-panel, .settings-modal, [class*="settings-dialog"]').first();
+      // Look for settings panel/modal using page object
+      const settingsPanel = await pm.metricsPage.getSettingsPanel();
       if (await settingsPanel.isVisible().catch(() => false)) {
         testLogger.info('Settings panel opened');
 
@@ -335,8 +267,8 @@ test.describe("Metrics Configuration Tests", () => {
           }
         }
 
-        // Close settings
-        const closeButton = page.locator('button:has-text("Close"), button:has-text("Cancel"), [aria-label="Close"]').first();
+        // Close settings using page object
+        const closeButton = await pm.metricsPage.getCloseButton();
         if (await closeButton.isVisible()) {
           await closeButton.click();
           testLogger.info('Settings panel closed');
@@ -357,30 +289,16 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('up');
     await page.waitForTimeout(2000);
 
-    // Look for export button
-    const exportSelectors = [
-      '[data-test*="export"]',
-      'button:has-text("Export")',
-      'button[aria-label*="export"]',
-      '[class*="export-btn"]'
-    ];
+    // Look for export button using page object
+    const exportButton = await pm.metricsPage.getExportButton();
 
-    let exportButton = null;
-    for (const selector of exportSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        exportButton = element;
-        testLogger.info(`Found export button: ${selector}`);
-        break;
-      }
-    }
-
-    if (exportButton) {
+    if (await exportButton.isVisible().catch(() => false)) {
       await exportButton.click();
       await page.waitForTimeout(500);
+      testLogger.info('Export button clicked');
 
-      // Look for export options
-      const exportOptions = page.locator('.q-item:has-text("CSV"), .q-item:has-text("JSON"), .q-item:has-text("PNG")');
+      // Look for export options using page object
+      const exportOptions = await pm.metricsPage.getExportOptions();
       const optionCount = await exportOptions.count();
 
       if (optionCount > 0) {
@@ -407,28 +325,13 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('cpu_usage');
     await page.waitForTimeout(2000);
 
-    // Look for axis configuration options
-    const axisSelectors = [
-      '[data-test*="axis-config"]',
-      '[data-test*="y-axis"]',
-      '[data-test*="x-axis"]',
-      'button:has-text("Axis")',
-      '[class*="axis-settings"]'
-    ];
+    // Look for axis configuration options using page object
+    const axisButton = await pm.metricsPage.getAxisButton();
 
-    let axisButton = null;
-    for (const selector of axisSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        axisButton = element;
-        testLogger.info(`Found axis configuration: ${selector}`);
-        break;
-      }
-    }
-
-    if (axisButton) {
+    if (await axisButton.isVisible().catch(() => false)) {
       await axisButton.click();
       await page.waitForTimeout(500);
+      testLogger.info('Axis configuration button clicked');
 
       // Look for axis options
       const axisOptions = [
@@ -460,29 +363,16 @@ test.describe("Metrics Configuration Tests", () => {
     await pm.metricsPage.executeQuery('memory_usage');
     await page.waitForTimeout(2000);
 
-    // Look for threshold configuration
-    const thresholdSelectors = [
-      '[data-test*="threshold"]',
-      'button:has-text("Threshold")',
-      '[class*="threshold-config"]'
-    ];
+    // Look for threshold configuration using page object
+    const thresholdButton = await pm.metricsPage.getThresholdButton();
 
-    let thresholdButton = null;
-    for (const selector of thresholdSelectors) {
-      const element = page.locator(selector).first();
-      if (await element.isVisible().catch(() => false)) {
-        thresholdButton = element;
-        testLogger.info(`Found threshold configuration: ${selector}`);
-        break;
-      }
-    }
-
-    if (thresholdButton) {
+    if (await thresholdButton.isVisible().catch(() => false)) {
       await thresholdButton.click();
       await page.waitForTimeout(500);
+      testLogger.info('Threshold configuration button clicked');
 
-      // Look for threshold input fields
-      const thresholdInputs = page.locator('input[type="number"][placeholder*="threshold"], input[placeholder*="value"]');
+      // Look for threshold input fields using page object
+      const thresholdInputs = await pm.metricsPage.getThresholdInputs();
       const inputCount = await thresholdInputs.count();
 
       if (inputCount > 0) {

@@ -1011,4 +1011,332 @@ export class MetricsPage {
         return await elements.count();
     }
 
+    // ===== DATE/TIME PICKER METHODS =====
+
+    async getDateTimePicker() {
+        return this.page.locator('[data-test="date-time-picker"]').or(
+            this.page.locator('[data-test="metrics-date-picker"]')
+        ).or(
+            this.page.locator('[data-cy="date-time-btn"]')
+        ).first();
+    }
+
+    async clickDateTimePicker() {
+        const picker = await this.getDateTimePicker();
+        if (await picker.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await picker.click();
+            return true;
+        }
+        return false;
+    }
+
+    async getCustomRangeOption() {
+        return this.page.locator('text=/custom|relative|absolute/i').first();
+    }
+
+    async getDateInput() {
+        return this.page.locator('input[type="date"], input[placeholder*="date"]').first();
+    }
+
+    async getPresetOption(preset) {
+        return this.page.locator(`text="${preset}"`).first();
+    }
+
+    // ===== REFRESH BUTTON METHODS =====
+
+    async getRefreshButton() {
+        return this.page.locator('[data-test*="refresh"]').or(
+            this.page.locator('[data-cy*="refresh"]')
+        ).or(
+            this.page.locator('button:has-text("Off")')
+        ).first();
+    }
+
+    async clickRefreshButton() {
+        const btn = await this.getRefreshButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            return true;
+        }
+        return false;
+    }
+
+    async getIntervalOptions() {
+        return this.page.locator('.q-item, [role="option"]');
+    }
+
+    // ===== CHART OPTIONS METHODS =====
+
+    async getVisibleChartOptions() {
+        return this.page.locator('.q-item:visible, [role="option"]:visible');
+    }
+
+    // ===== LEGEND METHODS =====
+
+    async getLegendElement() {
+        return this.page.locator('.legend, [class*="legend-container"]').first();
+    }
+
+    async isLegendVisible() {
+        const legend = await this.getLegendElement();
+        return await legend.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    // ===== MODE SELECTION METHODS =====
+
+    async getModeOptions() {
+        return this.page.locator('.q-item:has-text("SQL"), .q-item:has-text("PromQL")');
+    }
+
+    async getModeOptionCount() {
+        const options = await this.getModeOptions();
+        return await options.count();
+    }
+
+    // ===== SETTINGS PANEL METHODS =====
+
+    async getSettingsPanel() {
+        return this.page.locator('.settings-panel, .settings-modal, [class*="settings-dialog"]').first();
+    }
+
+    async isSettingsPanelVisible() {
+        const panel = await this.getSettingsPanel();
+        return await panel.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    async getSettingByText(text) {
+        return this.page.locator(`text=/${text}/i`).first();
+    }
+
+    async getCloseButton() {
+        return this.page.locator('button:has-text("Close"), button:has-text("Cancel"), [aria-label="Close"]').first();
+    }
+
+    async clickCloseButton() {
+        const btn = await this.getCloseButton();
+        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await btn.click();
+            return true;
+        }
+        return false;
+    }
+
+    // ===== EXPORT OPTIONS METHODS =====
+
+    async getExportOptions() {
+        return this.page.locator('.q-item:has-text("CSV"), .q-item:has-text("JSON"), .q-item:has-text("PNG")');
+    }
+
+    async getExportOptionCount() {
+        const options = await this.getExportOptions();
+        return await options.count();
+    }
+
+    // ===== THRESHOLD INPUT METHODS =====
+
+    async getThresholdInputs() {
+        return this.page.locator('input[type="number"][placeholder*="threshold"], input[placeholder*="value"]');
+    }
+
+    async getThresholdInputCount() {
+        const inputs = await this.getThresholdInputs();
+        return await inputs.count();
+    }
+
+    // ===== ADDITIONAL HELPER METHODS FOR metrics.spec.js =====
+
+    async selectLast15Minutes() {
+        // Look for "Last 15 minutes" option in the date picker
+        const last15MinutesOption = this.page.locator('.q-item__label, .q-item, [role="option"]').filter({ hasText: /Last 15 minutes|15m|15 min/i }).first();
+        const hasOption = await last15MinutesOption.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (hasOption) {
+            await last15MinutesOption.click();
+            return true;
+        } else {
+            // Try alternate approach - look for relative time options
+            const relativeTimeButton = this.page.locator('button, [role="button"]').filter({ hasText: /Relative|Last/i }).first();
+            if (await relativeTimeButton.isVisible().catch(() => false)) {
+                await relativeTimeButton.click();
+                await this.page.waitForTimeout(500);
+            }
+
+            // Try to find any 15 minute option
+            const anyTimeOption = this.page.locator('text=/15.*min/i').first();
+            if (await anyTimeOption.isVisible().catch(() => false)) {
+                await anyTimeOption.click();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    async hasTable() {
+        const dataTable = this.page.locator('.results-table, .data-table, table.q-table, [class*="table"], .q-table__middle, table').first();
+        return await dataTable.isVisible().catch(() => false);
+    }
+
+    async hasValue() {
+        const resultValue = this.page.locator('.metric-value, .result-value, [class*="value"], .metrics-value, .query-result-value').first();
+        return await resultValue.isVisible().catch(() => false);
+    }
+
+    async hasJson() {
+        const jsonResult = this.page.locator('pre, .json-viewer, .result-json, [class*="json"]').first();
+        return await jsonResult.isVisible().catch(() => false);
+    }
+
+    async getTableCells() {
+        return await this.page.locator('tbody td, .q-table__middle td, .table-cell').allTextContents();
+    }
+
+    async getResultsPageText() {
+        return await this.page.locator('.q-page, main, .metrics-results').textContent().catch(() => '');
+    }
+
+    async getMetricValueText() {
+        const resultValue = this.page.locator('.metric-value, .result-value, [class*="value"], .metrics-value, .query-result-value').first();
+        return await resultValue.textContent();
+    }
+
+    async getJsonResultText() {
+        const jsonResult = this.page.locator('pre, .json-viewer, .result-json, [class*="json"]').first();
+        return await jsonResult.textContent();
+    }
+
+    async getDatePickerDropdown() {
+        return this.page.locator('.date-time-picker-dropdown, .q-menu');
+    }
+
+    async getCollapsibleToggle() {
+        const collapsibleSelectors = [
+            '[data-test="metrics-field-list-collapsed-icon"]',
+            '[data-cy*="collapse"]',
+            '[class*="collapse-btn"]',
+            '[class*="toggle-btn"]',
+            'button[aria-expanded]',
+            '.q-expansion-item__toggle',
+            '.collapsible-header',
+            '[data-test*="collapse"]',
+            '[data-test*="expand"]',
+            '.sidebar-toggle',
+            '.panel-toggle'
+        ];
+
+        for (const selector of collapsibleSelectors) {
+            const elements = this.page.locator(selector);
+            const count = await elements.count();
+            if (count > 0) {
+                return elements.first();
+            }
+        }
+        return this.page.locator('.not-exists'); // Return non-existent locator
+    }
+
+    async getCollapsiblePanel() {
+        const panelSelectors = [
+            '.field-list-panel',
+            '[class*="field-list"]',
+            '.fields-panel',
+            '.sidebar-panel',
+            '.collapsible-content',
+            '.q-expansion-item__content',
+            '[class*="panel-content"]'
+        ];
+
+        for (const panelSelector of panelSelectors) {
+            const potentialPanel = this.page.locator(panelSelector).first();
+            if (await potentialPanel.count() > 0) {
+                return potentialPanel;
+            }
+        }
+        return this.page.locator('.not-exists'); // Return non-existent locator
+    }
+
+    async getNoDataMessage() {
+        return this.page.locator('text=/no data|No results|Empty/i').first();
+    }
+
+    async getHighlightedElements() {
+        return this.page.locator('.highlighted, [class*="match"], [class*="filtered"]');
+    }
+
+    async getMetricItems() {
+        return this.page.locator('[class*="metric-item"], [class*="field-item"], .metric-name');
+    }
+
+    async getAddToDashboardButton() {
+        return this.page.locator('button:has-text("Add to Dashboard"), [aria-label*="dashboard"]').first();
+    }
+
+    async getDashboardModal() {
+        return this.page.locator('.q-dialog, [role="dialog"]').filter({ hasText: 'Dashboard' });
+    }
+
+    async getErrorIndicator() {
+        return this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+    }
+
+    async getNoDataIndicator() {
+        return this.page.locator('text=/no data|no results|empty/i').first();
+    }
+
+    async getDataRowsWithNumbers() {
+        return this.page.locator('tbody tr').filter({ hasText: /\d+/ });
+    }
+
+    async getCancelButton() {
+        return this.page.locator(this.schemaCancel).or(this.page.locator(this.schemaCancelButton));
+    }
+
+    async findSearchInput() {
+        const searchSelectors = [
+            this.fieldSearchInput,
+            'input[placeholder*="search" i]',
+            'input[placeholder*="filter" i]',
+            'input[placeholder*="metric" i]',
+            '[data-test*="search-input"]',
+            '[data-cy*="search"]',
+            '.search-input',
+            '.filter-input',
+            '[class*="search-field"]',
+            '[role="searchbox"]'
+        ];
+
+        // Try to find a search input field
+        for (const selector of searchSelectors) {
+            const element = this.page.locator(selector).first();
+            if (await element.isVisible().catch(() => false)) {
+                return element;
+            }
+        }
+
+        // If not found, try to expand collapsible sections first
+        const expandableSelectors = [
+            '[data-test="metrics-field-list-collapsed-icon"]',
+            '[aria-expanded="false"]',
+            '.collapsed',
+            '.q-expansion-item:not(.q-expansion-item--expanded)',
+            '[class*="toggle"]:not(.expanded)'
+        ];
+
+        for (const expandSelector of expandableSelectors) {
+            const expandElement = this.page.locator(expandSelector).first();
+            if (await expandElement.count() > 0) {
+                await expandElement.click();
+                await this.page.waitForTimeout(500);
+
+                // Check again for search input
+                for (const selector of searchSelectors) {
+                    const element = this.page.locator(selector).first();
+                    if (await element.isVisible().catch(() => false)) {
+                        return element;
+                    }
+                }
+            }
+        }
+
+        return null; // Not found
+    }
+
 }
