@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
       <!-- Close Button -->
       <q-btn
-        icon="close"
+        icon="cancel"
         flat
         round
         dense
