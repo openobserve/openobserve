@@ -159,8 +159,8 @@ export default defineComponent({
 
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
-      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 100; // Use nullish coalescing to allow 0
-      const ingestionQuotaText = `Free up to ${ingestionQuota}GB/day`;
+      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 200; // Use nullish coalescing to allow 0
+      const ingestionQuotaText = `Free up to ${ingestionQuota}GB / day`;
 
       // Get usage percentage for circular indicator (this is already a percentage)
       const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
@@ -170,7 +170,7 @@ export default defineComponent({
         return {
           heroTitle: "Enterprise Features",
           offerText: "Get all enterprise features completely free when you self-host OpenObserve",
-          badgeText: "Free up to 200GB/day",
+          badgeText: "Free up to 200GB / day",
           badgeIcon: "bolt",
           featuresTitle: "Unlock All Enterprise Features",
           featuresSubtitle: "Everything you need for production-ready observability",
@@ -217,7 +217,7 @@ export default defineComponent({
       return {
         heroTitle: "Enterprise Features",
         offerText: "Get all enterprise features completely free when you self-host OpenObserve",
-        badgeText: "Free up to 200GB/day",
+        badgeText: "Free up to 200GB / day",
         badgeIcon: "bolt",
         featuresTitle: "Unlock All Enterprise Features",
         featuresSubtitle: "Everything you need for production-ready observability",
