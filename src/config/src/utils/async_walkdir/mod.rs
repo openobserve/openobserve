@@ -207,11 +207,12 @@ where
 {
     async move {
         if let Some((path, dir)) = dirs.last_mut() {
+            let path_clone = path.clone();
             match dir.next().await {
                 Some(Ok(entry)) => walk_entry(entry, dirs, filter).await,
                 Some(Err(source)) => Some((
                     Err(InnerError::Io {
-                        path: path.to_path_buf(),
+                        path: path_clone,
                         source,
                     }
                     .into()),
