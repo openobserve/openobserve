@@ -245,7 +245,11 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
         .service(status::schedulez);
 
     #[cfg(feature = "cloud")]
-    svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
+    svc.service(
+        web::scope("/webhook")
+            .service(cloud::billings::handle_stripe_event)
+            .service(cloud::billings::handle_azure_event),
+    );
 
     // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
     // Must be publicly accessible (no auth) as users haven't logged in yet
@@ -717,6 +721,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::marketing::handle_new_attribution_event)
         .service(cloud::aws_marketplace::link_subscription)
         .service(cloud::aws_marketplace::activation_status)
+        .service(cloud::azure_marketplace::link_subscription)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 
