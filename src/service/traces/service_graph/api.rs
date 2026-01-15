@@ -38,13 +38,15 @@ pub struct ServiceGraphQuery {
     tag = "Traces",
     operation_id = "GetCurrentServiceGraphTopology",
     summary = "Get current service graph topology",
-    description = "Returns service graph topology from stream storage (last 60 minutes). Stream-only - NO in-memory metrics.",
+    description = "Returns service graph topology from stream storage. Supports custom time ranges via start_time and end_time query parameters (in microseconds). Falls back to configured default window if not specified.",
     security(
         ("Authorization" = [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
+        ("start_time" = Option<i64>, Query, description = "Start time in microseconds (defaults to configured window)"),
+        ("end_time" = Option<i64>, Query, description = "End time in microseconds (defaults to now)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -63,8 +65,14 @@ pub async fn get_current_topology(
 ) -> Result<HttpResponse, actix_web::Error> {
     use config::meta::service_graph::ServiceGraphData;
 
-    // Query edges from stream (last 60 minutes by default)
-    let edges = match query_edges_from_stream_internal(&org_id, query.stream_name.as_deref()).await
+    // Query edges from stream with optional time range
+    let edges = match query_edges_from_stream_with_time_range(
+        &org_id,
+        query.stream_name.as_deref(),
+        query.start_time,
+        query.end_time,
+    )
+    .await
     {
         Ok(edges) => edges,
         Err(e) => {
@@ -110,42 +118,66 @@ pub async fn get_current_topology(
 }
 
 #[cfg(feature = "enterprise")]
-/// Query edge records from the _o2_service_graph stream
+/// Query edge records from the _o2_service_graph stream with custom time range
 ///
-/// Internal version exposed for incident topology enrichment.
-pub async fn query_edges_from_stream_internal(
+/// Accepts optional start_time and end_time parameters (in microseconds).
+/// Falls back to configured default window if not specified.
+pub async fn query_edges_from_stream_with_time_range(
     org_id: &str,
     stream_filter: Option<&str>,
+    start_time: Option<i64>,
+    end_time: Option<i64>,
 ) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
     use config::meta::stream::StreamType;
 
     let stream_name = "_o2_service_graph";
 
-    // Use configured time range (same as processor)
+    // Use provided time range or fall back to configured default
     let now = chrono::Utc::now().timestamp_micros();
-    let window_minutes = o2_enterprise::enterprise::common::config::get_config()
-        .service_graph
-        .query_time_range_minutes;
-    let window_micros = window_minutes * 60 * 1_000_000;
-    let start_time = now - window_micros;
+    let (query_start_time, query_end_time) = match (start_time, end_time) {
+        (Some(start), Some(end)) => {
+            log::debug!(
+                "[ServiceGraph] Using custom time range: {} to {}",
+                start,
+                end
+            );
+            (start, end)
+        }
+        (Some(start), None) => {
+            log::debug!("[ServiceGraph] Using custom start time {} to now", start);
+            (start, now)
+        }
+        _ => {
+            // Fall back to configured default window
+            let window_minutes = o2_enterprise::enterprise::common::config::get_config()
+                .service_graph
+                .query_time_range_minutes;
+            let window_micros = window_minutes * 60 * 1_000_000;
+            log::debug!(
+                "[ServiceGraph] Using default window of {} minutes",
+                window_minutes
+            );
+            (now - window_micros, now)
+        }
+    };
 
     // Query pre-aggregated edge state (already summarized per minute)
     let sql = if let Some(stream) = stream_filter {
         format!(
             "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {}
+             WHERE _timestamp >= {} AND _timestamp <= {}
              AND org_id = '{}'
              AND trace_stream_name = '{}'
              LIMIT 10000",
-            stream_name, start_time, org_id, stream
+            stream_name, query_start_time, query_end_time, org_id, stream
         )
     } else {
         format!(
             "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {}
+             WHERE _timestamp >= {} AND _timestamp <= {}
              AND org_id = '{}'
              LIMIT 10000",
-            stream_name, start_time, org_id
+            stream_name, query_start_time, query_end_time, org_id
         )
     };
 
@@ -155,8 +187,8 @@ pub async fn query_edges_from_stream_internal(
             sql: sql.clone(),
             from: 0,
             size: 100000,
-            start_time,
-            end_time: now,
+            start_time: query_start_time,
+            end_time: query_end_time,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
@@ -204,12 +236,26 @@ pub async fn query_edges_from_stream_internal(
         })?;
 
     log::debug!(
-        "[ServiceGraph] Retrieved {} edge records from stream for org '{}'",
+        "[ServiceGraph] Retrieved {} edge records from stream for org '{}' (time range: {} to {})",
         resp.hits.len(),
-        org_id
+        org_id,
+        query_start_time,
+        query_end_time
     );
 
     Ok(resp.hits)
+}
+
+#[cfg(feature = "enterprise")]
+/// Query edge records from the _o2_service_graph stream
+///
+/// Internal version exposed for incident topology enrichment.
+/// Uses default configured time range.
+pub async fn query_edges_from_stream_internal(
+    org_id: &str,
+    stream_filter: Option<&str>,
+) -> Result<Vec<serde_json::Value>, infra::errors::Error> {
+    query_edges_from_stream_with_time_range(org_id, stream_filter, None, None).await
 }
 
 /// GetCurrentTopology (OSS - Not Supported)
