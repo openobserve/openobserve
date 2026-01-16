@@ -84,6 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
 
+            <!-- License Limit Note (only for Enterprise without license) -->
+            <div v-if="dialogConfig.showLicenseNote" class="license-note">
+              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <span>100GB/day without license • 200GB/day with license</span>
+            </div>
+
             <div class="hero-actions">
               <q-btn
                 v-if="dialogConfig.showPrimaryButton"
@@ -145,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Columns 2 & 3: Enterprise Features -->
             <div
               v-for="feature in enterpriseFeatures"
+              v-show="!feature.cloudHidden"
               :key="feature.name"
               class="feature-list-item"
             >
@@ -291,6 +298,7 @@ export default defineComponent({
           primaryButtonText: "Get Free License",
           primaryButtonIcon: "key",
           showPrimaryButton: true,
+          showLicenseNote: true, // Show note about license limits
         };
       }
 
@@ -434,6 +442,7 @@ export default defineComponent({
         note: "Automate responses to events and alerts",
         icon: "code",
         requiresHA: true,
+        cloudHidden: true, // Hide from Cloud layout
       },
       {
         name: "Sensitive Data Redaction",
@@ -790,6 +799,26 @@ export default defineComponent({
           color: white;
         }
       }
+    }
+  }
+
+  .license-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -8px;
+    margin-bottom: 16px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+
+    .q-icon {
+      color: rgba(255, 255, 255, 0.85);
     }
   }
 
