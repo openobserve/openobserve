@@ -843,8 +843,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Fill URL input
         await this.fillUrlInput(csvUrl);
 
-        // Click Save button
-        await this.page.getByRole('button', { name: 'Save' }).click({ force: true });
+        // Click Save button (wait for it to be actionable)
+        await this.page.getByRole('button', { name: 'Save' }).click();
         testLogger.debug('Save button clicked');
 
         // Wait for save to complete
@@ -926,6 +926,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
             attempts++;
             const elapsed = Date.now() - startTime;
             testLogger.debug(`Polling attempt ${attempts}, elapsed: ${elapsed}ms`);
+
+            // Reload page to get fresh DOM state from server
+            await this.page.reload({ waitUntil: 'networkidle' });
 
             // Find the row with table name
             const row = this.page.locator('tbody tr').filter({ hasText: tableName });

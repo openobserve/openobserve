@@ -14,6 +14,7 @@ const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const { expect } = require('@playwright/test');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { randomUUID } = require('crypto');
 
 // Test data - using small protocols.csv (13 rows) for fast processing
 const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
@@ -25,8 +26,8 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     let enrichmentPage;
     let pipelinesPage;
 
-    // Generate unique table names for each test to avoid conflicts
-    const generateTableName = (prefix) => `${prefix}_${Date.now()}`;
+    // Generate unique table names for each test to avoid conflicts in parallel runs
+    const generateTableName = (prefix) => `${prefix}_${randomUUID().split('-')[0]}`;
 
     test.beforeEach(async ({ page }) => {
         testLogger.info('=== Starting test ===');
