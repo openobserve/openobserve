@@ -846,7 +846,7 @@
     "close": "Close",
     "filterAll": "All",
     "filterFile": "File",
-    "filterUrl": "Url",
+    "filterUrl": "URL",
     "dataSource": "Data Source",
     "uploadFile": "Upload File",
     "fromUrl": "From URL",
@@ -1664,7 +1664,7 @@
       "defaultWindowDescription": "In absence of semantic field match, alerts and data from given duration is considered related",
       "defaultWindowPlaceholder": "Use alert period by default",
       "cancelButton": "Cancel",
-      "saveButton": "Save Settings"
+      "saveButton": "Save"
     },
     "placeholders": {
       "typeSomething": "Type something",

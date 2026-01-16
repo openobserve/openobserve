@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="incident-list" class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
     <!-- Incidents table -->
     <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
+      <div class="card-container tw:h-[calc(100vh-120px)]">
         <q-table
           ref="qTableRef"
           v-model:pagination="pagination"
