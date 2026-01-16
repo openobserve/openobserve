@@ -1887,7 +1887,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+    const q = useQuasar();
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
@@ -2082,7 +2082,7 @@ export default defineComponent({
             searchObj.data.tempFunctionContent != "")
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
-            $q.notify({
+            q.notify({
               message: "Job Context have been removed",
               color: "warning",
               position: "bottom",
@@ -2100,7 +2100,7 @@ export default defineComponent({
       () => searchObj.meta.showHistogram,
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
-          $q.notify({
+          q.notify({
             message: "Histogram is not available for scheduled search",
             color: "negative",
             position: "bottom",
@@ -2350,7 +2350,7 @@ export default defineComponent({
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // $q.notify({
+                // q.notify({
                 //   message: "Stream not found",
                 //   color: "info",
                 //   position: "bottom",
@@ -2366,7 +2366,7 @@ export default defineComponent({
           searchObj.meta.queryEditorPlaceholderFlag == true
         ) {
           if (!checkQuery(value)) {
-            $q.notify({
+            q.notify({
               message: "Job Context have been removed",
               color: "warning",
               position: "bottom",
@@ -2491,7 +2491,7 @@ export default defineComponent({
       //to solve this issue we are using json2csv package
 
       if (!data || data.length === 0) {
-        $q.notify({
+        q.notify({
           message: "No data found to download.",
           color: "positive",
           position: "bottom",
@@ -2533,7 +2533,7 @@ export default defineComponent({
         showDownloadMenu.value = false;
       } catch (error) {
         showDownloadMenu.value = false;
-        $q.notify({
+        q.notify({
           type: "negative",
           message: "Error downloading logs",
           timeout: 2000,
@@ -2609,7 +2609,7 @@ export default defineComponent({
       }
 
       if (content.trim() == "") {
-        $q.notify({
+        q.notify({
           type: "warning",
           message:
             "The function field must contain a value and cannot be left empty.",
@@ -2620,7 +2620,7 @@ export default defineComponent({
 
       const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
       if (!pattern.test(fnName)) {
-        $q.notify({
+        q.notify({
           type: "negative",
           message: "Function name is not valid.",
         });
@@ -2643,7 +2643,7 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            $q.notify({
+            q.notify({
               type: "positive",
               message: res.data.message,
             });
@@ -2666,7 +2666,7 @@ export default defineComponent({
           })
           .catch((err) => {
             saveFunctionLoader.value = false;
-            $q.notify({
+            q.notify({
               type: "negative",
               message:
                 JSON.stringify(err.response.data["message"]) ||
@@ -2685,7 +2685,7 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              $q.notify({
+              q.notify({
                 type: "positive",
                 message: "Function updated successfully.",
               });
@@ -2709,7 +2709,7 @@ export default defineComponent({
             })
             .catch((err) => {
               saveFunctionLoader.value = false;
-              $q.notify({
+              q.notify({
                 type: "negative",
                 message:
                   JSON.stringify(err.response.data["message"]) ||
@@ -2743,7 +2743,7 @@ export default defineComponent({
 
     const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
-        $q.notify({
+        q.notify({
           type: "positive",
           message: `${fnValue.name} function applied successfully.`,
           timeout: 3000,
@@ -2762,7 +2762,7 @@ export default defineComponent({
     const fnSavedFunctionDialog = () => {
       const content = searchObj.data.tempFunctionContent;
       if (content == "") {
-        $q.notify({
+        q.notify({
           type: "negative",
           message: "No function definition found.",
         });
@@ -2818,7 +2818,7 @@ export default defineComponent({
 
     const fnSavedView = () => {
       if (searchObj.data.stream.selectedStream.length == 0) {
-        $q.notify({
+        q.notify({
           type: "negative",
           message: "No stream available to save view.",
         });
@@ -3239,7 +3239,7 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            $q.notify({
+            q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",
               position: "bottom",
@@ -3294,7 +3294,7 @@ export default defineComponent({
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
-            $q.notify({
+            q.notify({
               message: err.message || `Error while applying saved view.`,
               color: "negative",
               position: "bottom",
@@ -3305,7 +3305,7 @@ export default defineComponent({
         .catch((err) => {
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
-          $q.notify({
+          q.notify({
             message: `Error while applying saved view.`,
             color: "negative",
             position: "bottom",
@@ -3321,7 +3321,7 @@ export default defineComponent({
           savedViewName.value == "" ||
           /^[A-Za-z0-9 \-\_]+$/.test(savedViewName.value) == false
         ) {
-          $q.notify({
+          q.notify({
             message: `Please provide valid view name.`,
             color: "negative",
             position: "bottom",
@@ -3343,7 +3343,7 @@ export default defineComponent({
       //       );
       //     });
       //   } else {
-      //     $q.notify({
+      //     q.notify({
       //       message: `Please select saved view to update.`,
       //       color: "negative",
       //       position: "bottom",
@@ -3385,7 +3385,7 @@ export default defineComponent({
             );
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
-              $q.notify({
+              q.notify({
                 message: t("search.viewDeletedSuccessfully"),
                 color: "positive",
                 position: "bottom",
@@ -3393,7 +3393,7 @@ export default defineComponent({
               });
               getSavedViews();
             } else {
-              $q.notify({
+              q.notify({
                 message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
@@ -3402,7 +3402,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
-            $q.notify({
+            q.notify({
               message: t("search.errorDeletingSavedView"),
               color: "negative",
               position: "bottom",
@@ -3466,7 +3466,7 @@ export default defineComponent({
     const createSavedViews = (viewName: string) => {
       try {
         if (viewName.trim() == "") {
-          $q.notify({
+          q.notify({
             message: `Please provide valid view name.`,
             color: "negative",
             position: "bottom",
@@ -3495,7 +3495,7 @@ export default defineComponent({
                 view_id: res.data.view_id,
                 view_name: viewName,
               });
-              $q.notify({
+              q.notify({
                 message: t("search.viewCreatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
@@ -3507,7 +3507,7 @@ export default defineComponent({
               saveViewLoader.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              q.notify({
                 message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
@@ -3517,7 +3517,7 @@ export default defineComponent({
           })
           .catch((err) => {
             saveViewLoader.value = false;
-            $q.notify({
+            q.notify({
               message: t("search.errorCreatingSavedView"),
               color: "negative",
               position: "bottom",
@@ -3529,7 +3529,7 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
           position: "bottom",
@@ -3546,7 +3546,7 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        const dismiss = $q.notify({
+        const dismiss = q.notify({
           message: "Updating saved view...",
           position: "bottom",
           timeout: 0,
@@ -3568,7 +3568,7 @@ export default defineComponent({
                 },
               );
 
-              $q.notify({
+              q.notify({
                 message: t("search.viewUpdatedSuccessfully"),
                 color: "positive",
                 position: "bottom",
@@ -3580,7 +3580,7 @@ export default defineComponent({
               confirmSavedViewDialogVisible.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              q.notify({
                 message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
                 color: "negative",
                 position: "bottom",
@@ -3591,7 +3591,7 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             saveViewLoader.value = false;
-            $q.notify({
+            q.notify({
               message: t("search.errorUpdatingSavedView"),
               color: "negative",
               position: "bottom",
@@ -3603,7 +3603,7 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewSelectedName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        q.notify({
           message: `Error while saving view: ${e}`,
           color: "negative",
           position: "bottom",
@@ -3787,7 +3787,7 @@ export default defineComponent({
 
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
-          $q.notify({
+          q.notify({
             message: "You can only save 10 views.",
             color: "info",
             position: "bottom",
@@ -3802,7 +3802,7 @@ export default defineComponent({
         // moveItemsToTop(localSavedView, favoriteViews.value);
 
         useLocalSavedView(localSavedView);
-        $q.notify({
+        q.notify({
           message: "View added to favorites.",
           color: "positive",
           position: "bottom",
@@ -3811,7 +3811,7 @@ export default defineComponent({
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
-        $q.notify({
+        q.notify({
           message: "View removed from favorites.",
           color: "positive",
           position: "bottom",
@@ -4105,7 +4105,7 @@ export default defineComponent({
         //   searchObj.meta.jobId = "";
         // }
         if (!searchObj.data.stream.selectedStream || searchObj.data.stream.selectedStream.length === 0) {
-          $q.notify({
+          q.notify({
             type: "negative",
             message: "Please select a stream before scheduling a job",
             timeout: 3000,
@@ -4113,7 +4113,7 @@ export default defineComponent({
           return;
         }
         if (searchObj.meta.jobId != "") {
-          $q.notify({
+          q.notify({
             type: "negative",
             message: t("search.jobAlreadyScheduled"),
             timeout: 3000,
@@ -4125,7 +4125,7 @@ export default defineComponent({
           searchObj.meta.jobRecords == 0 ||
           searchObj.meta.jobRecords < 0
         ) {
-          $q.notify({
+          q.notify({
             type: "negative",
             message: t("search.jobSchedulerRange"),
             timeout: 3000,
@@ -4138,7 +4138,7 @@ export default defineComponent({
         await getJobData();
       } catch (e) {
         if (e.response.status != 403) {
-          $q.notify({
+          q.notify({
             type: "negative",
             message: t("search.errorAddingJob"),
             timeout: 3000,
@@ -4190,7 +4190,7 @@ export default defineComponent({
     };
 
     const updateActionSelection = (item: any) => {
-      $q.notify({
+      q.notify({
         message: `${item?.name} action applied successfully`,
         timeout: 3000,
         color: "secondary",
@@ -4269,7 +4269,6 @@ export default defineComponent({
     // [END] explain query functionality
 
     return {
-      $q,
       t,
       store,
       router,
