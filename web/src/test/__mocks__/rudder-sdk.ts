@@ -17,10 +17,10 @@ import { vi } from "vitest";
 
 vi.mock("@rudderstack/analytics-js", () => {
   return {
-    RudderAnalytics: vi.fn().mockImplementation(() => ({
-      ready: vi.fn(),
-      load: vi.fn(),
-      track: vi.fn(),
-    })),
+    RudderAnalytics: class {
+      ready = vi.fn();
+      load = vi.fn();
+      track = vi.fn();
+    },
   };
 });
