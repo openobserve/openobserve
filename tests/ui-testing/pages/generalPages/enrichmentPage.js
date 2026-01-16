@@ -854,11 +854,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
         testLogger.debug('Returned to enrichment tables list');
 
-        // Wait for list page to load completely
+        // Wait for list page to load completely and table to be added to backend
         await this.page.waitForLoadState('networkidle');
 
-        // Additional stabilization wait for table list to refresh
-        await this.page.waitForTimeout(3000);
+        // Give extra time for the enrichment table to be registered in the backend before searching
+        await this.page.waitForTimeout(5000);
     }
 
     /**
