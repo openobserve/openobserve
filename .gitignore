@@ -24,3 +24,4 @@ flamegraph.html
 # web distribution
 /web/dist
 /web/.env
+/docs/

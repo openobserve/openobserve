@@ -35,12 +35,19 @@ pub async fn ingest(
             Ok(req)
         },
     );
+
+    // set ingestion timeout
+    let mut request = tonic::Request::new(req);
+    request.set_timeout(std::time::Duration::from_secs(
+        cfg.limit.grpc_ingest_timeout,
+    ));
+
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let res: cluster_rpc::IngestionResponse = match client.ingest(req).await {
+    let res: cluster_rpc::IngestionResponse = match client.ingest(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
             log::error!(
