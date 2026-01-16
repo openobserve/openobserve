@@ -200,7 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   padding="sm"
                   unelevated
                   size="sm"
-                  icon="pause"
+                  :icon="outlinedPause"
+                  color="negative"
                   round
                   flat
                   @click="confirmPauseJob(props.row)"
@@ -213,7 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   padding="sm"
                   unelevated
                   size="sm"
-                  icon="play_arrow"
+                  :icon="outlinedPlayArrow"
+                  color="positive"
                   round
                   flat
                   @click="confirmResumeJob(props.row)"
@@ -235,29 +237,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tooltip>Edit Job</q-tooltip>
                 </q-btn>
                 <q-btn
-                  v-if="canDeleteJob(props.row.status)"
                   padding="sm"
                   unelevated
                   size="sm"
-                  icon="delete"
-                  round
-                  flat
-                  @click="confirmDeleteJob(props.row)"
-                  data-test="delete-job-btn"
-                >
-                  <q-tooltip>Delete Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  icon="info"
+                  :icon="outlinedVisibility"
                   round
                   flat
                   @click="viewJob(props.row)"
                   data-test="view-job-btn"
                 >
                   <q-tooltip>View Details</q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="canDeleteJob(props.row.status)"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  :icon="outlinedDelete"
+                  round
+                  flat
+                  @click="confirmDeleteJob(props.row)"
+                  data-test="delete-job-btn"
+                >
+                  <q-tooltip>Delete Job</q-tooltip>
                 </q-btn>
                 <q-btn
                   v-if="props.row.error"
@@ -384,6 +386,12 @@ import NoData from "../shared/grid/NoData.vue";
 import QTablePagination from "../shared/grid/Pagination.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
+import {
+  outlinedDelete,
+  outlinedPause,
+  outlinedPlayArrow,
+  outlinedVisibility,
+} from "@quasar/extras/material-icons-outlined";
 
 const router = useRouter();
 const $q = useQuasar();
