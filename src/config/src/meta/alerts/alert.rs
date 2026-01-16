@@ -57,6 +57,11 @@ pub struct Alert {
     #[serde(default)]
     pub trigger_condition: TriggerCondition,
     pub destinations: Vec<String>,
+    /// Optional template name. When specified, this template is used for all
+    /// destinations instead of destination-level templates. This allows using
+    /// different templates for different alerts while reusing the same destinations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
@@ -108,6 +113,7 @@ impl Default for Alert {
             query_condition: QueryCondition::default(),
             trigger_condition: TriggerCondition::default(),
             destinations: vec![],
+            template: None,
             context_attributes: None,
             row_template: "".to_string(),
             row_template_type: RowTemplateType::default(),

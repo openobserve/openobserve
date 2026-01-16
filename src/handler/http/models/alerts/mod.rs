@@ -57,6 +57,12 @@ pub struct Alert {
 
     pub destinations: Vec<String>,
 
+    /// Optional template name. When specified, this template is used for all
+    /// destinations instead of destination-level templates. This allows using
+    /// different templates for different alerts while reusing the same destinations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
 
@@ -299,6 +305,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             query_condition: alert.query_condition.into(),
             trigger_condition: alert.trigger_condition.into(),
             destinations: alert.destinations,
+            template: alert.template,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
             row_template_type: alert.row_template_type,
@@ -481,6 +488,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.query_condition = value.query_condition.into();
         alert.trigger_condition = value.trigger_condition.into();
         alert.destinations = value.destinations;
+        alert.template = value.template;
         alert.context_attributes = value.context_attributes;
         alert.row_template = value.row_template;
         alert.row_template_type = value.row_template_type;

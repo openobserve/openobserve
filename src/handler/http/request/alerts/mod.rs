@@ -85,6 +85,8 @@ impl From<AlertError> for Response {
             AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
+            AlertError::TemplateNotConfigured { .. } => MetaHttpResponse::bad_request(value),
+            AlertError::AlertTemplateNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
             AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
@@ -131,7 +133,7 @@ impl From<AlertError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(

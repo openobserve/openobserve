@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     common::{
-        infra::config::{ALERTS_TEMPLATES, DESTINATIONS},
+        infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS},
         meta::organization::DEFAULT_ORG,
     },
     service::db,
@@ -48,6 +48,8 @@ pub enum TemplateError {
     AlreadyExists,
     #[error("Template is in use for destination {0}")]
     DeleteWithDestination(String),
+    #[error("Template is in use for alert {0}")]
+    DeleteWithAlert(String),
     #[error("Template not found")]
     NotFound,
 }
@@ -97,14 +99,27 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
+    // Check if template is used by any destination
     for dest in DESTINATIONS.iter() {
         let d = dest.value();
         if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
-            && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
+            && matches!(&d.module, Module::Alert { template: Some(t), .. } if t.eq(name))
         {
             return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
         }
     }
+
+    // Check if template is used by any alert directly
+    let alerts_cache = ALERTS.read().await;
+    for (key, (_folder, alert)) in alerts_cache.iter() {
+        if (key.starts_with(org_id) || key.starts_with(DEFAULT_ORG))
+            && alert.template.as_ref().is_some_and(|t| t.eq(name))
+        {
+            return Err(TemplateError::DeleteWithAlert(alert.name.to_string()));
+        }
+    }
+    drop(alerts_cache);
+
     let event_key = match table::templates::get(org_id, name).await? {
         None => return Err(TemplateError::NotFound),
         Some(temp) => format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", temp.org_id, temp.name),

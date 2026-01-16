@@ -71,14 +71,15 @@ impl From<DestinationError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert destination", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create alert/pipeline destination, alert destination must have a template", "category": "alerts"}))
     )
 )]
 pub async fn save_destination(
     Path(org_id): Path<String>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    let dest = match dest.into(org_id) {
+    // This endpoint is for alert destinations, so is_alert = true
+    let dest = match dest.into(org_id, true) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
@@ -124,7 +125,8 @@ pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    let dest = match dest.into(org_id) {
+    // This endpoint is for alert destinations, so is_alert = true
+    let dest = match dest.into(org_id, true) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
