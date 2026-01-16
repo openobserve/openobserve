@@ -451,7 +451,6 @@ use crate::{common::meta, handler::http::request};
         (name = "Ratelimit", description = "Ratelimit operations"),
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
-        (name = "Backfill", description = "Pipeline backfill operations for gap filling"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
