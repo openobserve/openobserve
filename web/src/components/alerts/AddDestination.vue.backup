@@ -80,19 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Prebuilt Destination Form (for alerts only) -->
-        <div v-if="isAlerts && isPrebuiltDestination" class="col-12">
-          <PrebuiltDestinationForm
-            v-model="prebuiltCredentials"
-            :destination-type="formData.destination_type"
-            :is-testing="isTestInProgress"
-            :test-result="lastTestResult"
-            data-test="prebuilt-form"
-            @preview="showPreview"
-            @test="handleTestDestination"
-          />
-        </div>
-
         <!-- Legacy tabs for non-alert destinations -->
         <div v-if="!isAlerts" class="col-12 q-pb-md">
          <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
@@ -170,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template
-          v-if="((isAlerts && formData.destination_type === 'custom') || isAlerts == false)"
+          v-if="(isAlerts && formData.type === 'http') || isAlerts == false"
         >
           <div class="col-6 q-py-xs">
             <q-input
@@ -296,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
           </div>
         </template>
-        <template v-if="formData.type === 'email' && (!isAlerts || formData.destination_type === 'custom')">
+        <template v-if="formData.type === 'email'">
           <q-input
             v-model="formData.emails"
             :label="t('reports.recipients') + ' *'"
@@ -316,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template v-if="formData.type === 'action' && (!isAlerts || formData.destination_type === 'custom')">
+        <template v-if="formData.type === 'action'">
           <div class="col-6 q-py-xs action-select">
             <q-select
               data-test="add-destination-action-select"
@@ -360,14 +347,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     </div>
-
-    <!-- Destination Preview Modal -->
-    <DestinationPreview
-      v-model="showPreviewModal"
-      :type="formData.destination_type"
-      :template-content="previewContent"
-      data-test="destination-preview-modal"
-    />
   </q-page>
 </template>
 <script lang="ts" setup>
@@ -394,9 +373,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
-import DestinationPreview from "./DestinationPreview.vue";
 
 const props = defineProps({
   templates: {
@@ -430,7 +406,6 @@ const formData: Ref<DestinationData> = ref({
   type: "http",
   action_id: "",
   output_format: "json",
-  destination_type: "", // For prebuilt destinations
 });
 const isUpdatingDestination = ref(false);
 
@@ -443,23 +418,6 @@ const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
 const filteredActions = ref<any[]>([]);
 
 const { getAllActions } = useActions();
-
-// Prebuilt destinations composable
-const {
-  availableTypes,
-  popularTypes,
-  validateCredentials,
-  testDestination,
-  createDestination,
-  generatePreview,
-  isTestInProgress,
-  lastTestResult
-} = usePrebuiltDestinations();
-
-// Prebuilt destinations state
-const prebuiltCredentials = ref<Record<string, any>>({});
-const showPreviewModal = ref(false);
-const previewContent = ref('');
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -518,35 +476,6 @@ const tabs = computed(() => {
   }
 
   return tabs;
-});
-
-// Destination types for alerts (prebuilt + custom)
-const destinationTypes = computed(() => {
-  if (!props.isAlerts) return [];
-
-  const prebuiltTypes = availableTypes.value.map(type => ({
-    value: type.id,
-    label: type.name,
-    image: `/src/assets/images/destinations/${type.icon}.png`,
-    icon: type.icon,
-    description: type.description
-  }));
-
-  // Add custom option
-  prebuiltTypes.push({
-    value: 'custom',
-    label: 'Custom',
-    image: null,
-    icon: 'webhook',
-    description: 'Create custom webhook destination'
-  });
-
-  return prebuiltTypes;
-});
-
-// Check if current destination type is prebuilt
-const isPrebuiltDestination = computed(() => {
-  return formData.value.destination_type && formData.value.destination_type !== 'custom';
 });
 
 onActivated(() => setupDestinationData());
@@ -633,64 +562,7 @@ const getActionOptions = async () => {
   }
 };
 
-// Select destination type (prebuilt or custom)
-const selectDestinationType = (type: string) => {
-  formData.value.destination_type = type;
-
-  // Reset form data when switching types
-  prebuiltCredentials.value = {};
-
-  if (type === 'custom') {
-    // Switch to custom mode
-    formData.value.type = 'http';
-    formData.value.url = '';
-    formData.value.template = '';
-  } else {
-    // Set up prebuilt type
-    formData.value.type = type === 'email' ? 'email' : 'http';
-  }
-};
-
-// Handle prebuilt destination test
-const handleTestDestination = async () => {
-  if (!isPrebuiltDestination.value) return;
-
-  try {
-    await testDestination(formData.value.destination_type, prebuiltCredentials.value);
-  } catch (error) {
-    console.error('Test failed:', error);
-  }
-};
-
-// Show template preview
-const showPreview = () => {
-  if (!isPrebuiltDestination.value) return;
-
-  previewContent.value = generatePreview(formData.value.destination_type);
-  showPreviewModal.value = true;
-};
-
-// Save prebuilt or custom destination
-const saveDestination = async () => {
-  // Handle prebuilt destinations
-  if (isPrebuiltDestination.value) {
-    try {
-      await createDestination(
-        formData.value.destination_type,
-        formData.value.name,
-        prebuiltCredentials.value
-      );
-
-      emit("get:destinations");
-      emit("cancel:hideform");
-      return;
-    } catch (error) {
-      console.error('Failed to create prebuilt destination:', error);
-      return;
-    }
-  }
-
-  // Handle custom destinations (existing logic)
+const saveDestination = () => {
   if (!isValidDestination.value) {
     q.notify({
       type: "negative",
@@ -870,91 +742,5 @@ const filterActions = (val: string, update: any) => {
 
 .no-case .q-field__native span {
   text-transform: none !important;
-}
-
-// Destination Type Selection Grid Styles
-.destination-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
-
-.destination-type-card {
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 1rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: white;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-
-  &:hover {
-    border-color: #5960b2;
-    box-shadow: 0 4px 12px rgba(89, 96, 178, 0.15);
-    transform: translateY(-2px);
-  }
-
-  &.selected {
-    border-color: #5960b2;
-    background: linear-gradient(135deg, #5960b2 0%, #4a52a0 100%);
-    color: white;
-    box-shadow: 0 4px 16px rgba(89, 96, 178, 0.3);
-
-    .destination-type-label {
-      color: white;
-    }
-
-    &::after {
-      content: "✓";
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-    }
-  }
-}
-
-.destination-type-content {
-  margin-bottom: 0.75rem;
-}
-
-.destination-type-image {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-}
-
-.destination-type-icon {
-  color: #666;
-
-  .selected & {
-    color: white;
-  }
-}
-
-.destination-type-label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #333;
-  margin: 0;
-
-  &.active {
-    color: white;
-  }
 }
 </style>
