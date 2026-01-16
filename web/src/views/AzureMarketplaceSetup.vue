@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 color="primary"
-                label="Link AWS Billing"
+                label="Link Azure Billing"
                 @click="linkToExistingOrg"
                 :loading="isProcessing"
                 :disable="!selectedOrg"
