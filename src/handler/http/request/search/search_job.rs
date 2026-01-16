@@ -328,20 +328,20 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
     )
 )]
 pub async fn get_status(
-    Path(path): Path<(String, String)>,
+    Path((org_id, job_id)): Path<(String, String)>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let user_id = _user_email.user_id;
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
         let res = get(&job_id, &org_id).await;
         let model = match res {
             Ok(res) => res,
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
+        if model.status == 4 {
+            return MetaHttpResponse::not_found(format!("[Job_Id: {job_id}] Search Job not found"));
+        }
 
         // check permissions
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
@@ -352,7 +352,8 @@ pub async fn get_status(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        drop(org_id);
+        drop(job_id);
         (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
