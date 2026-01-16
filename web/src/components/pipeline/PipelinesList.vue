@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="history"
                 />
                 <q-btn
+                    v-if="config.isEnterprise == 'true'"
                     data-test="pipeline-list-backfill-btn"
                     class="q-ml-sm o2-secondary-button tw-h-[36px]"
                     :class="
@@ -209,9 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-item-section>
                               <q-item-section>{{ t('pipeline.export') }}</q-item-section>
                             </q-item>
-                            <q-separator v-if="props.row.source.source_type === 'scheduled'" />
+                            <q-separator v-if="props.row.source.source_type === 'scheduled' && config.isEnterprise == 'true'" />
                             <q-item
-                              v-if="props.row.source.source_type === 'scheduled'"
+                              v-if="props.row.source.source_type === 'scheduled' && config.isEnterprise == 'true'"
                               class="flex items-center"
                               clickable
                               v-close-popup
@@ -533,6 +534,7 @@ import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
 import { useQuasar, type QTableProps } from "quasar";
 import type { QTableColumn } from "quasar";
+import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
 import {
