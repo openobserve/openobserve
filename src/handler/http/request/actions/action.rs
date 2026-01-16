@@ -18,7 +18,6 @@ use axum::{
     extract::{Multipart, Path},
     response::Response,
 };
-use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
@@ -41,6 +40,7 @@ use {
     serde_json,
     std::collections::HashMap,
     std::str::FromStr,
+    svix_ksuid::Ksuid,
 };
 
 use crate::{
