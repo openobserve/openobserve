@@ -103,15 +103,27 @@ impl MemTable {
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
-        for (stream_name, stream) in self.streams.iter() {
-            let key_parts: Vec<&str> = stream_name.splitn(2, '/').collect();
-            let (org_id, stream_name) = if key_parts.len() == 2 {
+        for (stream_key, stream) in self.streams.iter() {
+            let key_parts: Vec<&str> = stream_key.splitn(2, '/').collect();
+            let (stream_org_id, stream_name) = if key_parts.len() == 2 {
                 (key_parts[0], key_parts[1])
             } else {
-                (org_id, stream_name.as_ref())
+                (org_id, stream_key.as_ref())
             };
+
+            // Skip deleted streams (fixes #9866)
+            if crate::immutable::is_stream_deleted(stream_org_id, stream_type, stream_name).await {
+                log::info!(
+                    "[INGESTER:MEM] skipping persist for deleted stream: {}/{}/{}",
+                    stream_org_id,
+                    stream_type,
+                    stream_name
+                );
+                continue;
+            }
+
             let (part_schema_size, partitions) = stream
-                .persist(idx, org_id, stream_type, stream_name)
+                .persist(idx, stream_org_id, stream_type, stream_name)
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
@@ -125,5 +137,14 @@ impl MemTable {
             self.json_bytes_written.load(Ordering::SeqCst) as usize,
             self.arrow_bytes_written.load(Ordering::SeqCst) as usize,
         )
+    }
+
+    /// Remove a specific stream from the memtable.
+    /// Returns true if the stream was found and removed.
+    /// Note: This does not update the bytes_written counters since we don't track
+    /// per-stream sizes. The counters will be reset when the memtable is dropped.
+    pub(crate) fn remove_stream(&mut self, org_id: &str, stream_name: &str) -> bool {
+        let key = Arc::from(format!("{org_id}/{stream_name}"));
+        self.streams.remove(&key).is_some()
     }
 }

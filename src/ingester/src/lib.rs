@@ -35,7 +35,7 @@ use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
     Writer, check_disk_circuit_breaker, check_memory_circuit_breaker, check_memtable_size,
-    flush_all, get_writer, read_from_memtable,
+    clear_stream_data, flush_all, get_writer, read_from_memtable,
 };
 
 use crate::errors::OpenDirSnafu;

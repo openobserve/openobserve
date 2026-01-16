@@ -83,6 +83,7 @@ pub async fn search_parquet(
             .unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, query.stream_type);
+
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
