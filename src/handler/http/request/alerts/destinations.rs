@@ -71,7 +71,7 @@ impl From<DestinationError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert destination", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create alert/pipeline destination, alert destination must have a template", "category": "alerts"}))
     )
 )]
 pub async fn save_destination(

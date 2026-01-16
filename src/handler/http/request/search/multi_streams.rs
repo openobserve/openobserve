@@ -1198,7 +1198,7 @@ pub async fn search_multi_stream(
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-                    format!("/api/{}/_{}", org_id, "search_multi_stream"),
+                    format!("/api/{}/_search_multi_stream", org_id),
                     query_string,
                     body_bytes,
                 )
@@ -1235,7 +1235,7 @@ pub async fn search_multi_stream(
                             http_response.status().into(),
                             Some(error_message),
                             "POST".to_string(),
-                            format!("/api/{}/_{}", org_id, "search_multi_stream"),
+                            format!("/api/{}/_search_multi_stream", org_id),
                             query
                                 .iter()
                                 .map(|(k, v)| format!("{}={}", k, v))
@@ -1387,7 +1387,7 @@ pub async fn search_multi_stream(
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-                    format!("/api/{}/_{}", org_id, "search_multi_stream"),
+                    format!("/api/{}/_search_multi_stream", org_id),
                     query
                         .iter()
                         .map(|(k, v)| format!("{}={}", k, v))
@@ -1407,7 +1407,7 @@ pub async fn search_multi_stream(
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
         method: "POST".to_string(),
-        path: format!("/api/{}/_{}", org_id, "search_multi_stream"),
+        path: format!("/api/{}/_search_multi_stream", org_id),
         query_params: query
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
