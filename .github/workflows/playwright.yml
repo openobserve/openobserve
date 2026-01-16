@@ -241,6 +241,18 @@ jobs:
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
               ]
+          - testfolder: "Metrics"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics.spec.js",
+                "metrics-queries.spec.js",
+                "metrics-aggregations.spec.js",
+                "metrics-advanced.spec.js",
+                "metrics-config-tabs.spec.js",
+                "metrics-visualizations.spec.js",
+                "metrics-config.spec.js",
+              ]
             # - testfolder: "Dashboards-Variables-Scoped"
             #   browser: "chrome"
             #   run_files:

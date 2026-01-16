@@ -290,7 +290,7 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/search_jobs/{job_id}/status",
+    path = "/{org_id}/search_jobs/{job_id}",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobStatus",

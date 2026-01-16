@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn test_module_display() {
         let alert_module = Module::Alert {
-            template: "test".to_string(),
+            template: Some("test".to_string()),
             destination_type: DestinationType::Http(Endpoint::default()),
         };
         assert_eq!(alert_module.to_string(), "alert");

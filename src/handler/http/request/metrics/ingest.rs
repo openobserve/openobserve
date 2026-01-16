@@ -80,7 +80,7 @@ pub async fn json(
         return MetaHttpResponse::too_many_requests(e);
     }
 
-    let mut resp = match metrics::json::ingest(&org_id, body, user).await {
+    let mut resp = match metrics::json::ingest(&org_id, None, body, user).await {
         Ok(v) => {
             if v.code == StatusCode::OK.as_u16() {
                 MetaHttpResponse::json(v)
