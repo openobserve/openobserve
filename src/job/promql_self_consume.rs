@@ -118,6 +118,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             let bytes = bytes::Bytes::from(metrics);
             match service::metrics::json::ingest(
                 org,
+                None,
                 bytes,
                 IngestUser::SystemJob(SystemJobType::SelfMetricsPromql),
             )
