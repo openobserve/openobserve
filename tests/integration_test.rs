@@ -229,26 +229,25 @@ mod tests {
         )
         .await;
 
-        if status.is_success() {
-            if let Ok(alerts) = serde_json::from_slice::<serde_json::Value>(&body)
-                && let Some(list) = alerts.get("list").and_then(|l| l.as_array())
-            {
-                let alert_names = ["alertChk", "sns_test_alert", "multirange_alert"];
-                for alert in list {
-                    if let Some(name) = alert.get("name").and_then(|n| n.as_str())
-                        && alert_names.contains(&name)
-                        && let Some(id) = alert.get("alert_id").and_then(|id| id.as_str())
-                    {
-                        let _ = make_request(
-                            &app,
-                            Method::DELETE,
-                            &format!("/api/v2/e2e/alerts/{}?type=logs", id),
-                            Some(headers.clone()),
-                            None,
-                        )
-                        .await;
-                        log::info!("Cleanup: deleted alert {}", name);
-                    }
+        if status.is_success()
+            && let Ok(alerts) = serde_json::from_slice::<serde_json::Value>(&body)
+            && let Some(list) = alerts.get("list").and_then(|l| l.as_array())
+        {
+            let alert_names = ["alertChk", "sns_test_alert", "multirange_alert"];
+            for alert in list {
+                if let Some(name) = alert.get("name").and_then(|n| n.as_str())
+                    && alert_names.contains(&name)
+                    && let Some(id) = alert.get("alert_id").and_then(|id| id.as_str())
+                {
+                    let _ = make_request(
+                        &app,
+                        Method::DELETE,
+                        &format!("/api/v2/e2e/alerts/{}?type=logs", id),
+                        Some(headers.clone()),
+                        None,
+                    )
+                    .await;
+                    log::info!("Cleanup: deleted alert {}", name);
                 }
             }
         }
@@ -1346,7 +1345,7 @@ mod tests {
 
         let req = Request::builder()
             .method(Method::POST)
-            .uri(&format!("/api/{}/prometheus/api/v1/write", "e2e"));
+            .uri(format!("/api/{}/prometheus/api/v1/write", "e2e"));
         let mut req_builder = req;
         for (key, value) in headers.iter() {
             req_builder = req_builder.header(key, value);

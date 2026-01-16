@@ -46,9 +46,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Alerts::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(Alerts::Template).string().null(),
-                        )
+                        .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
                         .to_owned(),
                 )
                 .await

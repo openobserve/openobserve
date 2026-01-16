@@ -152,7 +152,9 @@ pub enum AlertError {
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
-    #[error("No template configured for alert destination {dest}. Either set a template on the alert or on the destination.")]
+    #[error(
+        "No template configured for alert destination {dest}. Either set a template on the alert or on the destination."
+    )]
     TemplateNotConfigured { dest: String },
 
     #[error("Alert template {template} not found")]
@@ -326,14 +328,15 @@ async fn prepare_alert(
     }
 
     // Validate alert-level template if specified
-    if let Some(ref template_name) = alert.template {
-        if !template_name.is_empty() {
-            if db::alerts::templates::get(org_id, template_name).await.is_err() {
-                return Err(AlertError::AlertTemplateNotFound {
-                    template: template_name.clone(),
-                });
-            }
-        }
+    if let Some(ref template_name) = alert.template
+        && !template_name.is_empty()
+        && db::alerts::templates::get(org_id, template_name)
+            .await
+            .is_err()
+    {
+        return Err(AlertError::AlertTemplateNotFound {
+            template: template_name.clone(),
+        });
     }
 
     // before saving alert check alert destination

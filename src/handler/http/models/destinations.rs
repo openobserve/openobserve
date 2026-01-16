@@ -91,7 +91,11 @@ impl From<meta_dest::Destination> for Destination {
 impl Destination {
     /// Convert HTTP Destination model to meta Destination.
     /// For alert destinations, template is now optional - can be set at alert level instead.
-    pub fn into(self, org_id: String, is_alert: bool) -> Result<meta_dest::Destination, DestinationError> {
+    pub fn into(
+        self,
+        org_id: String,
+        is_alert: bool,
+    ) -> Result<meta_dest::Destination, DestinationError> {
         // Template is optional - filter out empty strings
         let template = self.template.filter(|t| !t.is_empty());
 
@@ -101,18 +105,16 @@ impl Destination {
                 DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
                     recipients: self.emails,
                 }),
-                DestinationType::Http => {
-                    meta_dest::DestinationType::Http(meta_dest::Endpoint {
-                        url: self.url,
-                        method: self.method,
-                        skip_tls_verify: self.skip_tls_verify,
-                        headers: self.headers,
-                        action_id: None,
-                        output_format: self.output_format,
-                        destination_type: self.destination_type_name,
-                        metadata: self.metadata,
-                    })
-                }
+                DestinationType::Http => meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                    url: self.url,
+                    method: self.method,
+                    skip_tls_verify: self.skip_tls_verify,
+                    headers: self.headers,
+                    action_id: None,
+                    output_format: self.output_format,
+                    destination_type: self.destination_type_name,
+                    metadata: self.metadata,
+                }),
                 DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
                     sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
                     aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
