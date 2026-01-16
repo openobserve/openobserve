@@ -645,6 +645,8 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
+    pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
     /// How often to run the background job that deletes expired sessions
     #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]

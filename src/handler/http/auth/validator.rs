@@ -123,6 +123,19 @@ pub struct AuthValidationResult {
     pub is_internal_user: bool,
 }
 
+/// Helper function to build a successful token validation response
+fn build_token_validation_response(user: &User) -> TokenValidationResponse {
+    TokenValidationResponse {
+        is_valid: true,
+        user_email: user.email.clone(),
+        is_internal_user: !user.is_external,
+        user_role: Some(user.role.clone()),
+        user_name: user.first_name.clone(),
+        family_name: user.last_name.clone(),
+        given_name: user.first_name.clone(),
+    }
+}
+
 pub async fn validator(
     req_data: &RequestData,
     user_id: &str,
@@ -308,6 +321,60 @@ pub async fn validate_credentials(
     }
     let user = user.unwrap();
 
+    // Check token authentication first (before native login restrictions)
+    // This allows service accounts and all users to use API tokens regardless of native login
+    // settings
+    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+        // Check if service accounts are enabled
+        let config = get_config();
+        if !config.auth.service_account_enabled {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+
+        // Check if static token usage is allowed for this service account
+        // allow_static_token=false means the token cannot be used directly,
+        // user must use assume_service_account API to get a temporary session
+        // However, tokens from assume_service_account sessions (from_session=true) bypass this
+        // check
+        if !from_session
+            && let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
+            && !org_user.allow_static_token
+        {
+            log::warn!(
+                "Service account '{}' in org '{}' attempted direct token auth but allow_static_token=false. Use assume_service_account API instead.",
+                user.email,
+                user.org
+            );
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+
+        return Ok(build_token_validation_response(&user));
+    }
+
+    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
+        && user.token.eq(&user_password)
+    {
+        return Ok(build_token_validation_response(&user));
+    }
+
+    // Enforce native login restrictions only for password-based authentication
+    // (Token authentication has already been checked above)
     #[cfg(feature = "enterprise")]
     {
         if !get_dex_config().native_login_enabled && !user.is_external {
@@ -334,59 +401,6 @@ pub async fn validate_credentials(
             });
         }
     }
-
-    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
-        // Check if static token usage is allowed for this service account
-        // allow_static_token=false means the token cannot be used directly,
-        // user must use assume_service_account API to get a temporary session
-        // However, tokens from assume_service_account sessions (from_session=true) bypass this
-        // check
-        if !from_session
-            && let Ok(org_user) = db::org_users::get(&user.org, &user.email).await
-            && !org_user.allow_static_token
-        {
-            log::warn!(
-                "Service account '{}' in org '{}' attempted direct token auth but allow_static_token=false. Use assume_service_account API instead.",
-                user.email,
-                user.org
-            );
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
-
-        // Service account authentication succeeded
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
-    }
-
-    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
-        && user.token.eq(&user_password)
-    {
-        return Ok(TokenValidationResponse {
-            is_valid: true,
-            user_email: user.email,
-            is_internal_user: !user.is_external,
-            user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
-            family_name: user.last_name,
-            given_name: user.first_name,
-        });
-    }
-
     let in_pass = get_hash(user_password, &user.salt);
     if !user.password.eq(&in_pass)
         && !user

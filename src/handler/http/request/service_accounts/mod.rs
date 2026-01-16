@@ -68,6 +68,11 @@ use crate::{
     )
 )]
 pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserEmail>) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     let user_id = &user_email.user_id;
     let mut _user_list_from_rbac = None;
     // Get List of allowed objects
@@ -137,6 +142,11 @@ pub async fn save(
     Headers(user_email): Headers<UserEmail>,
     Json(service_account): Json<ServiceAccountRequest>,
 ) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     let initiator_id = user_email.user_id;
     let user = UserRequest {
         email: service_account.email.trim().to_string(),
@@ -191,6 +201,11 @@ pub async fn update(
     Headers(user_email): Headers<UserEmail>,
     Json(service_account): Json<UpdateServiceAccountRequest>,
 ) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     let email_id = email_id.trim().to_lowercase();
 
     let rotate_token = match query.get("rotateToken") {
@@ -279,6 +294,11 @@ pub async fn delete(
     Path((org_id, email_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     let initiator_id = user_email.user_id;
     match users::remove_user_from_org(&org_id, &email_id, &initiator_id).await {
         Ok(resp) => resp,
@@ -315,6 +335,11 @@ pub async fn delete_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     let initiator_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
@@ -400,6 +425,11 @@ pub async fn get_api_token(
     Path((org, user_id)): Path<(String, String)>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
     // Always return single token for the requested org
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {
