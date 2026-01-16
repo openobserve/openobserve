@@ -368,65 +368,40 @@ export class MetricsPage {
 
     // Chart visualization methods
     async selectChartType(chartType) {
-        // Map chart types to common selector patterns
-        const chartTypeMap = {
-            'line': ['Line', 'line-chart', 'LineChart'],
-            'bar': ['Bar', 'bar-chart', 'BarChart'],
-            'area': ['Area', 'area-chart', 'AreaChart'],
-            'scatter': ['Scatter', 'scatter-plot', 'ScatterPlot'],
-            'pie': ['Pie', 'pie-chart', 'PieChart'],
-            'heatmap': ['Heatmap', 'heat-map', 'HeatMap'],
-            'table': ['Table', 'table-view', 'TableView']
-        };
+        // Use the actual selector pattern from ChartSelection.vue
+        // Selector format: [data-test="selected-chart-{chartId}-item"]
+        const chartTypeSelector = `[data-test="selected-chart-${chartType}-item"]`;
 
-        const chartNames = chartTypeMap[chartType.toLowerCase()] || [chartType];
+        try {
+            const chartButton = this.page.locator(chartTypeSelector);
 
-        // Try multiple selector strategies
-        for (const chartName of chartNames) {
-            // Try button with text
-            const chartButton = this.page.locator(`button:has-text("${chartName}")`).first();
-            if (await chartButton.count() > 0 && await chartButton.isVisible()) {
-                await chartButton.click();
-                await this.page.waitForTimeout(1000);
-                return true;
+            // Check if the chart type button exists and is visible
+            const isVisible = await chartButton.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (!isVisible) {
+                // Take screenshot for debugging
+                await this.page.screenshot({
+                    path: `test-results/chart-type-not-found-${chartType}.png`,
+                    fullPage: false
+                }).catch(() => {});
+
+                return false;
             }
 
-            // Try dropdown option
-            const dropdownOption = this.page.locator(`.q-item:has-text("${chartName}"), [role="option"]:has-text("${chartName}")`).first();
-            if (await dropdownOption.count() > 0 && await dropdownOption.isVisible()) {
-                await dropdownOption.click();
-                await this.page.waitForTimeout(1000);
-                return true;
-            }
+            // Click the chart type button
+            await chartButton.click();
+            await this.page.waitForTimeout(1000);
 
-            // Try radio/toggle with chart type
-            const radioOption = this.page.locator(`input[type="radio"][value="${chartName.toLowerCase()}"], .chart-type-${chartType.toLowerCase()}`).first();
-            if (await radioOption.count() > 0) {
-                await radioOption.click();
-                await this.page.waitForTimeout(1000);
-                return true;
-            }
+            return true;
+        } catch (error) {
+            // Take screenshot for debugging
+            await this.page.screenshot({
+                path: `test-results/chart-type-error-${chartType}.png`,
+                fullPage: false
+            }).catch(() => {});
+
+            return false;
         }
-
-        // If no direct selector found, try opening chart type selector first
-        const chartTypeSelector = this.page.locator('.chart-type-selector, button[aria-label*="chart type"], button:has-text("Chart Type")').first();
-        if (await chartTypeSelector.count() > 0 && await chartTypeSelector.isVisible()) {
-            await chartTypeSelector.click();
-            await this.page.waitForTimeout(500);
-
-            // Try again to find the chart type
-            for (const chartName of chartNames) {
-                const option = this.page.locator(`text="${chartName}"`).first();
-                if (await option.isVisible()) {
-                    await option.click();
-                    await this.page.waitForTimeout(1000);
-                    return true;
-                }
-            }
-        }
-
-        // Log warning if chart type couldn't be selected
-        return false;
     }
 
     async getCurrentChartType() {
@@ -598,6 +573,44 @@ export class MetricsPage {
 
     async getGaugeElementCount() {
         return await this.page.locator('svg circle, svg path[class*="gauge"], .apexcharts-radialbar').count();
+    }
+
+    async isGaugeVisible() {
+        const gaugeElements = this.page.locator('svg circle, svg path[class*="gauge"], .apexcharts-radialbar, .gauge-container');
+        const count = await gaugeElements.count();
+        return count > 0;
+    }
+
+    async getMetricValue() {
+        // Metric text chart displays a large numeric value
+        const metricSelectors = [
+            '.metric-value',
+            '.metric-text',
+            '.single-stat-value',
+            '[class*="metric"] .value',
+            '.apexcharts-text.apexcharts-datalabel-value'
+        ];
+
+        for (const selector of metricSelectors) {
+            const element = this.page.locator(selector).first();
+            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
+                const text = await element.textContent();
+                if (text && text.trim()) {
+                    return text.trim();
+                }
+            }
+        }
+
+        // Fallback: look for any large text that might be a metric value
+        const largeText = this.page.locator('text, tspan, div').filter({
+            has: this.page.locator('[style*="font-size"]')
+        }).first();
+
+        if (await largeText.isVisible({ timeout: 1000 }).catch(() => false)) {
+            return await largeText.textContent();
+        }
+
+        return null;
     }
 
     async getBarElementCount() {

@@ -230,15 +230,17 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
 
     let hasError = await pm.metricsPage.hasErrorIndicator();
 
+    // Error handling test: errors SHOULD be visible for invalid syntax
+    // If not, check for alternative error display patterns
     if (!hasError) {
-      testLogger.warn('Error indicator not visible for invalid syntax - may use different error display pattern');
       // Check if there's a "No data" message or empty result instead
       const noDataMessage = await pm.metricsPage.getNoDataMessage();
       const hasNoData = await noDataMessage.isVisible().catch(() => false);
-      testLogger.info(`No data message shown instead: ${hasNoData}`);
+      testLogger.info(`Error indicator not visible, checking alternatives - No data message: ${hasNoData}`);
+      // If neither error nor no-data message, the UI may display errors differently
+      // We still expect SOME indication of invalid query
+      expect(hasError || hasNoData).toBe(true);
     } else {
-      expect(hasError).toBe(true); // Should show error for invalid syntax
-
       const errorIndicators = await pm.metricsPage.getErrorIndicators();
       const errorText = await errorIndicators.textContent();
       testLogger.info(`Error message displayed: ${errorText}`);
@@ -261,11 +263,14 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
 
       hasError = await pm.metricsPage.hasErrorIndicator();
 
+      // SQL error handling: errors SHOULD be visible for invalid SQL syntax
       if (!hasError) {
-        testLogger.warn('SQL error indicator not visible - may use different error display pattern');
+        const noDataMessage = await pm.metricsPage.getNoDataMessage();
+        const hasNoData = await noDataMessage.isVisible().catch(() => false);
+        testLogger.info(`SQL error indicator not visible, checking alternatives - No data message: ${hasNoData}`);
+        // Expect SOME indication of invalid SQL query
+        expect(hasError || hasNoData).toBe(true);
       } else {
-        expect(hasError).toBe(true); // Should show error for invalid SQL
-
         const sqlErrorIndicators = await pm.metricsPage.getErrorIndicators();
         const sqlErrorText = await sqlErrorIndicators.textContent();
         testLogger.info(`SQL error message displayed: ${sqlErrorText}`);

@@ -28,78 +28,153 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // CONSOLIDATED TEST 1: All chart type selections and rendering (9 tests → 1 test)
+  // CONSOLIDATED TEST 1: All chart type selections and rendering (9 tests → 1 test, expanded to 14 chart types)
+  // Chart selector uses pattern: [data-test="selected-chart-{type}-item"]
+  // Testing: line, bar, area, area-stacked, scatter, stacked, h-bar, h-stacked, pie, donut, heatmap, table, metric, gauge
+  // Available (not tested): geomap, maps, html, markdown, sankey, custom_chart
   test("Verify all chart type selections render correctly", {
     tag: ['@metrics', '@visualization', '@chart-types', '@P1', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing all chart type selections and rendering');
 
-    // Execute a query first
-    await pm.metricsPage.executeQuery('rate(http_requests_total[5m])');
+    // Set time range to Last 15 minutes for all chart tests
+    testLogger.info('Setting time range to Last 15 minutes');
+    await pm.metricsPage.openDatePicker();
+    const timeRangeSelected = await pm.metricsPage.selectLast15Minutes();
+    if (timeRangeSelected) {
+      testLogger.info('Selected Last 15 minutes time range');
+    } else {
+      await page.keyboard.press('Escape');
+      testLogger.warn('Could not select 15 minutes time range, using default');
+    }
+    await page.waitForTimeout(500);
+
+    // Execute initial query to get results
+    testLogger.info('Executing initial query with cpu_usage metric');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await pm.metricsPage.executeQuery('cpu_usage');
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
 
     const chartTests = [
       {
         type: 'line',
         name: 'Line chart',
-        query: 'rate(request_count[5m])',
         checkAxes: true,
         checkLegend: true,
-        checkSeries: true
+        checkSeries: true,
+        skipIfNotFound: false // Line is default, should always work
       },
       {
         type: 'bar',
         name: 'Bar chart',
-        query: 'sum by (endpoint) (http_requests_total)',
-        checkBars: true
+        checkBars: true,
+        skipIfNotFound: true
       },
       {
         type: 'area',
         name: 'Area chart',
-        query: 'rate(http_requests_total[5m])',
-        checkAreaFills: true
+        checkAreaFills: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'area-stacked',
+        name: 'Area Stacked chart',
+        checkAreaFills: true,
+        skipIfNotFound: true
       },
       {
         type: 'scatter',
         name: 'Scatter plot',
-        query: 'cpu_usage_percent',
-        checkScatterPoints: true
+        checkScatterPoints: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'stacked',
+        name: 'Stacked Bar chart',
+        checkBars: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'h-bar',
+        name: 'Horizontal Bar chart',
+        checkBars: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'h-stacked',
+        name: 'Horizontal Stacked Bar chart',
+        checkBars: true,
+        skipIfNotFound: true
       },
       {
         type: 'pie',
         name: 'Pie chart',
-        query: 'sum by (status) (http_requests_total)',
-        checkSlices: true
+        checkSlices: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'donut',
+        name: 'Donut chart',
+        checkSlices: true,
+        skipIfNotFound: true
       },
       {
         type: 'heatmap',
         name: 'Heatmap',
-        query: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))',
-        checkCells: true
+        checkCells: true,
+        skipIfNotFound: true
       },
       {
         type: 'table',
         name: 'Table view',
-        query: 'topk(10, http_requests_total)',
         checkHeaders: true,
-        checkRows: true
+        checkRows: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'metric',
+        name: 'Metric Text',
+        checkValue: true,
+        skipIfNotFound: true
+      },
+      {
+        type: 'gauge',
+        name: 'Gauge chart',
+        checkGauge: true,
+        skipIfNotFound: true
       }
     ];
+
+    let foundChartTypes = 0;
+    let skippedChartTypes = 0;
 
     for (const chart of chartTests) {
       testLogger.info(`Testing ${chart.name}`);
 
-      // Execute query for this chart type
-      await pm.metricsPage.executeQuery(chart.query);
-      await page.waitForTimeout(1000);
+      // Scroll to top before attempting to select chart type
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(300);
 
-      // Select chart type
+      // Try to select chart type
       const selected = await pm.metricsPage.selectChartType(chart.type);
 
-      // Chart type selector must be available for basic chart types
       if (!selected) {
-        testLogger.warn(`${chart.name} selector not found - may not be implemented or accessible`);
-        // Skip validation for this chart type if selector not found
-        continue;
+        if (chart.type === 'line') {
+          // Line chart is default, continue with validation even if selector not found
+          testLogger.info('Line chart is default view, proceeding with validation');
+        } else if (chart.skipIfNotFound) {
+          testLogger.warn(`${chart.name} selector not found - skipping (may not be implemented in current UI)`);
+          skippedChartTypes++;
+          continue;
+        } else {
+          testLogger.error(`${chart.name} selector not found - this is required!`);
+          throw new Error(`Required chart type "${chart.name}" selector not found`);
+        }
+      } else {
+        foundChartTypes++;
+        testLogger.info(`Successfully selected ${chart.name}`);
       }
 
       // Wait for rendering
@@ -126,17 +201,17 @@ test.describe("Metrics Visualization and Chart Tests", () => {
             testLogger.info(`Line chart displaying ${seriesCount} series`);
           }
         }
-      } else if (chart.type === 'bar' && chart.checkBars) {
+      } else if (['bar', 'stacked', 'h-bar', 'h-stacked'].includes(chart.type) && chart.checkBars) {
         const bars = await pm.metricsPage.getBars();
         const barCount = await bars.count();
         if (barCount > 0) {
-          testLogger.info(`Bar chart rendered with ${barCount} bars`);
+          testLogger.info(`${chart.name} rendered with ${barCount} bars`);
         }
-      } else if (chart.type === 'area' && chart.checkAreaFills) {
+      } else if (['area', 'area-stacked'].includes(chart.type) && chart.checkAreaFills) {
         const fills = await pm.metricsPage.getAreaFills();
         const fillCount = await fills.count();
         if (fillCount > 0) {
-          testLogger.info(`Area chart rendered with ${fillCount} filled regions`);
+          testLogger.info(`${chart.name} rendered with ${fillCount} filled regions`);
         }
       } else if (chart.type === 'scatter' && chart.checkScatterPoints) {
         const dots = await pm.metricsPage.getScatterDots();
@@ -144,11 +219,11 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         if (dotCount > 0) {
           testLogger.info(`Scatter plot rendered with ${dotCount} points`);
         }
-      } else if (chart.type === 'pie' && chart.checkSlices) {
+      } else if (['pie', 'donut'].includes(chart.type) && chart.checkSlices) {
         const arcs = await pm.metricsPage.getPieArcs();
         const arcCount = await arcs.count();
         if (arcCount > 0) {
-          testLogger.info(`Pie chart rendered with ${arcCount} slices`);
+          testLogger.info(`${chart.name} rendered with ${arcCount} slices`);
         }
       } else if (chart.type === 'heatmap' && chart.checkCells) {
         const gridCells = await pm.metricsPage.getHeatmapGridCells();
@@ -174,12 +249,30 @@ test.describe("Metrics Visualization and Chart Tests", () => {
             testLogger.info(`Table displaying ${rowCount} data rows`);
           }
         }
+      } else if (chart.type === 'metric' && chart.checkValue) {
+        // Metric text displays a single numeric value
+        const metricValue = await pm.metricsPage.getMetricValue();
+        if (metricValue) {
+          testLogger.info(`Metric text displaying value: ${metricValue}`);
+        }
+      } else if (chart.type === 'gauge' && chart.checkGauge) {
+        // Gauge displays a visual gauge meter
+        const gaugeVisible = await pm.metricsPage.isGaugeVisible();
+        if (gaugeVisible) {
+          testLogger.info('Gauge chart rendered successfully');
+        }
       }
 
       testLogger.info(`${chart.name} verified successfully`);
     }
 
-    testLogger.info('All chart types tested successfully');
+    // Summary
+    testLogger.info(`Chart type testing complete: ${foundChartTypes} types found, ${skippedChartTypes} types skipped`);
+
+    // Assert at least one chart type was successfully tested
+    // Line chart is default and required, so we should have at least 1 success
+    expect(foundChartTypes).toBeGreaterThanOrEqual(1);
+    testLogger.info('All available chart types tested successfully');
   });
 
   // CONSOLIDATED TEST 2: Chart variations (stacked bar, stacked area, multi-series) (3 tests → 1 test)
@@ -210,6 +303,9 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       }
     ];
 
+    let successfulVariations = 0;
+    let stackingTestsRun = 0;
+
     for (const variation of variations) {
       testLogger.info(`Testing ${variation.name}`);
 
@@ -229,6 +325,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
           continue; // Skip this variation
         }
 
+        stackingTestsRun++;
         testLogger.info(`Stacking option found for ${variation.type} chart`);
         await stackOption.click();
         testLogger.info(`Enabled ${variation.type} chart stacking`);
@@ -271,7 +368,18 @@ test.describe("Metrics Visualization and Chart Tests", () => {
         }
       }
 
+      successfulVariations++;
       testLogger.info(`${variation.name} tested successfully`);
+    }
+
+    // Assert at least one variation was tested successfully
+    expect(successfulVariations).toBeGreaterThanOrEqual(1);
+    testLogger.info(`Successfully tested ${successfulVariations} of ${variations.length} variations`);
+
+    // If any variations had stacking enabled, at least one should have worked
+    const stackingVariations = variations.filter(v => v.enableStacking);
+    if (stackingVariations.length > 0 && stackingTestsRun === 0) {
+      testLogger.warn('No stacking tests could be run - stacking option may not be implemented');
     }
   });
 
@@ -317,21 +425,21 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     const tableSelected = await pm.metricsPage.selectChartType('table');
     await page.waitForTimeout(1000);
 
-    // Assert: Table chart should be selectable (skip if not available)
-    if (!tableSelected) {
-      testLogger.warn('Table chart type not selectable - may not be implemented');
-      return; // Exit test early
-    }
+    // Table chart SHOULD be selectable - fail explicitly if not
     expect(tableSelected).toBe(true);
 
-    const sortableHeader = await pm.metricsPage.getSortableHeader();
-    const hasSortableHeader = await sortableHeader.isVisible().catch(() => false);
-    if (hasSortableHeader) {
-      // Assert: Table should have sortable headers
-      expect(sortableHeader).toBeVisible();
-      await sortableHeader.click();
-      await page.waitForTimeout(500);
-      testLogger.info('Table sorting functionality available and working');
+    if (tableSelected) {
+      const sortableHeader = await pm.metricsPage.getSortableHeader();
+      const hasSortableHeader = await sortableHeader.isVisible().catch(() => false);
+      if (hasSortableHeader) {
+        // Assert: Table should have sortable headers
+        expect(sortableHeader).toBeVisible();
+        await sortableHeader.click();
+        await page.waitForTimeout(500);
+        testLogger.info('Table sorting functionality available and working');
+      } else {
+        testLogger.info('Table rendered but no sortable headers found');
+      }
     }
 
     testLogger.info('Advanced chart features tested successfully');
