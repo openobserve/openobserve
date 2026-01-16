@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :height="5"
         :width="5"
         :panelSchema="chartData"
-        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+        :selectedTimeObj="selectedTimeObj"
         :variablesData="{}"
         searchType="UI"
-        :is_ui_histogram="isUsingBackendSql"
+        :is_ui_histogram="shouldUseHistogram"
         style="height: 180px; width: 100%; overflow-x: hidden;"
         @result-metadata-update="handleChartDataUpdate"
       />
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -179,6 +179,7 @@ onBeforeMount(() => {
 
 const chartPanelRef = ref(null);
 const chartData = ref({});
+const selectedTimeObj = ref({});
 const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
@@ -186,6 +187,24 @@ const evaluationStatus = ref<{
 const { t } = useI18n();
 
 const store = useStore();
+
+// Computed property to determine if histogram should be used
+// For SQL/custom with aggregations (GROUP BY), we should NOT use histogram
+// because the query already has its own aggregation logic
+const shouldUseHistogram = computed(() => {
+  // SQL mode with aggregations: never use histogram
+  if (props.selectedTab === "sql") {
+    return false;
+  }
+
+  // Custom mode with aggregations: never use histogram
+  if (props.selectedTab === "custom" && props.isAggregationEnabled) {
+    return false;
+  }
+
+  // For other modes (PromQL, custom without agg), use the prop value
+  return props.isUsingBackendSql;
+});
 
 // Determine chart type based on result schema from API
 const determineChartType = (extractedFields: {
@@ -446,17 +465,48 @@ const handleChartDataUpdate = (resultMetaData: any) => {
 
         console.log("[PreviewAlert] Latest partition metadata:", latestPartition);
 
-        // For GROUP BY queries with aggregations, use 'total' field
-        // This matches how logs page handles aggregations in handleAggregation()
-        if (latestPartition?.total !== undefined) {
-          resultCount = latestPartition.total;
-          console.log("[PreviewAlert] Got count from total field (aggregation):", resultCount);
-        } else if (Array.isArray(latestPartition?.hits)) {
-          // Fallback: count hits array length
-          resultCount = latestPartition.hits.length;
-          console.log("[PreviewAlert] Got count from hits array length:", resultCount);
-        } else {
-          console.warn("[PreviewAlert] Could not determine result count from metadata:", latestPartition);
+        // Determine result count based on query mode
+        // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
+        if (props.selectedTab === "sql" || (props.selectedTab === "custom" && props.isAggregationEnabled)) {
+          if (latestPartition?.total !== undefined) {
+            resultCount = latestPartition.total;
+            console.log("[PreviewAlert] Got count from total field (SQL/Custom with agg):", resultCount);
+          } else if (Array.isArray(latestPartition?.hits)) {
+            resultCount = latestPartition.hits.length;
+            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
+          }
+        }
+        // PromQL mode: use hits array length (time-series data points)
+        else if (props.selectedTab === "promql") {
+          if (Array.isArray(latestPartition?.hits)) {
+            resultCount = latestPartition.hits.length;
+            console.log("[PreviewAlert] Got count from hits array (PromQL):", resultCount);
+          } else if (latestPartition?.total !== undefined) {
+            resultCount = latestPartition.total;
+            console.log("[PreviewAlert] Got count from total field (PromQL fallback):", resultCount);
+          }
+        }
+        // Custom mode without aggregations: use 'total' field (log count)
+        else if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
+          if (latestPartition?.total !== undefined) {
+            resultCount = latestPartition.total;
+            console.log("[PreviewAlert] Got count from total field (Custom no agg):", resultCount);
+          } else if (Array.isArray(latestPartition?.hits)) {
+            resultCount = latestPartition.hits.length;
+            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
+          }
+        }
+        // Fallback for any other modes
+        else {
+          if (latestPartition?.total !== undefined) {
+            resultCount = latestPartition.total;
+            console.log("[PreviewAlert] Got count from total field (fallback):", resultCount);
+          } else if (Array.isArray(latestPartition?.hits)) {
+            resultCount = latestPartition.hits.length;
+            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
+          } else {
+            console.warn("[PreviewAlert] Could not determine result count from metadata:", latestPartition);
+          }
         }
       }
 
@@ -541,7 +591,10 @@ const evaluateAndSetStatus = (resultCount: number) => {
   console.log("[PreviewAlert] Status bar should now be visible");
 };
 
+let refreshCallCounter = 0;
 const refreshData = () => {
+  const callId = ++refreshCallCounter;
+  console.log(`[PreviewAlert] refreshData #${callId} START`);
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
@@ -575,12 +628,93 @@ const refreshData = () => {
     return;
   }
 
-  // Handle promql mode
+  // Handle PromQL mode - configure for time-series visualization
   if (props.selectedTab === "promql") {
-    xAxis = [];
-    yAxis = [];
+    console.log("[PreviewAlert] Configuring panel for PromQL mode");
+
+    // PromQL mode: query should be a string, not an object
+    dashboardPanelData.data.queries[0].query = props.query || "";
+    dashboardPanelData.data.queries[0].customQuery = false;
+    dashboardPanelData.data.queries[0].fields.x = [];
+    dashboardPanelData.data.queries[0].fields.y = [];
+    dashboardPanelData.data.queries[0].fields.z = [];
+    dashboardPanelData.data.queries[0].fields.breakdown = [];
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.queries[0].config.promql_mode = true;
+    dashboardPanelData.data.queryType = "promql";
+    dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
+
+    // Update both refs together to prevent double watcher triggers
+    const newChartData = cloneDeep(dashboardPanelData.data);
+    const newTimeObj = { ...dashboardPanelData.meta.dateTime };
+
+    chartData.value = newChartData;
+    selectedTimeObj.value = newTimeObj;
+
+    console.log("[PreviewAlert] PromQL panel configured:", {
+      queryType: dashboardPanelData.data.queryType,
+      chartType: dashboardPanelData.data.type,
+      query: props.query
+    });
+
+    return;
   }
 
+  // Handle custom mode without aggregations - show histogram of log counts over time
+  if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
+    console.log("[PreviewAlert] Configuring panel for custom mode without aggregations (log count histogram)");
+
+    // For custom without aggregations, create a histogram visualization
+    xAxis = [
+      {
+        label: store.state.zoConfig.timestamp_column || "_timestamp",
+        alias: "x_axis_1",
+        column: store.state.zoConfig.timestamp_column || "_timestamp",
+        color: null,
+        aggregationFunction: "histogram"
+      }
+    ];
+
+    yAxis = [
+      {
+        label: "count",
+        alias: "y_axis_1",
+        column: "*",
+        color: null,
+        aggregationFunction: "count"
+      }
+    ];
+
+    dashboardPanelData.data.queries[0].fields.x = xAxis;
+    dashboardPanelData.data.queries[0].fields.y = yAxis;
+    dashboardPanelData.data.queries[0].fields.z = [];
+    dashboardPanelData.data.queries[0].fields.breakdown = [];
+    dashboardPanelData.data.queries[0].customQuery = true;
+    dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+    dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
+    dashboardPanelData.data.queries[0].config.show_histogram = true;
+    dashboardPanelData.data.queryType = "sql";
+    dashboardPanelData.data.type = "bar"; // Histogram visualization
+
+    // Update both refs together to prevent double watcher triggers
+    const newChartData = cloneDeep(dashboardPanelData.data);
+    const newTimeObj = { ...dashboardPanelData.meta.dateTime };
+
+    chartData.value = newChartData;
+    selectedTimeObj.value = newTimeObj;
+
+    console.log("[PreviewAlert] Custom (no agg) panel configured:", {
+      chartType: dashboardPanelData.data.type,
+      xAxis: JSON.stringify(xAxis),
+      yAxis: JSON.stringify(yAxis)
+    });
+
+    return;
+  }
+
+  // Fallback for any other modes (shouldn't reach here in normal flow)
   dashboardPanelData.data.queries[0].fields.x = xAxis;
   dashboardPanelData.data.queries[0].fields.y = yAxis;
   dashboardPanelData.data.queries[0].fields.breakdown = [];
@@ -593,14 +727,38 @@ const refreshData = () => {
   dashboardPanelData.data.queryType =
     props.selectedTab === "promql" ? "promql" : "sql";
 
-  chartData.value = cloneDeep(dashboardPanelData.data);
+  // Update both refs together to prevent double watcher triggers
+  const newChartData = cloneDeep(dashboardPanelData.data);
+  const newTimeObj = { ...dashboardPanelData.meta.dateTime };
 
-  // DEBUG: Print complete panel object for custom alerts
-  console.log("[PreviewAlert] ========== COMPLETE PANEL OBJECT ==========");
-  console.log(JSON.stringify(dashboardPanelData.data, null, 2));
-  console.log("[PreviewAlert] ========== END PANEL OBJECT ==========");
+  chartData.value = newChartData;
+  selectedTimeObj.value = newTimeObj;
+
+  console.log(`[PreviewAlert] refreshData #${callId} END - chartData updated`);
 
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
+};
+
+// Track if this is the initial load to prevent duplicate API calls
+let isInitialLoad = true;
+let lastRefreshTime = 0;
+
+const refreshDataOnce = () => {
+  const now = Date.now();
+  const timeSinceLastCall = now - lastRefreshTime;
+
+  console.log(`[PreviewAlert] refreshDataOnce called, time since last: ${timeSinceLastCall}ms`);
+
+  // Prevent multiple calls within 200ms (skip check on first call)
+  // 200ms window catches both usePanelDataLoader watchers firing from dateTime + panelSchema updates
+  if (lastRefreshTime > 0 && timeSinceLastCall < 200) {
+    console.log(`[PreviewAlert] ⚠️ Skipping duplicate call (${timeSinceLastCall}ms < 200ms)`);
+    return;
+  }
+
+  lastRefreshTime = now;
+  console.log("[PreviewAlert] ✓ Calling refreshData");
+  refreshData();
 };
 
 // Watch for changes to props and refresh chart data automatically
@@ -618,9 +776,19 @@ watch(
     props.isUsingBackendSql,
   ],
   () => {
+    console.log("[PreviewAlert] Watch triggered, isInitialLoad:", isInitialLoad);
+
+    // Skip the first watch trigger on mount since onMounted will handle it
+    if (isInitialLoad) {
+      isInitialLoad = false;
+      console.log("[PreviewAlert] Skipping first watch trigger");
+      return;
+    }
+
     // Refresh if we have a valid query
     if (props.query) {
-      refreshData();
+      console.log("[PreviewAlert] Watch calling refreshDataOnce");
+      refreshDataOnce();
     }
   },
   { deep: true }
@@ -628,12 +796,15 @@ watch(
 
 // Refresh data on mount if we already have a query
 onMounted(() => {
+  console.log("[PreviewAlert] onMounted called, query:", props.query);
   if (props.query) {
-    refreshData();
+    console.log("[PreviewAlert] onMounted calling refreshDataOnce");
+    refreshDataOnce();
   }
 });
 
-defineExpose({ refreshData, evaluationStatus });
+// Expose refreshDataOnce instead of refreshData to prevent duplicate calls from parent
+defineExpose({ refreshData: refreshDataOnce, evaluationStatus });
 </script>
 
 <style scoped>
