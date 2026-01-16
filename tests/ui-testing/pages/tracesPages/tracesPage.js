@@ -151,12 +151,13 @@ export class TracesPage {
 
   async selectTraceStream(streamName = 'default') {
     // Click to open dropdown
-    await this.page.locator(this.streamSelect).click();
-    await this.page.waitForTimeout(1000);
+    const streamSelectLocator = this.page.locator(this.streamSelect);
+    await streamSelectLocator.click();
+    await this.page.locator('.q-menu, [role="listbox"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Type stream name to filter
-    await this.page.locator(this.streamSelect).fill(streamName);
-    await this.page.waitForTimeout(2000);
+    await streamSelectLocator.fill(streamName);
+    await this.page.locator(`[data-test*="stream-toggle-${streamName}"]`).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Click on the stream toggle to select it
     const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${streamName}"] div`;
@@ -206,8 +207,8 @@ export class TracesPage {
         if (await selector.isVisible({ timeout: 3000 })) {
           await selector.click();
           await this.page.waitForLoadState('networkidle').catch(() => {});
-          // Additional wait for trace details page to render
-          await this.page.waitForTimeout(2000);
+          // Wait for trace details to render
+          await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
           return;
         }
       } catch {
@@ -306,7 +307,8 @@ export class TracesPage {
 
     const selector = rangeMap[range] || '[data-test="date-time-relative-15-m-btn"]';
     await this.page.locator(selector).click();
-    await this.page.waitForTimeout(1000);
+    // Wait for datetime dropdown to close
+    await this.page.locator(this.dateTimeButton).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
 
   async runSearch() {
@@ -323,8 +325,8 @@ export class TracesPage {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
     await this.page.locator(this.absoluteTab).click();
-    await this.page.waitForTimeout(1000);
-
+    // Wait for absolute tab content to be visible
+    await this.page.getByLabel('access_time').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
 
   async fillTimeRange(startTime, endTime) {
@@ -349,7 +351,8 @@ export class TracesPage {
     const sqlButton = this.page.locator(this.sqlModeButton);
     if (await sqlButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sqlButton.click();
-      await this.page.waitForTimeout(1000);
+      // Wait for query editor to be visible after mode switch
+      await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
 
@@ -357,15 +360,30 @@ export class TracesPage {
     const uiButton = this.page.locator(this.uiModeButton);
     if (await uiButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await uiButton.click();
-      await this.page.waitForTimeout(1000);
+      // Wait for UI mode elements to be visible after mode switch
+      await this.page.locator(this.searchBar).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
 
   async enterSQLQuery(query) {
-    // Try different editor selectors
-    const editor = this.page.locator('.monaco-editor textarea').first() ||
-                  this.page.locator(this.queryEditor) ||
-                  this.page.locator('.view-lines');
+    // Try different editor selectors - check visibility for each
+    const editorSelectors = [
+      this.page.locator('.monaco-editor textarea').first(),
+      this.page.locator(this.queryEditor),
+      this.page.locator('.view-lines')
+    ];
+
+    let editor = null;
+    for (const selector of editorSelectors) {
+      if (await selector.isVisible({ timeout: 2000 }).catch(() => false)) {
+        editor = selector;
+        break;
+      }
+    }
+
+    if (!editor) {
+      throw new Error('No visible editor found');
+    }
 
     await editor.click();
     await this.page.keyboard.press('Control+A');
@@ -576,16 +594,15 @@ export class TracesPage {
     const streamSelector = this.page.locator(this.streamSelect);
     if (await streamSelector.isVisible({ timeout: 5000 })) {
       await this.selectTraceStream(streamName);
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForLoadState('networkidle').catch(() => {});
     }
 
     // Set time range to 15 minutes
     await this.setTimeRange('15m');
-    await this.page.waitForTimeout(1000);
 
-    // Run search
+    // Run search and wait for results
     await this.runTraceSearch();
-    await this.page.waitForTimeout(3000);
+    await this.waitForSearchCompletion(10000);
   }
 
   /**

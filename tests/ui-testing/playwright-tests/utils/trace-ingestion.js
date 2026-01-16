@@ -3,6 +3,7 @@
  * Generates and ingests distributed traces for testing purposes
  */
 
+const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
 
 /**
@@ -11,9 +12,7 @@ const testLogger = require('./test-logger.js');
  * @returns {string} Hex string
  */
 function generateHexId(bytes) {
-  const array = new Uint8Array(bytes);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  return crypto.randomBytes(bytes).toString('hex');
 }
 
 /**
