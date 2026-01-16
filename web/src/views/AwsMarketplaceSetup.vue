@@ -277,7 +277,7 @@ export default defineComponent({
           name: newOrgName.value,
         });
 
-        const orgId = orgRes.data.data.identifier;
+        const orgId = orgRes.data.identifier;
 
         // Link AWS Marketplace subscription
         await linkSubscription(orgId);
