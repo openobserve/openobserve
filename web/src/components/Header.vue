@@ -713,7 +713,7 @@ export default defineComponent({
       if (isCloud) {
         return 'OpenObserve Features';
       } else if (isEnterprise) {
-        return 'Edition: Enterprise (Free)';
+        return 'Edition: Enterprise';
       } else {
         return 'Get OpenObserve Enterprise (Free)';
       }
