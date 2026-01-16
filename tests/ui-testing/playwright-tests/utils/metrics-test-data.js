@@ -247,12 +247,18 @@ class MetricsTestData {
             );
         }
 
+        // Determine instance format based on metric type
+        let instanceValue;
         if (metricName.includes('cpu') || metricName.includes('memory') || metricName.includes('disk')) {
+            // Infrastructure metrics use node naming
+            instanceValue = `node-${Math.floor(Math.random() * 5)}`;
             attributes.push(
-                { key: "instance", value: { stringValue: `node-${Math.floor(Math.random() * 5)}` } },
                 { key: "region", value: { stringValue: ["us-east-1", "us-west-2", "eu-central-1"][Math.floor(Math.random() * 3)] } },
                 { key: "datacenter", value: { stringValue: ["dc1", "dc2", "dc3"][Math.floor(Math.random() * 3)] } }
             );
+        } else {
+            // Other metrics use localhost:port format for Prometheus compatibility
+            instanceValue = `localhost:${8000 + Math.floor(Math.random() * 100)}`;
         }
 
         if (metricName.includes('business') || metricName.includes('revenue') || metricName.includes('orders')) {
@@ -263,10 +269,10 @@ class MetricsTestData {
             );
         }
 
-        // Add job and instance for Prometheus compatibility
+        // Add job and instance for Prometheus compatibility (instance set once based on metric type)
         attributes.push(
             { key: "job", value: { stringValue: "metrics_test" } },
-            { key: "instance", value: { stringValue: `localhost:${8000 + Math.floor(Math.random() * 100)}` } }
+            { key: "instance", value: { stringValue: instanceValue } }
         );
 
         return attributes;
