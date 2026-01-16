@@ -15,8 +15,8 @@ const { expect } = require('@playwright/test');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 
-// Test data
-const CSV_URL = 'https://raw.githubusercontent.com/openobserve/test_scripts/refs/heads/main/mb_data_1.csv';
+// Test data - using small protocols.csv (13 rows) for fast processing
+const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
 const INVALID_URL_NO_PROTOCOL = 'example.com/data.csv';
 const NONEXISTENT_URL = 'https://nonexistent-domain-12345.com/data.csv';
 
@@ -377,5 +377,42 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Verify navigation to logs page
         await enrichmentPage.page.waitForURL(/.*logs.*/);
         testLogger.info('Navigated to logs page');
+    });
+
+    test('@P1 Explore enrichment table and view log details', async ({ page }) => {
+        const tableName = generateTableName('explore_log');
+        testLogger.info(`Test: Explore and view log details - ${tableName}`);
+
+        // Create enrichment table from URL
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Enrichment table created');
+
+        // Search for the table in list
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table found in list');
+
+        // Click explore button to navigate to logs
+        const exploreBtn = page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await exploreBtn.click();
+        testLogger.info('Clicked explore button');
+
+        // Wait for navigation to logs page
+        await page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
+        await page.waitForLoadState('networkidle');
+        testLogger.info('Navigated to logs page');
+
+        // Wait for log table to load and click on first row
+        const firstLogRow = page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstLogRow.click();
+        testLogger.info('Clicked on first log row');
+
+        // Verify log detail panel expands (check for expanded row content)
+        const logDetailPanel = page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
+        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Log detail panel is visible');
     });
 });

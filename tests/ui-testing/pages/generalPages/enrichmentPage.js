@@ -854,11 +854,18 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
         testLogger.debug('Returned to enrichment tables list');
 
-        // Wait for list page to load completely and table to be added to backend
+        // Wait for backend to register the table
+        await this.page.waitForTimeout(3000);
+
+        // Force navigate to enrichment tables to get fresh list data from API
+        // This is necessary in CI where the list doesn't auto-refresh
+        await this.page.locator(this.pipelineMenuItem).click();
+        await this.page.locator(this.enrichmentTableTab).click();
         await this.page.waitForLoadState('networkidle');
 
-        // Give extra time for the enrichment table to be registered in the backend before searching
-        await this.page.waitForTimeout(5000);
+        // Wait for the enrichment tables list to be visible
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.debug('Navigated to enrichment tables list with fresh data');
     }
 
     /**
