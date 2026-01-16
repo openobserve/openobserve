@@ -2,9 +2,10 @@
  * Enrichment Table URL Feature E2E Tests
  *
  * Test Coverage:
- * - P0: Critical path (create, validation, list visibility)
- * - P1: Functional tests (cancel, delete, explore logs)
- * - P2: Edge cases (toggle source)
+ * - P0: Full lifecycle (create, search, explore logs, delete)
+ * - P0: URL validation
+ * - P1: Cancel form
+ * - P2: Data source toggle
  */
 
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -54,22 +55,57 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     // P0 - CRITICAL PATH TESTS
     // ============================================================================
 
-    test('@P0 @smoke Create enrichment table from URL', async () => {
-        const tableName = generateTableName('url_table');
-        testLogger.info(`Test: Create enrichment table from URL - ${tableName}`);
+    test('@P0 @smoke Full lifecycle: create, explore logs, and delete enrichment table', async () => {
+        const tableName = generateTableName('url_lifecycle');
+        testLogger.info(`Test: Full lifecycle - ${tableName}`);
 
-        // Click "Add Enrichment Table" button
+        // Step 1: Create enrichment table from URL
         await pipelinesPage.navigateToAddEnrichmentTable();
         testLogger.info('Clicked Add Enrichment Table button');
 
-        // Create table from URL
         await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Enrichment table creation submitted');
+        testLogger.info('Enrichment table created');
 
-        // Verify table appears in list (basic check)
+        // Step 2: Search and verify table appears in list
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
-        testLogger.info('Table verified in list');
+        testLogger.info('Table found in list');
+
+        // Step 3: Explore logs - click explore button
+        await enrichmentPage.clickExploreButton(tableName);
+        testLogger.info('Clicked explore button');
+
+        // Step 4: Wait for logs page and verify data
+        await enrichmentPage.waitForLogsPageNavigation();
+        testLogger.info('Navigated to logs page');
+
+        await enrichmentPage.clickFirstLogRow();
+        testLogger.info('Clicked on first log row');
+
+        await enrichmentPage.verifyLogDetailPanelVisible();
+        testLogger.info('Log detail panel is visible');
+
+        // Step 5: Close dialog and navigate back to enrichment tables
+        await enrichmentPage.closeAnyOpenDialogs();
+        await enrichmentPage.navigateToEnrichmentTable();
+        testLogger.info('Navigated back to enrichment tables');
+
+        // Step 6: Search and delete the table
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+
+        await enrichmentPage.clickDeleteButton(tableName);
+        testLogger.info('Clicked delete button');
+
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        testLogger.info('Confirmation dialog verified');
+
+        await enrichmentPage.clickDeleteOK();
+        testLogger.info('Confirmed deletion');
+
+        // Step 7: Verify table is removed
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table removed from list');
     });
 
     test('@P0 @smoke URL validation - invalid format (no protocol)', async () => {
@@ -86,24 +122,6 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Verify validation error message
         await enrichmentPage.verifyUrlValidationError('URL must start with http:// or https://');
         testLogger.info('Validation error message verified');
-    });
-
-    test('@P0 @smoke Table appears in list after creation', async () => {
-        const tableName = generateTableName('list_check');
-        testLogger.info(`Test: Table appears in list - ${tableName}`);
-
-        // Create table from URL
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Table created from URL');
-
-        // Search and verify table is visible in the list
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        testLogger.info('Searched for table');
-
-        // Verify table row exists (don't check for explore button yet as job is still processing)
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        testLogger.info('Table verified visible in list');
     });
 
     // ============================================================================
@@ -137,68 +155,6 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Verify table does NOT exist (no rows or "No data available" message)
         await enrichmentPage.verifyTableNotCreated(tableName);
         testLogger.info('Verified table was not created');
-    });
-
-    test('@P1 Delete enrichment table', async () => {
-        const tableName = generateTableName('delete_test');
-        testLogger.info(`Test: Delete enrichment table - ${tableName}`);
-
-        // Create enrichment table from URL
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Enrichment table created');
-
-        // Search for the table in list
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        testLogger.info('Table found in list');
-
-        // Click delete button (4th button in row: Explore, Schema, Edit, Delete)
-        await enrichmentPage.clickDeleteButton(tableName);
-        testLogger.info('Clicked delete button');
-
-        // Verify confirmation dialog
-        await enrichmentPage.verifyDeleteConfirmationDialog();
-        testLogger.info('Confirmation dialog verified');
-
-        // Click OK to confirm deletion
-        await enrichmentPage.clickDeleteOK();
-        testLogger.info('Confirmed deletion');
-
-        // Verify table is removed from list
-        await enrichmentPage.verifyTableRowHidden(tableName);
-        testLogger.info('Table removed from list');
-    });
-
-    test('@P1 Explore enrichment table and view log details', async () => {
-        const tableName = generateTableName('explore_log');
-        testLogger.info(`Test: Explore and view log details - ${tableName}`);
-
-        // Create enrichment table from URL
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Enrichment table created');
-
-        // Search for the table in list
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        testLogger.info('Table found in list');
-
-        // Click explore button to navigate to logs
-        await enrichmentPage.clickExploreButton(tableName);
-        testLogger.info('Clicked explore button');
-
-        // Wait for navigation to logs page
-        await enrichmentPage.waitForLogsPageNavigation();
-        testLogger.info('Navigated to logs page');
-
-        // Click on first log row
-        await enrichmentPage.clickFirstLogRow();
-        testLogger.info('Clicked on first log row');
-
-        // Verify log detail panel is visible
-        await enrichmentPage.verifyLogDetailPanelVisible();
-        testLogger.info('Log detail panel is visible');
     });
 
     // ============================================================================

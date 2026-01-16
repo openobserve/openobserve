@@ -189,13 +189,10 @@ test.describe("Pre-Test Cleanup", () => {
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
       /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
       // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
-      /^url_table_[a-f0-9]{8}$/,                                                             // url_table_<uuid> (URL creation test)
+      /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
       /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (validation test)
-      /^list_check_[a-f0-9]{8}$/,                                                            // list_check_<uuid> (list visibility test)
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
-      /^delete_test_[a-f0-9]{8}$/,                                                           // delete_test_<uuid> (delete operation test)
-      /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
-      /^explore_log_[a-f0-9]{8}$/                                                            // explore_log_<uuid> (logs exploration test)
+      /^toggle_test_[a-f0-9]{8}$/                                                            // toggle_test_<uuid> (source toggle test)
     ]);
 
     // Clean up streams matching test patterns

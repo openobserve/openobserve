@@ -1283,6 +1283,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         testLogger.debug('Log detail panel verified visible');
     }
+
+    /**
+     * Close any open dialogs/modals by pressing Escape
+     */
+    async closeAnyOpenDialogs() {
+        testLogger.debug('Closing any open dialogs');
+
+        // Press Escape to close any open dialogs/modals
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+
+        testLogger.debug('Dialogs closed');
+    }
 }
 
 module.exports = { EnrichmentPage };
