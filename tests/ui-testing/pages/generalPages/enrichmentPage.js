@@ -854,18 +854,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
         testLogger.debug('Returned to enrichment tables list');
 
-        // Wait for backend to register the table
-        await this.page.waitForTimeout(3000);
+        // Wait for backend to register the table (CI environments are slower)
+        await this.page.waitForTimeout(5000);
 
-        // Force navigate to enrichment tables to get fresh list data from API
-        // This is necessary in CI where the list doesn't auto-refresh
-        await this.page.locator(this.pipelineMenuItem).click();
-        await this.page.locator(this.enrichmentTableTab).click();
-        await this.page.waitForLoadState('networkidle');
+        // Hard reload the page to ensure fresh API data
+        // This is more reliable than menu navigation in CI environments
+        await this.page.reload({ waitUntil: 'networkidle' });
+        testLogger.debug('Page reloaded for fresh data');
 
-        // Wait for the enrichment tables list to be visible
+        // Wait for the enrichment tables list to be visible after reload
         await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
-        testLogger.debug('Navigated to enrichment tables list with fresh data');
+        testLogger.debug('Enrichment tables list visible with fresh data');
     }
 
     /**
