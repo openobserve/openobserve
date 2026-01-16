@@ -393,23 +393,15 @@ pub async fn activation_status(
     };
 
     // If customer_id is provided in query, verify it matches the org's subscription
-    match query.get("customer_id") {
-        Some(customer_id) if *customer_id != billing.customer_identifier => {
+    if let Some(customer_id) = query.get("customer_id") {
+        if *customer_id != billing.customer_identifier {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "customer_id_mismatch",
                 "message": "The provided customer_id does not match this organization's subscription"
             }));
-        }
-        None => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "customer_id_mismatch",
-                "message": "The provided customer_id does not match this organization's subscription"
-            }));
-        }
-        _ => {
-            // if customer id is valid and matching then proceed
         }
     }
+    // If customer_id is not provided, skip verification and proceed (it's optional)
 
     // Build response based on status
     let response = aws_mp_db::build_activation_status_response(&billing);

@@ -122,10 +122,15 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
                 None,
             )
             .await;
+        // Check db.put result before releasing the lock to ensure consistent state
+        if let Err(e) = ret {
+            dist_lock::unlock(&locker).await?;
+            drop(locker);
+            return Err(e);
+        }
         dist_lock::unlock(&locker).await?;
         log::info!("[o2::ENT] Metering lock acquired");
         drop(locker);
-        ret?;
     }
 
     Ok(Some(()))
