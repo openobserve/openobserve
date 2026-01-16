@@ -213,7 +213,6 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
-import { siteURL } from "@/constants/config";
 import licenseServer from "@/services/license_server";
 
 // Feature documentation links configuration
@@ -621,7 +620,7 @@ export default defineComponent({
     };
 
     const openDownloadPage = () => {
-      window.open("https://openobserve.ai/downloads/", "_blank");
+      window.open("https://o2.ws/download_resources", "_blank");
     };
 
     const openDocsLink = () => {
@@ -633,18 +632,18 @@ export default defineComponent({
 
       // Enterprise without license - redirect to license docs
       if (isEnterprise && !hasLicense) {
-        docsUrl = "https://openobserve.ai/docs/user-guide/management/lincense/";
+        docsUrl = "https://o2.ws/license_guide";
       }
       // Open Source or Cloud - redirect to enterprise edition installation guide
       else if (!isEnterprise || isCloud) {
-        docsUrl = "https://openobserve.ai/docs/openobserve-enterprise-edition-installation-guide/";
+        docsUrl = "https://o2.ws/ent_install_guide";
       }
 
       window.open(docsUrl, "_blank");
     };
 
     const contactSales = () => {
-      window.open(siteURL.contactSales, "_blank");
+      window.open("https://o2.ws/contact_us", "_blank");
     };
 
     const openFeatureLink = (url: string) => {
