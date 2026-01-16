@@ -170,6 +170,10 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
+    // If stream was previously deleted, unmark it since we're about to write new data
+    // This prevents memory leak in DELETED_STREAMS set (fixes PR review comment)
+    crate::immutable::unmark_stream_deleted(org_id, stream_type, stream_name).await;
+
     let start = std::time::Instant::now();
     let idx = get_table_idx(thread_id, org_id, stream_name);
     let key = WriterKey::new(idx, org_id, stream_type);
@@ -292,6 +296,82 @@ pub async fn flush_all() -> Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+/// Clear all WAL data (memtable and immutable) for a specific stream on this node.
+/// This is called when a stream is deleted to prevent stale data from appearing
+/// if the stream is recreated with the same name (fixes #9866).
+///
+/// Note: This only clears data on the local ingester node. In a multi-ingester cluster,
+/// other nodes may still have WAL data for this stream until they process their own
+/// WAL files and upload to object storage. The result cache is separately cleared
+/// cluster-wide via `delete_cached_results`.
+pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &str) -> Result<()> {
+    log::info!(
+        "[INGESTER:WAL] clearing WAL data for stream: {}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name
+    );
+
+    // Delete WAL parquet files from disk first (fixes #9866)
+    // Files are stored at: {data_wal_dir}/files/{org_id}/{stream_type}/{stream_name}/
+    // We delete these BEFORE clearing memtable/immutable to avoid race conditions
+    // where flush() might create new files
+    let cfg = get_config();
+    let wal_parquet_path = PathBuf::from(&cfg.common.data_wal_dir)
+        .join("files")
+        .join(org_id)
+        .join(stream_type)
+        .join(stream_name);
+
+    if wal_parquet_path.exists() {
+        match tokio::fs::remove_dir_all(&wal_parquet_path).await {
+            Ok(_) => {
+                log::info!(
+                    "[INGESTER:WAL] deleted WAL parquet files at: {}",
+                    wal_parquet_path.display()
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "[INGESTER:WAL] failed to delete WAL parquet files at {}: {}",
+                    wal_parquet_path.display(),
+                    e
+                );
+            }
+        }
+    }
+
+    // Clear memtable data for this specific stream
+    // Note: WriterKey only contains org_id and stream_type, not stream_name.
+    // A single Writer/MemTable can contain data for multiple streams of the same type.
+    // We only remove the specific stream from the memtable, leaving other streams intact.
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for writer in w.values() {
+            let mut memtable = writer.memtable.write().await;
+            if memtable.remove_stream(org_id, stream_name) {
+                log::debug!(
+                    "[INGESTER:WAL] removed stream {}/{} from memtable",
+                    org_id,
+                    stream_name
+                );
+            }
+        }
+    }
+
+    // Clear immutable data for this stream
+    crate::immutable::remove_stream_immutables(org_id, stream_type, stream_name).await;
+
+    log::info!(
+        "[INGESTER:WAL] cleared WAL data for stream: {}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name
+    );
+
     Ok(())
 }
 

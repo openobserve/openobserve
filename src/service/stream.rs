@@ -1067,6 +1067,53 @@ pub async fn stream_delete_inner(
         );
         return Err(e);
     }
+    // Delete result cache files on all querier nodes in the cluster (fixes #9866)
+    // This uses exact path matching: only cache entries for this specific stream are deleted.
+    // The second parameter (0) means delete all cache entries regardless of timestamp.
+    let cache_path = format!("{org_id}/{stream_type}/{stream_name}");
+    log::info!("Deleting result cache for stream: {cache_path}");
+    if !crate::service::search::cluster::cacher::delete_cached_results(cache_path.clone(), 0).await
+    {
+        log::warn!(
+            "Failed to delete result cache for stream: {cache_path}, some cache files may remain"
+        );
+    }
+
+    // Delete WAL data (memtable, immutable, and parquet files) on this ingester node (fixes #9866)
+    // This prevents stale data from appearing if the stream is recreated with the same name.
+    // Note: This only clears WAL on the local node. Other ingesters in the cluster will
+    // process their WAL files independently and upload to object storage.
+    log::info!("Deleting WAL data for stream: {org_id}/{stream_type}/{stream_name}");
+    if let Err(e) =
+        ingester::clear_stream_data(org_id, &stream_type.to_string(), stream_name).await
+    {
+        log::warn!(
+            "Failed to delete WAL data for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
+        );
+    }
+
+    // Delete file_list entries synchronously (fixes #9866 for super clusters)
+    // This ensures that even before the compactor runs, file_list queries won't return
+    // stale files from the deleted stream. The compactor will still run later to clean up
+    // the actual files from object storage.
+    // We use a very wide time range to cover all possible data.
+    let start_time = 0i64; // Beginning of time
+    let end_time = chrono::Utc::now().timestamp_micros() + 86400 * 1000000; // Now + 1 day buffer
+    log::info!(
+        "Deleting file_list entries for stream: {org_id}/{stream_type}/{stream_name}"
+    );
+    if let Err(e) = crate::service::compact::retention::delete_from_file_list(
+        org_id,
+        stream_type,
+        stream_name,
+        (start_time, end_time),
+    )
+    .await
+    {
+        log::warn!(
+            "Failed to delete file_list entries for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
+        );
+    }
 
     Ok(())
 }
