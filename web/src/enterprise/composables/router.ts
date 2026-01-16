@@ -17,8 +17,23 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
+
 const useEnvRoutes = () => {
-  const parentRoutes: any = [];
+  // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
+  // The backend sets a cookie and redirects to Dex login
+  const parentRoutes: any = [
+    {
+      // Post-login setup page for org selection/creation
+      path: "/marketplace/aws/setup",
+      name: "awsMarketplaceSetup",
+      component: AwsMarketplaceSetup,
+      meta: {
+        title: "AWS Marketplace Setup",
+        requiresAuth: true,
+      },
+    },
+  ];
 
   const homeChildRoutes = [
     {
