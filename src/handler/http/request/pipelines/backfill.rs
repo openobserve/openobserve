@@ -15,7 +15,7 @@
 
 //! HTTP handlers for backfill job management (Enterprise only)
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
