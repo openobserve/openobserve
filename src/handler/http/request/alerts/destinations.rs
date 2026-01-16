@@ -483,3 +483,43 @@ pub async fn delete_destination_bulk(
         err,
     })
 }
+
+/// ListPrebuiltDestinations
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/destinations/prebuilt",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListPrebuiltDestinations",
+    summary = "List prebuilt alert destination templates",
+    description = "Retrieves a list of prebuilt alert destination templates that can be used as starting points \
+                   for creating alert destinations. These templates include popular services like Slack, Microsoft \
+                   Teams, PagerDuty, Discord, and generic webhooks with preconfigured settings. Users can customize \
+                   these templates with their own URLs and credentials to quickly set up alert notifications.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List prebuilt alert destination templates", "category": "alerts"}))
+    )
+)]
+pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response {
+    // Get prebuilt destinations from config and set the org_id
+    let prebuilt_destinations = config::meta::destinations::Destination::prebuilt_destinations()
+        .into_iter()
+        .map(|mut dest| {
+            dest.org_id = org_id.clone();
+            Destination::from(dest)
+        })
+        .collect::<Vec<_>>();
+
+    MetaHttpResponse::json(prebuilt_destinations)
+}
