@@ -675,6 +675,11 @@ export const convertServiceGraphToNetwork = (
       curveness = 0.3 + (edgeIndex % 4) * 0.1;
     }
 
+    // Convert nanoseconds to milliseconds for display
+    const p50_latency_ms = (edge.p50_latency_ns || 0) / 1_000_000;
+    const p95_latency_ms = (edge.p95_latency_ns || 0) / 1_000_000;
+    const p99_latency_ms = (edge.p99_latency_ns || 0) / 1_000_000;
+
     return {
       source: edge.from,
       target: edge.to,
@@ -695,6 +700,17 @@ export const convertServiceGraphToNetwork = (
           width: 5,
           opacity: 0.9,
         },
+      },
+      tooltip: {
+        formatter: `
+          <strong>${edge.from} → ${edge.to}</strong><br/>
+          Requests: ${formatNumber(edge.total_requests || 0)}<br/>
+          Failed: ${formatNumber(edge.failed_requests || 0)}<br/>
+          Error Rate: ${errorRate.toFixed(2)}%<br/>
+          P50 Latency: ${p50_latency_ms.toFixed(2)} ms<br/>
+          P95 Latency: ${p95_latency_ms.toFixed(2)} ms<br/>
+          P99 Latency: ${p99_latency_ms.toFixed(2)} ms
+        `,
       },
     };
   });

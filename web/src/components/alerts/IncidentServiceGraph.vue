@@ -16,67 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="incident-service-graph tw-flex tw-flex-col tw-h-full">
-    <!-- Header with controls -->
-    <div
-      class="tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
-      :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
-    >
-      <div class="tw-flex tw-items-center tw-gap-2">
-        <q-select
-          v-model="layout"
-          :options="layoutOptions"
-          dense
-          outlined
-          emit-value
-          map-options
-          class="tw-w-36"
-          :dark="isDarkMode"
-          @update:model-value="onLayoutChange"
-        />
-        <q-btn
-          flat
-          dense
-          round
-          icon="refresh"
-          @click="loadGraph"
-          :loading="loading"
-        >
-          <q-tooltip>Refresh graph</q-tooltip>
-        </q-btn>
-      </div>
-    </div>
-
-    <!-- Stats Banner -->
-    <div
-      v-if="graphData"
-      class="tw-flex tw-gap-4 tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
-      :class="isDarkMode ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-200'"
-    >
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="hub" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Services:</span>
-        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
-          {{ graphData.stats.total_services }}
-        </span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="notifications" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Total Alerts:</span>
-        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
-          {{ graphData.stats.total_alerts }}
-        </span>
-      </div>
-      <div v-if="graphData.root_cause_service" class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="gps_fixed" size="16px" class="tw-text-red-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Root Cause:</span>
-        <span class="tw-text-xs tw-font-semibold tw-text-red-500">
-          {{ graphData.root_cause_service }}
-        </span>
-      </div>
-    </div>
-
     <!-- Graph Container -->
-    <div class="tw-flex-1 tw-relative tw-overflow-hidden">
       <!-- Loading State -->
       <div
         v-if="loading"
@@ -114,41 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Graph Canvas using ECharts -->
       <div
-        v-show="graphData && graphData.nodes.length > 0"
-        class="tw-w-full tw-h-full"
+        v-if="!loading && graphData && graphData.nodes.length > 0"
+        class="tw-absolute tw-inset-0"
+        style="width: 100%; height: calc(100vh - 150px)"
       >
         <ChartRenderer
           ref="chartRendererRef"
           :data="chartData"
           :key="chartKey"
-          class="tw-h-full"
         />
       </div>
     </div>
-
-    <!-- Legend -->
-    <div
-      class="tw-flex tw-gap-4 tw-px-3 tw-py-2 tw-border-t tw-flex-shrink-0"
-      :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
-    >
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-red-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Root Cause</span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-orange-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">High Alerts (&gt;5)</span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-blue-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Normal</span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-border-2 tw-border-purple-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Primary Service</span>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script lang="ts">
@@ -180,13 +96,7 @@ export default defineComponent({
     const loading = ref(false);
     const graphData = ref<IncidentServiceGraph | null>(null);
     const chartRendererRef = ref<any>(null);
-    const layout = ref("force");
     const chartKey = ref(0);
-
-    const layoutOptions = [
-      { label: "Force Directed", value: "force" },
-      { label: "Circular", value: "circular" },
-    ];
 
     const isDarkMode = computed(() => store.state.theme === "dark");
 
@@ -238,7 +148,7 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges, incident_service, root_cause_service } = graphData.value;
+      const { nodes, edges } = graphData.value;
 
       // Convert to ECharts graph format
       const echartsNodes = nodes.map((node) => ({
@@ -285,23 +195,6 @@ export default defineComponent({
         symbolSize: [0, 10],
       }));
 
-      const layoutConfig = layout.value === "circular"
-        ? {
-            type: "circular",
-            circular: {
-              rotateLabel: true,
-            },
-          }
-        : {
-            type: "force",
-            force: {
-              repulsion: 300,
-              gravity: 0.1,
-              edgeLength: 150,
-              layoutAnimation: true,
-            },
-          };
-
       const options = {
         tooltip: {
           trigger: "item",
@@ -316,8 +209,14 @@ export default defineComponent({
         series: [
           {
             type: "graph",
-            layout: layoutConfig.type,
-            ...(layoutConfig.type === "force" ? { force: layoutConfig.force } : { circular: layoutConfig.circular }),
+            layout: "force",
+            force: {
+              repulsion: 300,
+              gravity: 0.1,
+              edgeLength: 150,
+              layoutAnimation: true,
+            },
+            center: ["50%", "60%"],
             roam: true,
             draggable: true,
             data: echartsNodes,
@@ -338,10 +237,6 @@ export default defineComponent({
       return { options, notMerge: true };
     });
 
-    const onLayoutChange = () => {
-      chartKey.value++;
-    };
-
     // Watch for incident changes
     watch(
       () => props.incidentId,
@@ -358,13 +253,10 @@ export default defineComponent({
       loading,
       graphData,
       chartRendererRef,
-      layout,
-      layoutOptions,
       chartData,
       chartKey,
       isDarkMode,
       loadGraph,
-      onLayoutChange,
     };
   },
 });
