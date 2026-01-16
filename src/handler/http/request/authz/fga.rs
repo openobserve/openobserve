@@ -425,7 +425,7 @@ pub async fn update_role(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
-    post,
+    put,
     path = "/{org_id}/roles/{role_id}",
     context_path = "/api",
     tag = "Roles",

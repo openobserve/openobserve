@@ -85,6 +85,8 @@ impl From<AlertError> for Response {
             AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
+            AlertError::TemplateNotConfigured { .. } => MetaHttpResponse::bad_request(value),
+            AlertError::AlertTemplateNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
             AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
