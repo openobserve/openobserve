@@ -24,7 +24,7 @@ use crate::{
     service::{organization, users},
 };
 
-/// Request payload for linking AWS Marketplace subscription
+/// Request payload for linking Azure Marketplace subscription
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct LinkSubscriptionRequest {
     pub token: String,
@@ -67,12 +67,6 @@ pub async fn link_subscription(
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();
 
-    log::info!(
-        "[AZURE SAAS] Link subscription request: org_id={}, user={}",
-        org_id,
-        email
-    );
-
     // 1. Validate organization exists
     let _org = match organization::get_org(org_id).await {
         Some(org) => org,
@@ -95,7 +89,7 @@ pub async fn link_subscription(
         }
     };
 
-    // Only admins and root users can link AWS Marketplace subscriptions
+    // Only admins and root users can link Azure Marketplace subscriptions
     if user.role != UserRole::Admin && user.role != UserRole::Root {
         return HttpResponse::Forbidden().json(serde_json::json!({
             "error": "forbidden",
@@ -119,14 +113,20 @@ pub async fn link_subscription(
         if !sub.subscription_type.is_free_sub() {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "requested organization is not free organization",
-                "message": "Only free tier organizations can be linked to AWS Marketplace"
+                "message": "Only free tier organizations can be linked to Azure Marketplace"
             }));
         }
     }
 
-    return HttpResponse::Created().finish();
+    let req_id = config::ider::generate_trace_id();
+    log::info!(
+        "[AZURE SAAS] Link subscription request: org_id={}, user={}, req_id={}",
+        org_id,
+        email,
+        req_id
+    );
 
-    let res = match billings::azure_utils::process_token(&req.token).await {
+    let res = match billings::azure_utils::process_token(&req.token, &req_id).await {
         Ok(r) => r,
         Err(e) => {
             log::info!("[AZURE SAAS] Error processing token for org {org_id} user {email} : {e}");
@@ -138,7 +138,7 @@ pub async fn link_subscription(
     };
     let sub_id = res.id.clone();
 
-    if let Err(e) = billings::azure_utils::activate_subscription(&res).await {
+    if let Err(e) = billings::azure_utils::activate_subscription(&res, &req_id).await {
         log::error!(
             "[AZURE SAAS] Error activating subscription for org {org_id} user {email} sub_id: {sub_id} : {e}",
         );
@@ -148,7 +148,7 @@ pub async fn link_subscription(
         }));
     }
 
-    if let Err(e) = billings::azure_utils::save_subscription(org_id, email, res).await {
+    if let Err(e) = billings::azure_utils::save_subscription(org_id, email, res, &req_id).await {
         log::error!(
             "[AZURE SAAS] Error saving subscription for org {org_id} user {email} sub_id: {sub_id} : {e}",
         );
@@ -157,6 +157,10 @@ pub async fn link_subscription(
             "message": e.to_string()
         }));
     }
+
+    log::info!(
+        "subscription successfully linked and activated org_id={org_id}, email={email}, req_id={req_id}"
+    );
 
     HttpResponse::Created().finish()
 }
