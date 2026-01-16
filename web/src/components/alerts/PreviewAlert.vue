@@ -416,7 +416,7 @@ const fetchQuerySchema = async () => {
 };
 
 // Handle chart data updates from PanelSchemaRenderer
-// This receives the resultMetaData which contains the hits array from the chart's query
+// This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
   console.log("[PreviewAlert] Chart data updated, resultMetaData:", resultMetaData);
 
@@ -426,33 +426,38 @@ const handleChartDataUpdate = (resultMetaData: any) => {
     return;
   }
 
-  // resultMetaData is an array where each element corresponds to a query
-  // For alerts, we typically have one query, so we look at index 0
-  // The structure is: resultMetaData[queryIndex][0].hits or resultMetaData[queryIndex].hits
+  // resultMetaData structure from usePanelDataLoader:
+  // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
+  // Each metadata object has structure: {...content, ...content.results}
+  // Which includes: hits, total, took, etc.
+
   let resultCount = 0;
 
   try {
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
-      const firstQueryMeta = resultMetaData[0];
+      // Get metadata for first query (queryIndex = 0)
+      const firstQueryMetadata = resultMetaData[0];
 
-      console.log("[PreviewAlert] First query metadata:", firstQueryMeta);
+      console.log("[PreviewAlert] First query metadata array:", firstQueryMetadata);
 
-      // Check different possible structures for the hits data
-      if (Array.isArray(firstQueryMeta)) {
-        // Structure: resultMetaData[0] is an array where each element is a hit/group
-        // For GROUP BY queries, the array length IS the count of groups
-        resultCount = firstQueryMeta.length;
-        console.log("[PreviewAlert] Got count from resultMetaData array length:", resultCount);
-      } else if (firstQueryMeta?.hits) {
-        // Structure: resultMetaData[0].hits (direct object with hits array)
-        resultCount = Array.isArray(firstQueryMeta.hits)
-          ? firstQueryMeta.hits.length
-          : 0;
-        console.log("[PreviewAlert] Got count from direct hits array:", resultCount);
-      } else if (firstQueryMeta?.total !== undefined) {
-        // Fallback to total field if available
-        resultCount = firstQueryMeta.total;
-        console.log("[PreviewAlert] Got count from total field:", resultCount);
+      if (Array.isArray(firstQueryMetadata) && firstQueryMetadata.length > 0) {
+        // Get the latest partition metadata (last element in array)
+        const latestPartition = firstQueryMetadata[firstQueryMetadata.length - 1];
+
+        console.log("[PreviewAlert] Latest partition metadata:", latestPartition);
+
+        // For GROUP BY queries with aggregations, use 'total' field
+        // This matches how logs page handles aggregations in handleAggregation()
+        if (latestPartition?.total !== undefined) {
+          resultCount = latestPartition.total;
+          console.log("[PreviewAlert] Got count from total field (aggregation):", resultCount);
+        } else if (Array.isArray(latestPartition?.hits)) {
+          // Fallback: count hits array length
+          resultCount = latestPartition.hits.length;
+          console.log("[PreviewAlert] Got count from hits array length:", resultCount);
+        } else {
+          console.warn("[PreviewAlert] Could not determine result count from metadata:", latestPartition);
+        }
       }
 
       console.log("[PreviewAlert] Final result count:", resultCount);
