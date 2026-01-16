@@ -15,6 +15,7 @@
 
 pub mod arrow;
 pub mod async_file;
+pub mod async_walkdir;
 pub mod base64;
 pub mod download_utils;
 pub mod enrichment_local_cache;

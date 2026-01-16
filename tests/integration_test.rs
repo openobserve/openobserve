@@ -112,8 +112,9 @@ mod tests {
     /// Initialize test router with service and basic routes
     fn init_test_router() -> Router {
         Router::new()
-            .nest("/", service_routes())
-            .nest("/", basic_routes())
+            .merge(basic_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
     }
 
     /// Make a test request and return the response
@@ -222,7 +223,7 @@ mod tests {
         let (status, body) = make_request(
             &app,
             Method::GET,
-            "/api/e2e/olympics_schema/alerts?stream_type=logs",
+            "/api/v2/e2e/alerts?stream_type=logs",
             Some(headers.clone()),
             None,
         )
@@ -241,7 +242,7 @@ mod tests {
                         let _ = make_request(
                             &app,
                             Method::DELETE,
-                            &format!("/api/e2e/olympics_schema/alerts/{}?type=logs", id),
+                            &format!("/api/v2/e2e/alerts/{}?type=logs", id),
                             Some(headers.clone()),
                             None,
                         )
@@ -351,7 +352,7 @@ mod tests {
         e2e_get_stream_schema().await;
         e2e_get_org_summary().await;
         e2e_post_stream_settings().await;
-        e2e_get_org().await;
+        e2e_get_es_settings().await;
 
         // functions
         e2e_post_function().await;
@@ -728,7 +729,7 @@ mod tests {
         assert!(status.is_success());
     }
 
-    async fn e2e_get_org() {
+    async fn e2e_get_es_settings() {
         let auth = setup();
         let app = init_test_router();
         let headers = auth_headers(auth);
@@ -1778,7 +1779,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::POST,
-            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            &format!("/api/v2/{}/alerts", "e2e"),
             Some(headers),
             Some(body_str.to_string()),
         )
@@ -1790,13 +1791,25 @@ mod tests {
         let auth = setup();
         let app = init_test_router();
         let headers = auth_headers(auth);
+
+        let alert = openobserve::service::db::alerts::alert::get_by_name(
+            "e2e",
+            config::meta::stream::StreamType::Logs,
+            "olympics_schema",
+            "sns_test_alert",
+        )
+        .await;
+        assert!(alert.is_ok());
+        let alert = alert.unwrap();
+        assert!(alert.is_some());
+        let alert = alert.unwrap();
+        let id = alert.id;
+        assert!(id.is_some());
+        let id = id.unwrap();
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "sns_test_alert"
-            ),
+            &format!("/api/v2/{}/alerts/{}", "e2e", id),
             Some(headers),
             None,
         )
@@ -1837,7 +1850,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::POST,
-            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            &format!("/api/v2/{}/alerts", "e2e"),
             Some(headers),
             Some(body_str.to_string()),
         )
@@ -2246,7 +2259,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::DELETE,
-            &format!("/api/{}/{}/alerts/{}", "e2e", "olympics_schema", "alertChk"),
+            &format!("/api/v2/{}/alerts/{}", "e2e", id),
             Some(headers),
             None,
         )
@@ -2270,7 +2283,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::GET,
-            &format!("/api/{}/alerts", "e2e"),
+            &format!("/api/v2/{}/alerts", "e2e"),
             Some(headers),
             None,
         )
@@ -2285,7 +2298,7 @@ mod tests {
         let (status, _body) = make_request(
             &app,
             Method::GET,
-            &format!("/api/{}/{}/alerts", "e2e", "olympics_schema"),
+            &format!("/api/v2/{}/alerts", "e2e"),
             Some(headers),
             None,
         )
@@ -2304,10 +2317,7 @@ mod tests {
 
     async fn e2e_config() {
         let auth = setup();
-        let app = Router::new()
-            .nest("/", config_routes())
-            .nest("/", service_routes())
-            .nest("/", basic_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
         assert!(status.is_success());
@@ -2317,7 +2327,7 @@ mod tests {
     async fn e2e_post_pipeline(pipeline_data: Pipeline) {
         let auth = setup();
         let body_str = serde_json::to_string(&pipeline_data).unwrap();
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, body) = make_request(
             &app,
@@ -2413,7 +2423,7 @@ mod tests {
     async fn e2e_handle_derived_stream_success() {
         // list the pipelines and choose the first one using API
         let auth = setup();
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
@@ -2533,7 +2543,7 @@ mod tests {
     async fn e2e_handle_derived_stream_max_retries() {
         // list pipelines using API
         let auth = setup();
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
@@ -2664,7 +2674,7 @@ mod tests {
         e2e_post_pipeline(pipeline_data.clone()).await;
 
         // Check if pipeline was saved successfully by doing a list using API
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
 
         // delete the city field from the stream
         // Make a PUT call to `e2e/streams/olympics_schema/delete_fields` api
@@ -2884,7 +2894,7 @@ mod tests {
 
     async fn test_derived_stream_invalid_timerange_with_cron_frequency() {
         let auth = setup();
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
 
         // Create a pipeline with derived stream using cron frequency
         let pipeline_data = Pipeline {
@@ -3068,7 +3078,7 @@ mod tests {
     async fn e2e_cleanup_test_pipeline() {
         // list the pipelines and choose the first one using API
         let auth = setup();
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
@@ -3086,7 +3096,7 @@ mod tests {
     async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
         let auth = setup();
         // Check if pipeline was saved successfully by doing a list using API
-        let app = Router::new().nest("/", service_routes());
+        let app = init_test_router();
         let headers = auth_headers(auth);
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;

@@ -847,7 +847,15 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
 
             // store session_id in cluster co-ordinator
-            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
 
             let access_token = format!("session {session_id}");
 
@@ -971,7 +979,15 @@ pub async fn refresh_token_with_dex(
             }
 
             // store session_id in cluster co-ordinator
-            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
 
             let access_token = format!("session {session_id}");
 
@@ -1038,9 +1054,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_expires(
-        time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
-    );
+    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");

@@ -57,7 +57,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a VRL function"}))
+        ("x-o2-mcp" = json!({"description": "Create a VRL function", "category": "functions"}))
     )
 )]
 pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transform>) -> Response {
@@ -94,7 +94,7 @@ pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transfor
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all functions"}))
+        ("x-o2-mcp" = json!({"description": "List all functions", "category": "functions"}))
     )
 )]
 pub async fn list_functions(
@@ -156,7 +156,7 @@ pub async fn list_functions(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a function"}))
+        ("x-o2-mcp" = json!({"description": "Delete a function", "category": "functions"}))
     )
 )]
 pub async fn delete_function(Path((org_id, name)): Path<(String, String)>) -> Response {
@@ -285,7 +285,7 @@ pub async fn delete_function_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a VRL function"}))
+        ("x-o2-mcp" = json!({"description": "Update a VRL function", "category": "functions"}))
     )
 )]
 pub async fn update_function(
@@ -329,7 +329,7 @@ pub async fn update_function(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Check function dependencies"}))
+        ("x-o2-mcp" = json!({"description": "Check function dependencies", "category": "functions"}))
     )
 )]
 pub async fn list_pipeline_dependencies(

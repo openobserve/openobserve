@@ -63,7 +63,7 @@ pub mod service_accounts;
 
 /// ListUsers
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/users",
     context_path = "/api",
     tag = "Users",
@@ -84,7 +84,7 @@ pub mod service_accounts;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all users"}))
+        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
     )
 )]
 pub async fn list(
@@ -153,7 +153,7 @@ pub async fn list(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new user"}))
+        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
     )
 )]
 pub async fn save(
@@ -223,7 +223,7 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update user details"}))
+        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
     )
 )]
 pub async fn update(
@@ -308,7 +308,7 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Add user to organization"}))
+        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
     )
 )]
 pub async fn add_user_to_org(
@@ -369,7 +369,7 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove user from organization"}))
+        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users"}))
     )
 )]
 pub async fn delete(
@@ -1151,6 +1151,6 @@ mod tests {
         let result = check_role_available(&UserRole::Admin);
         assert!(result.is_some());
         let role_response = result.unwrap();
-        assert_eq!(role_response.value, "Admin");
+        assert_eq!(role_response.value, "admin");
     }
 }

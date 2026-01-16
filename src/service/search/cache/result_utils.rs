@@ -20,9 +20,9 @@ pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
         None => 0_i64,
         Some(ts) => match ts {
             serde_json::Value::String(ts) => {
-                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
+                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap_or(0)
             }
-            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
+            serde_json::Value::Number(ts) => ts.as_i64().unwrap_or(0),
             _ => 0_i64,
         },
     }
