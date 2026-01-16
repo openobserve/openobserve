@@ -36,7 +36,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Alerts::Table)
-                        .add_column(ColumnDef::new(Alerts::Template).string().null())
+                        .add_column(ColumnDef::new(Alerts::Template).string().not_null().default(""))
                         .to_owned(),
                 )
                 .await
@@ -46,7 +46,7 @@ impl MigrationTrait for Migration {
                 .alter_table(
                     Table::alter()
                         .table(Alerts::Table)
-                        .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
+                        .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().not_null().default(""))
                         .to_owned(),
                 )
                 .await
@@ -82,10 +82,10 @@ mod tests {
         collapsed_eq!(
             &Table::alter()
                 .table(Alerts::Table)
-                .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
+                .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().not_null().default(""))
                 .to_owned()
                 .to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "template" varchar"#
+            r#"ALTER TABLE "alerts" ADD COLUMN IF NOT EXISTS "template" varchar NOT NULL DEFAULT ''"#
         );
     }
 
@@ -95,10 +95,10 @@ mod tests {
         collapsed_eq!(
             &Table::alter()
                 .table(Alerts::Table)
-                .add_column(ColumnDef::new(Alerts::Template).string().null())
+                .add_column(ColumnDef::new(Alerts::Template).string().not_null().default(""))
                 .to_owned()
                 .to_string(MysqlQueryBuilder),
-            r#"ALTER TABLE `alerts` ADD COLUMN `template` varchar(255)"#
+            r#"ALTER TABLE `alerts` ADD COLUMN `template` varchar(255) NOT NULL DEFAULT ''"#
         );
     }
 
@@ -107,10 +107,10 @@ mod tests {
         collapsed_eq!(
             &Table::alter()
                 .table(Alerts::Table)
-                .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().null())
+                .add_column_if_not_exists(ColumnDef::new(Alerts::Template).string().not_null().default(""))
                 .to_owned()
                 .to_string(SqliteQueryBuilder),
-            r#"ALTER TABLE "alerts" ADD COLUMN "template" varchar"#
+            r#"ALTER TABLE "alerts" ADD COLUMN "template" varchar NOT NULL DEFAULT ''"#
         );
     }
 }
