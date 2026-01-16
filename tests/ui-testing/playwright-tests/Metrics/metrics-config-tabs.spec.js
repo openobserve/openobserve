@@ -141,7 +141,11 @@ test.describe("Metrics Config Tabs Tests", () => {
         action: async (selector) => {
           const element = await pm.metricsPage.getElementBySelector(selector);
           await element.fill('100');
-          testLogger.info('Set axis value');
+
+          // Verify the value was set
+          const setValue = await element.inputValue();
+          expect(setValue).toBe('100');
+          testLogger.info('Set and verified axis value: 100');
         }
       },
       {
@@ -227,11 +231,11 @@ test.describe("Metrics Config Tabs Tests", () => {
       const textInput = inputs.first();
       if (await textInput.isVisible().catch(() => false)) {
         const currentValue = await textInput.inputValue();
-        if (currentValue === testValue) {
-          testLogger.info('Config value persisted successfully');
-        } else {
-          testLogger.info(`Config value may have changed (original: "${testValue}", current: "${currentValue}")`);
-        }
+        // Assert: Config value should persist after closing and reopening
+        expect(currentValue).toBe(testValue);
+        testLogger.info('Config value persisted successfully');
+      } else {
+        testLogger.info('Input field not visible after reopening sidebar');
       }
     }
 
@@ -245,13 +249,16 @@ test.describe("Metrics Config Tabs Tests", () => {
       await chartTypeButton.click();
       await page.waitForTimeout(500);
 
-      if (await pm.metricsPage.selectChartTypeOption('Bar')) {
+      const chartTypeChanged = await pm.metricsPage.selectChartTypeOption('Bar');
+      if (chartTypeChanged) {
         testLogger.info('Changed chart type to Bar');
 
         await pm.metricsPage.clickDashboardSidebarButton();
         await page.waitForTimeout(1000);
 
         const tabCount = await pm.metricsPage.getSidebarTabCount();
+        // Assert: Config sidebar should have tabs for the selected chart type
+        expect(tabCount).toBeGreaterThan(0);
         testLogger.info(`Config sidebar has ${tabCount} tabs for Bar chart`);
       }
     }

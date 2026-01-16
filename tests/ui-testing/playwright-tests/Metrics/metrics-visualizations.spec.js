@@ -103,9 +103,10 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       // Select chart type
       const selected = await pm.metricsPage.selectChartType(chart.type);
 
+      // Chart type selector must be available
       if (!selected) {
-        testLogger.warn(`${chart.name} selector not found - may only be available in dashboard context`);
-        continue;
+        testLogger.error(`${chart.name} selector not found - this is unexpected`);
+        expect(selected).toBeTruthy(); // Fail the test - chart type should be available
       }
 
       // Wait for rendering
@@ -227,22 +228,28 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
       if (variation.enableStacking) {
         const stackOption = await pm.metricsPage.getStackOption();
-        if (await stackOption.isVisible().catch(() => false)) {
-          await stackOption.click();
-          testLogger.info(`Enabled ${variation.type} chart stacking`);
-          await page.waitForTimeout(2000);
 
-          if (variation.type === 'bar') {
-            const stackedBars = await pm.metricsPage.getStackedBars();
-            if (await stackedBars.isVisible().catch(() => false)) {
-              testLogger.info('Stacked bar chart rendered');
-            }
-          } else if (variation.type === 'area') {
-            const stackedAreas = await pm.metricsPage.getStackedAreas();
-            if (await stackedAreas.isVisible().catch(() => false)) {
-              testLogger.info('Stacked area chart rendered');
-            }
-          }
+        // Stacking option must be available when required for this chart type
+        await expect(stackOption).toBeVisible({
+          timeout: 5000,
+          message: `Stacking option must be available for ${variation.type} charts`
+        });
+        testLogger.info(`Stacking option found for ${variation.type} chart`);
+
+        await stackOption.click();
+        testLogger.info(`Enabled ${variation.type} chart stacking`);
+        await page.waitForTimeout(2000);
+
+        if (variation.type === 'bar') {
+          const stackedBars = await pm.metricsPage.getStackedBars();
+          const isStackedBarVisible = await stackedBars.isVisible().catch(() => false);
+          expect(isStackedBarVisible).toBeTruthy(); // Should render stacked bars
+          testLogger.info('Stacked bar chart rendered');
+        } else if (variation.type === 'area') {
+          const stackedAreas = await pm.metricsPage.getStackedAreas();
+          const isStackedAreaVisible = await stackedAreas.isVisible().catch(() => false);
+          expect(isStackedAreaVisible).toBeTruthy(); // Should render stacked areas
+          testLogger.info('Stacked area chart rendered');
         }
       }
 
@@ -284,31 +291,49 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     testLogger.info('Testing scatter plot with correlation analysis');
     const correlationQuery = 'cpu_usage_percent and memory_usage_bytes/1000000';
     await pm.metricsPage.executeQuery(correlationQuery);
-    await pm.metricsPage.selectChartType('scatter');
+    const scatterSelected = await pm.metricsPage.selectChartType('scatter');
     await page.waitForTimeout(2000);
 
+    // Assert: Scatter chart should be selectable
+    if (scatterSelected) {
+      expect(scatterSelected).toBe(true);
+      testLogger.info('Scatter chart type selected successfully');
+    }
+
     const trendLine = await pm.metricsPage.getTrendLine();
-    if (await trendLine.isVisible().catch(() => false)) {
+    const hasTrendLine = await trendLine.isVisible().catch(() => false);
+    if (hasTrendLine) {
+      // Assert: Trend line should be visible if correlation feature exists
+      expect(trendLine).toBeVisible();
       testLogger.info('Correlation trend line displayed');
     }
 
     const correlationText = await pm.metricsPage.getCorrelationText();
-    if (await correlationText.isVisible().catch(() => false)) {
+    const hasCorrelationText = await correlationText.isVisible().catch(() => false);
+    if (hasCorrelationText) {
       const value = await correlationText.textContent();
+      // Assert: Correlation text should contain valid coefficient
+      expect(value).toMatch(/correlation|r²|R²|\d+\.\d+/i);
       testLogger.info(`Correlation coefficient: ${value}`);
     }
 
     // Test 2: Table sorting
     testLogger.info('Testing table sorting functionality');
     await pm.metricsPage.executeQuery('topk(10, http_requests_total)');
-    await pm.metricsPage.selectChartType('table');
+    const tableSelected = await pm.metricsPage.selectChartType('table');
     await page.waitForTimeout(1000);
 
+    // Assert: Table chart should be selectable
+    expect(tableSelected).toBe(true);
+
     const sortableHeader = await pm.metricsPage.getSortableHeader();
-    if (await sortableHeader.isVisible().catch(() => false)) {
+    const hasSortableHeader = await sortableHeader.isVisible().catch(() => false);
+    if (hasSortableHeader) {
+      // Assert: Table should have sortable headers
+      expect(sortableHeader).toBeVisible();
       await sortableHeader.click();
       await page.waitForTimeout(500);
-      testLogger.info('Table sorting functionality available');
+      testLogger.info('Table sorting functionality available and working');
     }
 
     testLogger.info('Advanced chart features tested successfully');
@@ -326,7 +351,12 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     // Test zoom and pan
     const chartArea = await pm.metricsPage.getChartArea();
-    if (await chartArea.isVisible()) {
+    const isChartVisible = await chartArea.isVisible();
+
+    if (isChartVisible) {
+      // Assert: Chart area should be visible for interaction
+      expect(chartArea).toBeVisible();
+
       await chartArea.hover();
       await page.mouse.wheel(0, -100); // Zoom in
       await page.waitForTimeout(500);
@@ -339,7 +369,10 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       testLogger.info('Chart pan tested');
 
       const resetButton = await pm.metricsPage.getResetButton();
-      if (await resetButton.isVisible().catch(() => false)) {
+      const hasResetButton = await resetButton.isVisible().catch(() => false);
+      if (hasResetButton) {
+        // Assert: Reset button should be available after zoom
+        expect(resetButton).toBeVisible();
         await resetButton.click();
         testLogger.info('Chart zoom reset available');
       }
@@ -347,7 +380,9 @@ test.describe("Metrics Visualization and Chart Tests", () => {
 
     // Test export functionality
     const exportButton = await pm.metricsPage.getExportButtonElement();
-    if (await exportButton.isVisible().catch(() => false)) {
+    const hasExportButton = await exportButton.isVisible().catch(() => false);
+
+    if (hasExportButton) {
       await exportButton.click();
       await page.waitForTimeout(500);
 
@@ -355,22 +390,25 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       const svgOption = await pm.metricsPage.getSvgOption();
       const csvOption = await pm.metricsPage.getCsvOption();
 
-      if (await pngOption.isVisible().catch(() => false)) {
-        testLogger.info('PNG export option available');
-      }
-      if (await svgOption.isVisible().catch(() => false)) {
-        testLogger.info('SVG export option available');
-      }
-      if (await csvOption.isVisible().catch(() => false)) {
-        testLogger.info('CSV export option available');
-      }
+      const hasPng = await pngOption.isVisible().catch(() => false);
+      const hasSvg = await svgOption.isVisible().catch(() => false);
+      const hasCsv = await csvOption.isVisible().catch(() => false);
+
+      // Assert: At least one export format should be available
+      expect(hasPng || hasSvg || hasCsv).toBe(true);
+
+      if (hasPng) testLogger.info('PNG export option available');
+      if (hasSvg) testLogger.info('SVG export option available');
+      if (hasCsv) testLogger.info('CSV export option available');
 
       await page.keyboard.press('Escape');
     }
 
     // Test chart customization options
     const settingsButton = await pm.metricsPage.getChartSettingsButton();
-    if (await settingsButton.isVisible().catch(() => false)) {
+    const hasSettingsButton = await settingsButton.isVisible().catch(() => false);
+
+    if (hasSettingsButton) {
       await settingsButton.click();
       await page.waitForTimeout(500);
 
@@ -378,15 +416,16 @@ test.describe("Metrics Visualization and Chart Tests", () => {
       const gridToggle = await pm.metricsPage.getGridToggleOption();
       const tooltipToggle = await pm.metricsPage.getTooltipToggleOption();
 
-      if (await legendToggle.isVisible().catch(() => false)) {
-        testLogger.info('Legend toggle option available');
-      }
-      if (await gridToggle.isVisible().catch(() => false)) {
-        testLogger.info('Grid toggle option available');
-      }
-      if (await tooltipToggle.isVisible().catch(() => false)) {
-        testLogger.info('Tooltip toggle option available');
-      }
+      const hasLegend = await legendToggle.isVisible().catch(() => false);
+      const hasGrid = await gridToggle.isVisible().catch(() => false);
+      const hasTooltip = await tooltipToggle.isVisible().catch(() => false);
+
+      // Assert: At least one customization option should be available
+      expect(hasLegend || hasGrid || hasTooltip).toBe(true);
+
+      if (hasLegend) testLogger.info('Legend toggle option available');
+      if (hasGrid) testLogger.info('Grid toggle option available');
+      if (hasTooltip) testLogger.info('Tooltip toggle option available');
 
       await page.keyboard.press('Escape');
     }

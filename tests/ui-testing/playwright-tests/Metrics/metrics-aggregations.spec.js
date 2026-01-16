@@ -3,12 +3,20 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
-// Helper function to verify data is actually visible on the UI
+// Helper function to verify data is actually visible on the UI with actual value checks
 // Uses page object methods to comply with POM pattern
 async function verifyDataOnUI(pm, testName) {
   const hasVisualization = await pm.metricsPage.verifyDataVisualization(testName);
   // Final assertion - ensure we have some form of data visualization
   expect(hasVisualization).toBeTruthy();
+
+  // Additional validation - check for actual data values (not just presence)
+  const hasDataValues = await pm.metricsPage.hasDataValues();
+  if (hasDataValues) {
+    const dataValue = await pm.metricsPage.getFirstDataValue();
+    expect(dataValue).toBeTruthy(); // Should have actual data value
+    expect(dataValue.trim().length).toBeGreaterThan(0); // Value should not be empty
+  }
 }
 
 test.describe("Metrics Aggregation and Grouping Tests", () => {
@@ -90,8 +98,13 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         await pm.metricsPage.executeQuery(query);
         await page.waitForTimeout(1500);
 
-        // Verify no errors
+        // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
+        if (hasError) {
+          const errorIndicators = await pm.metricsPage.getErrorIndicators();
+          const errorText = await errorIndicators.textContent();
+          testLogger.error(`Query failed with error: ${errorText}`);
+        }
         expect(hasError).toBe(false);
 
         // Verify data is visible on UI
@@ -155,24 +168,27 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         await pm.metricsPage.executeQuery(query);
         await page.waitForTimeout(2000);
 
-        // Verify no errors
+        // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
+        if (hasError) {
+          const errorIndicators = await pm.metricsPage.getErrorIndicators();
+          const errorText = await errorIndicators.textContent();
+          testLogger.error(`Query failed with error: ${errorText}`);
+        }
         expect(hasError).toBe(false);
 
-        // Check legend count for topk/bottomk
+        // Check legend count for topk/bottomk - assert actual value
         if (testGroup.checkLegend) {
           const legendCount = await pm.metricsPage.getLegendItemCount();
-          if (legendCount > 0) {
-            testLogger.info(`Query returned ${legendCount} series`);
-          }
+          testLogger.info(`Query returned ${legendCount} series`);
+          expect(legendCount).toBeGreaterThan(0); // Should have legend items
         }
 
-        // Check result value for absent/present
+        // Check result value for absent/present - assert value exists
         if (testGroup.checkValue) {
           const value = await pm.metricsPage.getResultValue();
-          if (value) {
-            testLogger.info(`Result value: ${value}`);
-          }
+          testLogger.info(`Result value: ${value}`);
+          expect(value).toBeTruthy(); // Should have a result value
         }
       }
     }
@@ -216,8 +232,13 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         await pm.metricsPage.executeQuery(query);
         await page.waitForTimeout(2500);
 
-        // Verify no errors
+        // Verify no errors - if error found, test fails immediately
         const hasError = await pm.metricsPage.expectQueryError();
+        if (hasError) {
+          const errorIndicators = await pm.metricsPage.getErrorIndicators();
+          const errorText = await errorIndicators.textContent();
+          testLogger.error(`Query failed with error: ${errorText}`);
+        }
         expect(hasError).toBe(false);
 
         testLogger.info(`${query} executed successfully`);

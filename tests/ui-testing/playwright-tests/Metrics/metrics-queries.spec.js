@@ -56,7 +56,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       {
         name: 'Histogram quantile',
         query: 'histogram_quantile(0.95, rate(request_duration_bucket[5m]))',
-        expectData: false
+        expectData: true // Changed to true - we should verify data is returned
       },
       {
         name: 'Label filters',
@@ -71,7 +71,7 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       {
         name: 'Math expressions',
         query: '(memory_usage / cpu_usage) * 100',
-        expectData: false
+        expectData: true // Changed to true - we should verify data is returned
       }
     ];
 
@@ -85,12 +85,15 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await pm.metricsPage.clickApplyButton();
       await pm.metricsPage.waitForMetricsResults();
 
-      // Verify no error
-      await pm.metricsPage.expectNoErrorNotification();
+      // Assert: Query must execute without errors
+      const hasError = await pm.metricsPage.hasErrorIndicator();
+      expect(hasError).toBe(false);
 
       // Verify data visualization if expected
       if (q.expectData) {
-        await verifyDataOnUI(pm, `PromQL ${q.name}`);
+        const result = await verifyDataOnUI(pm, `PromQL ${q.name}`);
+        // Assert: Data visualization should be present
+        expect(result.hasVisualization).toBe(true);
       }
 
       testLogger.info(`${q.name} executed successfully`);
@@ -147,9 +150,9 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         const sqlIndicator = await pm.metricsPage.getSqlIndicator();
         const isSqlMode = await sqlIndicator.isVisible().catch(() => false);
 
-        if (isSqlMode) {
-          testLogger.info('SQL mode activated successfully');
-        }
+        // Assert: SQL mode should be activated
+        expect(isSqlMode).toBe(true);
+        testLogger.info('SQL mode activated successfully');
       } else {
         // Ensure SQL mode is active
         const currentlyInSqlMode = await pm.metricsPage.getSqlIndicator().then(i => i.isVisible().catch(() => false));
@@ -163,8 +166,9 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
         await pm.metricsPage.clickApplyButton();
         await pm.metricsPage.waitForMetricsResults();
 
-        // Verify no error
-        await pm.metricsPage.expectNoErrorNotification();
+        // Assert: SQL query must execute without errors
+        const hasError = await pm.metricsPage.hasErrorIndicator();
+        expect(hasError).toBe(false);
 
         testLogger.info(`${q.name} executed successfully`);
       }
@@ -204,8 +208,9 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await pm.metricsPage.clickApplyButton();
       await pm.metricsPage.waitForMetricsResults();
 
-      // Verify no error
-      await pm.metricsPage.expectNoErrorNotification();
+      // Assert: Advanced queries must execute without errors
+      const hasError = await pm.metricsPage.hasErrorIndicator();
+      expect(hasError).toBe(false);
 
       testLogger.info(`${q.name} executed successfully`);
     }
@@ -226,11 +231,12 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
     await page.waitForTimeout(2000);
 
     let hasError = await pm.metricsPage.hasErrorIndicator();
-    if (hasError) {
-      testLogger.info('Error message displayed for invalid PromQL syntax');
-    } else {
-      testLogger.info('System handled invalid PromQL syntax - may show empty results');
-    }
+    expect(hasError).toBe(true); // Should show error for invalid syntax
+
+    const errorIndicators = await pm.metricsPage.getErrorIndicators();
+    const errorText = await errorIndicators.textContent();
+    testLogger.info(`Error message displayed: ${errorText}`);
+    expect(errorText).toMatch(/syntax|parse|invalid|error/i); // Verify it's a proper error message
 
     // Test 2: Invalid SQL syntax (if SQL mode available)
     const sqlToggle = await pm.metricsPage.getSqlToggle();
@@ -247,11 +253,12 @@ test.describe("Metrics PromQL and SQL Query testcases", () => {
       await page.waitForTimeout(2000);
 
       hasError = await pm.metricsPage.hasErrorIndicator();
-      if (hasError) {
-        testLogger.info('Error message displayed for invalid SQL syntax');
-      } else {
-        testLogger.info('System handled invalid SQL syntax');
-      }
+      expect(hasError).toBe(true); // Should show error for invalid SQL
+
+      const sqlErrorIndicators = await pm.metricsPage.getErrorIndicators();
+      const sqlErrorText = await sqlErrorIndicators.textContent();
+      testLogger.info(`SQL error message displayed: ${sqlErrorText}`);
+      expect(sqlErrorText).toMatch(/syntax|parse|invalid|error|sql/i); // Verify proper error
     } else {
       testLogger.info('SQL mode not available - skipping invalid SQL test');
     }
