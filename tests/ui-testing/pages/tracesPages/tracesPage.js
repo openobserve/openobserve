@@ -71,6 +71,19 @@ export class TracesPage {
     this.uiModeButton = '[data-test="logs-search-ui-mode-btn"]';
     this.queryEditor = '[data-test="query-editor"]';
     this.queryErrorMessage = '[data-test="logs-search-error-message"]';
+    this.viewLines = '.view-lines';
+
+    // Time Range Selectors
+    this.dateTimeRelative15mButton = '[data-test="date-time-relative-15-m-btn"]';
+    this.dateTimeRelative1mButton = '[data-test="date-time-relative-1-m-btn"]';
+    this.dateTimeRelativeCustomButton = '[data-test="date-time-relative-custom-btn"]';
+
+    // Trace Tree/Span Selectors
+    this.traceTreeSpanServiceName = '[data-test="trace-tree-span-service-name"]';
+    this.traceTreeSpanServiceNamePrefix = '[data-test^="trace-tree-span-service-name-"]';
+
+    // Field List Toggle
+    this.fieldListToggleButton = '[data-test="logs-search-field-list-collapse-btn"]';
 
     // Legacy/Common
     this.dateTimeButton = dateTimeButtonLocator;
@@ -182,10 +195,27 @@ export class TracesPage {
   }
 
   async clickFirstTraceResult() {
-    await this.page.locator(this.searchResultItem).first().click();
-    await this.page.waitForLoadState('networkidle').catch(() => {});
-    // Additional wait for trace details page to render
-    await this.page.waitForTimeout(1000);
+    const selectors = [
+      this.page.getByText(/Spans\s*:\s*\d+/).first(),
+      this.page.locator(this.searchResultItem).first(),
+      this.page.locator('tbody tr').first()
+    ];
+
+    for (const selector of selectors) {
+      try {
+        if (await selector.isVisible({ timeout: 3000 })) {
+          await selector.click();
+          await this.page.waitForLoadState('networkidle').catch(() => {});
+          // Additional wait for trace details page to render
+          await this.page.waitForTimeout(2000);
+          return;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    throw new Error('No trace result found to click');
   }
 
   async expectTraceDetailsVisible() {
@@ -775,6 +805,503 @@ export class TracesPage {
       timeout: true,
       duration: timeout
     };
+  }
+
+  // ===== POM Compliance Helper Methods =====
+
+  /**
+   * Get query editor content
+   * @returns {Promise<string>} Content of the query editor
+   */
+  async getQueryEditorContent() {
+    const viewLines = this.page.locator(this.viewLines);
+    return await viewLines.textContent().catch(() => '');
+  }
+
+  /**
+   * Expect query editor contains specific text
+   * @param {string} text - Text to check for
+   */
+  async expectQueryEditorContains(text) {
+    const content = await this.getQueryEditorContent();
+    expect(content).toContain(text);
+  }
+
+  /**
+   * Check if no results message is visible
+   * @returns {Promise<boolean>}
+   */
+  async isNoResultsVisible() {
+    return await this.page.locator(this.resultNotFoundText).isVisible({ timeout: 1000 }).catch(() => false);
+  }
+
+  /**
+   * Check if error message is visible
+   * @returns {Promise<boolean>}
+   */
+  async isErrorMessageVisible() {
+    return await this.page.locator(this.errorMessage).isVisible({ timeout: 1000 }).catch(() => false);
+  }
+
+  /**
+   * Get error message text
+   * @returns {Promise<string>}
+   */
+  async getErrorMessageText() {
+    return await this.page.locator(this.errorMessage).textContent().catch(() => '');
+  }
+
+  /**
+   * Check if specific text is visible in results
+   * @param {string} text - Text to look for
+   * @returns {Promise<boolean>}
+   */
+  async isTextVisibleInResults(text) {
+    return await this.page.getByText(text).first().isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Check if any of the specified texts are visible
+   * @param {string[]} texts - Array of texts to check
+   * @returns {Promise<boolean>}
+   */
+  async isAnyTextVisible(texts) {
+    for (const text of texts) {
+      if (await this.isTextVisibleInResults(text)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get cell by name in trace details
+   * @param {string} name - Cell name
+   * @param {boolean} exact - Exact match
+   * @returns {Promise<boolean>} True if visible
+   */
+  async isCellVisible(name, exact = false) {
+    return await this.page.getByRole('cell', { name, exact }).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Click on a cell by name
+   * @param {string} name - Cell name
+   * @param {boolean} exact - Exact match
+   */
+  async clickCell(name, exact = false) {
+    const cell = this.page.getByRole('cell', { name, exact });
+    if (await cell.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await cell.first().click();
+    }
+  }
+
+  /**
+   * Check if ERROR status is visible in trace details
+   * @returns {Promise<boolean>}
+   */
+  async isErrorStatusVisible() {
+    return await this.isCellVisible('ERROR');
+  }
+
+  /**
+   * Check if status code 2 (error) is visible
+   * @returns {Promise<boolean>}
+   */
+  async isStatusCode2Visible() {
+    return await this.page.getByRole('cell', { name: '2' }).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Check if duration cell is visible
+   * @returns {Promise<boolean>}
+   */
+  async isDurationCellVisible() {
+    return await this.isCellVisible('duration');
+  }
+
+  /**
+   * Click on span service name in trace tree
+   */
+  async clickSpanServiceName() {
+    const spanServiceName = this.page.locator(this.traceTreeSpanServiceNamePrefix).first();
+    if (await spanServiceName.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await spanServiceName.click();
+      await this.page.waitForTimeout(1000);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if span service name is visible in trace tree
+   * @returns {Promise<boolean>}
+   */
+  async isSpanServiceNameVisible() {
+    return await this.page.locator(this.traceTreeSpanServiceNamePrefix).first().isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Click on trace tree span service name (generic selector)
+   */
+  async clickTraceTreeSpanServiceName() {
+    const serviceNameSpan = this.page.locator(this.traceTreeSpanServiceName).first();
+    if (await serviceNameSpan.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await serviceNameSpan.click();
+      await this.page.waitForTimeout(1000);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get error traces with regex pattern
+   * @returns {Promise<boolean>} True if error traces found
+   */
+  async hasErrorTracesWithPattern() {
+    const errorTrace = this.page.getByText(/Errors\s*:\s*[1-9]\d*/);
+    return await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click first error trace
+   */
+  async clickFirstErrorTrace() {
+    const errorTrace = this.page.getByText(/Errors\s*:\s*[1-9]\d*/);
+    if (await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+      await errorTrace.first().click();
+      await this.page.waitForTimeout(2000);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if attribute cell is visible
+   * @param {string} attrName - Attribute name
+   * @returns {Promise<boolean>}
+   */
+  async isAttributeCellVisible(attrName) {
+    return await this.page.getByRole('cell', { name: attrName, exact: true }).isVisible({ timeout: 2000 }).catch(() => false);
+  }
+
+  /**
+   * Click attribute cell
+   * @param {string} attrName - Attribute name
+   */
+  async clickAttributeCell(attrName) {
+    const attrCell = this.page.getByRole('cell', { name: attrName, exact: true });
+    if (await attrCell.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await attrCell.click();
+      await this.page.waitForTimeout(500);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if search result item is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSearchResultItemVisible() {
+    return await this.page.locator(this.searchResultItem).first().isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Check if timeline toggle button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTimelineToggleVisible() {
+    return await this.page.locator(this.traceDetailsToggleTimelineButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if timeline chart is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTimelineChartVisible() {
+    return await this.page.locator(this.traceDetailsTimelineChart).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if copy trace ID button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isCopyTraceIdButtonVisible() {
+    return await this.page.locator(this.traceDetailsCopyTraceIdButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if view logs button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isViewLogsButtonVisible() {
+    return await this.page.locator(this.traceDetailsViewLogsButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if search input in trace details is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTraceDetailsSearchInputVisible() {
+    return await this.page.locator(this.traceDetailsSearchInput).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if share link button in trace details is visible
+   * @returns {Promise<boolean>}
+   */
+  async isShareLinkButtonVisible() {
+    return await this.page.locator(this.traceDetailsShareLinkButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Expect URL contains specific path
+   * @param {RegExp|string} pattern - Pattern to match
+   */
+  async expectUrlContains(pattern) {
+    await expect(this.page).toHaveURL(pattern);
+  }
+
+  /**
+   * Check if service maps toggle is visible
+   * @returns {Promise<boolean>}
+   */
+  async isServiceMapsToggleVisible() {
+    return await this.page.locator(this.serviceMapsToggle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if service graph chart is visible
+   * @returns {Promise<boolean>}
+   */
+  async isServiceGraphChartVisible() {
+    return await this.page.locator(this.serviceGraphChart).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Check if service graph refresh button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isServiceGraphRefreshButtonVisible() {
+    return await this.page.locator(this.serviceGraphRefreshButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Get SVG element count in service graph
+   * @returns {Promise<number>}
+   */
+  async getServiceGraphSvgCount() {
+    const graphElement = this.page.locator(this.serviceGraphChart);
+    if (await graphElement.isVisible({ timeout: 5000 }).catch(() => false)) {
+      return await graphElement.locator('svg').count();
+    }
+    return 0;
+  }
+
+  /**
+   * Check if search bar is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSearchBarVisible() {
+    return await this.page.locator(this.searchBar).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Expect search bar to be visible
+   */
+  async expectSearchBarVisible() {
+    await expect(this.page.locator(this.searchBar)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Check if index list is visible
+   * @returns {Promise<boolean>}
+   */
+  async isIndexListVisible() {
+    const fieldListElement = this.page.locator(this.indexList);
+    return await fieldListElement.isVisible().catch(() => false);
+  }
+
+  /**
+   * Get index list count
+   * @returns {Promise<number>}
+   */
+  async getIndexListCount() {
+    return await this.page.locator(this.indexList).count();
+  }
+
+  /**
+   * Check if field list toggle button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isFieldListToggleButtonVisible() {
+    return await this.page.locator(this.fieldListToggleButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Expect field list toggle button to be visible
+   */
+  async expectFieldListToggleButtonVisible() {
+    await expect(this.page.locator(this.fieldListToggleButton)).toBeVisible();
+  }
+
+  /**
+   * Click share link button
+   */
+  async clickShareLinkButton() {
+    await this.page.locator(this.shareLinkButton).click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  /**
+   * Check if stream select is visible
+   * @returns {Promise<boolean>}
+   */
+  async isStreamSelectVisible() {
+    return await this.page.locator(this.streamSelect).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if no stream selected text is visible
+   * @returns {Promise<boolean>}
+   */
+  async isNoStreamSelectedVisible() {
+    return await this.page.locator(this.noStreamSelectedText).isVisible({ timeout: 1000 }).catch(() => false);
+  }
+
+  /**
+   * Get no stream selected count
+   * @returns {Promise<number>}
+   */
+  async getNoStreamSelectedCount() {
+    return await this.page.locator(this.noStreamSelectedText).count();
+  }
+
+  /**
+   * Get stream select count
+   * @returns {Promise<number>}
+   */
+  async getStreamSelectCount() {
+    return await this.page.locator(this.streamSelect).count();
+  }
+
+  /**
+   * Expect no stream selected to be visible
+   */
+  async expectNoStreamSelectedVisible() {
+    await expect(this.page.locator(this.noStreamSelectedText)).toBeVisible();
+  }
+
+  /**
+   * Expect stream select to be visible
+   */
+  async expectStreamSelectVisible() {
+    await expect(this.page.locator(this.streamSelect)).toBeVisible();
+  }
+
+  /**
+   * Check if trace details tree is visible
+   * @returns {Promise<boolean>}
+   */
+  async isTraceDetailsTreeVisible() {
+    return await this.page.locator(this.traceDetailsTree).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Check if any trace detail element is visible
+   * @returns {Promise<boolean>}
+   */
+  async isAnyTraceDetailVisible() {
+    // Try multiple selectors that indicate trace details are visible
+    const detailSelectors = [
+      this.traceDetailsTree,
+      this.traceDetailsSidebar,
+      this.spanBlock,
+      this.spanBlockContainer,
+      '[data-test*="trace-detail"]',
+      '[data-test*="trace-tree"]',
+      '[data-test*="span-block"]',
+      '[data-test="trace-details-header"]',
+      '.trace-detail',
+      '.trace-tree',
+      '.span-block'
+    ];
+
+    for (const selector of detailSelectors) {
+      try {
+        if (await this.page.locator(selector).first().isVisible({ timeout: 2000 })) {
+          return true;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get error message element text (if visible)
+   * @returns {Promise<string>}
+   */
+  async getVisibleErrorMessage() {
+    const errorElement = this.page.locator('.error-message');
+    if (await errorElement.isVisible({ timeout: 1000 }).catch(() => false)) {
+      return await errorElement.textContent().catch(() => '');
+    }
+    return '';
+  }
+
+  /**
+   * Click 1 minute time range button
+   */
+  async clickTimeRange1m() {
+    await this.page.locator(this.dateTimeButton).click();
+    try {
+      await this.page.locator(this.dateTimeRelative1mButton).click({ timeout: 5000 });
+    } catch {
+      // Fallback to custom range if 1m not available
+      await this.page.locator(this.dateTimeRelativeCustomButton).click();
+    }
+  }
+
+  /**
+   * Click 15 minute time range button directly
+   */
+  async clickTimeRange15mDirect() {
+    await this.page.locator(this.dateTimeButton).click();
+    await this.page.locator(this.dateTimeRelative15mButton).click();
+  }
+
+  /**
+   * Get current page URL
+   * @returns {string}
+   */
+  getPageUrl() {
+    return this.page.url();
+  }
+
+  /**
+   * Reload the page
+   */
+  async reloadPage() {
+    await this.page.reload();
+    await this.page.waitForLoadState('networkidle').catch(() => {});
+  }
+
+  /**
+   * Click button with specific text filter
+   * @param {string} text - Button text to filter by
+   * @returns {Promise<boolean>}
+   */
+  async clickButtonWithText(text) {
+    const button = this.page.locator('button').filter({ hasText: text }).first();
+    if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await button.click();
+      await this.page.waitForTimeout(1000);
+      return true;
+    }
+    return false;
   }
 
 }
