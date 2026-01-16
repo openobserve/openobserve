@@ -200,8 +200,7 @@ pub async fn chat_stream(
     let auth_str = crate::common::utils::auth::extract_auth_str(&in_req).await;
 
     // Extract headers to pass through to the LLM gateway
-    let passthrough_headers =
-        extract_passthrough_headers(&in_req, &config.ai.passthrough_headers);
+    let passthrough_headers = extract_passthrough_headers(&in_req, &config.ai.passthrough_headers);
 
     let stream = match ai::service::chat_stream(
         ai::meta::AiServerRequest::new(req_body.messages, req_body.model),
@@ -282,10 +281,7 @@ mod tests {
             headers.get("x-forwarded-for"),
             Some(&"192.168.1.1".to_string())
         );
-        assert_eq!(
-            headers.get("x-forwarded-proto"),
-            Some(&"https".to_string())
-        );
+        assert_eq!(headers.get("x-forwarded-proto"), Some(&"https".to_string()));
         assert_eq!(
             headers.get("x-forwarded-host"),
             Some(&"example.com".to_string())
