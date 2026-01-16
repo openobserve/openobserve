@@ -606,7 +606,7 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
 
     // Expected color mapping based on mapNumericStatus function
     const expectedColors = {
-      0: '#dc2626', // emergency - red
+      0: '#84a8f6', // OTEL UNSPECIFIED - mapped to info - blue
       1: '#ea580c', // alert - dark orange
       2: '#d97706', // critical - orange
       3: '#dc2626', // error - red

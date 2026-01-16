@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,11 @@
 
 use std::str::FromStr;
 
-use actix_web::{
-    HttpRequest, HttpResponse, delete, get,
+use axum::{
+    Json,
+    extract::{OriginalUri, Path, Query},
     http::StatusCode,
-    patch, post, put,
-    web::{self, Query},
+    response::Response,
 };
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
@@ -66,14 +66,12 @@ use crate::{
 
 pub mod dedup_stats;
 pub mod deduplication;
-#[allow(deprecated)]
-pub mod deprecated;
 pub mod destinations;
 pub mod history;
 pub mod incidents;
 pub mod templates;
 
-impl From<AlertError> for HttpResponse {
+impl From<AlertError> for Response {
     fn from(value: AlertError) -> Self {
         match &value {
             AlertError::InfraError(err) => MetaHttpResponse::internal_error(err),
@@ -112,6 +110,8 @@ impl From<AlertError> for HttpResponse {
 
 /// CreateAlert
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateAlert",
@@ -131,20 +131,16 @@ impl From<AlertError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
-#[post("/v2/{org_id}/alerts")]
 pub async fn create_alert(
-    path: web::Path<String>,
-    req_body: web::Json<CreateAlertRequestBody>,
+    Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let req_body = req_body.into_inner();
-
-    let query_str = req.query_string();
+    Json(req_body): Json<CreateAlertRequestBody>,
+) -> Response {
+    let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
@@ -166,6 +162,8 @@ pub async fn create_alert(
 
 /// GetAlert
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlert",
@@ -185,13 +183,10 @@ pub async fn create_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get alert details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/{alert_id}")]
-async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-
+pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
@@ -208,6 +203,8 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
 /// ExportAlert
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/{alert_id}/export",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ExportAlert",
@@ -227,13 +224,10 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Export alert as JSON"}))
+        ("x-o2-mcp" = json!({"description": "Export alert as JSON", "category": "alerts"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/{alert_id}/export")]
-pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-
+pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
@@ -250,6 +244,8 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
 /// UpdateAlert
 #[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateAlert",
@@ -270,18 +266,14 @@ pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an existing alert"}))
+        ("x-o2-mcp" = json!({"description": "Update an existing alert", "category": "alerts"}))
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}")]
 pub async fn update_alert(
-    path: web::Path<(String, Ksuid)>,
-    req_body: web::Json<UpdateAlertRequestBody>,
+    Path((org_id, alert_id)): Path<(String, Ksuid)>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-    let req_body = req_body.into_inner();
-
+    Json(req_body): Json<UpdateAlertRequestBody>,
+) -> Response {
     let mut alert: MetaAlert = req_body.into();
     alert.last_edited_by = Some(user_email.user_id);
     alert.id = Some(alert_id);
@@ -295,6 +287,8 @@ pub async fn update_alert(
 
 /// DeleteAlert
 #[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/{alert_id}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlert",
@@ -314,13 +308,10 @@ pub async fn update_alert(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete an alert by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
     )
 )]
-#[delete("/v2/{org_id}/alerts/{alert_id}")]
-async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-
+pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::delete_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
@@ -330,6 +321,8 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
 /// DeleteAlertBulk
 #[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/bulk",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertBulk",
@@ -351,15 +344,12 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/v2/{org_id}/alerts/bulk")]
-async fn delete_alert_bulk(
-    path: web::Path<String>,
+pub async fn delete_alert_bulk(
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
     let _folder_id = crate::common::utils::http::get_folder(&query);
 
@@ -411,6 +401,8 @@ async fn delete_alert_bulk(
 
 /// ListAlerts
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListAlerts",
@@ -428,21 +420,14 @@ async fn delete_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alerts"}))
+        ("x-o2-mcp" = json!({"description": "List all alerts", "category": "alerts"}))
     )
 )]
-#[get("/v2/{org_id}/alerts")]
-async fn list_alerts(
-    path: web::Path<String>,
-    req: HttpRequest,
+pub async fn list_alerts(
+    Path(org_id): Path<String>,
+    Query(query): Query<ListAlertsQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let Ok(query) = web::Query::<ListAlertsQuery>::from_query(req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-    let query = query.0;
-
+) -> Response {
     #[cfg(not(feature = "enterprise"))]
     let user_id = None;
     #[cfg(feature = "enterprise")]
@@ -478,6 +463,8 @@ async fn list_alerts(
 
 /// EnableAlert
 #[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/alerts/{alert_id}/enable",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlert",
@@ -498,16 +485,14 @@ async fn list_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable an alert"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable an alert", "category": "alerts"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
-async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-    let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-    let should_enable = query.0.value;
+pub async fn enable_alert(
+    Path((org_id, alert_id)): Path<(String, Ksuid)>,
+    Query(query): Query<EnableAlertQuery>,
+) -> Response {
+    let should_enable = query.value;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
@@ -523,6 +508,8 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
 
 /// EnableAlertBulk
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/bulk/enable",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "EnableAlertBulk",
@@ -546,18 +533,13 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/v2/{org_id}/alerts/bulk/enable")]
-async fn enable_alert_bulk(
-    path: web::Path<String>,
-    web::Json(req): web::Json<AlertBulkEnableRequest>,
-    in_req: HttpRequest,
+pub async fn enable_alert_bulk(
+    Path(org_id): Path<String>,
+    Query(query): Query<EnableAlertQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let Ok(query) = web::Query::<EnableAlertQuery>::from_query(in_req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-    let should_enable = query.0.value;
+    Json(req): Json<AlertBulkEnableRequest>,
+) -> Response {
+    let should_enable = query.value;
 
     #[cfg(feature = "enterprise")]
     {
@@ -596,6 +578,8 @@ async fn enable_alert_bulk(
 
 /// TriggerAlert
 #[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/alerts/{alert_id}/trigger",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "TriggerAlert",
@@ -616,13 +600,10 @@ async fn enable_alert_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Manually trigger an alert"}))
+        ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
-async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-
+pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
@@ -632,6 +613,8 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
 
 /// MoveAlerts
 #[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/alerts/move",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "MoveAlerts",
@@ -652,16 +635,14 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Move alerts to another folder"}))
+        ("x-o2-mcp" = json!({"description": "Move alerts to another folder", "category": "alerts"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/move")]
-async fn move_alerts(
-    path: web::Path<String>,
-    req_body: web::Json<MoveAlertsRequestBody>,
+pub async fn move_alerts(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
+    Json(req_body): Json<MoveAlertsRequestBody>,
+) -> Response {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::move_to_folder(
         client,
@@ -686,6 +667,8 @@ async fn move_alerts(
 
 /// GenerateSql
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/generate_sql",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GenerateSql",
@@ -707,20 +690,15 @@ async fn move_alerts(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "generate_sql"})),
-        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language"}))
+        ("x-o2-mcp" = json!({"description": "Generate SQL from natural language", "category": "alerts"}))
     )
 )]
-#[post("/v2/{org_id}/alerts/generate_sql")]
 pub async fn generate_sql(
-    path: web::Path<String>,
-    req_body: web::Json<GenerateSqlRequestBody>,
+    Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
-    _req: HttpRequest,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let req_body = req_body.into_inner();
-
+    Json(req_body): Json<GenerateSqlRequestBody>,
+) -> Response {
     // Convert HTTP models to internal types
     let stream_type: config::meta::stream::StreamType = req_body.stream_type.into();
     let query_condition: config::meta::alerts::QueryCondition = req_body.query_condition.into();

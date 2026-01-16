@@ -18,7 +18,7 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::web;
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME,
@@ -43,7 +43,6 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    runtime::METRICS_RUNTIME,
     schema::{SchemaCache, unwrap_partition_time_level},
 };
 use promql_parser::{label::MatchOp, parser};
@@ -58,7 +57,9 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
+        ingestion::{
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
+        },
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
@@ -68,24 +69,8 @@ use crate::{
 
 pub async fn remote_write(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     user: IngestUser,
-) -> std::result::Result<(), anyhow::Error> {
-    let org_id = org_id.to_string();
-    let ret = METRICS_RUNTIME
-        .spawn(async move { remote_write_inner(&org_id, body, user).await })
-        .await;
-    match ret {
-        Ok(Ok(_)) => Ok(()),
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(anyhow::anyhow!("Error spawning remote write task: {e}")),
-    }
-}
-
-async fn remote_write_inner(
-    org_id: &str,
-    body: web::Bytes,
-    user: crate::common::meta::ingestion::IngestUser,
 ) -> std::result::Result<(), anyhow::Error> {
     // check system resource
     check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
@@ -657,8 +642,13 @@ async fn remote_write_inner(
 
         // write to file
         let t = std::time::Instant::now();
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metrics.as_str(),
+            &stream_name,
+        )
+        .await;
         get_writer_time += t.elapsed().as_micros();
 
         // for performance issue, we will flush all when the app shutdown

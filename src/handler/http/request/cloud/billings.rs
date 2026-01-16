@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,12 @@
 
 use std::collections::HashMap;
 
-use actix_web::{HttpRequest, HttpResponse, Responder, get, post, web};
+use axum::{
+    body::Body,
+    extract::{Path, Query},
+    http::{HeaderMap, StatusCode, header},
+    response::{IntoResponse, Response},
+};
 use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 
@@ -40,6 +45,8 @@ use crate::{
 
 /// GetSubscriptionUrl
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/hosted_subscription_url",
     context_path = "/api",
     tag = "Billings",
     operation_id = "GetSubscriptionUrl",
@@ -60,16 +67,13 @@ use crate::{
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/billings/hosted_subscription_url")]
 pub async fn create_checkout_session(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> impl Responder {
-    let org_id = path.into_inner();
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let email = user_email.user_id.as_str();
 
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let Some(sub_type) = query.get("plan") else {
         return o2_cloud_billings::BillingError::SubTypeMissing.into_http_response();
     };
@@ -123,6 +127,8 @@ pub async fn create_checkout_session(
 
 /// ProcessSessionDetail
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/checkout_session_detail",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ProcessSessionDetail",
@@ -140,13 +146,11 @@ pub async fn create_checkout_session(
         (status = 500, description = "Failure",   content_type = "application/json", body = ()),
     ),
 )]
-#[get("/{org_id}/billings/checkout_session_detail")]
 pub async fn process_session_detail(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    query: web::Query<CheckoutSessionDetailRequestQuery>,
-) -> impl Responder {
-    let org_id = path.into_inner();
+    Query(query): Query<CheckoutSessionDetailRequestQuery>,
+) -> Response {
     let email = user_email.user_id.as_str();
     if query.status != "success" {
         return o2_cloud_billings::BillingError::InvalidStatus.into_http_response();
@@ -217,6 +221,8 @@ pub async fn process_session_detail(
 
 /// Unsubscribe
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/unsubscribe",
     context_path = "/api",
     tag = "Billings",
     operation_id = "Unsubscribe",
@@ -237,12 +243,10 @@ pub async fn process_session_detail(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/billings/unsubscribe")]
 pub async fn unsubscribe(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let org_id = path.into_inner();
+) -> Response {
     let email = user_email.user_id.as_str();
 
     let org = match organization::get_org(&org_id).await {
@@ -263,13 +267,21 @@ pub async fn unsubscribe(
                 stream_name: None,
             })
             .await;
-            HttpResponse::Ok().body("Subscription will be cancelled at the end of billing cycle.")
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/plain")
+                .body(Body::from(
+                    "Subscription will be cancelled at the end of billing cycle.",
+                ))
+                .unwrap()
         }
     }
 }
 
 /// ListInvoices
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/invoices",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListInvoices",
@@ -290,12 +302,10 @@ pub async fn unsubscribe(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/billings/invoices")]
 pub async fn list_invoices(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let org_id = path.into_inner();
+) -> Response {
     let email = user_email.user_id.as_str();
     if organization::get_org(&org_id).await.is_none() {
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
@@ -305,7 +315,7 @@ pub async fn list_invoices(
             let body = ListInvoicesResponseBody {
                 invoices: invoices.unwrap_or_default(),
             };
-            HttpResponse::Ok().json(body)
+            MetaHttpResponse::json(body)
         }
         Err(e) => e.into_http_response(),
     }
@@ -313,6 +323,8 @@ pub async fn list_invoices(
 
 /// ListSubscription
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/list_subscription",
     context_path = "/api",
     tag = "Billings",
     operation_id = "ListSubscription",
@@ -333,12 +345,10 @@ pub async fn list_invoices(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/billings/list_subscription")]
 pub async fn list_subscription(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let org_id = path.into_inner();
+) -> Response {
     let email = user_email.user_id.as_str();
     match o2_cloud_billings::get_subscription(email, &org_id).await {
         Ok(Some(cb)) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(cb)),
@@ -351,6 +361,8 @@ pub async fn list_subscription(
 
 /// CreateBillingPortalSession
 #[utoipa::path(
+    get,
+    path = "/{org_id}/billings/billing_portal",
     context_path = "/api",
     tag = "Billings",
     operation_id = "CreateBillingPortalSession",
@@ -371,14 +383,10 @@ pub async fn list_subscription(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/billings/billing_portal")]
 pub async fn create_billing_portal_session(
-    path: web::Path<String>,
-    req: HttpRequest,
-) -> impl Responder {
-    let org_id = path.into_inner();
-
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Some(customer_id) = query.get("customer_id") else {
         return o2_cloud_billings::BillingError::CustomerIdMissing.into_http_response();
     };
@@ -398,6 +406,8 @@ pub async fn create_billing_portal_session(
 
 /// StripeWebhookEvent
 #[utoipa::path(
+    post,
+    path = "/stripe",
     context_path = "/webhook",
     tag = "Billings",
     summary = "Handle Stripe webhook events",
@@ -407,11 +417,7 @@ pub async fn create_billing_portal_session(
         (status = 200, description="Status OK", content_type = "application/json", body = ())
     )
 )]
-#[post("/stripe")]
-pub async fn handle_stripe_event(
-    req: HttpRequest,
-    payload: web::Bytes, // Raw body bytes
-) -> impl Responder {
+pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes) -> Response {
     // Convert payload bytes to string
     let payload_str = match String::from_utf8(payload.to_vec()) {
         Ok(str) => str,
@@ -421,7 +427,7 @@ pub async fn handle_stripe_event(
     };
 
     // Get Stripe signature from headers
-    let signature = match req.headers().get("Stripe-Signature") {
+    let signature = match headers.get("Stripe-Signature") {
         Some(sig) => match sig.to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -450,7 +456,7 @@ pub async fn handle_stripe_event(
                 .await;
             }
 
-            HttpResponse::Ok().json(json::json!({
+            MetaHttpResponse::json(json::json!({
                 "status": "success"
             }))
         }

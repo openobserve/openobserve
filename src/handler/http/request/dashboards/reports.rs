@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::collections::HashMap;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use config::meta::{
     dashboards::reports::{Report, ReportListFilters},
     triggers::{Trigger, TriggerModule},
@@ -36,7 +39,7 @@ use crate::{
     },
 };
 
-impl From<ReportError> for HttpResponse {
+impl From<ReportError> for Response {
     fn from(value: ReportError) -> Self {
         match &value {
             ReportError::SmtpNotEnabled => MetaHttpResponse::internal_error(value),
@@ -64,6 +67,8 @@ impl From<ReportError> for HttpResponse {
 /// CreateReport
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/reports",
     context_path = "/api",
     tag = "Reports",
     operation_id = "CreateReport",
@@ -92,30 +97,29 @@ impl From<ReportError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a scheduled report"}))
+        ("x-o2-mcp" = json!({"description": "Create a scheduled report", "category": "dashboards"}))
     )
 )]
-#[post("/{org_id}/reports")]
 pub async fn create_report(
-    path: web::Path<String>,
-    report: web::Json<Report>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-
-    let mut report = report.into_inner();
+    axum::Json(report): axum::Json<Report>,
+) -> Response {
+    let mut report = report;
     if report.owner.is_empty() {
         report.owner = user_email.user_id;
     }
     match reports::save(&org_id, "", report, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => MetaHttpResponse::ok("Report saved"),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// UpdateReport
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "UpdateReport",
@@ -142,27 +146,27 @@ pub async fn create_report(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a report"}))
+        ("x-o2-mcp" = json!({"description": "Update a report", "category": "dashboards"}))
     )
 )]
-#[put("/{org_id}/reports/{name}")]
-async fn update_report(
-    path: web::Path<(String, String)>,
-    report: web::Json<Report>,
+pub async fn update_report(
+    Path((org_id, name)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    let mut report = report.into_inner();
+    axum::Json(report): axum::Json<Report>,
+) -> Response {
+    let mut report = report;
     report.last_edited_by = user_email.user_id;
     match reports::save(&org_id, &name, report, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => MetaHttpResponse::ok("Report saved"),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// ListReports
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/reports",
     context_path = "/api",
     tag = "Reports",
     operation_id = "ListReports",
@@ -182,18 +186,14 @@ async fn update_report(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all reports"}))
+        ("x-o2-mcp" = json!({"description": "List all reports", "category": "dashboards"}))
     )
 )]
-#[get("/{org_id}/reports")]
-async fn list_reports(
-    org_id: web::Path<String>,
+pub async fn list_reports(
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-
+) -> Response {
     let folder = query.get("folder_id").map(|field| field.to_owned());
     let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
     let destination_less = query
@@ -221,9 +221,7 @@ async fn list_reports(
                 _permitted = list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -256,16 +254,18 @@ async fn list_reports(
                 .unwrap_or_default(),
         ),
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
 
-    Ok(MetaHttpResponse::json(data))
+    MetaHttpResponse::json(data)
 }
 
 /// GetReport
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "GetReport",
@@ -287,21 +287,21 @@ async fn list_reports(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get report details"}))
+        ("x-o2-mcp" = json!({"description": "Get report details", "category": "dashboards"}))
     )
 )]
-#[get("/{org_id}/reports/{name}")]
-async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Response {
     match reports::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(data) => MetaHttpResponse::json(data),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// DeleteReport
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/reports/{name}",
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReport",
@@ -323,17 +323,15 @@ async fn get_report(path: web::Path<(String, String)>) -> Result<HttpResponse, E
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a report"}))
+        ("x-o2-mcp" = json!({"description": "Delete a report", "category": "dashboards"}))
     )
 )]
-#[delete("/{org_id}/reports/{name}")]
-async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn delete_report(Path((org_id, name)): Path<(String, String)>) -> Response {
     match reports::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Report deleted")),
+        Ok(_) => MetaHttpResponse::ok("Report deleted"),
         Err(e) => match e {
-            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
-            e => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
+            e => MetaHttpResponse::internal_error(e),
         },
     }
 }
@@ -341,6 +339,8 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
 /// DeleteReportBulk
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/reports/bulk",
     context_path = "/api",
     tag = "Reports",
     operation_id = "DeleteReportBulk",
@@ -366,20 +366,17 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/reports/bulk")]
-async fn delete_report_bulk(
-    path: web::Path<String>,
+pub async fn delete_report_bulk(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    axum::Json(req): axum::Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -400,16 +397,18 @@ async fn delete_report_bulk(
             },
         }
     }
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 /// EnableReport
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/reports/{name}/enable",
     context_path = "/api",
     tag = "Report",
     operation_id = "EnableReport",
@@ -432,13 +431,10 @@ async fn delete_report_bulk(
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     )
 )]
-#[put("/{org_id}/reports/{name}/enable")]
-async fn enable_report(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+pub async fn enable_report(
+    Path((org_id, name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let enable = match query.get("value") {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
@@ -446,10 +442,10 @@ async fn enable_report(
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
     match reports::enable(&org_id, &name, enable).await {
-        Ok(_) => Ok(MetaHttpResponse::json(resp)),
+        Ok(_) => MetaHttpResponse::json(resp),
         Err(e) => match e {
-            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
-            e => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
+            e => MetaHttpResponse::internal_error(e),
         },
     }
 }
@@ -457,6 +453,8 @@ async fn enable_report(
 /// TriggerReport
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/reports/{name}/trigger",
     context_path = "/api",
     tag = "Reports",
     operation_id = "TriggerReport",
@@ -481,14 +479,12 @@ async fn enable_report(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/reports/{name}/trigger")]
-async fn trigger_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn trigger_report(Path((org_id, name)): Path<(String, String)>) -> Response {
     match reports::trigger(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Report triggered")),
+        Ok(_) => MetaHttpResponse::ok("Report triggered"),
         Err(e) => match e {
-            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
-            e => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
+            e => MetaHttpResponse::internal_error(e),
         },
     }
 }

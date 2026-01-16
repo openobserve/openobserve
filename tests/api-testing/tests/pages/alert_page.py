@@ -55,7 +55,7 @@ class AlertPage:
             "description": "test"
         }
 
-        response = session.post(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?type=logs", json=payload)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -106,7 +106,7 @@ class AlertPage:
             "description": "test"
         }
 
-        response = session.post(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?type=logs", json=payload)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -157,7 +157,7 @@ class AlertPage:
             "description": "test"
         }
 
-        response = session.post(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?type=logs", json=payload)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -208,7 +208,7 @@ class AlertPage:
             "description": "test"
         }
 
-        response = session.post(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs", json=payload)
+        response = session.post(f"{base_url}api/v2/{org_id}/alerts?type=logs", json=payload)
         if response.status_code == 409:
             # Handle alert already exists scenario
             print(f"Alert already exists: {payload['name']}.")
@@ -219,7 +219,7 @@ class AlertPage:
     def retrieve_alerts_standard(self, session, base_url, user_email, user_password, org_id, stream_name):
         """Retrieve standard alerts."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         # Parse the response
@@ -259,7 +259,7 @@ class AlertPage:
     def retrieve_alert_standard(self, session, base_url, user_email, user_password, org_id, stream_name, alert_name):
         """Retrieve a standard alert."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alert: {response.content}"
         alert_standard_webhook = response.json()  # Assuming the response is a single alert, not a list.
 
@@ -273,7 +273,7 @@ class AlertPage:
     def retrieve_alerts_standard_sql(self, session, base_url, user_email, user_password, org_id, stream_name):
         """Retrieve standard SQL alerts."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         # Parse the response
@@ -312,7 +312,7 @@ class AlertPage:
     def retrieve_alert_standard_sql(self, session, base_url, user_email, user_password, org_id, stream_name, alert_name):
         """Retrieve a standard SQL alert."""    
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alert: {response.content}"
         alert_standard_sql = response.json()  # Assuming the response is a single alert, not a list.
 
@@ -326,7 +326,7 @@ class AlertPage:
     def retrieve_alerts_sql(self, session, base_url, user_email, user_password, org_id, stream_name):
         """Retrieve all SQL alerts."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         # Parse the JSON response
@@ -348,7 +348,7 @@ class AlertPage:
     def retrieve_alert_sql(self, session, base_url, user_email, user_password, org_id, stream_name, alert_name):
         """Retrieve a SQL alert."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alert: {response.content}"
         alert_sql = response.json()  # Assuming the response is a single alert, not a list. 
 
@@ -362,7 +362,7 @@ class AlertPage:
     def retrieve_alerts_real_time(self, session, base_url, user_email, user_password, org_id, stream_name):
         """Retrieve real-time alerts."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         alerts = response.json()
@@ -385,7 +385,7 @@ class AlertPage:
     def retrieve_alert_real_time(self, session, base_url, user_email, user_password, org_id, stream_name, alert_name):
         """Retrieve a real-time alert."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alert: {response.content}"
         alert_real_time = response.json()  # Assuming the response is a single alert, not a list.
 
@@ -399,7 +399,7 @@ class AlertPage:
     def retrieve_alerts_cron(self, session, base_url, user_email, user_password, org_id, stream_name):
         """Retrieve cron alerts."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         alerts = response.json()
@@ -422,7 +422,7 @@ class AlertPage:
     def retrieve_alert_cron(self, session, base_url, user_email, user_password, org_id, stream_name, alert_name):
         """Retrieve a cron alert."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alert: {response.content}"
         alert_cron = response.json()  # Assuming the response is a single alert, not a list.                                                                        
 
@@ -480,7 +480,7 @@ class AlertPage:
         }
 
 
-        response = session.put(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs", json=payload)
+        response = session.put(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs", json=payload)
         assert response.status_code == 200, f"Failed to update alert: {response.content}"
         return response
 
@@ -529,7 +529,7 @@ class AlertPage:
             "description": "test updated"
         }   
 
-        response = session.put(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs", json=payload)
+        response = session.put(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs", json=payload)
         assert response.status_code == 200, f"Failed to update alert: {response.content}"
         return response
 
@@ -578,7 +578,7 @@ class AlertPage:
             "description": "test updated"
         }
 
-        response = session.put(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs", json=payload)
+        response = session.put(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs", json=payload)
         assert response.status_code == 200, f"Failed to update alert: {response.content}"
         return response 
     
@@ -627,7 +627,7 @@ class AlertPage:
             "description": "test updated"
         }
 
-        response = session.put(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}?type=logs", json=payload)
+        response = session.put(f"{base_url}api/v2/{org_id}/alerts/{alert_name}?type=logs", json=payload)
         assert response.status_code == 200, f"Failed to update alert: {response.content}"
         return response
 
@@ -637,14 +637,14 @@ class AlertPage:
         """Delete alerts of a specified type."""
         session.auth = HTTPBasicAuth(user_email, user_password)
 
-        resp_delete_alert = session.delete(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}")
+        resp_delete_alert = session.delete(f"{base_url}api/v2/{org_id}/alerts/{alert_name}")
         assert resp_delete_alert.status_code == 200, f"Failed to delete alert {alert_name}: {resp_delete_alert.content}"
 
         # Wait for a few seconds to allow the data to be deleted
         time.sleep(10)  # Increase this time if necessary
 
             # Verify deletion
-        resp_ver_alert = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts/{alert_name}")
+        resp_ver_alert = session.get(f"{base_url}api/v2/{org_id}/alerts/{alert_name}")
         assert resp_ver_alert.status_code == 404, f"Expected 404 for {alert_name}, but got {resp_ver_alert.status_code}"
 
         return resp_delete_alert  # Return the list of deleted alert names for verification if needed
@@ -653,7 +653,7 @@ class AlertPage:
         """Running an E2E test for validating deleted alerts in SC."""
         session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all alerts
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts?type=logs")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts?type=logs")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         # Get the response data
@@ -702,7 +702,7 @@ class AlertPage:
         """Running an E2E test for validating deleted templates in SC."""
         session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all templates
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts")
         assert response.status_code == 200, f"Failed to retrieve templates: {response.content}"
 
         alerts = response.json()
@@ -726,7 +726,7 @@ class AlertPage:
         """Running an E2E test for validating deleted alerts in SC."""
         session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all alerts
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         alerts = response.json()
@@ -746,7 +746,7 @@ class AlertPage:
         """Running an E2E test for validating deleted alerts in SC."""
         session.auth = HTTPBasicAuth(user_email, user_password)         
         # Retrieve all alerts
-        response = session.get(f"{base_url}api/{org_id}/{stream_name}/alerts")
+        response = session.get(f"{base_url}api/v2/{org_id}/alerts")
         assert response.status_code == 200, f"Failed to retrieve alerts: {response.content}"
 
         alerts = response.json()

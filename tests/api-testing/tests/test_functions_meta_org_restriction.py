@@ -399,7 +399,7 @@ class TestEdgeCases:
         resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
         # Should handle gracefully (400 or default to VRL)
-        assert resp.status_code in [200, 400], (
+        assert resp.status_code in [200, 400, 422], (
             f"Expected 200 or 400 for invalid trans_type, "
             f"but got {resp.status_code}"
         )

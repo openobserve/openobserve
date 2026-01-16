@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,25 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, get, web};
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use chrono::{Duration, Utc};
 use config::{
     meta::{
-        search::{Query, Request as SearchRequest},
+        search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
     },
     utils::time::now_micros,
 };
-#[cfg(feature = "enterprise")]
-use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-#[cfg(feature = "enterprise")]
-use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -128,6 +127,8 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
 /// This prevents header forgery attacks as the header is populated server-side after
 /// authentication.
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/history",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetAlertHistory",
@@ -153,16 +154,12 @@ pub fn escape_like(input: impl AsRef<str>) -> String {
         (status = 500, description = "Internal Server Error", content_type = "application/json"),
     ),
 )]
-#[get("/{org_id}/alerts/history")]
 pub async fn get_alert_history(
-    path: web::Path<String>,
-    query: web::Query<AlertHistoryQuery>,
+    Path(org_id): Path<String>,
+    Query(query): Query<AlertHistoryQuery>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-    let query = query.into_inner();
-
+    req: axum::http::Request<axum::body::Body>,
+) -> Response {
     // Set default pagination values
     let from = query.from.unwrap_or(0).max(0);
     let size = query.size.unwrap_or(100).clamp(1, 1000);
@@ -250,7 +247,7 @@ pub async fn get_alert_history(
             None
         }
         // If RBAC is enabled, check permissions
-        else if get_openfga_config().enabled {
+        else if o2_openfga::config::get_config().enabled {
             let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
@@ -260,10 +257,17 @@ pub async fn get_alert_history(
 
             let role = user.role.to_string();
 
-            // If specific alert_name is requested, check access to it
+            // If specific alert_id is requested, check access to it
             if let Some(ref alert_id) = query.alert_id {
-                let folder_id = _folder_id.unwrap_or_default();
-                let alert_obj = format!("{}:{}", OFGA_MODELS.get("alerts").unwrap().key, alert_id);
+                let folder_id = _folder_id.clone().unwrap_or_default();
+                let alert_obj = format!(
+                    "{}:{}",
+                    o2_openfga::meta::mapping::OFGA_MODELS
+                        .get("alerts")
+                        .unwrap()
+                        .key,
+                    alert_id
+                );
 
                 let has_permission = o2_openfga::authorizer::authz::is_allowed(
                     &org_id, user_id, "GET", &alert_obj, &folder_id, &role,
@@ -276,15 +280,22 @@ pub async fn get_alert_history(
                     ));
                 }
 
-                // Means the user has the permission
+                // User has permission to this specific alert
                 None
             } else {
                 // List all history - filter by accessible alerts
-                let alert_object_type = OFGA_MODELS
+                let alert_object_type = o2_openfga::meta::mapping::OFGA_MODELS
                     .get("alerts")
                     .map_or("alerts", |model| model.key);
 
-                match list_objects_for_user(&org_id, user_id, "GET", alert_object_type).await {
+                match crate::handler::http::auth::validator::list_objects_for_user(
+                    &org_id,
+                    user_id,
+                    "GET",
+                    alert_object_type,
+                )
+                .await
+                {
                     Ok(Some(permitted)) => {
                         // Check if user has access to all alerts
                         let all_alerts_key = format!("{alert_object_type}:_all_{org_id}");
@@ -364,7 +375,7 @@ pub async fn get_alert_history(
             .join(" OR ");
         where_clause.push_str(&format!(" AND ({alert_filter})"));
     }
-    // If permitted_alert_ids is Ok(None), user has access to all alerts
+    // If permitted_alert_ids is None, user has access to all alerts
     // No additional filter needed in WHERE clause
 
     // Get trace ID for the request
@@ -375,7 +386,7 @@ pub async fn get_alert_history(
     let count_sql = format!("SELECT _timestamp FROM \"{TRIGGERS_STREAM}\" WHERE {where_clause}");
 
     let count_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: count_sql,
             start_time,
             end_time,
@@ -433,7 +444,7 @@ pub async fn get_alert_history(
     );
 
     let data_req = SearchRequest {
-        query: Query {
+        query: SearchQuery {
             sql: data_sql,
             start_time,
             end_time,

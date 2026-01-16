@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@
 
 use std::{fs, path::Path};
 
-use actix_web::web::Query;
 use async_trait::async_trait;
+use axum::extract::Query;
 use config::{TIMESTAMP_COL_NAME, get_config, meta::search};
 use hashbrown::HashMap;
 
