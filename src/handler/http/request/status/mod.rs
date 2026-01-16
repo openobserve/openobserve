@@ -847,7 +847,15 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
 
             // store session_id in cluster co-ordinator
-            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
 
             let access_token = format!("session {session_id}");
 
@@ -971,7 +979,15 @@ pub async fn refresh_token_with_dex(
             }
 
             // store session_id in cluster co-ordinator
-            let _ = crate::service::session::set_session(&session_id, &access_token).await;
+            if crate::service::session::set_session(&session_id, &access_token)
+                .await
+                .is_none()
+            {
+                log::error!(
+                    "Failed to store session {} in cluster coordinator",
+                    session_id
+                );
+            }
 
             let access_token = format!("session {session_id}");
 

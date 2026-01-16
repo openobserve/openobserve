@@ -77,9 +77,13 @@ fn extract_jwt_expiry(access_token: &str) -> i64 {
 
 pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
     let expires_at = extract_jwt_expiry(val);
-    db::session::set_with_expiry(session_id, val, expires_at)
-        .await
-        .ok()
+    match db::session::set_with_expiry(session_id, val, expires_at).await {
+        Ok(()) => Some(()),
+        Err(e) => {
+            log::error!("Failed to write session {} to database: {}", session_id, e);
+            None
+        }
+    }
 }
 
 pub async fn remove_session(session_id: &str) {

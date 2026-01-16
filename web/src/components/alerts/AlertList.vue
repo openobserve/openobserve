@@ -596,9 +596,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="formData"
         :isUpdated="isUpdated"
         :destinations="destinations"
+        :templates="templates"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
+        @refresh:templates="getTemplates"
       />
     </template>
     <template v-else>

@@ -938,14 +938,24 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectLogsTableVisible();
     await page.waitForTimeout(3000);
 
-    // Get table content
+    // Bug #9475: Truncation happened in the default logs view after apostrophes
+    // To properly test this, we need to add the 'log' field to the table columns
+    // since it's not visible by default in the table view
+    testLogger.info('Adding log field to table columns to verify apostrophe display');
+    await pm.logsPage.fillIndexFieldSearchInput('log');
+    await page.waitForTimeout(500);
+    await pm.logsPage.hoverOnFieldExpandButton('log');
+    await pm.logsPage.clickAddFieldToTableButton('log');
+    await page.waitForTimeout(1000);
+
+    // Get table content after adding the log field column
     const logsTableContent = await pm.logsPage.getLogsTableContent();
     testLogger.info(`Logs table content length: ${logsTableContent.length} characters`);
 
     let passedTests = 0;
     let failedTests = 0;
 
-    // PRIMARY ASSERTION: Verify each apostrophe scenario
+    // PRIMARY ASSERTION: Verify each apostrophe scenario is displayed without truncation
     for (const testCase of testMessages) {
       testLogger.info(`Checking: ${testCase.description}`);
 
@@ -964,6 +974,12 @@ test.describe("Logs Regression Bugs", () => {
         failedTests++;
       }
     }
+
+    // Remove the log field from table (cleanup)
+    await pm.logsPage.hoverOnFieldExpandButton('log');
+    await pm.logsPage.clickRemoveFieldFromTableButton('log').catch(() => {
+      testLogger.debug('Could not remove log field from table (may already be removed)');
+    });
 
     // Final assertion
     testLogger.info(`Test results: ${passedTests} passed, ${failedTests} failed, ${testMessages.length - passedTests - failedTests} skipped`);

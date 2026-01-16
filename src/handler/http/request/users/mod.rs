@@ -63,7 +63,7 @@ pub mod service_accounts;
 
 /// ListUsers
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/users",
     context_path = "/api",
     tag = "Users",

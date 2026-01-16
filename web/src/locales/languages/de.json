@@ -1607,7 +1607,8 @@
       "alertSettings": "Lege deine Alarmregeln fest und wähle aus, wie du benachrichtigt werden möchtest.",
       "deduplication": "Vermeiden Sie es, dieselbe Warnung mehrmals zu senden, indem Sie ähnliche Warnungen zu Gruppen zusammenfassen.",
       "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
-    }
+    },
+    "template": "Vorlage überschreiben"
   },
   "alert_templates": {
     "header": "Vorlagen",
