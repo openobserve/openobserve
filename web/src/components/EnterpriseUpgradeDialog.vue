@@ -775,17 +775,17 @@ export default defineComponent({
     .offer-badge {
       display: inline-flex;
       align-items: center;
-      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
       padding: 10px 20px;
       border-radius: 24px;
       font-weight: 700;
       font-size: 15px;
       backdrop-filter: blur(10px);
-      color: #1a1a1a;
-      box-shadow: 0 4px 16px rgba(255, 215, 0, 0.4);
+      color: white;
+      box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
 
       .q-icon {
-        color: #1a1a1a;
+        color: white;
         font-size: 20px;
       }
 
