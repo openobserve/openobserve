@@ -1604,7 +1604,7 @@
       "deduplication": "通过将相似的警报分组在一起，避免多次发送相同的警报。",
       "advanced": "上下文变量、描述和行模板"
     },
-    "template": "模板覆盖"
+    "template": "模板"
   },
   "alert_templates": {
     "header": "模板",

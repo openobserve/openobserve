@@ -65,11 +65,9 @@ use crate::{
 )]
 #[axum::debug_handler]
 pub async fn extract_patterns(
-    Path(org_id): Path<String>,
+    Path((org_id, stream_name)): Path<(String, String)>,
     in_req: axum::extract::Request,
 ) -> Response {
-    let stream_name = "default".to_string();
-
     // Extract headers manually to avoid conflict with body extraction
     let (mut parts, body) = in_req.into_parts();
 
