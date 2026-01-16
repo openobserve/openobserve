@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="dialogConfig.usagePercentage"
                 size="40px"
                 :thickness="0.18"
-                color="white"
+                :color="getProgressColor(dialogConfig.usagePercentage)"
                 track-color="rgba(255, 255, 255, 0.3)"
                 class="usage-indicator"
                 show-value
@@ -154,7 +154,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <span v-if="feature.requiresHA" class="ha-badge">HA</span>
+                  <span v-if="feature.requiresHA" class="ha-badge">
+                    HA
+                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
+                      High Availability mode only
+                    </q-tooltip>
+                  </span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -167,12 +172,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType } from "vue";
+import { defineComponent, ref, computed, PropType, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
+import licenseServer from "@/services/license_server";
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
@@ -188,6 +194,24 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const licenseData = ref<any>(null);
+
+    // Fetch license data on mount for Enterprise with license
+    onMounted(async () => {
+      const isEnterprise = config.isEnterprise === 'true';
+      const isCloud = config.isCloud === 'true';
+      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+
+      // Only fetch for Enterprise with license (not Cloud)
+      if (isEnterprise && hasLicense && !isCloud) {
+        try {
+          const response = await licenseServer.get_license();
+          licenseData.value = response.data;
+        } catch (error) {
+          console.error("Failed to fetch license data:", error);
+        }
+      }
+    });
 
     // Dialog configuration based on deployment type
     const dialogConfig = computed(() => {
@@ -238,11 +262,18 @@ export default defineComponent({
 
       // Enterprise with license
       if (isEnterprise && hasLicense) {
+        // Calculate ingestion usage from license data
+        const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
+        const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
+        const badgeText = ingestionLimit > 0 ? `Ingestion Limit: ${ingestionLimit}GB / day` : "Ingestion Limit: Unlimited";
+
         return {
           heroTitle: "Your Enterprise Edition",
           offerText: "You're running OpenObserve Enterprise with all features enabled",
-          badgeText: "Licensed & Active",
+          badgeText: badgeText,
           badgeIcon: "verified",
+          showUsageIndicator: true,
+          usagePercentage: ingestionUsedPercentage,
           featuresTitle: "Active Enterprise Features",
           featuresSubtitle: "All features unlocked and ready to use",
           primaryButtonText: "Manage License",
@@ -550,6 +581,17 @@ export default defineComponent({
       }
     };
 
+    // Function to get progress color based on percentage
+    const getProgressColor = (percentage: number): string => {
+      if (percentage >= 80) {
+        return "red";
+      } else if (percentage >= 60) {
+        return "orange";
+      } else {
+        return "green";
+      }
+    };
+
     return {
       showDialog,
       dialogConfig,
@@ -561,6 +603,8 @@ export default defineComponent({
       contactSales,
       navigateToLicense,
       handlePrimaryButtonClick,
+      getProgressColor,
+      Math,
     };
   },
   watch: {
@@ -856,6 +900,7 @@ export default defineComponent({
       font-weight: 700;
       letter-spacing: 0.5px;
       line-height: 1;
+      cursor: pointer;
     }
 
     .feature-desc {
