@@ -213,6 +213,68 @@ export class MetricsPage {
         throw new Error(`Stream "${streamName}" not found in dropdown`);
     }
 
+    /**
+     * Select a metric from the metrics list on the left sidebar
+     * @param {string} metricName - The metric name to select (e.g., 'cpu_usage')
+     * @returns {Promise<boolean>} - True if metric was selected successfully
+     */
+    async selectMetricFromList(metricName) {
+        // Step 1: Try to find the search input in the metrics list
+        const searchInput = this.page.locator(this.fieldSearchInput).or(
+            this.page.locator('input[placeholder*="search" i]')
+        ).or(
+            this.page.locator('input[placeholder*="metric" i]')
+        ).first();
+
+        if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // Clear existing search and type the metric name
+            await searchInput.click();
+            await this.page.keyboard.press('Control+A');
+            await searchInput.fill(metricName);
+            await this.page.waitForTimeout(1000);
+        }
+
+        // Step 2: Try to click on the metric in the filtered list
+        const metricItem = this.page.locator('.q-item, [class*="field-item"], [class*="metric-item"], [class*="stream-item"]')
+            .filter({ hasText: new RegExp(`^${metricName}$|^${metricName}\\s`, 'i') }).first();
+
+        if (await metricItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await metricItem.click();
+            await this.page.waitForTimeout(1000);
+            return true;
+        }
+
+        // Step 3: Fallback - try the stream selector dropdown
+        const streamSelector = this.page.locator(this.selectStream);
+        if (await streamSelector.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await streamSelector.click();
+            await this.page.waitForTimeout(500);
+
+            // Search within dropdown if search input exists
+            const dropdownSearch = this.page.locator('.q-menu input[type="text"]').first();
+            if (await dropdownSearch.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await dropdownSearch.fill(metricName);
+                await this.page.waitForTimeout(500);
+            }
+
+            // Look for the metric in the dropdown options
+            const metricOption = this.page.locator('.q-item, [role="option"]')
+                .filter({ hasText: new RegExp(metricName, 'i') }).first();
+
+            if (await metricOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await metricOption.click();
+                await this.page.waitForTimeout(1000);
+                return true;
+            }
+
+            // Close dropdown if metric not found
+            await this.page.keyboard.press('Escape');
+        }
+
+        // Step 4: If all else fails, just return false - the executeQuery will still work
+        return false;
+    }
+
     async getCurrentStream() {
         const streamSelector = this.page.locator(this.selectStream);
         if (await streamSelector.count() > 0) {
@@ -296,11 +358,45 @@ export class MetricsPage {
     }
 
     async enterMetricsQuery(query) {
-        // Using a common query editor selector pattern from other tests
-        const queryEditor = this.page.locator('.monaco-editor').first();
-        await queryEditor.click();
-        await this.page.keyboard.press('Control+A');
-        await this.page.keyboard.type(query);
+        // Use the same pattern as logsPage.js which works reliably with Monaco editor
+        // The key is to use the .inputarea selector inside the Monaco editor
+        const editorSelectors = [
+            '[data-test="dashboard-panel-query-editor"]',  // Primary metrics query editor
+            '[data-test="dashboard-query"]',              // Alternate dashboard query selector
+            '.monaco-editor'                               // Fallback to generic Monaco editor
+        ];
+
+        let editorContainer = null;
+        for (const selector of editorSelectors) {
+            const container = this.page.locator(selector).first();
+            if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
+                editorContainer = container;
+                break;
+            }
+        }
+
+        if (!editorContainer) {
+            editorContainer = this.page.locator('.monaco-editor').first();
+        }
+
+        // Click on the Monaco editor to focus it
+        await editorContainer.locator('.monaco-editor').click();
+        await this.page.waitForTimeout(100);
+
+        // Use platform-specific key combo for select all
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
+        await this.page.waitForTimeout(100);
+
+        // Use the .inputarea to fill the query (this is the hidden textarea Monaco uses)
+        const inputArea = editorContainer.locator('.inputarea').first();
+        if (await inputArea.count() > 0) {
+            await inputArea.fill(query);
+        } else {
+            // Fallback: type the query character by character
+            await this.page.keyboard.type(query, { delay: 10 });
+        }
+        await this.page.waitForTimeout(200);
     }
 
     async waitForMetricsResults() {
@@ -359,10 +455,29 @@ export class MetricsPage {
     }
 
     async clearQueryEditor() {
-        // Clear the query editor
-        const queryEditor = this.page.locator('.monaco-editor').first();
-        await queryEditor.click();
-        await this.page.keyboard.press('Control+A');
+        // Clear the query editor using the same approach as enterMetricsQuery
+        const editorSelectors = [
+            '[data-test="dashboard-panel-query-editor"]',
+            '[data-test="dashboard-query"]',
+            '.monaco-editor'
+        ];
+
+        let editorContainer = null;
+        for (const selector of editorSelectors) {
+            const container = this.page.locator(selector).first();
+            if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
+                editorContainer = container;
+                break;
+            }
+        }
+
+        if (!editorContainer) {
+            editorContainer = this.page.locator('.monaco-editor').first();
+        }
+
+        await editorContainer.locator('.monaco-editor').click();
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
         await this.page.keyboard.press('Delete');
     }
 
@@ -810,23 +925,60 @@ export class MetricsPage {
 
     // ===== DATE RANGE METHODS =====
 
+    /**
+     * Select a date range using the DateTime component
+     * @param {string} range - Time range like 'Last 5 minutes', 'Last 1 hour', 'Last 24 hours'
+     * @returns {Promise<boolean>} - True if selection was successful
+     */
     async selectDateRange(range) {
         await this.openDatePicker();
         await this.page.waitForTimeout(500);
 
+        // Parse the range string to extract value and unit
+        // Supports formats: 'Last 5 minutes', 'Last 1 hour', 'Last 24 hours', 'Last 15 minutes'
+        const rangeMatch = range.match(/(\d+)\s*(minute|min|hour|day|week|second|m|h|d|w|s)/i);
+        if (rangeMatch) {
+            const value = rangeMatch[1];
+            const unitRaw = rangeMatch[2].toLowerCase();
+
+            // Map unit to DateTime component format (s, m, h, d, w)
+            const unitMap = {
+                'second': 's', 'seconds': 's', 's': 's',
+                'minute': 'm', 'minutes': 'm', 'min': 'm', 'm': 'm',
+                'hour': 'h', 'hours': 'h', 'h': 'h',
+                'day': 'd', 'days': 'd', 'd': 'd',
+                'week': 'w', 'weeks': 'w', 'w': 'w'
+            };
+            const unit = unitMap[unitRaw] || 'm';
+
+            // Use the actual data-test selector pattern from DateTime.vue
+            // Pattern: [data-test="date-time-relative-{value}-{unit}-btn"]
+            const dateTimeSelector = `[data-test="date-time-relative-${value}-${unit}-btn"]`;
+            const dateTimeBtn = this.page.locator(dateTimeSelector);
+
+            if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await dateTimeBtn.click();
+                await this.page.waitForTimeout(500);
+                return true;
+            }
+        }
+
+        // Fallback: Try generic button text matching
         const rangeOption = this.page.locator(`.q-item:has-text("${range}"), button:has-text("${range}")`).first();
         if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await rangeOption.click();
             return true;
         }
 
-        // Try alternate selector
+        // Fallback: Try alternate selector
         const relativeOption = this.page.locator('button').filter({ hasText: range }).first();
         if (await relativeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await relativeOption.click();
             return true;
         }
 
+        // Close the date picker if nothing found
+        await this.page.keyboard.press('Escape');
         return false;
     }
 
@@ -1264,6 +1416,23 @@ export class MetricsPage {
     }
 
     async getNoDataMessage() {
+        // Check for various no-data/empty state messages
+        const noDataSelectors = [
+            'text=/no data|No results|Empty|no records|0 results/i',
+            '[class*="no-data"]',
+            '[class*="empty-state"]',
+            '.no-results',
+            '.empty-results',
+            '[data-test*="no-data"]',
+            '[data-test*="empty"]'
+        ];
+
+        for (const selector of noDataSelectors) {
+            const element = this.page.locator(selector).first();
+            if (await element.count() > 0) {
+                return element;
+            }
+        }
         return this.page.locator('text=/no data|No results|Empty/i').first();
     }
 
@@ -1540,11 +1709,57 @@ export class MetricsPage {
     }
 
     async hasErrorIndicator() {
-        return await this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first().isVisible().catch(() => false);
+        // Check for actual error indicators in the UI (not false positives)
+        // Focus on Quasar notifications and explicit error messages
+        // Only check for actual error notifications that indicate a query failure
+        const errorSelectors = [
+            '.q-notification--negative',           // Quasar negative notification
+            '.q-notification.bg-negative',         // Quasar notification with negative background
+            '.q-banner--negative',                 // Quasar negative banner
+            '[data-test="error-message"]',         // Explicit error message data-test
+            '.error-notification'                  // Explicit error notification class
+        ];
+
+        for (const selector of errorSelectors) {
+            const element = this.page.locator(selector).first();
+            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
+                return true;
+            }
+        }
+
+        // Also check for notification messages containing error text (more specific check)
+        const notificationMessage = this.page.locator('.q-notification__message').first();
+        if (await notificationMessage.isVisible({ timeout: 500 }).catch(() => false)) {
+            const text = await notificationMessage.textContent().catch(() => '');
+            const lowerText = text.toLowerCase();
+            if (lowerText.includes('error') || lowerText.includes('failed') || lowerText.includes('invalid')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     async getErrorIndicators() {
-        return this.page.locator('.q-notification--negative, .error-message, [class*="error"]').first();
+        // Return the first visible error indicator
+        const errorSelectors = [
+            '.q-notification--negative',
+            '.q-notification.bg-negative',
+            '.q-banner--negative',
+            '.q-notification__message:has-text("Error")',
+            '.q-notification__message:has-text("error")',
+            '.q-notification__message:has-text("failed")',
+            '[data-test="error-message"]',
+            '.error-notification'
+        ];
+
+        for (const selector of errorSelectors) {
+            const element = this.page.locator(selector).first();
+            if (await element.isVisible({ timeout: 500 }).catch(() => false)) {
+                return element;
+            }
+        }
+        return this.page.locator('.q-notification--negative, .q-notification__message').first();
     }
 
     // SQL mode methods
