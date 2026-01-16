@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="green-2"
           text-color="green-10"
           icon="check_circle"
-          label="Managed via AWS Marketplace"
+          label="Managed via Azure Marketplace"
           class="q-px-md q-py-sm"
         />
         <div class="text-caption text-grey-7 q-mt-sm">
