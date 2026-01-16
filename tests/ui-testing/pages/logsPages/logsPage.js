@@ -161,6 +161,20 @@ export class LogsPage {
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
+        // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
+        this.viewRelatedBtn = '[data-test="log-correlation-btn"]';
+        this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
+        this.applyDimensionFilters = '[data-test="apply-dimension-filters"]';
+        this.applyDimensionFiltersEmbedded = '[data-test="apply-dimension-filters-embedded"]';
+        this.metricSelectorButton = '[data-test="metric-selector-button"]';
+        // Correlation tabs in detail drawer (tab names, not data-test)
+        this.correlatedLogsTab = '.q-tab[name="correlated-logs"], .q-tabs .q-tab:has-text("Logs"):not([data-test="log-detail-json-tab"])';
+        this.correlatedMetricsTab = '.q-tab[name="correlated-metrics"], .q-tabs .q-tab:has-text("Metrics")';
+        this.correlatedTracesTab = '.q-tab[name="correlated-traces"], .q-tabs .q-tab:has-text("Traces")';
+        // Correlation loading and error states
+        this.correlationLoadingSpinner = '.q-spinner-hourglass';
+        this.correlationErrorMessage = '.tw\\:text-red-500';
+
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
         this.queryHistoryButton = '[data-test="logs-search-bar-query-history-btn"]';
@@ -736,18 +750,20 @@ export class LogsPage {
         await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
-        // Click and wait for focus
+        // Click to focus the editor
         await this.page.locator(this.queryEditor).click();
         await this.page.waitForTimeout(500);
 
-        // Select all and delete
+        // Select all existing content
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.waitForTimeout(300);
-        await this.page.keyboard.press("Backspace");
-        await this.page.waitForTimeout(300);
 
-        // Type new query
-        await this.page.keyboard.type(query);
+        // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
+        // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
+        // The .fill() method will replace the selected content
+        const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
+        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+        await inputArea.fill(query);
     }
 
     async typeQuery(query) {
@@ -2003,6 +2019,145 @@ export class LogsPage {
         await expect(this.page.locator(this.logDetailPreviousBtn)).toBeVisible();
         await expect(this.page.locator(this.logDetailNextBtn)).toBeVisible();
         testLogger.info('✓ Previous and Next navigation buttons are visible');
+    }
+
+    // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
+
+    /**
+     * Checks if the View Related button is visible in log detail sidebar
+     * Note: This is an Enterprise-only feature
+     * @returns {Promise<boolean>}
+     */
+    async isViewRelatedButtonVisible() {
+        try {
+            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verifies the View Related button is visible (Enterprise feature)
+     * @returns {Promise<void>}
+     */
+    async expectViewRelatedButtonVisible() {
+        await expect(this.page.locator(this.viewRelatedBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ View Related button is visible (Enterprise feature)');
+    }
+
+    /**
+     * Verifies the View Related button is NOT visible
+     * @returns {Promise<void>}
+     */
+    async expectViewRelatedButtonNotVisible() {
+        await expect(this.page.locator(this.viewRelatedBtn)).not.toBeVisible();
+        testLogger.info('✓ View Related button is not visible');
+    }
+
+    /**
+     * Clicks the View Related button to open correlation view
+     * @returns {Promise<void>}
+     */
+    async clickViewRelatedButton() {
+        await this.page.locator(this.viewRelatedBtn).click();
+        testLogger.info('Clicked View Related button');
+        // Wait for correlation to start loading
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verifies correlation tabs (Logs, Metrics, Traces) are visible in detail drawer
+     * These tabs appear after clicking View Related
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationTabsVisible() {
+        // Wait for tabs to appear - correlation tabs are enterprise feature
+        await this.page.waitForTimeout(2000);
+
+        // Check for correlation tabs by looking for tabs with specific text
+        const logsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' });
+        const metricsTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        const tracesTab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+
+        // At least one correlation tab should be visible
+        const anyCorrelationTabVisible = await logsTab.or(metricsTab).or(tracesTab).first().isVisible().catch(() => false);
+        expect(anyCorrelationTabVisible, 'At least one correlation tab should be visible').toBe(true);
+        testLogger.info('✓ Correlation tabs are visible');
+    }
+
+    /**
+     * Clicks on the Correlated Logs tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedLogsTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Logs' }).last();
+        await tab.click();
+        testLogger.info('Clicked Correlated Logs tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Clicks on the Correlated Metrics tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedMetricsTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Metrics' });
+        await tab.click();
+        testLogger.info('Clicked Correlated Metrics tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Clicks on the Correlated Traces tab
+     * @returns {Promise<void>}
+     */
+    async clickCorrelatedTracesTab() {
+        const tab = this.page.locator('.q-tabs').locator('.q-tab').filter({ hasText: 'Traces' });
+        await tab.click();
+        testLogger.info('Clicked Correlated Traces tab');
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Verifies correlation loading state is displayed
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationLoadingVisible() {
+        await expect(this.page.locator(this.correlationLoadingSpinner)).toBeVisible({ timeout: 5000 });
+        testLogger.info('✓ Correlation loading spinner is visible');
+    }
+
+    /**
+     * Waits for correlation loading to complete
+     * @param {number} timeout - Maximum wait time in ms
+     * @returns {Promise<void>}
+     */
+    async waitForCorrelationLoaded(timeout = 30000) {
+        await this.page.locator(this.correlationLoadingSpinner).waitFor({ state: 'hidden', timeout });
+        testLogger.info('✓ Correlation loading completed');
+    }
+
+    /**
+     * Verifies Apply Dimension Filters button is visible
+     * @returns {Promise<void>}
+     */
+    async expectApplyDimensionFiltersVisible() {
+        const filterBtn = this.page.locator(this.applyDimensionFilters).or(this.page.locator(this.applyDimensionFiltersEmbedded));
+        await expect(filterBtn.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Apply Dimension Filters button is visible');
+    }
+
+    /**
+     * Closes the correlation dashboard dialog
+     * @returns {Promise<void>}
+     */
+    async closeCorrelationDashboard() {
+        const closeBtn = this.page.locator(this.correlationDashboardClose);
+        if (await closeBtn.isVisible()) {
+            await closeBtn.click();
+            testLogger.info('Closed correlation dashboard');
+        }
     }
 
     async clickSavedViewDialogSaveContent() {

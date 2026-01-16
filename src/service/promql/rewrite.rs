@@ -45,8 +45,8 @@ fn match_placeholder(matcher: &Matcher, placeholder: &str) -> bool {
     match &matcher.op {
         MatchOp::Equal => matcher.value == placeholder,
         MatchOp::NotEqual => matcher.value == placeholder,
-        MatchOp::Re(pattern) => pattern.is_match(placeholder),
-        MatchOp::NotRe(pattern) => pattern.is_match(placeholder),
+        MatchOp::Re(pattern) => pattern.to_string() == placeholder,
+        MatchOp::NotRe(pattern) => pattern.to_string() == placeholder,
     }
 }
 
