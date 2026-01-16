@@ -21,6 +21,9 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const metricsTestData = require('../utils/metrics-test-data.js');
+const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const { verifyDataOnUI } = require('../utils/metrics-assertions.js');
 
 test.describe('Metrics PromQL Query Persistence Tests', () => {
     test.describe.configure({ mode: 'parallel' });
@@ -31,25 +34,8 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     /**
      * Setup: Ingest sample metrics data for testing
      */
-    test.beforeAll(async ({ browser }) => {
-        testLogger.info('Setting up test metrics data (beforeAll)');
-
-        const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-        const page = await context.newPage();
-
-        try {
-            // Navigate to base to get auth context
-            await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${process.env.ORGNAME || 'default'}`);
-            await page.waitForLoadState('networkidle');
-
-            // Ingest sample metrics
-            await ingestMetricsData(page);
-
-            testLogger.info('Test metrics data setup completed');
-        } finally {
-            await page.close();
-            await context.close();
-        }
+    test.beforeAll(async () => {
+        await ensureMetricsIngested();
     });
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -61,9 +47,13 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Navigate to metrics page
         await pm.metricsPage.gotoMetricsPage();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-        testLogger.info('Metrics test setup completed');
+        testLogger.info('Test setup completed - navigated to metrics page');
+    });
+
+    test.afterEach(async ({ page }, testInfo) => {
+        testLogger.testEnd(testInfo.title, testInfo.status);
     });
 
     /**
@@ -462,79 +452,3 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         testLogger.info('✓ SUCCESS: All queries persisted after rapid switching');
     });
 });
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Ingest metrics data to the test metrics stream using JSON API
- * This follows the same pattern as alerts-regression.spec.js
- */
-async function ingestMetricsData(page) {
-    const orgId = process.env.ORGNAME || 'default';
-    const streamName = 'e2e_metrics_query_test';
-    const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
-    const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;
-
-    const basicAuthCredentials = Buffer.from(
-        `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
-    ).toString('base64');
-
-    const timestamp = Math.floor(Date.now() / 1000);
-
-    // Create metrics data in JSON format with __name__ field
-    const metricsData = [];
-    for (let i = 0; i < 10; i++) {
-        metricsData.push({
-            "__name__": streamName,
-            "__type__": "gauge",
-            "host_name": `server-${i % 3 + 1}`,
-            "env": "test",
-            "region": ["us-east-1", "us-west-2", "eu-west-1"][i % 3],
-            "_timestamp": timestamp - (i * 60),
-            "value": 20 + Math.random() * 60
-        });
-    }
-
-    try {
-        const response = await page.evaluate(async ({ url, authToken, data }) => {
-            const fetchResponse = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Basic ${authToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-
-            return {
-                status: fetchResponse.status,
-                statusText: fetchResponse.statusText,
-                body: await fetchResponse.text().catch(() => '')
-            };
-        }, {
-            url: ingestionUrl,
-            authToken: basicAuthCredentials,
-            data: metricsData
-        });
-
-        if (response.status === 200) {
-            testLogger.info('Metrics data ingested successfully', {
-                stream: streamName,
-                count: metricsData.length
-            });
-        } else {
-            testLogger.warn('Metrics ingestion returned non-200 status', {
-                status: response.status,
-                statusText: response.statusText
-            });
-        }
-    } catch (error) {
-        testLogger.error('Failed to ingest metrics data', {
-            error: error.message,
-            stream: streamName
-        });
-        throw error;
-    }
-}
