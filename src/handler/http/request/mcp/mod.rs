@@ -167,20 +167,17 @@ pub async fn handle_mcp_get(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    // MCP Streamable HTTP: GET with empty body is optional
-    // for server-initiated notifications. This is deprecated
-    // and therefore not supported by O2
+    // MCP Streamable HTTP: GET with empty body is for server-initiated
+    // notifications (SSE streaming). O2 doesn't push notifications, so
+    // return an empty SSE stream that immediately ends gracefully.
+    // This prevents 405 errors from breaking MCP clients.
     if body.is_empty() {
         return Response::builder()
-            .status(StatusCode::METHOD_NOT_ALLOWED)
-            .header(header::ALLOW, "POST")
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                serde_json::to_string(&serde_json::json!({
-                    "error": "GET requests must include a JSON-RPC request body. Use POST for standard requests."
-                }))
-                .unwrap(),
-            ))
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header("X-Accel-Buffering", "no")
+            .body(Body::from("event: close\ndata: {}\n\n"))
             .unwrap();
     }
 
