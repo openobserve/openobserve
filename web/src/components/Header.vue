@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="upgrade-to-enterprise-btn"
       >
         <div class="row items-center no-wrap">
-          <q-icon name="workspace_premium" size="16px" class="q-mr-xs" />
+          <q-icon name="card_giftcard" size="16px" class="q-mr-xs" />
           <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
         </div>
       </q-btn>
