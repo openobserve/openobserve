@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
               <q-icon name="info" size="14px" class="q-mr-xs" />
-              <span>100GB/day without license • 200GB/day with license</span>
+              <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 
             <div class="hero-actions">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="dialogConfig.showContactSales"
                 flat
-                label="Contact Sales"
+                :label="t('about.enterprise_offer.buttons.contact_sales')"
                 @click="contactSales"
                 no-caps
                 class="learn-more-btn"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-else
                 flat
-                label="Learn More"
+                :label="t('about.enterprise_offer.buttons.learn_more')"
                 @click="openDocsLink"
                 no-caps
                 class="learn-more-btn"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
                     <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                      High Availability mode only
+                      {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
                     </q-tooltip>
                   </span>
                 </div>
@@ -202,6 +202,7 @@ import { defineComponent, ref, computed, PropType, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import licenseServer from "@/services/license_server";
@@ -220,6 +221,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
+    const { t } = useI18n();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
 
@@ -263,7 +265,6 @@ export default defineComponent({
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
       const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 200; // Use nullish coalescing to allow 0
-      const ingestionQuotaText = `Free up to ${ingestionQuota}GB / day`;
 
       // Get usage percentage for circular indicator (this is already a percentage)
       const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
@@ -271,13 +272,13 @@ export default defineComponent({
       // Cloud (check this first because Cloud has both isCloud=true and isEnterprise=true)
       if (isCloud) {
         return {
-          heroTitle: "Enterprise Features",
-          offerText: "Get all enterprise features completely free when you self-host OpenObserve",
-          badgeText: "Free up to 200GB / day",
+          heroTitle: t("about.enterprise_offer.cloud.hero_title"),
+          offerText: t("about.enterprise_offer.cloud.offer_text"),
+          badgeText: t("about.enterprise_offer.cloud.badge_text"),
           badgeIcon: "bolt",
-          featuresTitle: "OpenObserve Cloud Features",
-          featuresSubtitle: "All features included in your cloud subscription",
-          primaryButtonText: "Download Now",
+          featuresTitle: t("about.enterprise_offer.cloud.features_title"),
+          featuresSubtitle: t("about.enterprise_offer.cloud.features_subtitle"),
+          primaryButtonText: t("about.enterprise_offer.cloud.primary_button_text"),
           primaryButtonIcon: "download",
           showPrimaryButton: true,
           isCloudLayout: true,
@@ -287,18 +288,19 @@ export default defineComponent({
       // Enterprise without license
       if (isEnterprise && !hasLicense) {
         return {
-          heroTitle: "Enterprise Features",
-          offerText: "Request a free license to maximize your OpenObserve deployment",
-          badgeText: ingestionQuotaText,
+          heroTitle: t("about.enterprise_offer.enterprise_without_license.hero_title"),
+          offerText: t("about.enterprise_offer.enterprise_without_license.offer_text"),
+          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", { quota: ingestionQuota }),
           badgeIcon: "data_usage",
           showUsageIndicator: true,
           usagePercentage: usagePercentage,
-          featuresTitle: "Available Enterprise Features",
-          featuresSubtitle: "Get a free license to unlock unlimited capabilities",
-          primaryButtonText: "Get Free License",
+          featuresTitle: t("about.enterprise_offer.enterprise_without_license.features_title"),
+          featuresSubtitle: t("about.enterprise_offer.enterprise_without_license.features_subtitle"),
+          primaryButtonText: t("about.enterprise_offer.enterprise_without_license.primary_button_text"),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showLicenseNote: true, // Show note about license limits
+          licenseNoteText: t("about.enterprise_offer.enterprise_without_license.license_note"),
         };
       }
 
@@ -307,18 +309,20 @@ export default defineComponent({
         // Calculate ingestion usage from license data
         const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
         const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
-        const badgeText = ingestionLimit > 0 ? `Ingestion Limit: ${ingestionLimit}GB / day` : "Ingestion Limit: Unlimited";
+        const badgeText = ingestionLimit > 0
+          ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", { limit: ingestionLimit })
+          : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
 
         return {
-          heroTitle: "Your Enterprise Edition",
-          offerText: "You're running OpenObserve Enterprise with all features enabled",
+          heroTitle: t("about.enterprise_offer.enterprise_with_license.hero_title"),
+          offerText: t("about.enterprise_offer.enterprise_with_license.offer_text"),
           badgeText: badgeText,
           badgeIcon: "verified",
           showUsageIndicator: true,
           usagePercentage: ingestionUsedPercentage,
-          featuresTitle: "Active Enterprise Features",
-          featuresSubtitle: "All features unlocked and ready to use",
-          primaryButtonText: "Manage License",
+          featuresTitle: t("about.enterprise_offer.enterprise_with_license.features_title"),
+          featuresSubtitle: t("about.enterprise_offer.enterprise_with_license.features_subtitle"),
+          primaryButtonText: t("about.enterprise_offer.enterprise_with_license.primary_button_text"),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showContactSales: true,
@@ -328,13 +332,13 @@ export default defineComponent({
 
       // Open Source (both false) - Default fallback
       return {
-        heroTitle: "Get Enterprise Edition",
-        offerText: "Download and unlock all enterprise features completely free",
-        badgeText: "Free up to 200GB / day",
+        heroTitle: t("about.enterprise_offer.open_source.hero_title"),
+        offerText: t("about.enterprise_offer.open_source.offer_text"),
+        badgeText: t("about.enterprise_offer.open_source.badge_text"),
         badgeIcon: "card_giftcard",
-        featuresTitle: "Unlock All Enterprise Features",
-        featuresSubtitle: "Everything you need for production-ready observability",
-        primaryButtonText: "Download Now",
+        featuresTitle: t("about.enterprise_offer.open_source.features_title"),
+        featuresSubtitle: t("about.enterprise_offer.open_source.features_subtitle"),
+        primaryButtonText: t("about.enterprise_offer.open_source.primary_button_text"),
         primaryButtonIcon: "download",
         showPrimaryButton: true,
       };
@@ -343,58 +347,58 @@ export default defineComponent({
     // Core features list - available in all versions (for Cloud 3-column layout)
     const coreFeatures = [
       {
-        name: "Logs, Metrics, Traces",
-        note: "Full observability data ingestion and analysis",
+        name: t("about.enterprise_offer.core_features.logs_metrics_traces.name"),
+        note: t("about.enterprise_offer.core_features.logs_metrics_traces.note"),
         icon: "storage",
       },
       {
-        name: "RUM",
-        note: "Real User Monitoring for frontend performance",
+        name: t("about.enterprise_offer.core_features.rum.name"),
+        note: t("about.enterprise_offer.core_features.rum.note"),
         icon: "visibility",
       },
       {
-        name: "Alerts",
-        note: "Real-time alerting and notifications",
+        name: t("about.enterprise_offer.core_features.alerts.name"),
+        note: t("about.enterprise_offer.core_features.alerts.note"),
         icon: "notifications_active",
       },
       {
-        name: "Dashboards",
-        note: "Customizable visualization dashboards",
+        name: t("about.enterprise_offer.core_features.dashboards.name"),
+        note: t("about.enterprise_offer.core_features.dashboards.note"),
         icon: "dashboard",
       },
       {
-        name: "Reports",
-        note: "Scheduled and on-demand reporting",
+        name: t("about.enterprise_offer.core_features.reports.name"),
+        note: t("about.enterprise_offer.core_features.reports.note"),
         icon: "description",
       },
       {
-        name: "VRL Functions",
-        note: "Vector Remap Language for data transformation",
+        name: t("about.enterprise_offer.core_features.vrl_functions.name"),
+        note: t("about.enterprise_offer.core_features.vrl_functions.note"),
         icon: "functions",
       },
       {
-        name: "Pipelines",
-        note: "Data processing and transformation pipelines",
+        name: t("about.enterprise_offer.core_features.pipelines.name"),
+        note: t("about.enterprise_offer.core_features.pipelines.note"),
         icon: "account_tree",
       },
       {
-        name: "High Availability",
-        note: "Distributed architecture for reliability",
+        name: t("about.enterprise_offer.core_features.high_availability.name"),
+        note: t("about.enterprise_offer.core_features.high_availability.note"),
         icon: "cloud_done",
       },
       {
-        name: "Multitenancy",
-        note: "Organization-based data isolation",
+        name: t("about.enterprise_offer.core_features.multitenancy.name"),
+        note: t("about.enterprise_offer.core_features.multitenancy.note"),
         icon: "corporate_fare",
       },
       {
-        name: "Dynamic Schema",
-        note: "Automatic schema detection and evolution",
+        name: t("about.enterprise_offer.core_features.dynamic_schema.name"),
+        note: t("about.enterprise_offer.core_features.dynamic_schema.note"),
         icon: "schema",
       },
       {
-        name: "Multilingual GUI",
-        note: "Advanced internationalization support",
+        name: t("about.enterprise_offer.core_features.multilingual_gui.name"),
+        note: t("about.enterprise_offer.core_features.multilingual_gui.note"),
         icon: "language",
       },
     ];
@@ -402,129 +406,129 @@ export default defineComponent({
     // Enterprise features list - all 21 features
     const enterpriseFeatures = [
       {
-        name: "Single Sign On",
-        note: "Seamless authentication with SSO providers",
+        name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
+        note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
         icon: "key",
         requiresHA: true,
       },
       {
-        name: "Role Based Access Control",
-        note: "Granular permissions and user management",
+        name: t("about.enterprise_offer.enterprise_features.rbac.name"),
+        note: t("about.enterprise_offer.enterprise_features.rbac.note"),
         icon: "admin_panel_settings",
         requiresHA: true,
       },
       {
-        name: "Federated Search / Supercluster",
-        note: "Distribute queries across multiple clusters",
+        name: t("about.enterprise_offer.enterprise_features.federated_search.name"),
+        note: t("about.enterprise_offer.enterprise_features.federated_search.note"),
         icon: "hub",
         requiresHA: true,
       },
       {
-        name: "Query Management",
-        note: "Advanced query monitoring and optimization",
+        name: t("about.enterprise_offer.enterprise_features.query_management.name"),
+        note: t("about.enterprise_offer.enterprise_features.query_management.note"),
         icon: "insights",
         requiresHA: false,
       },
       {
-        name: "Workload Management",
-        note: "Priority-based resource allocation and QoS",
+        name: t("about.enterprise_offer.enterprise_features.workload_management.name"),
+        note: t("about.enterprise_offer.enterprise_features.workload_management.note"),
         icon: "speed",
         requiresHA: false,
       },
       {
-        name: "Audit Trail",
-        note: "Complete activity logging for compliance",
+        name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
+        note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
         icon: "fact_check",
         requiresHA: false,
       },
       {
-        name: "Action Scripts",
-        note: "Automate responses to events and alerts",
+        name: t("about.enterprise_offer.enterprise_features.action_scripts.name"),
+        note: t("about.enterprise_offer.enterprise_features.action_scripts.note"),
         icon: "code",
         requiresHA: true,
         cloudHidden: true, // Hide from Cloud layout
       },
       {
-        name: "Sensitive Data Redaction",
-        note: "Protect PII and sensitive information",
+        name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
+        note: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.note"),
         icon: "shield",
         requiresHA: false,
       },
       {
-        name: "Pipeline Remote Destinations",
-        note: "Send data to remote destinations",
+        name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
+        note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
         icon: "alt_route",
         requiresHA: false,
       },
       {
-        name: "Query Optimizer / Aggregation Cache",
-        note: "TopK aggregation and query optimization",
+        name: t("about.enterprise_offer.enterprise_features.query_optimizer.name"),
+        note: t("about.enterprise_offer.enterprise_features.query_optimizer.note"),
         icon: "memory",
         requiresHA: false,
       },
       {
-        name: "Incident Management",
-        note: "Track and manage incidents efficiently",
+        name: t("about.enterprise_offer.enterprise_features.incident_management.name"),
+        note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
         icon: "emergency",
         requiresHA: true,
       },
       {
-        name: "SRE Agent",
-        note: "Automated SRE operations and insights",
+        name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
+        note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
         icon: "smart_toy",
         requiresHA: true,
       },
       {
-        name: "AI Assistant",
-        note: "Intelligent query and analysis assistance",
+        name: t("about.enterprise_offer.enterprise_features.ai_assistant.name"),
+        note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
         icon: "psychology",
         requiresHA: true,
       },
       {
-        name: "Anomaly Detection",
-        note: "Automatically detect anomalies in data",
+        name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
+        note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
         icon: "query_stats",
         requiresHA: false,
       },
       {
-        name: "Metrics Auto Downsampling",
-        note: "Automatic metrics aggregation over time",
+        name: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.name"),
+        note: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.note"),
         icon: "compress",
         requiresHA: false,
       },
       {
-        name: "Log Patterns",
-        note: "Discover patterns in log data",
+        name: t("about.enterprise_offer.enterprise_features.log_patterns.name"),
+        note: t("about.enterprise_offer.enterprise_features.log_patterns.note"),
         icon: "pattern",
         requiresHA: false,
       },
       {
-        name: "MCP Server",
-        note: "Model Context Protocol server integration",
+        name: t("about.enterprise_offer.enterprise_features.mcp_server.name"),
+        note: t("about.enterprise_offer.enterprise_features.mcp_server.note"),
         icon: "dns",
         requiresHA: true,
       },
       {
-        name: "Rate Limiting",
-        note: "Control query and ingestion rates",
+        name: t("about.enterprise_offer.enterprise_features.rate_limiting.name"),
+        note: t("about.enterprise_offer.enterprise_features.rate_limiting.note"),
         icon: "speed",
         requiresHA: false,
       },
       {
-        name: "Broadcast Join",
-        note: "Optimized distributed join operations",
+        name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
+        note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
         icon: "call_merge",
         requiresHA: true,
       },
       {
-        name: "Logs, Metrics & Traces Correlation",
-        note: "Automated detection and correlation",
+        name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
+        note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
         icon: "auto_graph",
         requiresHA: false,
       },
       {
-        name: "Service Maps",
-        note: "Visualize service dependencies",
+        name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
+        note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
         icon: "account_tree",
         requiresHA: false,
       },
@@ -595,7 +599,7 @@ export default defineComponent({
       } else {
         // Show error notification when user doesn't have access to meta org
         $q.notify({
-          message: "You are not authorized to manage the license.",
+          message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
           color: 'negative',
           timeout: 5000,
         });
@@ -656,6 +660,7 @@ export default defineComponent({
       handlePrimaryButtonClick,
       getProgressColor,
       isLoadingLicense,
+      t,
       Math,
     };
   },
