@@ -11,6 +11,7 @@ import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scope
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardFilter from "./dashboardPages/dashboard-filter";
+import DashboardJoinsHelper from "./dashboardPages/dashboardJoinsHelper.js";
 import DashboardImport from "./dashboardPages/dashboard-import.js";
 import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
@@ -83,6 +84,7 @@ class PageManager {
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardFilter = new DashboardFilter(page);
+    this.dashboardJoins = new DashboardJoinsHelper(page);
     this.dashboardImport = new DashboardImport(page);
     this.dashboardShareExport = new DashboardShareExportPage(page);
     this.dashboardTimeRefresh = new DashboardTimeRefresh(page);
