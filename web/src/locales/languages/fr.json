@@ -1607,7 +1607,8 @@
       "alertSettings": "Définissez vos règles d'alerte et choisissez la manière dont vous souhaitez être averti.",
       "deduplication": "Évitez d'envoyer plusieurs fois la même alerte en regroupant les alertes similaires.",
       "advanced": "Variables de contexte, description et modèle de ligne"
-    }
+    },
+    "template": "Remplacer le modèle"
   },
   "alert_templates": {
     "header": "Modèles",

@@ -1607,7 +1607,8 @@
       "alertSettings": "Imposta le regole per gli avvisi e scegli come ricevere le notifiche.",
       "deduplication": "Evita di inviare lo stesso avviso più volte raggruppando avvisi simili.",
       "advanced": "Variabili di contesto, descrizione e modello di riga"
-    }
+    },
+    "template": "Sostituisci modello"
   },
   "alert_templates": {
     "header": "Modelli",

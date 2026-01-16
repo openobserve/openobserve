@@ -1607,7 +1607,8 @@
       "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
       "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
       "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
-    }
+    },
+    "template": "Sjabloon overschrijven"
   },
   "alert_templates": {
     "header": "Sjablonen",

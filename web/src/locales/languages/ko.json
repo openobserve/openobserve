@@ -1607,7 +1607,8 @@
       "alertSettings": "알림 규칙을 설정하고 알림 수신 방법을 선택하세요.",
       "deduplication": "비슷한 알림을 그룹화하여 동일한 알림을 여러 번 전송하지 마십시오.",
       "advanced": "컨텍스트 변수, 설명 및 행 템플릿"
-    }
+    },
+    "template": "템플릿 오버라이드"
   },
   "alert_templates": {
     "header": "템플릿",

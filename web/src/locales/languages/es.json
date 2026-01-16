@@ -1607,7 +1607,8 @@
       "alertSettings": "Establece tus reglas de alerta y elige cómo quieres recibir las notificaciones.",
       "deduplication": "Evite enviar la misma alerta varias veces agrupando alertas similares.",
       "advanced": "Variables de contexto, descripción y plantilla de filas"
-    }
+    },
+    "template": "Anulación de plantillas"
   },
   "alert_templates": {
     "header": "Plantillas",
