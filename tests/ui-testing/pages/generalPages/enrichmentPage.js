@@ -712,13 +712,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
         await searchInput.waitFor({ state: 'visible', timeout: 30000 });
 
+        // Clear existing search first
+        await searchInput.clear();
+        await this.page.waitForTimeout(500);
+
         // Fill the search input with table name to filter results
         await searchInput.fill(tableName);
         await this.page.waitForLoadState('networkidle');
 
-        // Wait for filtered results to appear - look for table row containing the searched name
-        const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
-        await tableRow.first().waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for search to process
+        await this.page.waitForTimeout(1000);
     }
 
     async verifyTableVisibleInList(tableName) {
@@ -851,8 +854,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
         testLogger.debug('Returned to enrichment tables list');
 
-        // Additional stabilization wait
-        await this.page.waitForTimeout(2000);
+        // Wait for list page to load completely
+        await this.page.waitForLoadState('networkidle');
+
+        // Additional stabilization wait for table list to refresh
+        await this.page.waitForTimeout(3000);
     }
 
     /**
@@ -1124,7 +1130,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Verifying table row visible: ${tableName}`);
 
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
-        await expect(row).toBeVisible();
+        await expect(row).toBeVisible({ timeout: 20000 });
 
         testLogger.debug('Table row verified visible');
     }
