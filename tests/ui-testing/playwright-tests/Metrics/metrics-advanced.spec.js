@@ -103,10 +103,10 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     // Should have successfully selected at least one time range
     if (successfulSelections === 0) {
       testLogger.warn('Could not select any time ranges - date picker UI may have changed');
-    } else {
-      expect(successfulSelections).toBeGreaterThan(0);
-      testLogger.info(`Successfully selected ${successfulSelections} time ranges`);
     }
+    // Assert OUTSIDE the if - this will fail if successfulSelections is 0
+    expect(successfulSelections).toBeGreaterThan(0);
+    testLogger.info(`Successfully selected ${successfulSelections} time ranges`);
 
     testLogger.info('Stream and time range selection tests completed');
   });

@@ -166,23 +166,16 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
         if (testGroup.checkLegend) {
           const legendCount = await pm.metricsPage.getLegendItemCount();
           testLogger.info(`Query returned ${legendCount} series`);
-          if (legendCount === 0) {
-            testLogger.warn(`No legend items found for query: ${query} - may indicate no matching data`);
-          } else {
-            expect(legendCount).toBeGreaterThan(0); // Should have legend items
-          }
+          // Assert OUTSIDE the if - will fail if legendCount is 0
+          expect(legendCount).toBeGreaterThan(0);
         }
 
         // Check result value for absent/present - assert value exists
         if (testGroup.checkValue) {
           const value = await pm.metricsPage.getResultValue();
           testLogger.info(`Result value: ${value}`);
-          // Value might be null for some aggregation functions if no data matches
-          if (!value) {
-            testLogger.warn(`No result value returned for query: ${query} - may indicate no matching data`);
-          } else {
-            expect(value).toBeTruthy(); // Should have a result value
-          }
+          // Assert OUTSIDE the if - will fail if value is falsy
+          expect(value).toBeTruthy();
         }
       }
     }

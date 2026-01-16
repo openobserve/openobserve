@@ -71,6 +71,8 @@ test.describe("Metrics testcases", () => {
       testLogger.info('Selected Last 15 minutes time range');
     } else {
       // If we can't find the option, close the picker and continue
+      // NOTE: For P0 smoke test, time range selection is not critical -
+      // the primary goal is validating query execution without errors
       await page.keyboard.press('Escape');
       testLogger.warn('Could not select specific time range, using default');
     }
