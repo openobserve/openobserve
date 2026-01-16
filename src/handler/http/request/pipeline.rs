@@ -51,7 +51,7 @@ impl From<PipelineError> for Response {
     post,
     path = "/{org_id}/pipelines",
     context_path = "/api",
-    tag = "Pipeline",
+    tag = "Pipelines",
     operation_id = "createPipeline",
     summary = "Create new pipeline",
     description = "Creates a new data processing pipeline with specified transformations and routing rules. Pipelines define how incoming data is processed before storage",
