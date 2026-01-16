@@ -26,6 +26,7 @@ use config::{
     },
 };
 use infra::{
+    cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
@@ -33,7 +34,7 @@ use infra::{
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
-use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
+use crate::service::db;
 
 pub mod deleted;
 pub mod flatten;
@@ -113,7 +114,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let retention = columns[3];
 
         // here we use job to get the compactor node, so that we can use different compactor for
-        // different job
+        // different job of same stream
         let Some(node_name) = get_node_from_consistent_hash(&job, &Role::Compactor, None).await
         else {
             continue; // no compactor node

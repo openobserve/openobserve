@@ -45,30 +45,26 @@ use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster as infra_cluster,
-    service::{
-        db::enrichment_table,
-        search::{
-            DATAFUSION_RUNTIME, SearchResult,
-            datafusion::{
-                distributed_plan::{
-                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
-                    rewrite::RemoteScanRewriter,
-                },
-                exec::{prepare_datafusion_context, register_udf},
-                optimizer::{
-                    generate_analyzer_rules, generate_optimizer_rules,
-                    utils::is_place_holder_or_empty,
-                },
-                table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
+use crate::service::{
+    db::enrichment_table,
+    search::{
+        DATAFUSION_RUNTIME, SearchResult,
+        datafusion::{
+            distributed_plan::{
+                EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
+                rewrite::RemoteScanRewriter,
             },
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            is_use_inverted_index,
-            request::Request,
-            sql::Sql,
-            utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
+            exec::{prepare_datafusion_context, register_udf},
+            optimizer::{
+                generate_analyzer_rules, generate_optimizer_rules, utils::is_place_holder_or_empty,
+            },
+            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        is_use_inverted_index,
+        request::Request,
+        sql::Sql,
+        utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
     },
 };
 
@@ -657,9 +653,9 @@ pub async fn get_online_querier_nodes(
     // get nodes from cluster
     let cfg = get_config();
     let nodes = if cfg.common.feature_query_skip_wal {
-        infra_cluster::get_cached_online_querier_nodes(role_group).await
+        infra::cluster::get_cached_online_querier_nodes(role_group).await
     } else {
-        infra_cluster::get_cached_online_query_nodes(role_group).await
+        infra::cluster::get_cached_online_query_nodes(role_group).await
     };
     let mut nodes = match nodes {
         Some(nodes) => nodes,
@@ -928,9 +924,12 @@ pub(crate) async fn partition_file_by_hash(
     }
     let mut partitions = vec![Vec::new(); idx];
     for fk in file_id_list {
-        let node_name =
-            infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await;
+        let node_name = infra::cluster::get_node_from_consistent_hash(
+            &fk.id.to_string(),
+            &Role::Querier,
+            group,
+        )
+        .await;
         let idx = match node_name {
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,

@@ -30,8 +30,6 @@ use tokio::sync::mpsc::Sender;
 use tracing::Instrument;
 
 #[cfg(feature = "enterprise")]
-use crate::common::infra::cluster::get_cached_online_router_nodes;
-#[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 #[cfg(feature = "enterprise")]
 use crate::service::{self_reporting::audit, websocket_events::handle_cancel};
@@ -90,7 +88,7 @@ async fn resolve_enterprise_user_id(
     } else {
         // Cluster mode, try to determine user ID
         // First check if we're running without router nodes
-        let router_nodes = get_cached_online_router_nodes().await;
+        let router_nodes = infra::cluster::get_cached_online_router_nodes().await;
         if let Some(nodes) = router_nodes
             && nodes.is_empty()
         {

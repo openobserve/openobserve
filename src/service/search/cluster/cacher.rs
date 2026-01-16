@@ -14,17 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    cluster::{get_cached_online_querier_nodes, get_node_by_uuid},
+    errors::{Error, ErrorCodes},
+};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse},
-    service::{
-        grpc::get_cached_channel,
-        search::{infra_cluster, server_internal_error},
-    },
+    service::{grpc::get_cached_channel, search::server_internal_error},
 };
 
 #[tracing::instrument(name = "service:search:cluster:cacher:get_cached_results", skip_all)]
@@ -36,7 +36,7 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
+    let mut nodes = match get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] get_cached_results: no querier node online");
@@ -48,7 +48,7 @@ pub async fn get_cached_results(
 
     nodes.sort_by_key(|x| x.id);
 
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    let local_node = get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
     nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
     let querier_num = nodes.len();
@@ -255,7 +255,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_querier_nodes(None).await {
+    let mut nodes = match get_cached_online_querier_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] delete_cached_results: no querier node online");
@@ -267,7 +267,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
 
     nodes.sort_by_key(|x| x.id);
 
-    let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    let local_node = get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
     nodes.retain(|node| node.is_querier() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
 
     let querier_num = nodes.len();

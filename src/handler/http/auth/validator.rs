@@ -31,7 +31,6 @@ use url::Url;
 
 use crate::{
     common::{
-        infra::cluster,
         meta::{
             ingestion::INGESTION_EP,
             user::{
@@ -771,7 +770,7 @@ pub async fn validator_proxy_url(
 pub async fn validate_http_internal(
     req: ServiceRequest,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let router_nodes = cluster::get_cached_online_router_nodes()
+    let router_nodes = infra::cluster::get_cached_online_router_nodes()
         .await
         .unwrap_or_default();
 

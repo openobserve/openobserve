@@ -19,10 +19,11 @@ use config::{
     meta::{cluster::CompactionJobType, stream::ALL_STREAM_TYPES},
     metrics, spawn_pausable_job,
 };
+use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::compact};
+use crate::service::compact;
 
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
@@ -211,6 +212,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+// TODO: refactor here only select node when it start,
+// if this node stopped, then there is no one can continue to merge
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] Running enrichment table merge");
     let db = infra::db::get_db().await;

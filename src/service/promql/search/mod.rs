@@ -37,17 +37,14 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 
-use crate::{
-    common::infra::cluster,
-    service::{
-        grpc::make_grpc_metrics_client,
-        promql::{
-            DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-            micros, value::*,
-        },
-        search::server_internal_error,
-        self_reporting::report_request_usage_stats,
+use crate::service::{
+    grpc::make_grpc_metrics_client,
+    promql::{
+        DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
+        micros, value::*,
     },
+    search::server_internal_error,
+    self_reporting::report_request_usage_stats,
 };
 
 mod cache;
@@ -112,7 +109,7 @@ async fn search_in_cluster(
     );
 
     // get querier nodes from cluster
-    let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let mut nodes = infra::cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap();
     // sort nodes by node_id this will improve hit cache ratio

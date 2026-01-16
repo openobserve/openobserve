@@ -386,9 +386,7 @@ impl Search for Searcher {
             Ok(Response::new(ScanStatsResponse { stats: Some(stats) }))
         } else {
             let mut ret = search::ScanStats::default();
-            if let Some(nodes) =
-                crate::common::infra::cluster::get_cached_online_query_nodes(None).await
-            {
+            if let Some(nodes) = infra::cluster::get_cached_online_query_nodes(None).await {
                 let nodes: Vec<_> = nodes
                     .into_iter()
                     .map(|n| Arc::new(n) as Arc<dyn NodeInfo>)

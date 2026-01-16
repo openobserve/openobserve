@@ -90,6 +90,7 @@ pub async fn get_ws_handler() -> Arc<WsHandler> {
     handler
 }
 
+#[allow(unused)]
 pub async fn remove_querier_from_handler(querier_name: &str) {
     get_ws_handler()
         .await
