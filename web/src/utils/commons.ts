@@ -619,6 +619,16 @@ export const getDashboard = async (
     return {};
   }
 
+  // Ensure variables structure always exists (fix for dashboards with no variables)
+  if (!dashboardJson.variables) {
+    dashboardJson.variables = {
+      showDynamicFilters: false,
+      list: []
+    };
+  } else if (!dashboardJson.variables.list) {
+    dashboardJson.variables.list = [];
+  }
+
   // Fix duplicate panel IDs and check if any were found
   const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
 
@@ -646,6 +656,16 @@ export const getDashboard = async (
       folderId,
       apiResponse,
     );
+
+    // Ensure variables structure exists after re-fetching too
+    if (!dashboardJson.variables) {
+      dashboardJson.variables = {
+        showDynamicFilters: false,
+        list: []
+      };
+    } else if (!dashboardJson.variables.list) {
+      dashboardJson.variables.list = [];
+    }
   }
 
   return dashboardJson;
