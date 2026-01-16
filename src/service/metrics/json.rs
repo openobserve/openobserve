@@ -65,11 +65,12 @@ const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary
 
 pub async fn ingest(
     org_id: &str,
+    stream_name: Option<&str>,
     body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, stream_name).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             return Ok(IngestionResponse {
@@ -119,18 +120,20 @@ pub async fn ingest(
         let mut record = flatten::flatten(record)?;
         // check data type
         let record = record.as_object_mut().unwrap();
-        let stream_name = match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
-            json::Value::String(s) => format_stream_name(s.to_string()),
-            _ => {
-                return Err(anyhow::anyhow!("invalid __name__, need to be string"));
-            }
+        let stream_name = match stream_name {
+            Some(name) => name.to_string(),
+            None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
+                json::Value::String(s) => format_stream_name(s.to_string()),
+                _ => {
+                    return Err(anyhow::anyhow!("invalid __name__, need to be string"));
+                }
+            },
         };
-        let metrics_type = match record.get(TYPE_LABEL).ok_or(anyhow!("missing __type__"))? {
-            json::Value::String(s) => s.clone(),
-            _ => {
-                return Err(anyhow::anyhow!("invalid __type__, need to be string"));
-            }
-        };
+        let metrics_type = record
+            .get(TYPE_LABEL)
+            .and_then(|v| v.as_str())
+            .unwrap_or("gauge") // default to gauge if __type__ is missing
+            .to_string();
 
         // Start retrieve associated pipeline and initialize ExecutablePipeline
         let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
