@@ -640,4 +640,70 @@ mod tests {
             _ => panic!("Should be Email template type"),
         }
     }
+
+    #[test]
+    fn test_prebuilt_destinations() {
+        let prebuilt = Destination::prebuilt_destinations();
+
+        // Should have 6 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
+        // Email
+        assert_eq!(prebuilt.len(), 6);
+
+        // Check that each destination has expected properties
+        let slack = prebuilt.iter().find(|d| d.name == "Slack Webhook").unwrap();
+        assert_eq!(slack.org_id, "");
+        match &slack.module {
+            Module::Alert {
+                template,
+                destination_type,
+            } => {
+                assert!(template.is_none()); // Template should be optional
+                match destination_type {
+                    DestinationType::Http(endpoint) => {
+                        assert!(endpoint.url.contains("slack.com"));
+                        assert_eq!(endpoint.method, HTTPType::POST);
+                        assert_eq!(endpoint.destination_type.as_ref().unwrap(), "slack");
+                    }
+                    _ => panic!("Slack destination should be HTTP type"),
+                }
+            }
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Teams destination
+        let teams = prebuilt
+            .iter()
+            .find(|d| d.name == "Microsoft Teams Webhook")
+            .unwrap();
+        match &teams.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("webhook.office.com"));
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "teams");
+                }
+                _ => panic!("Teams destination should be HTTP type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Email destination
+        let email = prebuilt
+            .iter()
+            .find(|d| d.name == "Email Notification")
+            .unwrap();
+        match &email.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Email(email_config) => {
+                    assert!(!email_config.recipients.is_empty());
+                    assert!(email_config.recipients[0].contains("@"));
+                }
+                _ => panic!("Email destination should be Email type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+    }
 }
