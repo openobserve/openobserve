@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -34,6 +35,25 @@ use crate::{
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
 
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDestinationRequest {
+    pub url: String,
+    pub method: Option<String>,
+    pub headers: Option<HashMap<String, String>>,
+    pub body: Option<String>,
+    pub skip_tls_verify: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDestinationResponse {
+    pub success: bool,
+    pub status_code: Option<u16>,
+    pub response_body: Option<String>,
+    pub error: Option<String>,
+}
+
 impl From<DestinationError> for Response {
     fn from(value: DestinationError) -> Self {
         match &value {
@@ -43,6 +63,122 @@ impl From<DestinationError> for Response {
             DestinationError::NotFound => MetaHttpResponse::not_found(value),
             other_err => MetaHttpResponse::bad_request(other_err),
         }
+    }
+}
+
+/// TestDestination
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/test",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TestDestination",
+    summary = "Test alert destination",
+    description = "Tests an alert destination configuration by sending a test HTTP request to the specified endpoint. \
+                   This allows users to verify that their destination configuration is correct before saving it. The \
+                   test sends a sample payload and returns the HTTP response status and body for validation.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = inline(TestDestinationRequest), description = "Test request data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(TestDestinationResponse)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"})),
+        ("x-o2-mcp" = json!({"description": "Test alert destination connectivity", "category": "alerts"}))
+    )
+)]
+pub async fn test_destination(
+    Path(_org_id): Path<String>,
+    Json(test_req): Json<TestDestinationRequest>,
+) -> Response {
+    let method = test_req
+        .method
+        .unwrap_or_else(|| "POST".to_string())
+        .to_uppercase();
+    let url = &test_req.url;
+    let body = test_req.body.unwrap_or_default();
+    let headers = test_req.headers.unwrap_or_default();
+    let skip_tls_verify = test_req.skip_tls_verify.unwrap_or(false);
+
+    // Build HTTP client
+    let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
+
+    if skip_tls_verify {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+
+    let client = match client_builder.build() {
+        Ok(client) => client,
+        Err(e) => {
+            return MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                response_body: None,
+                error: Some(format!("Failed to build HTTP client: {}", e)),
+            });
+        }
+    };
+
+    // Build request
+    let mut request_builder = match method.as_str() {
+        "GET" => client.get(url),
+        "POST" => client.post(url),
+        "PUT" => client.put(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        _ => {
+            return MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                response_body: None,
+                error: Some(format!("Unsupported HTTP method: {}", method)),
+            });
+        }
+    };
+
+    // Add headers
+    for (key, value) in headers {
+        request_builder = request_builder.header(key, value);
+    }
+
+    // Add body if not empty
+    if !body.is_empty() {
+        request_builder = request_builder.body(body);
+    }
+
+    // Send request
+    match request_builder.send().await {
+        Ok(response) => {
+            let status_code = response.status().as_u16();
+            let success = response.status().is_success();
+
+            match response.text().await {
+                Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
+                    success,
+                    status_code: Some(status_code),
+                    response_body: Some(response_body),
+                    error: None,
+                }),
+                Err(e) => MetaHttpResponse::json(TestDestinationResponse {
+                    success: false,
+                    status_code: Some(status_code),
+                    response_body: None,
+                    error: Some(format!("Failed to read response body: {}", e)),
+                }),
+            }
+        }
+        Err(e) => MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(format!("HTTP request failed: {}", e)),
+        }),
     }
 }
 
