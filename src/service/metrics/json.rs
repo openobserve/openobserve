@@ -61,13 +61,16 @@ use crate::{
     },
 };
 
+const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
+
 pub async fn ingest(
     org_id: &str,
+    stream_name: Option<&str>,
     body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, stream_name).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             return Ok(IngestionResponse {
@@ -117,18 +120,20 @@ pub async fn ingest(
         let mut record = flatten::flatten(record)?;
         // check data type
         let record = record.as_object_mut().unwrap();
-        let stream_name = match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
-            json::Value::String(s) => format_stream_name(s.to_string()),
-            _ => {
-                return Err(anyhow::anyhow!("invalid __name__, need to be string"));
-            }
+        let stream_name = match stream_name {
+            Some(name) => name.to_string(),
+            None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
+                json::Value::String(s) => format_stream_name(s.to_string()),
+                _ => {
+                    return Err(anyhow::anyhow!("invalid __name__, need to be string"));
+                }
+            },
         };
-        let metrics_type = match record.get(TYPE_LABEL).ok_or(anyhow!("missing __type__"))? {
-            json::Value::String(s) => s.clone(),
-            _ => {
-                return Err(anyhow::anyhow!("invalid __type__, need to be string"));
-            }
-        };
+        let metrics_type = record
+            .get(TYPE_LABEL)
+            .and_then(|v| v.as_str())
+            .unwrap_or("gauge") // default to gauge if __type__ is missing
+            .to_string();
 
         // Start retrieve associated pipeline and initialize ExecutablePipeline
         let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
@@ -148,37 +153,41 @@ pub async fn ingest(
         )
         .await;
 
-        // check metrics type for Histogram & Summary
-        if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
-            if !stream_schema_map.contains_key(&stream_name) {
-                let mut schema =
-                    infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-                if schema == Schema::empty() {
-                    // create the metadata for the stream
-                    let metadata = Metadata {
-                        metric_family_name: stream_name.clone(),
-                        metric_type: metrics_type.as_str().into(),
-                        help: stream_name.clone().replace('_', " "),
-                        unit: "".to_string(),
-                    };
-                    let mut extra_metadata: HashMap<String, String> = HashMap::new();
-                    extra_metadata.insert(
-                        METADATA_LABEL.to_string(),
-                        json::to_string(&metadata).unwrap(),
-                    );
-                    schema = schema.with_metadata(extra_metadata);
-                    db::schema::merge(
-                        org_id,
-                        &stream_name,
-                        StreamType::Metrics,
-                        &schema,
-                        Some(now_micros()),
-                    )
-                    .await?;
-                }
-                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
+        // check metrics type
+        if !VALID_METRICS_TYPES.contains(&metrics_type.to_lowercase().as_str()) {
+            return Err(anyhow::anyhow!(
+                "invalid metrics type, need to be one of: {}",
+                VALID_METRICS_TYPES.join(", ")
+            ));
+        }
+
+        // check schema
+        if !stream_schema_map.contains_key(&stream_name) {
+            let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+            if schema == Schema::empty() {
+                // create the metadata for the stream
+                let metadata = Metadata {
+                    metric_family_name: stream_name.clone(),
+                    metric_type: metrics_type.as_str().into(),
+                    help: stream_name.clone().replace('_', " "),
+                    unit: "".to_string(),
+                };
+                let mut extra_metadata: HashMap<String, String> = HashMap::new();
+                extra_metadata.insert(
+                    METADATA_LABEL.to_string(),
+                    json::to_string(&metadata).unwrap(),
+                );
+                schema = schema.with_metadata(extra_metadata);
+                db::schema::merge(
+                    org_id,
+                    &stream_name,
+                    StreamType::Metrics,
+                    &schema,
+                    Some(now_micros()),
+                )
+                .await?;
             }
-            continue;
+            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
         }
 
         // check timestamp
