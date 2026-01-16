@@ -97,9 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel - Features List -->
         <div class="features-panel">
           <div class="features-header">
-            <div class="header-icon-wrapper">
-              <q-icon name="stars" size="24px" class="header-icon" />
-            </div>
             <h4>{{ dialogConfig.featuresTitle }}</h4>
             <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
           </div>
@@ -285,10 +282,10 @@ export default defineComponent({
 
       // Open Source (both false) - Default fallback
       return {
-        heroTitle: "Enterprise Features",
-        offerText: "Get all enterprise features completely free when you self-host OpenObserve",
+        heroTitle: "Get Enterprise Edition",
+        offerText: "Download and unlock all enterprise features completely free",
         badgeText: "Free up to 200GB / day",
-        badgeIcon: "bolt",
+        badgeIcon: "card_giftcard",
         featuresTitle: "Unlock All Enterprise Features",
         featuresSubtitle: "Everything you need for production-ready observability",
         primaryButtonText: "Download Now",
@@ -719,14 +716,18 @@ export default defineComponent({
     .offer-badge {
       display: inline-flex;
       align-items: center;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-weight: 600;
+      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      padding: 10px 20px;
+      border-radius: 24px;
+      font-weight: 700;
+      font-size: 15px;
       backdrop-filter: blur(10px);
+      color: #1a1a1a;
+      box-shadow: 0 4px 16px rgba(255, 215, 0, 0.4);
 
       .q-icon {
-        color: #ffd700;
+        color: #1a1a1a;
+        font-size: 20px;
       }
     }
   }
@@ -938,6 +939,8 @@ body.body--dark {
     }
 
     .feature-list-item {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+
       &:hover {
         background: rgba(255, 255, 255, 0.05);
       }
