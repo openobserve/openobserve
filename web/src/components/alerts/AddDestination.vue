@@ -42,7 +42,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:h-full tw:py-2">
         <div>
        <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
+        <!-- Destination Type Selection for Alerts -->
         <div v-if="isAlerts" class="col-12 q-pb-md">
+          <div class="text-subtitle2 q-mb-sm">{{ t('alert_destinations.destination_type') }}</div>
+          <div class="destination-type-grid">
+            <div
+              v-for="destType in destinationTypes"
+              :key="destType.value"
+              :data-test="`destination-type-card-${destType.value}`"
+              class="destination-type-card"
+              :class="{
+                selected: formData.destination_type === destType.value,
+              }"
+              @click="selectDestinationType(destType.value)"
+            >
+              <div class="destination-type-content">
+                <img
+                  v-if="destType.image && destType.value !== 'custom'"
+                  :src="destType.image"
+                  :alt="destType.label"
+                  class="destination-type-image"
+                />
+                <q-icon
+                  v-else
+                  :name="destType.icon"
+                  size="24px"
+                  class="destination-type-icon"
+                />
+              </div>
+              <div
+                class="destination-type-label"
+                :class="{ active: formData.destination_type === destType.value }"
+              >
+                {{ destType.label }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legacy tabs for non-alert destinations -->
+        <div v-if="!isAlerts" class="col-12 q-pb-md">
          <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
           <app-tabs
             data-test="add-destination-tabs"
