@@ -61,6 +61,10 @@ type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, Ha
 type TokioExemplarsResult =
     tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
 
+// Constants for optimization thresholds
+const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
+const OPTIMIZATION_MAX_STEPS: i64 = 30;
+
 pub struct Engine {
     trace_id: String,
     /// PromQL evaluation context
@@ -1193,15 +1197,16 @@ async fn selector_load_data_from_datafusion(
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
 
-    // Optimization: When step > lookback, we don't need to load all data in [start-lookback, end]
-    // Instead, we only need to load data windows around each evaluation point
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => {
-            if config::get_config().limit.metrics_data_load_window_enabled
-                && start != end
+            // Optimization: When step > lookback, we don't need to load all data in
+            // [start-lookback, end] Instead, we only need to load data windows around
+            // each evaluation point
+            let use_optimization = start != end
                 && step > 0
-                && step > lookback
-            {
+                && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+                && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+            if use_optimization {
                 let num_steps = ((end - start) / step) + 1;
                 let eval_timestamps: Vec<i64> =
                     (0..num_steps).map(|i| start + (step * i)).collect();
@@ -1243,7 +1248,6 @@ async fn selector_load_data_from_datafusion(
     }
 
     // check if exemplars field is exists
-
     if query_ctx.query_exemplars {
         let schema = df_group.schema().as_arrow();
         if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
