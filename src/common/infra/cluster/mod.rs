@@ -36,7 +36,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let mut node = load_local_node();
+        let mut node = LOCAL_NODE.clone();
         node.status = NodeStatus::Online;
         node.scheduled = true;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
@@ -222,7 +222,7 @@ mod tests {
         reset_consistent_hash().await;
 
         // Test consistent hash logic.
-        let node = load_local_node();
+        let node = LOCAL_NODE.clone();
         for i in 0..10 {
             let node_q = Node {
                 name: format!("node-q-{i}").to_string(),
