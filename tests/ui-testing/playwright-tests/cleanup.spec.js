@@ -187,7 +187,20 @@ test.describe("Pre-Test Cleanup", () => {
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
       /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
-      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/      // delete_test_<uuid>_csv (delete confirmation test)
+      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
+      // URL-based enrichment table tests (enrichment-table-url.spec.js)
+      /^url_table_\d{13}$/,                                                                  // url_table_<timestamp> (URL creation tests)
+      /^invalid_url_\d{13}$/,                                                                // invalid_url_<timestamp> (validation tests)
+      /^list_check_\d{13}$/,                                                                 // list_check_<timestamp> (list visibility tests)
+      /^reload_test_\d{13}$/,                                                                // reload_test_<timestamp> (reload mode tests)
+      /^append_test_\d{13}$/,                                                                // append_test_<timestamp> (append mode tests)
+      /^replace_test_\d{13}$/,                                                               // replace_test_<timestamp> (replace mode tests)
+      /^cancel_test_\d{13}$/,                                                                // cancel_test_<timestamp> (cancel form tests)
+      /^search_test_\d{13}$/,                                                                // search_test_<timestamp> (search functionality tests)
+      /^delete_test_\d{13}$/,                                                                // delete_test_<timestamp> (delete operation tests)
+      /^toggle_test_\d{13}$/,                                                                // toggle_test_<timestamp> (source toggle tests)
+      /^nonexistent_url_\d{13}$/,                                                            // nonexistent_url_<timestamp> (URL validation edge case)
+      /^explore_test_\d{13}$/                                                                // explore_test_<timestamp> (data exploration tests)
     ]);
 
     // Clean up streams matching test patterns
