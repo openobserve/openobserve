@@ -8,7 +8,6 @@
  */
 
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const { expect } = require('@playwright/test');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { randomUUID } = require('crypto');
@@ -140,7 +139,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified table was not created');
     });
 
-    test('@P1 Delete enrichment table', async ({ page }) => {
+    test('@P1 Delete enrichment table', async () => {
         const tableName = generateTableName('delete_test');
         testLogger.info(`Test: Delete enrichment table - ${tableName}`);
 
@@ -167,13 +166,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Confirmed deletion');
 
         // Verify table is removed from list
-        await page.waitForTimeout(2000);
-        const tableRow = page.locator('tbody tr').filter({ hasText: tableName });
-        await expect(tableRow).toBeHidden({ timeout: 10000 });
+        await enrichmentPage.verifyTableRowHidden(tableName);
         testLogger.info('Table removed from list');
     });
 
-    test('@P1 Explore enrichment table and view log details', async ({ page }) => {
+    test('@P1 Explore enrichment table and view log details', async () => {
         const tableName = generateTableName('explore_log');
         testLogger.info(`Test: Explore and view log details - ${tableName}`);
 
@@ -188,25 +185,19 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Table found in list');
 
         // Click explore button to navigate to logs
-        const exploreBtn = page.locator(`[data-test="${tableName}-explore-btn"]`);
-        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
-        await exploreBtn.click();
+        await enrichmentPage.clickExploreButton(tableName);
         testLogger.info('Clicked explore button');
 
         // Wait for navigation to logs page
-        await page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
-        await page.waitForLoadState('networkidle');
+        await enrichmentPage.waitForLogsPageNavigation();
         testLogger.info('Navigated to logs page');
 
-        // Wait for log table to load and click on first row
-        const firstLogRow = page.locator('[data-test="log-table-column-0-_timestamp"]').first();
-        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
-        await firstLogRow.click();
+        // Click on first log row
+        await enrichmentPage.clickFirstLogRow();
         testLogger.info('Clicked on first log row');
 
-        // Verify log detail panel expands (check for expanded row content)
-        const logDetailPanel = page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
-        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
+        // Verify log detail panel is visible
+        await enrichmentPage.verifyLogDetailPanelVisible();
         testLogger.info('Log detail panel is visible');
     });
 

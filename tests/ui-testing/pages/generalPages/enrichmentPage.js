@@ -1229,6 +1229,61 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         testLogger.debug('Update mode saved');
     }
+
+    // ============================================================================
+    // EXPLORE / LOGS NAVIGATION METHODS
+    // ============================================================================
+
+    /**
+     * Click explore button for a specific table
+     * @param {string} tableName - Name of the table
+     */
+    async clickExploreButton(tableName) {
+        testLogger.debug(`Clicking explore button for: ${tableName}`);
+
+        const exploreBtn = this.page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await exploreBtn.click();
+
+        testLogger.debug('Explore button clicked');
+    }
+
+    /**
+     * Wait for navigation to logs page with enrichment tables stream
+     */
+    async waitForLogsPageNavigation() {
+        testLogger.debug('Waiting for logs page navigation');
+
+        await this.page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
+        await this.page.waitForLoadState('networkidle');
+
+        testLogger.debug('Navigated to logs page');
+    }
+
+    /**
+     * Click the first log row in the results table
+     */
+    async clickFirstLogRow() {
+        testLogger.debug('Clicking first log row');
+
+        const firstLogRow = this.page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstLogRow.click();
+
+        testLogger.debug('First log row clicked');
+    }
+
+    /**
+     * Verify log detail panel is visible after clicking a row
+     */
+    async verifyLogDetailPanelVisible() {
+        testLogger.debug('Verifying log detail panel is visible');
+
+        const logDetailPanel = this.page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
+        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
+
+        testLogger.debug('Log detail panel verified visible');
+    }
 }
 
 module.exports = { EnrichmentPage };
