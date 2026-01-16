@@ -1545,6 +1545,7 @@
     "multiWindow": "Compare with past",
     "multiWindowSubLabel": "Compare current results with data from another time period",
     "destination": "Destination",
+    "template": "Template Override",
     "additionalVariables": "Additional Variables",
     "description": "Description",
     "stream_name": "Stream Name",
