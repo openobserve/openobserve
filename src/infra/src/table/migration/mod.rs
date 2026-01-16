@@ -89,6 +89,7 @@ mod m20251229_000001_create_backfill_jobs;
 mod m20251230_000001_add_allow_static_token_to_org_users;
 mod m20260107_000001_sync_distinct_stream_retention;
 mod m20260108_000001_recreate_enrichment_table_urls_with_ksuids;
+mod m20260113_000001_add_alert_template;
 
 pub struct Migrator;
 
@@ -167,6 +168,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251230_000001_add_allow_static_token_to_org_users::Migration),
             Box::new(m20260107_000001_sync_distinct_stream_retention::Migration),
             Box::new(m20260108_000001_recreate_enrichment_table_urls_with_ksuids::Migration),
+            Box::new(m20260113_000001_add_alert_template::Migration),
         ]
     }
 }

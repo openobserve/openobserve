@@ -37,7 +37,7 @@ impl From<meta_dest::Destination> for Destination {
                 meta_dest::DestinationType::Email(email) => Self {
                     name: value.name,
                     emails: email.recipients,
-                    template: Some(template),
+                    template,
                     destination_type: DestinationType::Email,
                     ..Default::default()
                 },
@@ -55,7 +55,7 @@ impl From<meta_dest::Destination> for Destination {
                     },
                     #[cfg(not(feature = "enterprise"))]
                     destination_type: DestinationType::Http,
-                    template: Some(template),
+                    template,
                     #[cfg(feature = "enterprise")]
                     action_id: endpoint.action_id,
                     output_format: endpoint.output_format,
@@ -65,7 +65,7 @@ impl From<meta_dest::Destination> for Destination {
                 },
                 meta_dest::DestinationType::Sns(aws_sns) => Self {
                     name: value.name,
-                    template: Some(template),
+                    template,
                     sns_topic_arn: Some(aws_sns.sns_topic_arn),
                     aws_region: Some(aws_sns.aws_region),
                     destination_type: DestinationType::Sns,
@@ -89,83 +89,87 @@ impl From<meta_dest::Destination> for Destination {
 }
 
 impl Destination {
-    pub fn into(self, org_id: String) -> Result<meta_dest::Destination, DestinationError> {
-        match self.template {
-            Some(template) if !template.is_empty() => {
-                let destination_type = match self.destination_type {
-                    DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
-                        recipients: self.emails,
-                    }),
-                    DestinationType::Http => {
+    /// Convert HTTP Destination model to meta Destination.
+    /// For alert destinations, template is now optional - can be set at alert level instead.
+    pub fn into(self, org_id: String, is_alert: bool) -> Result<meta_dest::Destination, DestinationError> {
+        // Template is optional - filter out empty strings
+        let template = self.template.filter(|t| !t.is_empty());
+
+        if is_alert {
+            // Alert destination - template is optional (can be set at alert level)
+            let destination_type = match self.destination_type {
+                DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
+                    recipients: self.emails,
+                }),
+                DestinationType::Http => {
+                    meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                        url: self.url,
+                        method: self.method,
+                        skip_tls_verify: self.skip_tls_verify,
+                        headers: self.headers,
+                        action_id: None,
+                        output_format: self.output_format,
+                        destination_type: self.destination_type_name,
+                        metadata: self.metadata,
+                    })
+                }
+                DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
+                    sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
+                    aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
+                }),
+                #[cfg(feature = "enterprise")]
+                DestinationType::Action => {
+                    if let Some(action_id) = self.action_id {
+                        let action_endpoint = ActionEndpoint::new(&org_id, &action_id)
+                            .map_err(DestinationError::InvalidActionId)?;
                         meta_dest::DestinationType::Http(meta_dest::Endpoint {
-                            url: self.url,
-                            method: self.method,
-                            skip_tls_verify: self.skip_tls_verify,
-                            headers: self.headers,
-                            action_id: None,
+                            url: action_endpoint.url,
+                            method: if action_endpoint.method == reqwest::Method::POST {
+                                meta_dest::HTTPType::POST
+                            } else {
+                                meta_dest::HTTPType::GET
+                            },
+                            skip_tls_verify: action_endpoint.skip_tls,
+                            headers: None,
+                            action_id: Some(action_id),
                             output_format: self.output_format,
                             destination_type: self.destination_type_name,
                             metadata: self.metadata,
                         })
+                    } else {
+                        return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
+                            "Action id is required for action destination"
+                        )));
                     }
-                    DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
-                        sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
-                        aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
-                    }),
-                    #[cfg(feature = "enterprise")]
-                    DestinationType::Action => {
-                        if let Some(action_id) = self.action_id {
-                            let action_endpoint = ActionEndpoint::new(&org_id, &action_id)
-                                .map_err(DestinationError::InvalidActionId)?;
-                            meta_dest::DestinationType::Http(meta_dest::Endpoint {
-                                url: action_endpoint.url,
-                                method: if action_endpoint.method == reqwest::Method::POST {
-                                    meta_dest::HTTPType::POST
-                                } else {
-                                    meta_dest::HTTPType::GET
-                                },
-                                skip_tls_verify: action_endpoint.skip_tls,
-                                headers: None,
-                                action_id: Some(action_id),
-                                output_format: self.output_format,
-                                destination_type: self.destination_type_name,
-                                metadata: self.metadata,
-                            })
-                        } else {
-                            return Err(DestinationError::InvalidActionId(anyhow::anyhow!(
-                                "Action id is required for action destination"
-                            )));
-                        }
-                    }
-                };
-                Ok(meta_dest::Destination {
-                    id: None,
-                    org_id,
-                    name: self.name,
-                    module: meta_dest::Module::Alert {
-                        template,
-                        destination_type,
-                    },
-                })
-            }
-            _ => {
-                let endpoint = meta_dest::Endpoint {
-                    url: self.url,
-                    method: self.method,
-                    skip_tls_verify: self.skip_tls_verify,
-                    headers: self.headers,
-                    action_id: None,
-                    output_format: self.output_format,
-                    destination_type: self.destination_type_name,
-                    metadata: self.metadata,
-                };
-                Ok(meta_dest::Destination {
-                    id: None,
-                    org_id,
-                    name: self.name,
-                    module: meta_dest::Module::Pipeline { endpoint },
-                })
-            }
+                }
+            };
+            Ok(meta_dest::Destination {
+                id: None,
+                org_id,
+                name: self.name,
+                module: meta_dest::Module::Alert {
+                    template,
+                    destination_type,
+                },
+            })
+        } else {
+            // Pipeline destination
+            let endpoint = meta_dest::Endpoint {
+                url: self.url,
+                method: self.method,
+                skip_tls_verify: self.skip_tls_verify,
+                headers: self.headers,
+                action_id: None,
+                output_format: self.output_format,
+                destination_type: self.destination_type_name,
+                metadata: self.metadata,
+            };
+            Ok(meta_dest::Destination {
+                id: None,
+                org_id,
+                name: self.name,
+                module: meta_dest::Module::Pipeline { endpoint },
+            })
         }
     }
 }
