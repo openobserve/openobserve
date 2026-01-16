@@ -23,6 +23,7 @@
  */
 
 import type { ContextProvider, PageContext } from './types';
+import { getConsumableRelativeTime } from '@/utils/date';
 
 
 /**
@@ -76,18 +77,22 @@ const extractInterestingFieldsByStream = (
 };
 
 /**
- * Builds conditional time range context based on whether it's relative or absolute
- * 
+ * Builds time range context with actual microsecond timestamps for AI agent search queries.
+ *
+ * IMPORTANT: The AI agent needs actual microsecond timestamps (not relative strings like "3d")
+ * to perform search queries. This function ensures startTime and endTime are always calculated
+ * and included in the context, regardless of whether the user selected relative or absolute time.
+ *
  * @param datetimeObj - The datetime object from searchObj
- * @returns Conditional time range structure
- * 
+ * @returns Time range structure with startTime and endTime in microseconds
+ *
  * Example:
  * ```typescript
- * // For relative time:
- * // Returns: { type: 'relative', relativeTimePeriod: '3d' }
- * 
+ * // For relative time (e.g., "last 3 days"):
+ * // Returns: { type: 'relative', relativeTimePeriod: '3d', startTime: 1768406781751488, endTime: 1768496804185872 }
+ *
  * // For absolute time:
- * // Returns: { type: 'absolute', startTime: 123456, endTime: 789012, selectedDate: {...}, selectedTime: {...} }
+ * // Returns: { type: 'absolute', startTime: 1768406781751488, endTime: 1768496804185872, ... }
  * ```
  */
 const buildTimeRangeContext = (datetimeObj: any) => {
@@ -100,9 +105,18 @@ const buildTimeRangeContext = (datetimeObj: any) => {
   };
 
   if (datetimeObj.type === 'relative') {
+    const relativeTimePeriod = datetimeObj.relativeTimePeriod || datetimeObj.relative_period;
+
+    // Calculate actual timestamps from relative period for AI agent
+    // The agent needs real microsecond timestamps to execute search queries
+    const calculatedTime = getConsumableRelativeTime(relativeTimePeriod);
+
     return {
       ...baseContext,
-      relativeTimePeriod: datetimeObj.relativeTimePeriod || datetimeObj.relative_period
+      relativeTimePeriod,
+      // Always include calculated timestamps so AI agent can search without needing to guess
+      startTime: calculatedTime?.startTime || datetimeObj.startTime,
+      endTime: calculatedTime?.endTime || datetimeObj.endTime
     };
   } else if (datetimeObj.type === 'absolute') {
     return {
