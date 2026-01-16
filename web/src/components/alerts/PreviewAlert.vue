@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Chart -->
     <div data-test="alert-preview-chart" class="preview-alert-chart" style="flex: 1; min-height: 0; padding: 1rem;">
       <PanelSchemaRenderer
+        ref="panelRendererRef"
         v-if="chartData"
         :height="5"
         :width="5"
@@ -29,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is_ui_histogram="shouldUseHistogram"
         style="height: 180px; width: 100%; overflow-x: hidden;"
         @result-metadata-update="handleChartDataUpdate"
+        @series-data-update="handleSeriesDataUpdate"
       />
     </div>
   </div>
@@ -178,6 +180,7 @@ onBeforeMount(() => {
 });
 
 const chartPanelRef = ref(null);
+const panelRendererRef = ref(null);
 const chartData = ref({});
 const selectedTimeObj = ref({});
 const evaluationStatus = ref<{
@@ -394,6 +397,7 @@ const fetchQuerySchema = async () => {
     }
 
     chartData.value = cloneDeep(dashboardPanelData.data);
+    selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
 
     // DEBUG: Print complete panel object after result_schema
     console.log("[PreviewAlert] ========== COMPLETE PANEL OBJECT (from result_schema) ==========");
@@ -431,6 +435,7 @@ const fetchQuerySchema = async () => {
     }
 
     chartData.value = cloneDeep(dashboardPanelData.data);
+    selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
   }
 };
 
@@ -438,6 +443,7 @@ const fetchQuerySchema = async () => {
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
   console.log("[PreviewAlert] Chart data updated, resultMetaData:", resultMetaData);
+  console.log("[PreviewAlert] Current selectedTab:", props.selectedTab);
 
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
@@ -453,6 +459,15 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   let resultCount = 0;
 
   try {
+    console.log("[PreviewAlert] resultMetaData type:", typeof resultMetaData);
+    console.log("[PreviewAlert] resultMetaData is array?", Array.isArray(resultMetaData));
+    console.log("[PreviewAlert] resultMetaData length:", resultMetaData?.length);
+
+    // For PromQL, also log the raw metadata to see its structure
+    if (props.selectedTab === "promql" && resultMetaData) {
+      console.log("[PreviewAlert] PromQL raw resultMetaData:", JSON.stringify(resultMetaData, null, 2));
+    }
+
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
       // Get metadata for first query (queryIndex = 0)
       const firstQueryMetadata = resultMetaData[0];
@@ -464,6 +479,10 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         const latestPartition = firstQueryMetadata[firstQueryMetadata.length - 1];
 
         console.log("[PreviewAlert] Latest partition metadata:", latestPartition);
+        console.log("[PreviewAlert] Latest partition keys:", Object.keys(latestPartition || {}));
+        console.log("[PreviewAlert] Has 'result' field?", 'result' in (latestPartition || {}));
+        console.log("[PreviewAlert] Has 'hits' field?", 'hits' in (latestPartition || {}));
+        console.log("[PreviewAlert] Has 'total' field?", 'total' in (latestPartition || {}));
 
         // Determine result count based on query mode
         // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
@@ -476,9 +495,23 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
           }
         }
-        // PromQL mode: use hits array length (time-series data points)
+        // PromQL mode: count time series or data points
         else if (props.selectedTab === "promql") {
-          if (Array.isArray(latestPartition?.hits)) {
+          // PromQL response structure: { data: { result: [{metric: {...}, values: [[timestamp, value], ...]}] } }
+          // For PromQL, we want to count:
+          // 1. Number of time series (result array length) - for "series count" alerts
+          // 2. OR count data points above/below threshold - for "value" alerts
+
+          // Check if we have PromQL result structure
+          if (latestPartition?.result && Array.isArray(latestPartition.result)) {
+            // Count the number of time series
+            resultCount = latestPartition.result.length;
+            console.log("[PreviewAlert] Got count from PromQL result array (time series count):", resultCount);
+
+            // Alternative: Could also count total data points across all series
+            // const totalPoints = latestPartition.result.reduce((sum, series) =>
+            //   sum + (series.values?.length || 0), 0);
+          } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
             console.log("[PreviewAlert] Got count from hits array (PromQL):", resultCount);
           } else if (latestPartition?.total !== undefined) {
@@ -514,9 +547,136 @@ const handleChartDataUpdate = (resultMetaData: any) => {
       evaluateAndSetStatus(resultCount);
     } else {
       console.log("[PreviewAlert] No result metadata available yet");
+
+      // For PromQL, the data might come through the chart data directly
+      // Let's check if we have chart data with results
+      if (props.selectedTab === "promql" && chartData.value) {
+        console.log("[PreviewAlert] Checking chartData for PromQL results...");
+        console.log("[PreviewAlert] chartData.value:", chartData.value);
+
+        // Try to get data from chart queries
+        if (chartData.value.queries && chartData.value.queries[0]) {
+          const queryData = chartData.value.queries[0];
+          console.log("[PreviewAlert] Query data:", queryData);
+          console.log("[PreviewAlert] Query data keys:", Object.keys(queryData));
+
+          // Check if there's cached or loaded data
+          if (queryData.data || queryData.result) {
+            console.log("[PreviewAlert] Found data in query:", queryData.data || queryData.result);
+          } else {
+            console.log("[PreviewAlert] No data/result in query yet");
+          }
+        }
+      }
     }
   } catch (error) {
     console.error("[PreviewAlert] Error processing chart data:", error);
+  }
+};
+
+// Handle series data update event (for PromQL and other series-based data)
+const handleSeriesDataUpdate = (seriesData: any) => {
+  console.log("[PreviewAlert] Series data updated:", seriesData);
+
+  // Only process for PromQL mode
+  if (props.selectedTab !== "promql") {
+    return;
+  }
+
+  // Safety check: ensure trigger_condition exists
+  if (!props.formData.trigger_condition) {
+    console.warn("[PreviewAlert] No trigger_condition found in series update");
+    return;
+  }
+
+  try {
+    // seriesData should contain the chart series information
+    // For PromQL, count the number of series (time series count)
+    let resultCount = 0;
+
+    console.log("[PreviewAlert] seriesData type:", typeof seriesData);
+    console.log("[PreviewAlert] seriesData keys:", Object.keys(seriesData || {}));
+
+    // Log options if it exists
+    if (seriesData?.options) {
+      console.log("[PreviewAlert] seriesData.options keys:", Object.keys(seriesData.options));
+
+      // Log series if it exists
+      if (seriesData.options.series) {
+        console.log("[PreviewAlert] seriesData.options.series:", seriesData.options.series);
+        console.log("[PreviewAlert] seriesData.options.series.length:", seriesData.options.series.length);
+
+        // Log details of each series to understand what they are
+        seriesData.options.series.forEach((series: any, index: number) => {
+          console.log(`[PreviewAlert] Series ${index}:`, {
+            name: series.name,
+            type: series.type,
+            hasData: !!series.data,
+            dataLength: series.data?.length || 0,
+            encode: series.encode,
+            datasetIndex: series.datasetIndex
+          });
+        });
+      }
+    }
+
+    // Log extras to see if it has raw PromQL data
+    if (seriesData?.extras) {
+      console.log("[PreviewAlert] seriesData.extras keys:", Object.keys(seriesData.extras));
+      if (seriesData.extras.rawData || seriesData.extras.result) {
+        console.log("[PreviewAlert] Found raw data in extras:", seriesData.extras.rawData || seriesData.extras.result);
+      }
+    }
+
+    if (Array.isArray(seriesData)) {
+      resultCount = seriesData.length;
+      console.log("[PreviewAlert] PromQL series count from array:", resultCount);
+    } else if (seriesData && typeof seriesData === 'object') {
+      // Check if there's a nested array
+      if (Array.isArray(seriesData.series)) {
+        resultCount = seriesData.series.length;
+        console.log("[PreviewAlert] Found series in seriesData.series:", resultCount);
+      } else if (Array.isArray(seriesData.data)) {
+        resultCount = seriesData.data.length;
+        console.log("[PreviewAlert] Found series in seriesData.data:", resultCount);
+      } else if (seriesData.options && Array.isArray(seriesData.options.series)) {
+        // ECharts series are in options.series
+        // Filter to only count actual data series with meaningful data
+        // Exclude helper/placeholder series (unnamed series with only 1 data point)
+        const dataSeries = seriesData.options.series.filter((s: any) => {
+          const hasData = s.data && Array.isArray(s.data);
+          const hasMultiplePoints = hasData && s.data.length > 1;
+          const hasName = s.name !== undefined && s.name !== null;
+
+          // Count series that either have a name OR have multiple data points
+          // This filters out placeholder series (no name, 1 point)
+          return (hasName || hasMultiplePoints) && hasData;
+        });
+        resultCount = dataSeries.length;
+        console.log("[PreviewAlert] Total series in options:", seriesData.options.series.length);
+        console.log("[PreviewAlert] Filtered data series count:", resultCount);
+        console.log("[PreviewAlert] Series types:", seriesData.options.series.map((s: any) => s.type || 'unknown'));
+        console.log("[PreviewAlert] Filtered series names:", dataSeries.map((s: any) => s.name || 'unnamed'));
+      } else if (seriesData.options?.dataset?.source) {
+        // Dataset-based series
+        const source = seriesData.options.dataset.source;
+        if (Array.isArray(source) && source.length > 1) {
+          resultCount = source.length - 1; // Subtract header row
+          console.log("[PreviewAlert] Found series in dataset.source:", resultCount);
+        }
+      }
+
+      if (resultCount === 0) {
+        console.log("[PreviewAlert] No series found in any expected location");
+      }
+    }
+
+    if (resultCount > 0) {
+      console.log("[PreviewAlert] Evaluating PromQL alert with series count:", resultCount);
+      evaluateAndSetStatus(resultCount);
+    }
+  } catch (error) {
+    console.error("[PreviewAlert] Error processing series data:", error);
   }
 };
 
@@ -595,6 +755,13 @@ let refreshCallCounter = 0;
 const refreshData = () => {
   const callId = ++refreshCallCounter;
   console.log(`[PreviewAlert] refreshData #${callId} START`);
+
+  // Safety check: ensure trigger_condition exists
+  if (!props.formData.trigger_condition) {
+    console.warn("[PreviewAlert] No trigger_condition found, skipping refreshData");
+    return;
+  }
+
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
