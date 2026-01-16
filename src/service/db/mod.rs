@@ -23,6 +23,7 @@ use {
 
 pub mod ai_prompts;
 pub mod alerts;
+pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;

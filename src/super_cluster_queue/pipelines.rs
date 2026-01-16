@@ -16,7 +16,7 @@
 use config::{meta::pipeline::Pipeline, utils::json};
 use infra::{
     errors::{Error, Result},
-    table::enrichment_table_urls,
+    table::{backfill_jobs, enrichment_table_urls},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -59,6 +59,40 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 return Err(Error::Message("Invalid key".to_string()));
             }
             enrichment_table_urls::delete(key_columns[2], key_columns[3]).await?;
+        }
+        MessageType::BackfillAdd => {
+            // format is /{BACKFILL_JOBS_KEY}/org/job_id
+            let bytes = msg
+                .value
+                .ok_or(Error::Message("Message missing value".to_string()))?;
+            let backfill_job: backfill_jobs::BackfillJob = json::from_slice(&bytes).inspect_err(|e| {
+                log::error!(
+                    "[SUPER_CLUSTER:BACKFILL] Failed to deserialize message value to backfill job: {e}"
+                );
+            })?;
+            backfill_jobs::add(backfill_job).await?;
+        }
+        MessageType::BackfillUpdate => {
+            // format is /{BACKFILL_JOBS_KEY}/org/job_id
+            let bytes = msg
+                .value
+                .ok_or(Error::Message("Message missing value".to_string()))?;
+            let backfill_job: backfill_jobs::BackfillJob = json::from_slice(&bytes).inspect_err(|e| {
+                log::error!(
+                    "[SUPER_CLUSTER:BACKFILL] Failed to deserialize message value to backfill job: {e}"
+                );
+            })?;
+            backfill_jobs::update(&backfill_job).await?;
+        }
+        MessageType::BackfillDelete => {
+            let key_columns: Vec<&str> = msg.key.split('/').collect();
+            // format is /{BACKFILL_JOBS_KEY}/org/job_id
+            if key_columns.len() != 4 || key_columns[2].is_empty() || key_columns[3].is_empty() {
+                return Err(Error::Message("Invalid key for BackfillDelete".to_string()));
+            }
+            let org = key_columns[2];
+            let job_id = key_columns[3];
+            backfill_jobs::delete(org, job_id).await?;
         }
         _ => {
             log::error!(
