@@ -49,6 +49,18 @@ test.describe("Metrics Visualization and Chart Tests", () => {
     }
     await page.waitForTimeout(500);
 
+    // Select cpu_usage metric from the metrics list/stream selector
+    testLogger.info('Selecting cpu_usage metric from the UI');
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    // Use the POM method to select cpu_usage metric
+    const metricSelected = await pm.metricsPage.selectMetricFromList('cpu_usage');
+    if (metricSelected) {
+      testLogger.info('Successfully selected cpu_usage metric from list/dropdown');
+    } else {
+      testLogger.info('Could not select cpu_usage from UI, will use direct query');
+    }
+
     // Execute initial query to get results
     testLogger.info('Executing initial query with cpu_usage metric');
     await page.evaluate(() => window.scrollTo(0, 0));
