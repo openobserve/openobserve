@@ -159,6 +159,22 @@ export class MetricsPage {
         await expect(icon).toBeVisible();
     }
 
+    async isApplyButtonVisible() {
+        return await this.page.locator(this.applyButton).isVisible().catch(() => false);
+    }
+
+    async isApplyButtonEnabled() {
+        return await this.page.locator(this.applyButton).isEnabled().catch(() => false);
+    }
+
+    async isDatePickerVisible() {
+        return await this.page.locator(this.datePicker).isVisible().catch(() => false);
+    }
+
+    async isSyntaxGuideVisible() {
+        return await this.page.locator(this.syntaxGuideButton).isVisible().catch(() => false);
+    }
+
     async searchInFieldList(searchTerm) {
         await this.page.locator(this.fieldSearchInput).fill(searchTerm);
     }
