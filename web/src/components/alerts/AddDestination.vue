@@ -45,39 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Destination Type Selection for Alerts -->
         <div v-if="isAlerts" class="col-12 q-pb-md">
           <div class="text-subtitle2 q-mb-sm">{{ t('alert_destinations.destination_type') }}</div>
-          <div class="destination-type-grid">
-            <div
-              v-for="destType in destinationTypes"
-              :key="destType.value"
-              :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card"
-              :class="{
-                selected: formData.destination_type === destType.value,
-              }"
-              @click="selectDestinationType(destType.value)"
-            >
-              <div class="destination-type-content">
-                <img
-                  v-if="destType.image && destType.value !== 'custom'"
-                  :src="destType.image"
-                  :alt="destType.label"
-                  class="destination-type-image"
-                />
-                <q-icon
-                  v-else
-                  :name="destType.icon"
-                  size="24px"
-                  class="destination-type-icon"
-                />
-              </div>
-              <div
-                class="destination-type-label"
-                :class="{ active: formData.destination_type === destType.value }"
-              >
-                {{ destType.label }}
-              </div>
-            </div>
-          </div>
+          <PrebuiltDestinationSelector
+            v-model="formData.destination_type"
+            :search-query="destinationSearchQuery"
+            data-test="prebuilt-destination-selector"
+            @select="selectDestinationType"
+            @update:search-query="destinationSearchQuery = $event"
+          />
         </div>
 
         <!-- Prebuilt Destination Form (for alerts only) -->
@@ -90,6 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="prebuilt-form"
             @preview="showPreview"
             @test="handleTestDestination"
+          />
+
+          <!-- Test Result Display -->
+          <DestinationTestResult
+            :result="lastTestResult"
+            :is-loading="isTestInProgress"
+            data-test="prebuilt-test-result"
+            @retry="handleTestDestination"
           />
         </div>
 
@@ -396,6 +378,8 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
+import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
+import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
 
 const props = defineProps({
@@ -458,6 +442,7 @@ const {
 
 // Prebuilt destinations state
 const prebuiltCredentials = ref<Record<string, any>>({});
+const destinationSearchQuery = ref('');
 const showPreviewModal = ref(false);
 const previewContent = ref('');
 
