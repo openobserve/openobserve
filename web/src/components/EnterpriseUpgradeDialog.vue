@@ -136,6 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in coreFeatures"
               :key="feature.name"
               class="feature-list-item"
+              :class="{ 'has-link': feature.link }"
+              @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
                 <q-icon :name="feature.icon" size="15px" />
@@ -143,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
+                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -154,6 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudHidden"
               :key="feature.name"
               class="feature-list-item"
+              :class="{ 'has-link': feature.link }"
+              @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
                 <q-icon :name="feature.icon" size="15px" />
@@ -161,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
+                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -173,6 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in enterpriseFeatures"
               :key="feature.name"
               class="feature-list-item"
+              :class="{ 'has-link': feature.link }"
+              @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
                 <q-icon :name="feature.icon" size="15px" />
@@ -180,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
+                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
                     <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
@@ -206,6 +215,45 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import licenseServer from "@/services/license_server";
+
+// Feature documentation links configuration
+const FEATURE_LINKS = {
+  // Core Features
+  logs_metrics_traces: "https://o2.ws/logs_metrics_traces",
+  rum: "https://o2.ws/rum",
+  alerts: "https://o2.ws/alerts",
+  dashboards: "https://o2.ws/dashboards",
+  reports: "https://o2.ws/reports",
+  vrl_functions: "https://o2.ws/vrl_func",
+  pipelines: "https://o2.ws/pipelines",
+  high_availability: "https://o2.ws/high_avail",
+  multitenancy: "https://o2.ws/multitenancy",
+  dynamic_schema: "https://o2.ws/dynamic_schema",
+  multilingual_gui: "https://o2.ws/multilang_gui",
+
+  // Enterprise Features
+  single_sign_on: "https://o2.ws/sso",
+  rbac: "https://o2.ws/rbac",
+  federated_search: "https://o2.ws/fed_search",
+  query_management: "https://o2.ws/query_mgmt",
+  workload_management: "https://o2.ws/workload_mgmt",
+  audit_trail: "https://o2.ws/audit_trail",
+  action_scripts: "https://o2.ws/action_scripts",
+  sensitive_data_redaction: "https://o2.ws/data_redact",
+  pipeline_remote_destinations: "https://o2.ws/pipeline_remote",
+  query_optimizer: "https://o2.ws/query_opt",
+  incident_management: "https://o2.ws/incident_mgmt",
+  sre_agent: "https://o2.ws/sre_agent",
+  ai_assistant: "https://o2.ws/ai_assistant",
+  anomaly_detection: "https://o2.ws/anomaly_detect",
+  metrics_auto_downsampling: "https://o2.ws/metrics_downsample",
+  log_patterns: "https://o2.ws/log_patterns",
+  mcp_server: "https://o2.ws/mcp_server",
+  rate_limiting: "https://o2.ws/rate_limit",
+  broadcast_join: "https://o2.ws/broadcast_join",
+  logs_metrics_traces_correlation: "https://o2.ws/telemetry_corr",
+  service_maps: "https://o2.ws/service_maps",
+};
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
@@ -350,56 +398,67 @@ export default defineComponent({
         name: t("about.enterprise_offer.core_features.logs_metrics_traces.name"),
         note: t("about.enterprise_offer.core_features.logs_metrics_traces.note"),
         icon: "storage",
+        link: FEATURE_LINKS.logs_metrics_traces,
       },
       {
         name: t("about.enterprise_offer.core_features.rum.name"),
         note: t("about.enterprise_offer.core_features.rum.note"),
         icon: "visibility",
+        link: FEATURE_LINKS.rum,
       },
       {
         name: t("about.enterprise_offer.core_features.alerts.name"),
         note: t("about.enterprise_offer.core_features.alerts.note"),
         icon: "notifications_active",
+        link: FEATURE_LINKS.alerts,
       },
       {
         name: t("about.enterprise_offer.core_features.dashboards.name"),
         note: t("about.enterprise_offer.core_features.dashboards.note"),
         icon: "dashboard",
+        link: FEATURE_LINKS.dashboards,
       },
       {
         name: t("about.enterprise_offer.core_features.reports.name"),
         note: t("about.enterprise_offer.core_features.reports.note"),
         icon: "description",
+        link: FEATURE_LINKS.reports,
       },
       {
         name: t("about.enterprise_offer.core_features.vrl_functions.name"),
         note: t("about.enterprise_offer.core_features.vrl_functions.note"),
         icon: "functions",
+        link: FEATURE_LINKS.vrl_functions,
       },
       {
         name: t("about.enterprise_offer.core_features.pipelines.name"),
         note: t("about.enterprise_offer.core_features.pipelines.note"),
         icon: "account_tree",
+        link: FEATURE_LINKS.pipelines,
       },
       {
         name: t("about.enterprise_offer.core_features.high_availability.name"),
         note: t("about.enterprise_offer.core_features.high_availability.note"),
         icon: "cloud_done",
+        link: FEATURE_LINKS.high_availability,
       },
       {
         name: t("about.enterprise_offer.core_features.multitenancy.name"),
         note: t("about.enterprise_offer.core_features.multitenancy.note"),
         icon: "corporate_fare",
+        link: FEATURE_LINKS.multitenancy,
       },
       {
         name: t("about.enterprise_offer.core_features.dynamic_schema.name"),
         note: t("about.enterprise_offer.core_features.dynamic_schema.note"),
         icon: "schema",
+        link: FEATURE_LINKS.dynamic_schema,
       },
       {
         name: t("about.enterprise_offer.core_features.multilingual_gui.name"),
         note: t("about.enterprise_offer.core_features.multilingual_gui.note"),
         icon: "language",
+        link: FEATURE_LINKS.multilingual_gui,
       },
     ];
 
@@ -410,36 +469,42 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
         icon: "key",
         requiresHA: true,
+        link: FEATURE_LINKS.single_sign_on,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.rbac.name"),
         note: t("about.enterprise_offer.enterprise_features.rbac.note"),
         icon: "admin_panel_settings",
         requiresHA: true,
+        link: FEATURE_LINKS.rbac,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.federated_search.name"),
         note: t("about.enterprise_offer.enterprise_features.federated_search.note"),
         icon: "hub",
         requiresHA: true,
+        link: FEATURE_LINKS.federated_search,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.query_management.name"),
         note: t("about.enterprise_offer.enterprise_features.query_management.note"),
         icon: "insights",
         requiresHA: false,
+        link: FEATURE_LINKS.query_management,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.workload_management.name"),
         note: t("about.enterprise_offer.enterprise_features.workload_management.note"),
         icon: "speed",
         requiresHA: false,
+        link: FEATURE_LINKS.workload_management,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
         note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
         icon: "fact_check",
         requiresHA: false,
+        link: FEATURE_LINKS.audit_trail,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.action_scripts.name"),
@@ -447,90 +512,105 @@ export default defineComponent({
         icon: "code",
         requiresHA: true,
         cloudHidden: true, // Hide from Cloud layout
+        link: FEATURE_LINKS.action_scripts,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
         note: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.note"),
         icon: "shield",
         requiresHA: false,
+        link: FEATURE_LINKS.sensitive_data_redaction,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
         note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
         icon: "alt_route",
         requiresHA: false,
+        link: FEATURE_LINKS.pipeline_remote_destinations,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.query_optimizer.name"),
         note: t("about.enterprise_offer.enterprise_features.query_optimizer.note"),
         icon: "memory",
         requiresHA: false,
+        link: FEATURE_LINKS.query_optimizer,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.incident_management.name"),
         note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
         icon: "emergency",
         requiresHA: true,
+        link: FEATURE_LINKS.incident_management,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
         icon: "smart_toy",
         requiresHA: true,
+        link: FEATURE_LINKS.sre_agent,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.ai_assistant.name"),
         note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
         icon: "psychology",
         requiresHA: true,
+        link: FEATURE_LINKS.ai_assistant,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
         icon: "query_stats",
         requiresHA: false,
+        link: FEATURE_LINKS.anomaly_detection,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.name"),
         note: t("about.enterprise_offer.enterprise_features.metrics_auto_downsampling.note"),
         icon: "compress",
         requiresHA: false,
+        link: FEATURE_LINKS.metrics_auto_downsampling,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.log_patterns.name"),
         note: t("about.enterprise_offer.enterprise_features.log_patterns.note"),
         icon: "pattern",
         requiresHA: false,
+        link: FEATURE_LINKS.log_patterns,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.mcp_server.name"),
         note: t("about.enterprise_offer.enterprise_features.mcp_server.note"),
         icon: "dns",
         requiresHA: true,
+        link: FEATURE_LINKS.mcp_server,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.rate_limiting.name"),
         note: t("about.enterprise_offer.enterprise_features.rate_limiting.note"),
         icon: "speed",
         requiresHA: false,
+        link: FEATURE_LINKS.rate_limiting,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
         note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
         icon: "call_merge",
         requiresHA: true,
+        link: FEATURE_LINKS.broadcast_join,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
         note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
         icon: "auto_graph",
         requiresHA: false,
+        link: FEATURE_LINKS.logs_metrics_traces_correlation,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
         note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
         icon: "account_tree",
         requiresHA: false,
+        link: FEATURE_LINKS.service_maps,
       },
     ];
 
@@ -563,6 +643,10 @@ export default defineComponent({
 
     const contactSales = () => {
       window.open(siteURL.contactSales, "_blank");
+    };
+
+    const openFeatureLink = (url: string) => {
+      window.open(url, "_blank");
     };
 
     const navigateToLicense = () => {
@@ -656,6 +740,7 @@ export default defineComponent({
       openDownloadPage,
       openDocsLink,
       contactSales,
+      openFeatureLink,
       navigateToLicense,
       handlePrimaryButtonClick,
       getProgressColor,
@@ -953,6 +1038,20 @@ export default defineComponent({
       border-color: rgba(0, 0, 0, 0.12);
     }
 
+    &.has-link {
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(var(--q-primary-rgb), 0.05);
+        border-color: rgba(var(--q-primary-rgb), 0.3);
+        transform: translateX(2px);
+      }
+
+      &:active {
+        transform: translateX(0);
+      }
+    }
+
     .feature-icon-badge {
       flex-shrink: 0;
       width: 30px;
@@ -985,6 +1084,12 @@ export default defineComponent({
       gap: 6px;
     }
 
+    .external-link-icon {
+      opacity: 0.6;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
     .ha-badge {
       display: inline-flex;
       align-items: center;
@@ -997,6 +1102,7 @@ export default defineComponent({
       letter-spacing: 0.5px;
       line-height: 1;
       cursor: pointer;
+      margin-left: 4px;
     }
 
     .feature-desc {
@@ -1038,6 +1144,13 @@ body.body--dark {
 
       &:hover {
         background: rgba(255, 255, 255, 0.05);
+      }
+
+      &.has-link {
+        &:hover {
+          background: rgba(var(--q-primary-rgb), 0.1);
+          border-color: rgba(var(--q-primary-rgb), 0.4);
+        }
       }
 
       .feature-icon-badge {
