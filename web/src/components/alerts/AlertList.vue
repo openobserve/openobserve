@@ -647,13 +647,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="info" size="24px" class="tw:mr-2" />
             <h6 class="tw:text-lg tw:font-semibold tw:m-0">{{ t('alert_list.alert_details') }}</h6>
           </div>
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="showAlertDetailsDrawer = false"
-          />
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-btn
+              flat
+              round
+              dense
+              icon="edit"
+              @click="editAlertFromDrawer"
+              data-test="alert-details-drawer-edit-btn"
+            >
+              <q-tooltip>{{ t('alerts.edit') }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              round
+              dense
+              icon="close"
+              @click="showAlertDetailsDrawer = false"
+            />
+          </div>
         </div>
 
         <!-- Drawer Content -->
@@ -2224,6 +2236,17 @@ export default defineComponent({
       showAddUpdateFn({ row: selectedAlert });
     };
 
+    const editAlertFromDrawer = async () => {
+      if (!selectedAlertDetails.value) return;
+
+      // Close the drawer first
+      showAlertDetailsDrawer.value = false;
+
+      // Get the full alert data and open the edit form
+      const selectedAlert = await getAlertById(selectedAlertDetails.value.alert_id);
+      showAddUpdateFn({ row: selectedAlert });
+    };
+
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
       selectedAlertToMove.value = [row.alert_id];
@@ -2742,6 +2765,7 @@ export default defineComponent({
       updateActiveFolderId,
       activeFolderId,
       editAlert,
+      editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
       outlinedDriveFileMove,

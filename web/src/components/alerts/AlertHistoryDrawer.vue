@@ -43,14 +43,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
-          @click="close"
-          data-test="alert-history-drawer-close-btn"
-        />
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <q-btn
+            icon="edit"
+            flat
+            round
+            dense
+            @click="editAlert"
+            data-test="alert-history-drawer-edit-btn"
+          >
+            <q-tooltip>{{ t("alerts.edit") }}</q-tooltip>
+          </q-btn>
+          <q-btn
+            icon="close"
+            flat
+            round
+            dense
+            @click="close"
+            data-test="alert-history-drawer-close-btn"
+          >
+            <q-tooltip>{{ t("common.close") }}</q-tooltip>
+          </q-btn>
+        </div>
       </div>
 
       <!-- Stats Summary -->
@@ -168,12 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
 import { date } from "quasar";
 
 const { t } = useI18n();
 const store = useStore();
+const router = useRouter();
 
 interface AlertHistoryItem {
   timestamp: number;
@@ -373,6 +389,23 @@ const loadMore = () => {
 
 const close = () => {
   isOpen.value = false;
+};
+
+const editAlert = () => {
+  // Close the drawer
+  close();
+
+  // Navigate to the alert list with edit mode
+  router.push({
+    name: "alertList",
+    query: {
+      action: "update",
+      alert_id: props.alertId,
+      name: props.alertName,
+      org_identifier: store.state.selectedOrganization.identifier,
+      folder: "default", // TODO: Pass actual folder if available in props
+    },
+  });
 };
 
 // Watch for drawer opening

@@ -26,7 +26,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="togglePreview"
       >
-        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+          <!-- Status Indicator -->
+          <div
+            v-if="evaluationStatus"
+            class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded"
+            :class="{
+              'status-would-trigger': evaluationStatus.wouldTrigger,
+              'status-would-not-trigger': !evaluationStatus.wouldTrigger,
+              'status-indicator-light': store.state.theme !== 'dark'
+            }"
+            data-test="alert-status-indicator"
+          >
+            <q-icon
+              :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+              class="tw:text-xs"
+              :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
+            />
+            <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase">
+              {{ evaluationStatus.wouldTrigger ? 'WOULD TRIGGER' : 'WOULD NOT TRIGGER' }}
+            </span>
+            <span class="status-separator tw:text-xs">•</span>
+            <span class="tw:text-xs">
+              {{ evaluationStatus.reason }}
+            </span>
+          </div>
+        </div>
         <q-btn
           flat
           dense
@@ -142,6 +168,18 @@ export default defineComponent({
     const { t } = useI18n();
     const previewAlertRef = ref(null);
 
+    // Reactive ref for evaluation status
+    const evaluationStatus = ref(null);
+
+    // Watch the child component's evaluation status
+    watch(
+      () => previewAlertRef.value?.evaluationStatus,
+      (newStatus) => {
+        evaluationStatus.value = newStatus;
+      },
+      { deep: true, immediate: true }
+    );
+
     // Load saved state from localStorage or use defaults
     const loadExpandState = () => {
       try {
@@ -230,6 +268,7 @@ export default defineComponent({
       toggleSummary,
       previewSectionStyle,
       summarySectionStyle,
+      evaluationStatus,
     };
   },
 });
@@ -278,5 +317,41 @@ export default defineComponent({
       opacity: 1;
     }
   }
+}
+
+/* Status Indicator Styles */
+.alert-status-indicator {
+  border-left: 0.1875rem solid;
+  background: rgba(76, 175, 80, 0.08);
+  border-left-color: #4caf50;
+}
+
+.alert-status-indicator.status-would-not-trigger {
+  background: rgba(158, 158, 158, 0.08);
+  border-left-color: #9e9e9e;
+}
+
+.alert-status-indicator.status-indicator-light {
+  background: rgba(76, 175, 80, 0.04);
+}
+
+.alert-status-indicator.status-would-not-trigger.status-indicator-light {
+  background: rgba(158, 158, 158, 0.04);
+}
+
+.alert-status-indicator .status-separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.alert-status-indicator.status-indicator-light .status-separator {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.alert-status-indicator span:last-child {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.alert-status-indicator.status-indicator-light span:last-child {
+  color: rgba(0, 0, 0, 0.6);
 }
 </style>

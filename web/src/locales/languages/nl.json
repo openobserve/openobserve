@@ -1607,6 +1607,29 @@
       "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
       "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
       "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
+    },
+    "saveAlert": "Waarschuwing opslaan",
+    "thresholdDynamic": {
+      "alertMeWhen": "Waarschuw me wanneer",
+      "metricTypes": {
+        "resultsPassedFilter": "resultaten geslaagd: filters",
+        "distinctGroupsAffected": "verschillende groepen worden getroffen",
+        "metricsMatchCriteria": "statistieken komen overeen met criteria",
+        "matchingLogsFound": "overeenkomende logboeken gevonden",
+        "groupsPassFilter": "groepen voldoen aan filtercriteria",
+        "distinctGroups": "verschillende groepen gevonden",
+        "resultRows": "resultaatrijen geretourneerd",
+        "timeSeries": "actieve tijdreeksen gevonden",
+        "matchingRecords": "overeenkomende records gevonden",
+        "groupsWithHaving": "wedstrijdvoorwaarden voor groepen",
+        "uniqueGroups": "unieke groepen",
+        "events": "wedstrijdvoorwaarden voor evenementen",
+        "aggregatedValue": "wedstrijdvoorwaarden"
+      },
+      "contextLabels": {
+        "groupedBy": "Gegroepeerd op:",
+        "havingConditions": "De voorwaarden met betrekking tot:"
+      }
     }
   },
   "alert_templates": {

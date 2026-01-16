@@ -1617,6 +1617,29 @@
       "alertSettings": "アラートルールを設定し、通知方法を選択します。",
       "deduplication": "類似のアラートをグループ化して、同じアラートを複数回送信しないようにします。",
       "advanced": "コンテキスト変数、説明、行テンプレート"
+    },
+    "saveAlert": "アラートを保存",
+    "thresholdDynamic": {
+      "alertMeWhen": "次の場合に通知する",
+      "metricTypes": {
+        "resultsPassedFilter": "フィルターを通過した結果",
+        "distinctGroupsAffected": "個別のグループが影響を受ける",
+        "metricsMatchCriteria": "メトリックス一致基準",
+        "matchingLogsFound": "一致するログが見つかりました",
+        "groupsPassFilter": "グループはフィルター条件に合格します",
+        "distinctGroups": "異なるグループが見つかりました",
+        "resultRows": "結果行が返されました",
+        "timeSeries": "アクティブな時系列が見つかりました",
+        "matchingRecords": "一致するレコードが見つかりました",
+        "groupsWithHaving": "グループ一致条件",
+        "uniqueGroups": "ユニークグループ",
+        "events": "イベント一致条件",
+        "aggregatedValue": "マッチ条件"
+      },
+      "contextLabels": {
+        "groupedBy": "グループ化:",
+        "havingConditions": "条件がある:"
+      }
     }
   },
   "alert_templates": {

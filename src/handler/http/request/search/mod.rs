@@ -1976,6 +1976,7 @@ pub async fn result_schema(
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
+        having: res_schema.having,
         timeseries_field: res_schema.timeseries,
     })
     .into_response()

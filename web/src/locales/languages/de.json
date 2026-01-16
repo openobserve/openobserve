@@ -1607,6 +1607,29 @@
       "alertSettings": "Lege deine Alarmregeln fest und wähle aus, wie du benachrichtigt werden möchtest.",
       "deduplication": "Vermeiden Sie es, dieselbe Warnung mehrmals zu senden, indem Sie ähnliche Warnungen zu Gruppen zusammenfassen.",
       "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
+    },
+    "saveAlert": "Warnung speichern",
+    "thresholdDynamic": {
+      "alertMeWhen": "Informiere mich, wenn",
+      "metricTypes": {
+        "resultsPassedFilter": "Ergebnisse haben Filter bestanden",
+        "distinctGroupsAffected": "verschiedene Gruppen sind betroffen",
+        "metricsMatchCriteria": "Metriken entsprechen den Kriterien",
+        "matchingLogsFound": "passende Logs gefunden",
+        "groupsPassFilter": "Gruppen erfüllen die Filterkriterien",
+        "distinctGroups": "verschiedene Gruppen gefunden",
+        "resultRows": "Ergebniszeilen zurückgegeben",
+        "timeSeries": "aktive Zeitreihe gefunden",
+        "matchingRecords": "passende Datensätze gefunden",
+        "groupsWithHaving": "Spielbedingungen für Gruppen",
+        "uniqueGroups": "einzigartige Gruppen",
+        "events": "Ereignisse entsprechen den Bedingungen",
+        "aggregatedValue": "Spielbedingungen"
+      },
+      "contextLabels": {
+        "groupedBy": "Gruppiert nach:",
+        "havingConditions": "UNTER FOLGENDEN BEDINGUNGEN:"
+      }
     }
   },
   "alert_templates": {

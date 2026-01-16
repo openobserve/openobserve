@@ -1514,6 +1514,7 @@
     "move": "Move alert",
     "name": "Name",
     "save": "Save",
+    "saveAlert": "Save Alert",
     "actions": "Actions",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -1539,7 +1540,29 @@
     "trigger": "Trigger",
     "period": "Look back window",
     "frequency": "Check every",
-    "threshold": "Alert when count is",
+    "threshold": "Alert when ",
+    "thresholdDynamic": {
+      "alertMeWhen": "Alert me when",
+      "metricTypes": {
+        "resultsPassedFilter": "results passed filters",
+        "distinctGroupsAffected": "distinct groups are affected",
+        "metricsMatchCriteria": "metrics match criteria",
+        "matchingLogsFound": "matching logs found",
+        "groupsPassFilter": "groups pass filter criteria",
+        "distinctGroups": "distinct groups found",
+        "resultRows": "result rows returned",
+        "timeSeries": "active time series found",
+        "matchingRecords": "matching records found",
+        "groupsWithHaving": "groups match conditions",
+        "uniqueGroups": "unique groups",
+        "events": "events match conditions",
+        "aggregatedValue": "match conditions"
+      },
+      "contextLabels": {
+        "groupedBy": "Grouped by:",
+        "havingConditions": "HAVING conditions:"
+      }
+    },
     "interval": "Check every",
     "silenceNotification": "Cooldown period",
     "multiWindow": "Compare with past",
