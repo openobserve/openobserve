@@ -814,8 +814,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async fillUrlInput(url) {
         testLogger.debug(`Filling URL input: ${url}`);
 
-        // Wait for URL input to be visible - use aria-label for specificity
-        const urlInput = this.page.getByRole('textbox', { name: 'CSV File URL' });
+        // Wait for URL input to be visible - use label locator for specificity to avoid AI assistant conflict
+        const urlInput = this.page.locator('label:has-text("CSV File URL")').locator('..').locator('input[aria-label="CSV File URL"]');
 
         await urlInput.waitFor({ state: 'visible', timeout: 10000 });
         await urlInput.fill(url);
