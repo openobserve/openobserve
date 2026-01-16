@@ -38,6 +38,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     cache::{self, file_data::disk::FileType},
+    cluster::*,
     file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST},
 };
@@ -200,7 +201,7 @@ pub async fn healthz_head() -> Result<HttpResponse, Error> {
 #[get("/schedulez")]
 pub async fn schedulez() -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE.uuid.clone();
-    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
+    let Some(node) = get_node_by_uuid(&node_id).await else {
         return Ok(HttpResponse::NotFound().json(HealthzResponse {
             status: "not ok".to_string(),
         }));
@@ -849,7 +850,7 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
 #[put("/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE.uuid.clone();
-    let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
+    let Some(mut node) = get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
@@ -886,7 +887,7 @@ async fn flush_node() -> Result<HttpResponse, Error> {
 
 #[get("/list")]
 async fn list_node() -> Result<HttpResponse, Error> {
-    let nodes = cluster::get_cached_nodes(|_| true).await;
+    let nodes = get_cached_nodes(|_| true).await;
     Ok(MetaHttpResponse::json(nodes))
 }
 
@@ -903,23 +904,15 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
         let mut nodes = HashMap::new();
         nodes.insert(
             "querier_interactive".to_string(),
-            cluster::get_node_from_consistent_hash(
-                file,
-                &Role::Querier,
-                Some(RoleGroup::Interactive),
-            )
-            .await
-            .unwrap_or_default(),
+            get_node_from_consistent_hash(file, &Role::Querier, Some(RoleGroup::Interactive))
+                .await
+                .unwrap_or_default(),
         );
         nodes.insert(
             "querier_background".to_string(),
-            cluster::get_node_from_consistent_hash(
-                file,
-                &Role::Querier,
-                Some(RoleGroup::Background),
-            )
-            .await
-            .unwrap_or_default(),
+            get_node_from_consistent_hash(file, &Role::Querier, Some(RoleGroup::Background))
+                .await
+                .unwrap_or_default(),
         );
         ret.files.insert(file.clone(), nodes);
     }
@@ -928,7 +921,7 @@ async fn consistent_hash(body: web::Json<HashFileRequest>) -> Result<HttpRespons
 
 #[get("/refresh_nodes_list")]
 async fn refresh_nodes_list() -> Result<HttpResponse, Error> {
-    match cluster::cache_node_list().await {
+    match cache_node_list().await {
         Ok(node_ids) => Ok(MetaHttpResponse::json(node_ids)),
         Err(e) => {
             log::error!("[CLUSTER] refresh_node_list failed: {}", e);

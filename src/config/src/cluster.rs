@@ -30,7 +30,7 @@ pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
-pub fn load_local_node() -> Node {
+fn load_local_node() -> Node {
     let cfg = get_config();
     Node {
         id: 1,

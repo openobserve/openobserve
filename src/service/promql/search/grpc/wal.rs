@@ -30,25 +30,23 @@ use datafusion::{
     physical_plan::visit_execution_plan,
     prelude::{SessionContext, col, lit},
 };
+use infra::cluster::get_cached_online_ingester_nodes;
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster::get_cached_online_ingester_nodes,
-    service::{
-        promql::utils::{apply_label_selector, apply_matchers},
-        search::{
-            datafusion::{
-                distributed_plan::{
-                    node::{RemoteScanNode, SearchInfos},
-                    remote_scan::RemoteScanExec,
-                },
-                exec::prepare_datafusion_context,
-                table_provider::empty_table::NewEmptyTable,
+use crate::service::{
+    promql::utils::{apply_label_selector, apply_matchers},
+    search::{
+        datafusion::{
+            distributed_plan::{
+                node::{RemoteScanNode, SearchInfos},
+                remote_scan::RemoteScanExec,
             },
-            utils::ScanStatsVisitor,
+            exec::prepare_datafusion_context,
+            table_provider::empty_table::NewEmptyTable,
         },
+        utils::ScanStatsVisitor,
     },
 };
 

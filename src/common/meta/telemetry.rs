@@ -22,10 +22,17 @@ use config::{
     utils::{json, sysinfo},
 };
 use hashbrown::HashSet;
-use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
+use infra::{
+    cache::stats,
+    cluster::{
+        get_cached_online_ingester_nodes, get_cached_online_nodes, get_cached_online_querier_nodes,
+    },
+    db as infra_db,
+    schema::STREAM_SCHEMAS_LATEST,
+};
 use segment::{Client, Message, message::Track};
 
-use crate::common::infra::{cluster::get_cached_online_nodes, config::*};
+use crate::common::infra::config::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -175,7 +182,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
                 data.insert(
                     "querier_nodes".to_string(),
-                    crate::common::infra::cluster::get_cached_online_querier_nodes(None)
+                    get_cached_online_querier_nodes(None)
                         .await
                         .unwrap_or_default()
                         .len()
@@ -183,7 +190,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
                 );
                 data.insert(
                     "ingester_nodes".to_string(),
-                    crate::common::infra::cluster::get_cached_online_ingester_nodes()
+                    get_cached_online_ingester_nodes()
                         .await
                         .unwrap_or_default()
                         .len()

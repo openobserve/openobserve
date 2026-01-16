@@ -825,13 +825,33 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc(cfg.disk_cache.gc_size).await?;
         drop(w);
     }
-
+    
     let scale_factor = std::cmp::max(1, cfg.disk_cache.max_size / cfg.disk_cache.result_max_size);
     let release_size = std::cmp::max(
         10 * config::SIZE_IN_MB as usize,
         cfg.disk_cache.release_size / scale_factor,
     );
     for file in RESULT_FILES.iter() {
+        let r = file.read().await;
+        if r.cur_size + release_size < r.max_size {
+            drop(r);
+            continue;
+        }
+        drop(r);
+        let mut w = file.write().await;
+        w.gc(cfg.disk_cache.gc_size).await?;
+        drop(w);
+    }
+
+    let scale_factor = std::cmp::max(
+        1,
+        cfg.disk_cache.max_size / cfg.disk_cache.aggregation_max_size,
+    );
+    let release_size = std::cmp::max(
+        10 * config::SIZE_IN_MB as usize,
+        cfg.disk_cache.release_size / scale_factor,
+    );
+    for file in AGGREGATION_FILES.iter() {
         let r = file.read().await;
         if r.cur_size + release_size < r.max_size {
             drop(r);

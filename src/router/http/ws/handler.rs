@@ -712,9 +712,7 @@ pub async fn get_querier_connection(
 }
 
 async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResult<QuerierName> {
-    use crate::common::infra::cluster;
-
-    let node = cluster::get_node_from_consistent_hash(
+    let node = infra::cluster::get_node_from_consistent_hash(
         trace_id,
         &config::meta::cluster::Role::Querier,
         role_group,

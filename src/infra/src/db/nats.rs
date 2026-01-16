@@ -189,7 +189,19 @@ impl NatsDb {
                                     break;
                                 }
                             };
-                            let item_key = key_decode(&entry.key);
+                            let item_key = match key_decode(&entry.key) {
+                                Ok(key) => key,
+                                Err(e) => {
+                                    log::error!(
+                                        "[NATS:kv_watch] Skipping invalid key - bucket: {}, prefix: {}, entry.key: '{}', error: {}",
+                                        bucket.name,
+                                        prefix,
+                                        entry.key,
+                                        e
+                                    );
+                                    continue;
+                                }
+                            };
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -626,7 +638,20 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
             .last()
             .unwrap()
             .to_string();
-        let key = key_decode(&key);
+        let key = match key_decode(&key) {
+            Ok(decoded_key) => decoded_key,
+            Err(e) => {
+                log::error!(
+                    "[NATS:keys] Skipping invalid key - bucket: {}, prefix: {}, key: '{}', subject: '{}', error: {}",
+                    kv.name,
+                    prefix,
+                    key,
+                    message.subject,
+                    e
+                );
+                continue;
+            }
+        };
         if key.starts_with(prefix) {
             keys.push(key);
         }
@@ -892,8 +917,18 @@ fn key_encode(key: &str) -> String {
 }
 
 #[inline]
-fn key_decode(key: &str) -> String {
-    base64::decode(&key.replace('-', "+").replace('_', "/")).unwrap()
+fn key_decode(key: &str) -> Result<String> {
+    let normalized = key.replace('-', "+").replace('_', "/");
+    base64::decode(&normalized).map_err(|e| {
+        log::error!(
+            "[NATS] key_decode failed - original_key: '{}', normalized: '{}', key_length: {}, error: {}",
+            key,
+            normalized,
+            key.len(),
+            e
+        );
+        Error::from(e)
+    })
 }
 
 #[inline]

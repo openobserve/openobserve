@@ -76,12 +76,9 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{
-        infra::cluster as infra_cluster,
-        utils::{
-            functions::{get_all_transform_keys, init_vrl_runtime},
-            stream::get_settings_max_query_range,
-        },
+    common::utils::{
+        functions::{get_all_transform_keys, init_vrl_runtime},
+        stream::get_settings_max_query_range,
     },
     handler::grpc::request::search::Searcher,
     service::search::{
@@ -805,7 +802,7 @@ pub async fn search_partition(
     };
 
     log::info!("[trace_id {trace_id}] search_partition: getting nodes");
-    let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let nodes = infra::cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
@@ -1112,7 +1109,7 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra::cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("query_status: no querier node online");
@@ -1246,7 +1243,7 @@ pub async fn cancel_query(
     trace_id: &str,
 ) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra::cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
             log::error!("cancel_query: no querier node online");

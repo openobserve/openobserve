@@ -22,8 +22,6 @@ use proto::cluster_rpc::{
 };
 use tonic::{Request, Response, Status};
 
-use crate::common::infra::cluster;
-
 pub struct NodeService;
 
 // Convert from ConfigNode to proto Node
@@ -158,7 +156,7 @@ impl proto::cluster_rpc::node_service_server::NodeService for NodeService {
         _request: Request<EmptyRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
         // Get all nodes from cache
-        let nodes = cluster::get_cached_nodes(|_| true)
+        let nodes = infra::cluster::get_cached_nodes(|_| true)
             .await
             .unwrap_or_default();
 
