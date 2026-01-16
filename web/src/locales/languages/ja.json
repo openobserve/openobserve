@@ -476,7 +476,185 @@
     "value_cost_free": "無料",
     "value_cost_enterprise": "セルフホストの場合、1日あたり最大200 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
     "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。",
-    "feature_comparison_lbl": "機能比較"
+    "feature_comparison_lbl": "機能比較",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "エンタープライズ機能",
+        "offer_text": "OpenObserveをセルフホストすると、すべてのエンタープライズ機能を完全に無料で利用できます",
+        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "features_title": "OpenObserve クラウドの機能",
+        "features_subtitle": "クラウドサブスクリプションに含まれるすべての機能",
+        "primary_button_text": "今すぐダウンロード"
+      },
+      "enterprise_without_license": {
+        "hero_title": "エンタープライズ機能",
+        "offer_text": "OpenObserveの導入を最大限に活用するための無料ライセンスをリクエストしてください",
+        "badge_text": "1 日あたり最大 {quota} GB まで無料",
+        "features_title": "利用可能なエンタープライズ機能",
+        "features_subtitle": "無償ライセンスを取得して、無限の機能をアンロックしましょう",
+        "primary_button_text": "無料ライセンスを取得",
+        "license_note": "100 GB/日 (ライセンスなし) • 200 GB/日 (ライセンス契約の場合)"
+      },
+      "enterprise_with_license": {
+        "hero_title": "あなたのエンタープライズエディション",
+        "offer_text": "すべての機能が有効になっている状態でOpenObserveエンタープライズを実行している",
+        "badge_text_unlimited": "取り込み制限:無制限",
+        "badge_text_limited": "インジェスト上限:{limit} GB/日",
+        "features_title": "アクティブなエンタープライズ機能",
+        "features_subtitle": "すべての機能がロック解除され、すぐに使用できます",
+        "primary_button_text": "ライセンスを管理"
+      },
+      "open_source": {
+        "hero_title": "エンタープライズエディションを入手",
+        "offer_text": "すべてのエンタープライズ機能を完全無料でダウンロードしてロック解除",
+        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "features_title": "すべてのエンタープライズ機能をロック解除",
+        "features_subtitle": "本番環境に対応したオブザーバビリティに必要なものすべて",
+        "primary_button_text": "今すぐダウンロード"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "ログ、メトリックス、トレース",
+          "note": "完全なオブザーバビリティデータの取り込みと分析"
+        },
+        "rum": {
+          "name": "ラム酒",
+          "note": "フロントエンドパフォーマンスのためのリアルユーザーモニタリング"
+        },
+        "alerts": {
+          "name": "アラート",
+          "note": "リアルタイムのアラートと通知"
+        },
+        "dashboards": {
+          "name": "ダッシュボード",
+          "note": "カスタマイズ可能な視覚化ダッシュボード"
+        },
+        "reports": {
+          "name": "レポート",
+          "note": "定期レポートとオンデマンドレポート"
+        },
+        "vrl_functions": {
+          "name": "VRL ファンクション",
+          "note": "データ変換用のベクターリマップ言語"
+        },
+        "pipelines": {
+          "name": "パイプライン",
+          "note": "データ処理と変換パイプライン"
+        },
+        "high_availability": {
+          "name": "高可用性",
+          "note": "信頼性を高める分散アーキテクチャ"
+        },
+        "multitenancy": {
+          "name": "マルチテナンシー",
+          "note": "組織ベースのデータ分離"
+        },
+        "dynamic_schema": {
+          "name": "ダイナミックスキーマ",
+          "note": "スキーマの自動検出と進化"
+        },
+        "multilingual_gui": {
+          "name": "マルチ言語 GUI",
+          "note": "高度な国際化サポート"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "シングル・サインオン",
+          "note": "SSO プロバイダーとのシームレスな認証"
+        },
+        "rbac": {
+          "name": "ロールベースのアクセス制御",
+          "note": "きめ細かな権限とユーザー管理"
+        },
+        "federated_search": {
+          "name": "フェデレーテッドサーチ/スーパークラスター",
+          "note": "複数のクラスターにクエリを分散する"
+        },
+        "query_management": {
+          "name": "クエリー管理",
+          "note": "高度なクエリの監視と最適化"
+        },
+        "workload_management": {
+          "name": "ワークロード管理",
+          "note": "優先度ベースのリソース割り当てと QoS"
+        },
+        "audit_trail": {
+          "name": "オーディットトレイル",
+          "note": "コンプライアンスのための完全なアクティビティロギング"
+        },
+        "action_scripts": {
+          "name": "アクションスクリプト",
+          "note": "イベントやアラートへの対応を自動化する"
+        },
+        "sensitive_data_redaction": {
+          "name": "機密データの編集",
+          "note": "PII と機密情報の保護"
+        },
+        "pipeline_remote_destinations": {
+          "name": "パイプラインのリモート送信先",
+          "note": "リモート宛先へのデータ送信"
+        },
+        "query_optimizer": {
+          "name": "クエリー・オプティマイザー/アグリゲーション・キャッシュ",
+          "note": "TopK アグリゲーションとクエリの最適化"
+        },
+        "incident_management": {
+          "name": "インシデント管理",
+          "note": "インシデントの効率的な追跡と管理"
+        },
+        "sre_agent": {
+          "name": "SRE エージェント",
+          "note": "自動化されたSRE運用と洞察"
+        },
+        "ai_assistant": {
+          "name": "AI アシスタント",
+          "note": "インテリジェントなクエリと分析の支援"
+        },
+        "anomaly_detection": {
+          "name": "異常検知",
+          "note": "データ内の異常を自動的に検出"
+        },
+        "metrics_auto_downsampling": {
+          "name": "メトリクスの自動ダウンサンプリング",
+          "note": "経時的な指標の自動集計"
+        },
+        "log_patterns": {
+          "name": "ログパターン",
+          "note": "ログデータのパターンを発見"
+        },
+        "mcp_server": {
+          "name": "MCP サーバー",
+          "note": "モデルコンテキストプロトコルサーバー統合"
+        },
+        "rate_limiting": {
+          "name": "レート制限",
+          "note": "クエリレートとインジェストレートの制御"
+        },
+        "broadcast_join": {
+          "name": "ブロードキャスト・ジョイン",
+          "note": "最適化された分散結合操作"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "ログ、指標、トレースの相関関係",
+          "note": "自動検出および関連づけ"
+        },
+        "service_maps": {
+          "name": "サービスマップ",
+          "note": "サービスの依存関係を視覚化"
+        }
+      },
+      "buttons": {
+        "contact_sales": "セールスに問い合わせる",
+        "learn_more": "さらに詳しく"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "高可用性モードのみ"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "ライセンスを管理する権限がありません。"
+      }
+    }
   },
   "login": {
     "userid": "ユーザーID",
