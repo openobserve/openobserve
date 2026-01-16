@@ -45,6 +45,7 @@ const useEnvRoutes = () => {
           // Save token for after login - Login.vue will check this
           sessionStorage.setItem("azure_marketplace_token", token);
         }
+        next();
       },
     },
   ];
