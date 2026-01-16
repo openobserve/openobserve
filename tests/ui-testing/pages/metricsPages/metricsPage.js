@@ -552,56 +552,6 @@ export class MetricsPage {
         return false;
     }
 
-    // ===== CHART TYPE SELECTION METHODS (Added by Sentinel Auto-Fix) =====
-
-    async selectChartType(chartType) {
-        // Chart buttons mapping
-        const chartButtons = {
-          'line': 'button[title*="Line"], [aria-label*="Line"], .chart-type-line',
-          'pie': 'button[title*="Pie"], [aria-label*="Pie"], .chart-type-pie',
-          'table': 'button[title*="Table"], [aria-label*="Table"], .chart-type-table',
-          'heatmap': 'button[title*="Heatmap"], [aria-label*="Heat"], .chart-type-heatmap',
-          'gauge': 'button[title*="Gauge"], [aria-label*="Gauge"], .chart-type-gauge',
-          'bar': 'button[title*="Bar"], [aria-label*="Bar"], .chart-type-bar'
-        };
-
-        let chartButton = this.page.locator(chartButtons[chartType]).first();
-
-        if (await chartButton.count() === 0) {
-          // Try Quasar icon names
-          const iconNames = {
-            'line': 'show_chart',
-            'pie': 'pie_chart',
-            'table': 'table_chart',
-            'heatmap': 'grid_on',
-            'gauge': 'speed',
-            'bar': 'bar_chart'
-          };
-          chartButton = this.page.locator(`q-icon[name="${iconNames[chartType]}"]`).first();
-        }
-
-        if (await chartButton.count() === 0) {
-          // Try text matching
-          const chartNames = {
-            'line': 'Line',
-            'pie': 'Pie',
-            'table': 'Table',
-            'heatmap': 'Heatmap',
-            'gauge': 'Gauge',
-            'bar': 'Bar'
-          };
-          chartButton = this.page.getByText(chartNames[chartType], { exact: false }).first();
-        }
-
-        const exists = await chartButton.count() > 0;
-        if (exists) {
-          await chartButton.click();
-          await this.page.waitForTimeout(1000);
-          return true;
-        }
-        return false;
-    }
-
     async expectChartTypeRendered(chartType) {
         const chartSelectors = {
           'line': 'canvas, svg path, .apexcharts-line-series',
@@ -1141,6 +1091,49 @@ export class MetricsPage {
     async getThresholdInputCount() {
         const inputs = await this.getThresholdInputs();
         return await inputs.count();
+    }
+
+    // ===== TABLE DATA VERIFICATION METHODS =====
+
+    async verifyMetricInTable(metricName, expectedValue = null) {
+        const cells = await this.getTableCells();
+        const allCellText = cells.join(' ');
+
+        const hasMetricName = allCellText.includes(metricName);
+        const hasExpectedValue = expectedValue ? allCellText.includes(expectedValue.toString()) : true;
+
+        return hasMetricName && hasExpectedValue;
+    }
+
+    async getTableCellValues() {
+        const cells = await this.page.locator('table td, .q-table td, .data-table td').allTextContents();
+        return cells.filter(c => c.trim() !== '');
+    }
+
+    // ===== LEGEND AND SETTINGS METHODS =====
+
+    async getLegendToggle() {
+        return this.page.locator('button[aria-label*="legend"], .legend-toggle, input[name*="legend"], [data-test*="legend-toggle"]').first();
+    }
+
+    async getQueryModeToggle() {
+        return this.page.locator('[data-test*="query-mode"], button:has-text("Query Mode"), .query-mode-toggle').first();
+    }
+
+    async getSettingsButton() {
+        return this.page.locator('button[aria-label*="settings"], .settings-button, button:has-text("Settings"), [data-test*="settings"]').first();
+    }
+
+    async getAxisButton() {
+        return this.page.locator('button[aria-label*="axis"], .axis-button, button:has-text("Axis"), [data-test*="axis"]').first();
+    }
+
+    async getThresholdButton() {
+        return this.page.locator('button[aria-label*="threshold"], .threshold-button, button:has-text("Threshold"), [data-test*="threshold"]').first();
+    }
+
+    async getExportButton() {
+        return this.page.locator('button[aria-label*="export"], .export-button, button:has-text("Export"), [data-test*="export"]').first();
     }
 
     // ===== ADDITIONAL HELPER METHODS FOR metrics.spec.js =====

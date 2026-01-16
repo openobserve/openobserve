@@ -46,41 +46,45 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
     // Test 1: Stream selection
     testLogger.info('Testing metric stream selection');
     const streamSelector = await pm.metricsPage.getStreamSelector();
+    const isStreamSelectorVisible = await streamSelector.isVisible().catch(() => false);
 
-    if (await streamSelector.isVisible().catch(() => false)) {
+    // Stream selector should be visible for multi-stream environments
+    if (isStreamSelectorVisible) {
       await pm.metricsPage.clickStreamSelector();
 
-      if (await pm.metricsPage.isStreamOptionVisible()) {
-        const streamOption = await pm.metricsPage.getStreamOption();
-        const streamName = await streamOption.textContent();
-        testLogger.info(`Selecting stream: ${streamName}`);
-        await streamOption.click();
-        await page.waitForTimeout(1000);
+      const hasStreamOptions = await pm.metricsPage.isStreamOptionVisible();
+      expect(hasStreamOptions).toBe(true); // Should have stream options available
 
-        await pm.metricsPage.enterMetricsQuery('up');
-        await pm.metricsPage.clickApplyButton();
-        await pm.metricsPage.waitForMetricsResults();
+      const streamOption = await pm.metricsPage.getStreamOption();
+      const streamName = await streamOption.textContent();
+      testLogger.info(`Selecting stream: ${streamName}`);
+      await streamOption.click();
+      await page.waitForTimeout(1000);
 
-        await verifyDataOnUI(pm, 'Stream selection query');
-        testLogger.info('Stream selection and query completed');
-      } else {
-        testLogger.info('No stream options available');
-      }
+      await pm.metricsPage.enterMetricsQuery('up');
+      await pm.metricsPage.clickApplyButton();
+      await pm.metricsPage.waitForMetricsResults();
+
+      await verifyDataOnUI(pm, 'Stream selection query');
+      testLogger.info('Stream selection and query completed');
     } else {
-      testLogger.info('Stream selector not visible, using default stream');
+      testLogger.info('Stream selector not visible - single stream environment');
     }
 
     // Test 2: Time range selection
     testLogger.info('Testing time range selection');
     const timeRanges = ['Last 5 minutes', 'Last 1 hour', 'Last 24 hours'];
 
+    let successfulSelections = 0;
     for (const range of timeRanges) {
       testLogger.info(`Testing time range: ${range}`);
 
       const selected = await pm.metricsPage.selectDateRange(range);
       if (selected) {
         testLogger.info(`Selected time range: ${range}`);
+        successfulSelections++;
       } else {
+        testLogger.warn(`Failed to select time range: ${range}`);
         await page.keyboard.press('Escape');
       }
 
@@ -88,8 +92,16 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await page.waitForTimeout(2000);
 
       const hasError = await pm.metricsPage.expectQueryError();
+      if (hasError) {
+        const errorIndicators = await pm.metricsPage.getErrorIndicators();
+        const errorText = await errorIndicators.textContent();
+        testLogger.error(`Query failed for time range "${range}": ${errorText}`);
+      }
       expect(hasError).toBe(false);
     }
+
+    // Should have successfully selected at least one time range
+    expect(successfulSelections).toBeGreaterThan(0);
 
     testLogger.info('Stream and time range selection tests completed');
   });
@@ -150,13 +162,16 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
         await pm.metricsPage.executeQuery(queryData.query);
         await page.waitForTimeout(1500);
 
-        // Verify query executed
+        // Verify query executed without errors
         const hasError = await pm.metricsPage.expectQueryError();
-        if (!hasError) {
-          testLogger.info(`${queryData.name} executed successfully`);
-        } else {
-          testLogger.info(`${queryData.name} returned error (may be expected if no data)`);
+        if (hasError) {
+          const errorIndicators = await pm.metricsPage.getErrorIndicators();
+          const errorText = await errorIndicators.textContent();
+          testLogger.error(`Query "${queryData.name}" failed with error: ${errorText}`);
         }
+        expect(hasError).toBe(false); // All queries should execute successfully
+
+        testLogger.info(`${queryData.name} executed successfully`);
       }
     }
 
@@ -184,9 +199,14 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
       await pm.metricsPage.waitForMetricsResults();
 
       const hasError = await pm.metricsPage.expectQueryError();
-      if (!hasError) {
-        testLogger.info(`Aggregation "${queryData.name}" executed successfully`);
+      if (hasError) {
+        const errorIndicators = await pm.metricsPage.getErrorIndicators();
+        const errorText = await errorIndicators.textContent();
+        testLogger.error(`Aggregation "${queryData.name}" failed: ${errorText}`);
       }
+      expect(hasError).toBe(false); // Should execute without errors
+
+      testLogger.info(`Aggregation "${queryData.name}" executed successfully`);
 
       await page.waitForTimeout(1000);
     }
@@ -261,8 +281,8 @@ test.describe("Advanced Metrics Tests with Stream Selection", () => {
 
       testLogger.info(`${queryData.name} executed in ${executionTime}ms`);
 
-      // Verify query completed within reasonable time (30 seconds)
-      expect(executionTime).toBeLessThan(30000);
+      // Verify query completed within reasonable time (10 seconds for performance)
+      expect(executionTime).toBeLessThan(10000);
 
       await page.waitForTimeout(1000);
     }

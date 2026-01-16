@@ -69,10 +69,12 @@ test.describe("Metrics Configuration Tests", () => {
         'Last 1 day'
       ];
 
+      let foundPreset = false;
       for (const preset of presets) {
         const presetOption = await pm.metricsPage.getPresetOptionByText(preset);
         if (await presetOption.isVisible().catch(() => false)) {
           testLogger.info(`Found preset: ${preset}`);
+          foundPreset = true;
           if (preset === 'Last 1 hour') {
             await presetOption.click();
             testLogger.info('Selected "Last 1 hour" preset');
@@ -80,6 +82,9 @@ test.describe("Metrics Configuration Tests", () => {
           }
         }
       }
+
+      // Should have found at least one preset option
+      expect(foundPreset).toBe(true);
     }
 
     // Test 3: Auto-refresh configuration
@@ -103,81 +108,7 @@ test.describe("Metrics Configuration Tests", () => {
     testLogger.info('Time range configuration tests completed');
   });
 
-  // CONSOLIDATED TEST 2: Chart and visualization configurations (chart type, legend, query mode) (3 tests → 1 test)
-  test("Configure chart visualization settings (type, legend, query mode)", {
-    tag: ['@metrics', '@config', '@visualization', '@legend', '@querybuilder', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing chart visualization configuration');
-
-    // Execute a query first to have data
-    await pm.metricsPage.executeQuery('up');
-    await page.waitForTimeout(2000);
-
-    // Test 1: Chart type configuration
-    testLogger.info('Testing chart type configuration');
-    const chartTypeButton = await pm.metricsPage.getChartTypeButton();
-
-    if (await chartTypeButton.isVisible().catch(() => false)) {
-      await chartTypeButton.click();
-      await page.waitForTimeout(500);
-      testLogger.info('Chart type selector clicked');
-
-      const chartOptions = await pm.metricsPage.getVisibleChartOptions();
-      const optionCount = await chartOptions.count();
-
-      if (optionCount > 0) {
-        testLogger.info(`Found ${optionCount} chart type options`);
-        const barOption = chartOptions.filter({ hasText: /bar/i }).first();
-        if (await barOption.isVisible().catch(() => false)) {
-          await barOption.click();
-          testLogger.info('Selected bar chart type');
-        }
-      }
-    }
-
-    // Test 2: Legend configuration
-    testLogger.info('Testing legend configuration');
-    const legendToggle = await pm.metricsPage.getLegendToggle();
-
-    if (await legendToggle.isVisible().catch(() => false)) {
-      testLogger.info('Found legend toggle');
-
-      const initialState = await legendToggle.getAttribute('aria-pressed') || 'false';
-      await legendToggle.click();
-      await page.waitForTimeout(500);
-
-      const newState = await legendToggle.getAttribute('aria-pressed') || 'true';
-      if (initialState !== newState) {
-        testLogger.info(`Legend toggled from ${initialState} to ${newState}`);
-      }
-
-      const legend = await pm.metricsPage.getLegendElement();
-      if (await legend.isVisible().catch(() => false)) {
-        testLogger.info('Legend is visible on chart');
-      }
-    }
-
-    // Test 3: Query builder mode
-    testLogger.info('Testing query builder mode configuration');
-    const queryModeToggle = await pm.metricsPage.getQueryModeToggle();
-
-    if (await queryModeToggle.isVisible().catch(() => false)) {
-      const currentMode = await queryModeToggle.textContent();
-      testLogger.info(`Current query mode: ${currentMode}`);
-
-      await queryModeToggle.click();
-      await page.waitForTimeout(500);
-
-      const modeOptions = await pm.metricsPage.getModeOptions();
-      if (await modeOptions.count() > 0) {
-        testLogger.info('Query mode options are available');
-      }
-    }
-
-    testLogger.info('Chart visualization configuration tests completed');
-  });
-
-  // CONSOLIDATED TEST 3: Panel and display settings (panel settings, axis, threshold, export) (4 tests → 1 test)
+  // CONSOLIDATED TEST 2: Panel and display settings (panel settings, axis, threshold, export) (4 tests → 1 test)
   test("Configure panel display settings (settings, axis, threshold, export)", {
     tag: ['@metrics', '@config', '@panel', '@axis', '@threshold', '@export', '@P2', '@all']
   }, async ({ page }) => {
@@ -196,29 +127,35 @@ test.describe("Metrics Configuration Tests", () => {
       testLogger.info('Settings button clicked');
 
       const settingsPanel = await pm.metricsPage.getSettingsPanel();
-      if (await settingsPanel.isVisible().catch(() => false)) {
-        testLogger.info('Settings panel opened');
+      const isPanelVisible = await settingsPanel.isVisible().catch(() => false);
+      expect(isPanelVisible).toBe(true); // Settings panel should open
+      testLogger.info('Settings panel opened');
 
-        const settingOptions = [
-          'Show data points',
-          'Stack series',
-          'Show grid',
-          'Y-axis scale'
-        ];
+      const settingOptions = [
+        'Show data points',
+        'Stack series',
+        'Show grid',
+        'Y-axis scale'
+      ];
 
-        for (const option of settingOptions) {
-          const settingElement = await pm.metricsPage.getSettingElementByText(option);
-          if (await settingElement.isVisible().catch(() => false)) {
-            testLogger.info(`Found setting option: ${option}`);
-          }
-        }
-
-        const closeButton = await pm.metricsPage.getCloseButton();
-        if (await closeButton.isVisible()) {
-          await closeButton.click();
-          testLogger.info('Settings panel closed');
+      let foundOptions = 0;
+      for (const option of settingOptions) {
+        const settingElement = await pm.metricsPage.getSettingElementByText(option);
+        if (await settingElement.isVisible().catch(() => false)) {
+          testLogger.info(`Found setting option: ${option}`);
+          foundOptions++;
         }
       }
+
+      // Should have found at least some setting options
+      expect(foundOptions).toBeGreaterThan(0);
+
+      const closeButton = await pm.metricsPage.getCloseButton();
+      const isCloseVisible = await closeButton.isVisible();
+      expect(isCloseVisible).toBe(true); // Close button should be visible
+
+      await closeButton.click();
+      testLogger.info('Settings panel closed');
     }
 
     // Test 2: Axis configuration

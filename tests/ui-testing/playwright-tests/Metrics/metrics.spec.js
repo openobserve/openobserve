@@ -42,6 +42,16 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.expectDatePickerVisible();
     await pm.metricsPage.expectSyntaxGuideVisible();
 
+    // Assert that all critical UI elements are present (P0 smoke test requirement)
+    // Final verification with explicit visibility checks
+    const applyButtonVisible = await page.locator('[data-test="metrics-apply"]').isVisible();
+    const datePickerVisible = await page.locator('[data-test="metrics-date-picker"]').isVisible();
+    const syntaxGuideVisible = await page.locator('[data-cy="syntax-guide-button"]').isVisible();
+
+    expect(applyButtonVisible).toBe(true);
+    expect(datePickerVisible).toBe(true);
+    expect(syntaxGuideVisible).toBe(true);
+
     testLogger.info('Metrics page loaded successfully with all core elements');
   });
 
@@ -96,16 +106,11 @@ test.describe("Metrics testcases", () => {
     // Check for "No data" message using page object
     const noDataMessage = await pm.metricsPage.getNoDataMessage();
     const hasNoData = await noDataMessage.isVisible().catch(() => false);
-    if (hasNoData) {
-      testLogger.warn('No data message found - metrics may not be properly indexed yet');
 
-      // Try simpler query without labels
-      testLogger.info('Retrying with simpler query: up');
-      await pm.metricsPage.enterMetricsQuery('up');
-      await page.waitForTimeout(500);
-      await pm.metricsPage.clickApplyButton();
-      await pm.metricsPage.waitForMetricsResults();
-      await page.waitForTimeout(2000);
+    // If no data found, the test should fail - metrics should be ingested
+    if (hasNoData) {
+      testLogger.error('No data found for query "up{job="api-server"}" - metrics may not be ingested');
+      expect(hasNoData).toBe(false); // Fail - we expect data to be available
     }
 
     // Check for actual data in the results using page object methods
@@ -197,46 +202,33 @@ test.describe("Metrics testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing auto-refresh interval configuration');
 
-    try {
-      // Look for auto-refresh button using page object
-      const refreshButton = await pm.metricsPage.getRefreshButton();
+    // Look for auto-refresh button using page object
+    const refreshButton = await pm.metricsPage.getRefreshButton();
 
-      if (refreshButton) {
-        // Click the refresh button/dropdown
-        await refreshButton.click();
-        await page.waitForTimeout(500); // Wait for dropdown to open
+    // Auto-refresh button must be visible - this is a P1 feature
+    await expect(refreshButton).toBeVisible({
+      timeout: 5000,
+      message: 'Auto-refresh button must be visible - this is a P1 feature that should not be missing'
+    });
+    testLogger.info('Auto-refresh button found');
 
-        // Look for interval options using page object
-        const intervalOptions = await pm.metricsPage.getIntervalOptions();
-        const optionCount = await intervalOptions.count();
+    await refreshButton.click();
+    await page.waitForTimeout(500);
 
-        if (optionCount > 0) {
-          const firstOption = intervalOptions.first();
-          await firstOption.click();
-          const optionText = await firstOption.textContent();
-          testLogger.info(`Selected refresh interval: ${optionText}`);
-        } else {
-          // Just verify the dropdown opened
-          testLogger.info('Auto-refresh dropdown opened successfully');
-        }
+    // Look for interval options
+    const intervalOptions = await pm.metricsPage.getIntervalOptions();
+    const optionCount = await intervalOptions.count();
 
-        // Verify the selection was made (button text might change)
-        await page.waitForTimeout(500);
-        const buttonText = await refreshButton.textContent().catch(() => '');
-        if (buttonText && buttonText !== 'Off') {
-          testLogger.info(`Auto-refresh interval set to: ${buttonText}`);
-        }
-      } else {
-        testLogger.warn('Auto-refresh feature not found in current UI - feature may have been moved or redesigned');
-        // Don't fail the test - just log that the feature wasn't found
-      }
+    expect(optionCount).toBeGreaterThan(0); // Should have interval options
 
-      testLogger.info('Auto-refresh interval test completed');
-    } catch (error) {
-      testLogger.error('Error during auto-refresh test', { error: error.message });
-      // Log the error but don't fail - the feature might not exist in this version
-      testLogger.info('Auto-refresh test completed with warnings');
-    }
+    const firstOption = intervalOptions.first();
+    await firstOption.click();
+    const optionText = await firstOption.textContent();
+    testLogger.info(`Selected refresh interval: ${optionText}`);
+
+    // Verify the selection was made
+    await page.waitForTimeout(500);
+    testLogger.info('Auto-refresh interval test completed');
   });
 
   test("Field list collapse and expand functionality", {
@@ -246,15 +238,11 @@ test.describe("Metrics testcases", () => {
 
     // Try to find any collapsible element using page object
     const toggleElement = await pm.metricsPage.getCollapsibleToggle();
-    if (await toggleElement.count() > 0) {
-      testLogger.info('Found collapsible element');
-    }
+    const toggleCount = await toggleElement.count();
 
-    if (!toggleElement) {
-      testLogger.warn('No collapsible UI elements found in metrics page. This might be a UI change. Skipping test.');
-      test.skip();
-      return;
-    }
+    // Collapsible UI elements must be present - this is a P1 feature
+    expect(toggleCount).toBeGreaterThan(0);
+    testLogger.info('Found collapsible element');
 
     try {
       // Find the associated panel using page object
@@ -317,15 +305,13 @@ test.describe("Metrics testcases", () => {
     // Find search input using page object method
     const searchInput = await pm.metricsPage.findSearchInput();
 
-    if (searchInput) {
-      testLogger.info('Found search input');
-    }
-
-    if (!searchInput) {
-      testLogger.warn('No search input field found in metrics page. Feature might have been removed or relocated. Skipping test.');
-      test.skip();
-      return;
-    }
+    // Search input field must be present - this is a P1 feature
+    expect(searchInput).toBeTruthy();
+    await expect(searchInput).toBeVisible({
+      timeout: 5000,
+      message: 'Search input field must be visible - this is a P1 feature'
+    });
+    testLogger.info('Found search input');
 
     try {
       // Test search functionality
@@ -417,8 +403,24 @@ test.describe("Metrics testcases", () => {
     // Wait a moment for any validation
     await page.waitForTimeout(1000);
 
-    // Check if there's an error or the button is disabled
-    // Note: Behavior may vary - query might be disabled or show error
+    // Assert: Empty query should either disable button or show validation error
+    const isEnabled = await page.locator('[data-test="metrics-apply"]').isEnabled();
+
+    if (isEnabled) {
+      // If button is enabled, there should be an error message or no-data indicator
+      const hasError = await pm.metricsPage.hasErrorIndicator();
+      const noDataMessage = await pm.metricsPage.getNoDataMessage();
+      const hasNoData = await noDataMessage.isVisible().catch(() => false);
+
+      // At least one validation indicator should be present
+      expect(hasError || hasNoData).toBe(true);
+      testLogger.info('Empty query shows error or no-data message');
+    } else {
+      // Button should be disabled for empty query
+      expect(isEnabled).toBe(false);
+      testLogger.info('Empty query disables apply button');
+    }
+
     testLogger.info('Empty query validation tested');
   });
 
@@ -436,14 +438,18 @@ test.describe("Metrics testcases", () => {
     // Wait for error response
     await page.waitForTimeout(2000);
 
-    // Check for error notification using page object
-    const errorIndicator = await pm.metricsPage.getErrorIndicator();
-    const hasError = await errorIndicator.isVisible().catch(() => false);
+    // Assert: Invalid syntax MUST show an error
+    const hasError = await pm.metricsPage.hasErrorIndicator();
+    expect(hasError).toBe(true);
 
     if (hasError) {
-      testLogger.info('Error message displayed for invalid query');
+      // Verify error message is meaningful
+      const errorIndicator = await pm.metricsPage.getErrorIndicator();
+      const errorText = await errorIndicator.textContent();
+      expect(errorText).toMatch(/error|invalid|syntax|parse/i);
+      testLogger.info(`Error message displayed for invalid query: ${errorText.substring(0, 100)}`);
     } else {
-      testLogger.info('No visible error, system may handle invalid query differently');
+      testLogger.error('No error displayed for invalid PromQL syntax - this is unexpected');
     }
   });
 
@@ -465,31 +471,24 @@ test.describe("Metrics testcases", () => {
     const noDataIndicator = await pm.metricsPage.getNoDataIndicator();
     const hasNoDataMessage = await noDataIndicator.isVisible().catch(() => false);
 
-    // For non-existent metrics, the system might show:
-    // 1. A "no data" message
-    // 2. An empty table (header only, no data rows)
-    // 3. An empty chart
-
+    // For non-existent metrics, system MUST show no data or empty results
     if (hasNoDataMessage) {
-      testLogger.info('No data message displayed for non-existent metric - test passed');
+      testLogger.info('No data message displayed for non-existent metric - correct behavior');
     } else {
-      // Check if there's any actual data displayed using page object
-      // Look for data rows specifically, not header rows
+      // If no explicit message, verify no data rows exist
       const dataRows = await pm.metricsPage.getDataRowsWithNumbers();
       const rowCount = await dataRows.count();
 
-      if (rowCount === 0) {
-        testLogger.info('No data rows found for non-existent metric - test passed');
-      } else {
-        // Check if the data is actually for our non-existent metric
-        // Sometimes cached or default data might show
+      testLogger.info(`Found ${rowCount} data rows for non-existent metric`);
+
+      // Should have no data rows for non-existent metric
+      if (rowCount > 0) {
         const cellText = await dataRows.first().textContent().catch(() => '');
-        if (cellText.includes('non_existent_metric_xyz123')) {
-          testLogger.error(`Unexpected data found for non-existent metric: ${cellText}`);
-          expect(rowCount).toBe(0);
-        } else {
-          testLogger.info(`Found ${rowCount} rows but not for our query - might be default/cached data`);
-        }
+        testLogger.error(`Unexpected data found for non-existent metric: ${cellText}`);
+        // This is a failure - we should not get data for non-existent metrics
+        expect(rowCount).toBe(0);
+      } else {
+        testLogger.info('No data rows found - correct behavior for non-existent metric');
       }
     }
   });
