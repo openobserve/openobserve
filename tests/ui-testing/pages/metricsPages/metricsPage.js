@@ -588,10 +588,6 @@ export class MetricsPage {
         return await this.page.locator('svg path[class*="pie"], svg path[class*="slice"]').count();
     }
 
-    async getTableRowCount() {
-        return await this.page.locator('table tbody tr, .q-table tbody tr').count();
-    }
-
     async getTableHeaderCount() {
         return await this.page.locator('table thead th, .q-table thead th').count();
     }
@@ -1038,15 +1034,7 @@ export class MetricsPage {
     }
 
     // ===== LEGEND METHODS =====
-
-    async getLegendElement() {
-        return this.page.locator('.legend, [class*="legend-container"]').first();
-    }
-
-    async isLegendVisible() {
-        const legend = await this.getLegendElement();
-        return await legend.isVisible({ timeout: 3000 }).catch(() => false);
-    }
+    // Note: Main legend methods are defined in the visualization section below
 
     // ===== MODE SELECTION METHODS =====
 
