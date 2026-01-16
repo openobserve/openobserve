@@ -154,20 +154,17 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyTableRowVisible(tableName);
         testLogger.info('Table found in list');
 
-        // Click delete button
-        const deleteBtn = page.locator(`[data-test="${tableName}-delete-btn"]`);
-        await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
-        await deleteBtn.click();
+        // Click delete button (4th button in row: Explore, Schema, Edit, Delete)
+        await enrichmentPage.clickDeleteButton(tableName);
         testLogger.info('Clicked delete button');
 
-        // Verify confirmation dialog and click OK
-        const confirmBtn = page.getByRole('button', { name: 'OK' });
-        await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await confirmBtn.click();
-        testLogger.info('Confirmed deletion');
+        // Verify confirmation dialog
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        testLogger.info('Confirmation dialog verified');
 
-        // Wait for deletion to complete
-        await page.waitForLoadState('networkidle');
+        // Click OK to confirm deletion
+        await enrichmentPage.clickDeleteOK();
+        testLogger.info('Confirmed deletion');
 
         // Verify table is removed from list
         await page.waitForTimeout(2000);
