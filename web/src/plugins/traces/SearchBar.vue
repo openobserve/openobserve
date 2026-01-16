@@ -38,16 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <q-btn
-                data-test="traces-service-maps-toggle"
-                :class="activeTab === 'service-maps' ? 'selected' : ''"
-                @click="$emit('update:activeTab', 'service-maps')"
+                data-test="traces-service-graph-toggle"
+                :class="activeTab === 'service-graph' ? 'selected' : ''"
+                @click="$emit('update:activeTab', 'service-graph')"
                 no-caps
                 size="sm"
                 icon="hub"
                 class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[2rem]"
               >
                 <q-tooltip>
-                  Service Maps
+                  Service Graph
                 </q-tooltip>
               </q-btn>
             </div>
