@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -217,11 +217,11 @@ const formData = ref({
   deleteBeforeBackfill: false,
 });
 
-// Watch for job changes to populate form
+// Watch for dialog opening and job changes to populate form
 watch(
-  () => props.job,
-  (job) => {
-    if (job) {
+  () => [props.modelValue, props.job] as const,
+  async ([isOpen, job]) => {
+    if (isOpen && job) {
       formData.value = {
         startTimeMicros: job.start_time,
         endTimeMicros: job.end_time,
@@ -230,7 +230,10 @@ watch(
         deleteBeforeBackfill: job.delete_before_backfill || false,
       };
 
-      // Set date time component
+      // Wait for the next tick to ensure dateTimeRef is mounted
+      await nextTick();
+
+      // Set date time component with the job's time range
       if (dateTimeRef.value) {
         dateTimeRef.value.setCustomDate("absolute", {
           start: job.start_time / 1000, // Convert from microseconds to milliseconds
@@ -239,7 +242,7 @@ watch(
       }
     }
   },
-  { immediate: true }
+  { immediate: false }
 );
 
 // Handle datetime changes from the DateTime component
