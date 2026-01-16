@@ -231,6 +231,19 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
+
+          - testfolder: "Traces"
+            browser: "chrome"
+            run_files:
+              [
+                "tracesSearch.spec.js",
+                "traceQueryEditor.spec.js",
+                "traceErrorFilter.spec.js",
+                "traceDetails.spec.js",
+                "traceAdvancedFiltering.spec.js",
+                "serviceMaps.spec.js",
+              ]
+
           - testfolder: "RegressionSet"
             browser: "chrome"
             run_files:
