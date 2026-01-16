@@ -43,23 +43,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
 
             <div class="hero-offer">
-              <q-circular-progress
-                v-if="dialogConfig.showUsageIndicator"
-                :value="dialogConfig.usagePercentage"
-                size="40px"
-                :thickness="0.18"
-                :color="getProgressColor(dialogConfig.usagePercentage)"
-                track-color="rgba(255, 255, 255, 0.3)"
-                class="usage-indicator"
-                show-value
-                font-size="10px"
-              >
-                <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
-              </q-circular-progress>
-              <div class="offer-badge">
-                <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
-                <span>{{ dialogConfig.badgeText }}</span>
-              </div>
+              <!-- Loading State: Show skeleton -->
+              <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
+                <q-skeleton
+                  type="circle"
+                  size="40px"
+                  class="usage-indicator"
+                  animation="pulse"
+                  style="background: rgba(255, 255, 255, 0.2);"
+                />
+                <q-skeleton
+                  type="rect"
+                  width="200px"
+                  height="44px"
+                  class="offer-badge-skeleton"
+                  animation="pulse"
+                  style="background: rgba(255, 255, 255, 0.2); border-radius: 24px;"
+                />
+              </template>
+
+              <!-- Loaded State: Show actual data -->
+              <template v-else>
+                <q-circular-progress
+                  v-if="dialogConfig.showUsageIndicator"
+                  :value="dialogConfig.usagePercentage"
+                  size="40px"
+                  :thickness="0.18"
+                  :color="getProgressColor(dialogConfig.usagePercentage)"
+                  track-color="rgba(255, 255, 255, 0.3)"
+                  class="usage-indicator"
+                  show-value
+                  font-size="10px"
+                >
+                  <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
+                </q-circular-progress>
+                <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
+                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <span>{{ dialogConfig.badgeText }}</span>
+                </div>
+              </template>
             </div>
 
             <div class="hero-actions">
@@ -169,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, onMounted } from "vue";
+import { defineComponent, ref, computed, PropType, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -192,23 +214,38 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const licenseData = ref<any>(null);
+    const isLoadingLicense = ref(false);
 
-    // Fetch license data on mount for Enterprise with license
-    onMounted(async () => {
+    // Fetch license data when dialog opens for Enterprise with license
+    const fetchLicenseData = async () => {
       const isEnterprise = config.isEnterprise === 'true';
       const isCloud = config.isCloud === 'true';
       const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Only fetch for Enterprise with license (not Cloud)
       if (isEnterprise && hasLicense && !isCloud) {
+        isLoadingLicense.value = true;
         try {
           const response = await licenseServer.get_license();
           licenseData.value = response.data;
         } catch (error) {
           console.error("Failed to fetch license data:", error);
+          // On error, set default values (0% usage, unlimited)
+          licenseData.value = {
+            license: {
+              limits: {
+                Ingestion: {
+                  value: 0
+                }
+              }
+            },
+            ingestion_used: 0
+          };
+        } finally {
+          isLoadingLicense.value = false;
         }
       }
-    });
+    };
 
     // Dialog configuration based on deployment type
     const dialogConfig = computed(() => {
@@ -277,6 +314,7 @@ export default defineComponent({
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showContactSales: true,
+          isLicensed: true, // Flag to apply different badge styling
         };
       }
 
@@ -589,6 +627,13 @@ export default defineComponent({
       }
     };
 
+    // Watch for dialog opening to fetch license data
+    watch(showDialog, (newVal) => {
+      if (newVal) {
+        fetchLicenseData();
+      }
+    });
+
     return {
       showDialog,
       dialogConfig,
@@ -601,6 +646,7 @@ export default defineComponent({
       navigateToLicense,
       handlePrimaryButtonClick,
       getProgressColor,
+      isLoadingLicense,
       Math,
     };
   },
@@ -713,6 +759,10 @@ export default defineComponent({
       flex-shrink: 0;
     }
 
+    .offer-badge-skeleton {
+      flex-shrink: 0;
+    }
+
     .offer-badge {
       display: inline-flex;
       align-items: center;
@@ -728,6 +778,17 @@ export default defineComponent({
       .q-icon {
         color: #1a1a1a;
         font-size: 20px;
+      }
+
+      // Licensed badge styling - neutral white/transparent for users who already have license
+      &.licensed-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+        .q-icon {
+          color: white;
+        }
       }
     }
   }
