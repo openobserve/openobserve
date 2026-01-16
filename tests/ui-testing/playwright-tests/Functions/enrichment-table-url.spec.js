@@ -3,11 +3,8 @@
  *
  * Test Coverage:
  * - P0: Critical path (create, validation, list visibility)
- * - P1: Functional tests (search, delete, cancel)
- * - P2: Edge cases (toggle source, nonexistent URL)
- *
- * Known Limitation: URL background job processing takes >240s on pentest environment
- * Tests that require waiting for job completion are marked with .skip()
+ * - P1: Functional tests (cancel, delete, explore logs)
+ * - P2: Edge cases (toggle source)
  */
 
 const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -19,7 +16,6 @@ const { randomUUID } = require('crypto');
 // Test data - using small protocols.csv (13 rows) for fast processing
 const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
 const INVALID_URL_NO_PROTOCOL = 'example.com/data.csv';
-const NONEXISTENT_URL = 'https://nonexistent-domain-12345.com/data.csv';
 
 test.describe('Enrichment Table URL Feature Tests', () => {
     let pageManager;
@@ -115,94 +111,6 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     // P1 - FUNCTIONAL TESTS
     // ============================================================================
 
-    test.skip('@P1 Update mode - Reload existing URLs', async () => {
-        // SKIP REASON: Background job processing takes >240s on pentest
-        const tableName = generateTableName('reload_test');
-        testLogger.info(`Test: Update mode - Reload - ${tableName}`);
-
-        // Create initial table
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Click edit button
-        await enrichmentPage.clickEditButton(tableName);
-        await enrichmentPage.verifyUpdateMode();
-
-        // Select reload mode
-        await enrichmentPage.selectUpdateMode('reload');
-
-        // Save
-        await enrichmentPage.saveUpdateMode();
-
-        testLogger.info('Reload mode test completed');
-    });
-
-    test.skip('@P1 Update mode - Append new URL', async () => {
-        // SKIP REASON: Background job processing takes >240s on pentest
-        const tableName = generateTableName('append_test');
-        testLogger.info(`Test: Update mode - Append - ${tableName}`);
-
-        // Create initial table
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Click edit button
-        await enrichmentPage.clickEditButton(tableName);
-
-        // Select append mode
-        await enrichmentPage.selectUpdateMode('append');
-
-        // Fill new URL
-        await enrichmentPage.fillUrlInput(CSV_URL);
-
-        // Save
-        await enrichmentPage.saveUpdateMode();
-
-        testLogger.info('Append mode test completed');
-    });
-
-    test.skip('@P1 Update mode - Replace all URLs', async () => {
-        // SKIP REASON: Background job processing takes >240s on pentest
-        const tableName = generateTableName('replace_test');
-        testLogger.info(`Test: Update mode - Replace - ${tableName}`);
-
-        // Create initial table
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Click edit button
-        await enrichmentPage.clickEditButton(tableName);
-
-        // Select replace mode
-        await enrichmentPage.selectUpdateMode('replace');
-
-        // Fill new URL
-        await enrichmentPage.fillUrlInput(CSV_URL);
-
-        // Save
-        await enrichmentPage.saveUpdateMode();
-
-        testLogger.info('Replace mode test completed');
-    });
-
     test('@P1 Cancel form without saving', async () => {
         const tableName = generateTableName('cancel_test');
         testLogger.info(`Test: Cancel form - ${tableName}`);
@@ -232,63 +140,77 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified table was not created');
     });
 
-    test.skip('@P1 Search enrichment tables', async () => {
-        // SKIP REASON: Requires background job completion to have searchable tables
-        const tableName = generateTableName('search_test');
-        testLogger.info(`Test: Search enrichment tables - ${tableName}`);
-
-        // Create table
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Search for table
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        testLogger.info('Searched for table');
-
-        // Verify table is visible in filtered results
-        await enrichmentPage.verifyTableVisibleInList(tableName);
-        testLogger.info('Table found in search results');
-    });
-
-    test.skip('@P1 Delete enrichment table', async () => {
-        // SKIP REASON: Requires background job completion
+    test('@P1 Delete enrichment table', async ({ page }) => {
         const tableName = generateTableName('delete_test');
         testLogger.info(`Test: Delete enrichment table - ${tableName}`);
 
-        // Create table
+        // Create enrichment table from URL
         await pipelinesPage.navigateToAddEnrichmentTable();
         await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Enrichment table created');
 
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Search for table
+        // Search for the table in list
         await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table found in list');
 
         // Click delete button
-        await enrichmentPage.clickDeleteButton(tableName);
+        const deleteBtn = page.locator(`[data-test="${tableName}-delete-btn"]`);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await deleteBtn.click();
         testLogger.info('Clicked delete button');
 
-        // Verify confirmation dialog
-        await enrichmentPage.verifyDeleteConfirmationDialog();
-        testLogger.info('Confirmation dialog verified');
-
-        // Click OK to delete
-        await enrichmentPage.clickDeleteOK();
+        // Verify confirmation dialog and click OK
+        const confirmBtn = page.getByRole('button', { name: 'OK' });
+        await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await confirmBtn.click();
         testLogger.info('Confirmed deletion');
 
+        // Wait for deletion to complete
+        await page.waitForLoadState('networkidle');
+
         // Verify table is removed from list
-        await enrichmentPage.verifyTableRowHidden(tableName);
+        await page.waitForTimeout(2000);
+        const tableRow = page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(tableRow).toBeHidden({ timeout: 10000 });
         testLogger.info('Table removed from list');
+    });
+
+    test('@P1 Explore enrichment table and view log details', async ({ page }) => {
+        const tableName = generateTableName('explore_log');
+        testLogger.info(`Test: Explore and view log details - ${tableName}`);
+
+        // Create enrichment table from URL
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Enrichment table created');
+
+        // Search for the table in list
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table found in list');
+
+        // Click explore button to navigate to logs
+        const exploreBtn = page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await exploreBtn.click();
+        testLogger.info('Clicked explore button');
+
+        // Wait for navigation to logs page
+        await page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
+        await page.waitForLoadState('networkidle');
+        testLogger.info('Navigated to logs page');
+
+        // Wait for log table to load and click on first row
+        const firstLogRow = page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstLogRow.click();
+        testLogger.info('Clicked on first log row');
+
+        // Verify log detail panel expands (check for expanded row content)
+        const logDetailPanel = page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
+        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Log detail panel is visible');
     });
 
     // ============================================================================
@@ -328,92 +250,5 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Cancel without saving
         await enrichmentPage.cancelEnrichmentTableForm();
-    });
-
-    test.skip('@P2 URL validation - nonexistent URL', async () => {
-        // SKIP REASON: Requires waiting for background job to fail (>240s timeout)
-        const tableName = generateTableName('nonexistent_url');
-        testLogger.info(`Test: Nonexistent URL - ${tableName}`);
-
-        // Create table with nonexistent URL
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, NONEXISTENT_URL);
-
-        // Wait for job to fail
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-
-        // Verify job failed
-        expect(status).toBe('failed');
-        testLogger.info('URL job failed as expected');
-
-        // Verify failed status icon
-        await enrichmentPage.verifyUrlJobStatus(tableName, 'failed');
-        testLogger.info('Failed status icon verified');
-    });
-
-    test.skip('@P2 Explore enrichment data in logs', async () => {
-        // SKIP REASON: Requires background job completion (>240s)
-        const tableName = generateTableName('explore_test');
-        testLogger.info(`Test: Explore enrichment data - ${tableName}`);
-
-        // Create table
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-
-        // Wait for job to complete
-        const status = await enrichmentPage.waitForUrlJobComplete(tableName, 240000);
-        if (status !== 'completed') {
-            test.skip(true, `URL job did not complete (status: ${status})`);
-        }
-
-        // Verify explore button is visible
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableVisibleInList(tableName);
-        testLogger.info('Explore button verified for completed table');
-
-        // Click explore button
-        await enrichmentPage.exploreEnrichmentTable();
-        testLogger.info('Clicked explore button');
-
-        // Verify navigation to logs page
-        await enrichmentPage.page.waitForURL(/.*logs.*/);
-        testLogger.info('Navigated to logs page');
-    });
-
-    test('@P1 Explore enrichment table and view log details', async ({ page }) => {
-        const tableName = generateTableName('explore_log');
-        testLogger.info(`Test: Explore and view log details - ${tableName}`);
-
-        // Create enrichment table from URL
-        await pipelinesPage.navigateToAddEnrichmentTable();
-        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Enrichment table created');
-
-        // Search for the table in list
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        testLogger.info('Table found in list');
-
-        // Click explore button to navigate to logs
-        const exploreBtn = page.locator(`[data-test="${tableName}-explore-btn"]`);
-        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
-        await exploreBtn.click();
-        testLogger.info('Clicked explore button');
-
-        // Wait for navigation to logs page
-        await page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
-        await page.waitForLoadState('networkidle');
-        testLogger.info('Navigated to logs page');
-
-        // Wait for log table to load and click on first row
-        const firstLogRow = page.locator('[data-test="log-table-column-0-_timestamp"]').first();
-        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
-        await firstLogRow.click();
-        testLogger.info('Clicked on first log row');
-
-        // Verify log detail panel expands (check for expanded row content)
-        const logDetailPanel = page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
-        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
-        testLogger.info('Log detail panel is visible');
     });
 });
