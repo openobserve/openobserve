@@ -145,7 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
-              store.state.userInfo.email !== formData.email
+              store.state.userInfo.email !== formData.email &&
+              (config.isEnterprise == 'true' || config.isCloud == 'true')
             "
             v-model="formData.custom_role"
             :label="t('user.customRole')"
@@ -428,6 +429,7 @@ export default defineComponent({
       loggedInUserEmail,
       filterdOption,
       invalidateLoginData,
+      config,
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
