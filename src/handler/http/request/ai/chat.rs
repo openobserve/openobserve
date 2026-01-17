@@ -52,9 +52,6 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     DEFAULT_AGENT_TYPE
 }
 
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::ai::agent::meta::Role;
-
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{

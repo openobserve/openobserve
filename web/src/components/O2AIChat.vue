@@ -126,6 +126,11 @@
                 <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+                <!-- Loading indicator inside message box for empty assistant messages -->
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
+                  <q-spinner-dots color="primary" size="1.5em" />
+                  <span>{{ currentAnalyzingMessage }}</span>
+                </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
                 <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
                   <!-- Tool call block - expandable -->
@@ -311,7 +316,7 @@
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
             <q-spinner-dots color="primary" size="2em" />
-            <span style="font-size: 14px; opacity: 0.7;">{{ currentAnalyzingMessage }}</span>
+            <span>{{ currentAnalyzingMessage }}</span>
           </div>
         </div>
         
@@ -1283,7 +1288,6 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
-      pendingToolCalls.value = []; // Clear any pending tool calls from previous messages
       startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
@@ -2657,13 +2661,6 @@ export default defineComponent({
     }
   }
 
-  .tool-call-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-  }
-
   .tool-call-name {
     font-weight: 500;
     flex: 1;
@@ -2743,6 +2740,16 @@ export default defineComponent({
         }
       }
     }
+  }
+
+  .tool-call-error {
+    font-size: 11px;
+    color: #f44336;
+    font-style: italic;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .tool-call-error {
