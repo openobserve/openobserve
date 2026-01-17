@@ -433,17 +433,17 @@ export default defineComponent({
       }
     };
     const handleSaveVariable = async () => {
-      try {
-        await getDashboardData();
-        emit("save");
-      } finally {
-        // Wait for next tick before switching views to ensure data is updated
-        await nextTick();
-        // Always go back to listing page after save, regardless of success or failure
-        isAddVariable.value = false;
-        // Wait for the listing view to render
-        await nextTick();
-      }
+      // Refresh the dashboard data to get the latest variables list
+      await getDashboardData();
+      // Emit save event to parent (ViewDashboard) to trigger dashboard reload
+      emit("save");
+      // Wait for next tick before switching views to ensure data is updated
+      await nextTick();
+      // Go back to listing page after save so user can see the updated variable list
+      // The settings dialog remains open (controlled by parent component)
+      isAddVariable.value = false;
+      // Wait for the listing view to render
+      await nextTick();
     };
     const goBackToDashboardList = () => {
       isAddVariable.value = false;
