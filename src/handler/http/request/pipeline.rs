@@ -68,7 +68,47 @@ impl From<PipelineError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a data pipeline", "category": "pipelines"}))
+        ("x-o2-mcp" = json!({
+            "description": r#"Create a data pipeline for processing and transforming data streams.
+
+PIPELINE STRUCTURE:
+- name: Pipeline name (required, lowercase)
+- source: { "source_type": "realtime" } for real-time pipelines
+- nodes: Array of processing nodes (required)
+- edges: Array of connections between nodes (required)
+
+NODE STRUCTURE (each node requires):
+- id: Unique identifier (use UUID format)
+- io_type: MUST be one of: "input" (source stream), "output" (destination stream), "default" (processing node like function/condition)
+- position: { "x": number, "y": number } for visual layout
+- data: Node configuration (structure depends on node_type)
+
+NODE DATA TYPES:
+1. Stream node (input/output): { "node_type": "stream", "org_id": "default", "stream_name": "your_stream", "stream_type": "logs"|"metrics"|"traces" }
+2. Function node: { "node_type": "function", "name": "function_name", "after_flatten": true|false }
+3. Condition node: { "node_type": "condition", "conditions": { "column": "field", "operator": "=", "value": "val" } }
+
+EDGE STRUCTURE:
+- id: Format "e{source_id}-{target_id}"
+- source: Source node id
+- target: Target node id
+
+EXAMPLE - Simple pipeline with function:
+{
+  "name": "my_pipeline",
+  "source": { "source_type": "realtime" },
+  "nodes": [
+    { "id": "input-1", "io_type": "input", "position": {"x": 100, "y": 100}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "source_stream", "stream_type": "logs"} },
+    { "id": "func-1", "io_type": "default", "position": {"x": 100, "y": 200}, "data": {"node_type": "function", "name": "my_function", "after_flatten": true} },
+    { "id": "output-1", "io_type": "output", "position": {"x": 100, "y": 300}, "data": {"node_type": "stream", "org_id": "default", "stream_name": "dest_stream", "stream_type": "logs"} }
+  ],
+  "edges": [
+    { "id": "einput-1-func-1", "source": "input-1", "target": "func-1" },
+    { "id": "efunc-1-output-1", "source": "func-1", "target": "output-1" }
+  ]
+}"#,
+            "category": "pipelines"
+        }))
     )
 )]
 pub async fn save_pipeline(
@@ -341,7 +381,10 @@ pub async fn delete_pipeline_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a pipeline", "category": "pipelines"}))
+        ("x-o2-mcp" = json!({
+            "description": "Update an existing pipeline. Uses the same schema as createPipeline - include pipeline_id and version from the existing pipeline. See createPipeline for full node/edge structure documentation.",
+            "category": "pipelines"
+        }))
     )
 )]
 pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Response {

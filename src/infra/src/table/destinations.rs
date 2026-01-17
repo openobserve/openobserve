@@ -67,7 +67,7 @@ pub async fn put(
     // Template is now optional - only look it up if one is specified
     let template_id =
         if let destinations::Module::Alert {
-            template: Some(ref template_name),
+            template: Some(template_name),
             ..
         } = &destination.module
         {
