@@ -14,6 +14,33 @@
 
 import { PrebuiltConfig } from './types';
 
+const isValidServiceNowIncidentUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+
+    // Only allow HTTP/S URLs
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    // Require a host within the service-now.com domain
+    if (hostname !== 'service-now.com' && !hostname.endsWith('.service-now.com')) {
+      return false;
+    }
+
+    // Require the incident table API path
+    if (!parsed.pathname.startsWith('/api/now/table/incident')) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    // If URL parsing fails, the URL is not valid
+    return false;
+  }
+};
+
 /**
  * ServiceNow prebuilt destination configuration
  * Creates incidents via ServiceNow Table API
@@ -45,8 +72,7 @@ export const servicenowConfig: PrebuiltConfig = {
     'Accept': 'application/json'
   },
   method: 'post',
-  urlValidator: (url: string) =>
-    url.includes('.service-now.com') && url.includes('/api/now/table/incident'),
+  urlValidator: (url: string) => isValidServiceNowIncidentUrl(url),
   credentialFields: [
     {
       key: 'instanceUrl',
@@ -55,7 +81,7 @@ export const servicenowConfig: PrebuiltConfig = {
       required: true,
       hint: 'https://your-instance.service-now.com/api/now/table/incident',
       validator: (url: string) =>
-        (url.includes('.service-now.com') && url.includes('/api/now/table/incident')) ||
+        isValidServiceNowIncidentUrl(url) ||
         'URL should be like https://instance.service-now.com/api/now/table/incident'
     },
     {
