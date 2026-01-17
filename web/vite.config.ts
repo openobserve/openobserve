@@ -160,7 +160,7 @@ export default defineConfig({
       ],
       output: {
         manualChunks: {
-          "o2cs-analytics": ["rudder-sdk-js"],
+          "o2cs-analytics": ["@rudderstack/analytics-js"],
           "o2cs-oo-rum": [
             "@openobserve/browser-logs",
             "@openobserve/browser-rum",
