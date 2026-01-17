@@ -26,11 +26,10 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
-use tracing::Span;
-
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use serde::Deserialize;
+use tracing::Span;
 
 /// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
 #[cfg(feature = "enterprise")]
@@ -53,6 +52,9 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     DEFAULT_AGENT_TYPE
 }
 
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::ai::agent::meta::Role;
+
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
@@ -61,9 +63,6 @@ use crate::{
         request::search::search_stream::report_to_audit,
     },
 };
-
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::ai::agent::meta::Role;
 
 /// CreateChat
 #[utoipa::path(
@@ -162,9 +161,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
 
         // Extract user token from cookie/header for per-user MCP auth
         let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
-        let user_token = auth_str
-            .strip_prefix("Basic ")
-            .map(|s| s.to_string());
+        let user_token = auth_str.strip_prefix("Basic ").map(|s| s.to_string());
 
         // Create agent client
         let zo_config = get_config();
@@ -447,9 +444,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         // Extract user token from cookie/header for per-user MCP auth
         let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
-        let user_token = auth_str
-            .strip_prefix("Basic ")
-            .map(|s| s.to_string());
+        let user_token = auth_str.strip_prefix("Basic ").map(|s| s.to_string());
 
         // Transform PromptRequest -> QueryRequest
         let last_user_message = prompt_body
