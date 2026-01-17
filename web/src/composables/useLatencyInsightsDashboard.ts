@@ -180,15 +180,15 @@ export function useLatencyInsightsDashboard() {
         ? "approx_distinct(trace_id)"
         : "count(_timestamp)";
 
-      // For logs only: check if we should use single query or comparison query
-      // Traces ALWAYS use comparison (UNION) query regardless of time range
+      // Check if we should use single query or comparison query
+      // When no brush selection is made (baseline == selected), show only baseline data
+      // This applies to both logs and traces
       const isSameTimeRange =
-        config.streamType === "logs" &&
         config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
         config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
 
 
-      // If time ranges are the same AND it's logs (no brush selection), show single query instead of comparison
+      // If time ranges are the same (no brush selection), show single query instead of comparison
       if (isSameTimeRange) {
         const singleQuery = `
           SELECT
@@ -236,6 +236,29 @@ export function useLatencyInsightsDashboard() {
     } else if (config.analysisType === "error") {
       // Error Analysis: Compare error percentages by dimension
       // Error % = (error_traces / total_traces) * 100
+
+      // Check if we should use single query or comparison query
+      const isSameTimeRange =
+        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
+
+      // If time ranges are the same (no brush selection), show single query instead of comparison
+      if (isSameTimeRange) {
+        const singleQuery = `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            (approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') * 100.0) /
+            NULLIF(approx_distinct(trace_id), 0) AS error_percentage
+          FROM "${config.streamName}"
+          ${selectedWhere}
+          GROUP BY ${dimensionName}
+          ORDER BY error_percentage DESC
+          LIMIT 5
+        `.trim();
+        return singleQuery;
+      }
+
+      // Different time ranges: use comparison query with baseline vs selected
       const baselineQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
@@ -264,6 +287,28 @@ export function useLatencyInsightsDashboard() {
       return unionQuery;
     } else {
       // Latency Analysis: Compare percentile latencies by dimension
+
+      // Check if we should use single query or comparison query
+      const isSameTimeRange =
+        config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
+        config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
+
+      // If time ranges are the same (no brush selection), show single query instead of comparison
+      if (isSameTimeRange) {
+        const singleQuery = `
+          SELECT
+            COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
+            approx_percentile_cont(duration, \${percentile}) AS percentile_latency
+          FROM "${config.streamName}"
+          ${selectedWhere}
+          GROUP BY ${dimensionName}
+          ORDER BY percentile_latency DESC
+          LIMIT 5
+        `.trim();
+        return singleQuery;
+      }
+
+      // Different time ranges: use comparison query with baseline vs selected
       const baselineQuery = `
         SELECT
           COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)') AS value,
@@ -299,10 +344,9 @@ export function useLatencyInsightsDashboard() {
     const isErrorAnalysis = config.analysisType === "error";
 
     // Check if we're using comparison mode (baseline vs selected) or single query mode
-    // Traces ALWAYS use comparison mode
-    // Logs use comparison mode only when time ranges differ (brush selection made)
+    // When no brush selection is made (baseline == selected), show only baseline data
+    // This applies to both logs and traces
     const isSameTimeRange =
-      config.streamType === "logs" &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
     const isComparisonMode = !isSameTimeRange;
