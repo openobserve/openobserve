@@ -38,6 +38,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
       varA,
       "logs",
@@ -45,6 +46,12 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       "kubernetes_namespace_name",
       { scope: "global" }
     );
+    await pm.dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Add variable B (depends on A)
     await scopedVars.addScopedVariable(
@@ -54,11 +61,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       "kubernetes_container_name",
       {
         scope: "global",
-        dependsOn: varA
+        dependsOn: varA,
+        dependsOnField: "kubernetes_namespace_name"
       }
     );
 
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -108,12 +124,40 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     // Add variables: A (independent), B (depends on A), C (depends on B)
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     await scopedVars.addScopedVariable(varA, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
-    await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global", dependsOn: varA });
-    await scopedVars.addScopedVariable(varC, "logs", "e2e_automate", "_timestamp", { scope: "global", dependsOn: varB });
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global", dependsOn: varA, dependsOnField: "kubernetes_namespace_name" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    await pm.dashboardSetting.closeSettingWindow();
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    await scopedVars.addScopedVariable(varC, "logs", "e2e_automate", "_timestamp", { scope: "global", dependsOn: varB, dependsOnField: "kubernetes_container_name" });
+
+    // Wait for variable to be saved - either in settings or redirected to dashboard
+    await Promise.race([
+      page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 }),
+      page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 })
+    ]).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Close settings if still open
+    const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+    if (isDialogOpen) {
+      await pm.dashboardSetting.closeSettingWindow();
+    }
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -126,12 +170,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await varADropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await varADropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    const options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -160,6 +212,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Create chain: A -> B -> C -> D
     const fields = ["kubernetes_namespace_name", "kubernetes_container_name", "_timestamp", "log"];
@@ -171,12 +224,41 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
         fields[i],
         {
           scope: "global",
-          dependsOn: i > 0 ? vars[i - 1] : null
+          dependsOn: i > 0 ? vars[i - 1] : null,
+          dependsOnField: i > 0 ? fields[i - 1] : null
         }
       );
+
+      // Wait for variable to be saved - either in settings or redirected to dashboard
+      await Promise.race([
+        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
+        page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 })
+      ]).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      if (i < vars.length - 1) {
+        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+        if (!isDialogOpen) {
+          // Wait for dashboard to stabilize before reopening settings
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openSetting();
+          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openVariables();
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        }
+      }
     }
 
-    await pm.dashboardSetting.closeSettingWindow();
+    // Close settings if still open
+    const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+    if (isDialogOpen) {
+      await pm.dashboardSetting.closeSettingWindow();
+    }
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -189,12 +271,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await varADropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await varADropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    const options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -223,6 +313,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     const fields = [
       "kubernetes_namespace_name",
@@ -242,12 +333,41 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
         fields[i],
         {
           scope: "global",
-          dependsOn: i > 0 ? vars[i - 1] : null
+          dependsOn: i > 0 ? vars[i - 1] : null,
+          dependsOnField: i > 0 ? fields[i - 1] : null
         }
       );
+
+      // Wait for variable to be saved - either in settings or redirected to dashboard
+      await Promise.race([
+        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
+        page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 })
+      ]).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      if (i < vars.length - 1) {
+        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+        if (!isDialogOpen) {
+          // Wait for dashboard to stabilize before reopening settings
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openSetting();
+          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openVariables();
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        }
+      }
     }
 
-    await pm.dashboardSetting.closeSettingWindow();
+    // Close settings if still open
+    const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+    if (isDialogOpen) {
+      await pm.dashboardSetting.closeSettingWindow();
+    }
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[5]}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -260,12 +380,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await var0Dropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    const options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -294,6 +422,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     const fields = [
       "kubernetes_namespace_name",
@@ -316,14 +445,41 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
         fields[i] || "_timestamp",
         {
           scope: "global",
-          dependsOn: i > 0 ? vars[i - 1] : null
+          dependsOn: i > 0 ? vars[i - 1] : null,
+          dependsOnField: i > 0 ? (fields[i - 1] || "_timestamp") : null
         }
       );
-      // Wait for UI to stabilize after adding each variable
+
+      // Wait for variable to be saved - either in settings or redirected to dashboard
+      await Promise.race([
+        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
+        page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 })
+      ]).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      if (i < vars.length - 1) {
+        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+        if (!isDialogOpen) {
+          // Wait for dashboard to stabilize before reopening settings
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openSetting();
+          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+          await pm.dashboardSetting.openVariables();
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        }
+      }
     }
 
-    await pm.dashboardSetting.closeSettingWindow();
+    // Close settings if still open
+    const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
+    if (isDialogOpen) {
+      await pm.dashboardSetting.closeSettingWindow();
+    }
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[8]}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -336,12 +492,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await var0Dropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    const options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -372,10 +536,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add A and B (independent)
     await scopedVars.addScopedVariable(varA, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Add C depending on both A and B
     await scopedVars.addScopedVariable(
@@ -385,11 +555,21 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       "_timestamp",
       {
         scope: "global",
-        dependsOnMultiple: [varA, varB]
+        dependsOnMultiple: [varA, varB],
+        dependencyFieldMap: {
+          [varA]: "kubernetes_namespace_name",
+          [varB]: "kubernetes_container_name"
+        }
       }
     );
+    await page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -402,12 +582,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await varADropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await varADropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    let options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -425,12 +613,20 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await varBDropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Click to open the dropdown
     await varBDropdown.click();
 
-    // Wait for dropdown menu to open
+    // Wait for dropdown menu to open and options to load
     await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
+    options = page.locator('[role="option"]');
+    await options.first().waitFor({ state: "visible", timeout: 5000 });
+
+    // Wait for dropdown to stabilize and all options to render
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Select the 2nd option (index 1) to ensure value changes
+    await options.nth(1).click();
 
     // Wait for dropdown to close
     await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
@@ -460,18 +656,24 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // First, create both variables without dependencies
     // Add variable A (independent initially)
     await scopedVars.addScopedVariable(varA, "logs", "e2e_automate", "kubernetes_namespace_name", {
       scope: "global"
     });
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Add variable B that depends on A
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", {
       scope: "global",
-      dependsOn: varA // B depends on A
+      dependsOn: varA, // B depends on A
+      dependsOnField: "kubernetes_namespace_name"
     });
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Now edit variable A to depend on B (creating circular dependency: A->B->A)
     // Make sure we're on the variables tab
@@ -520,13 +722,26 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
 
     // Add 3 independent variables
     await scopedVars.addScopedVariable(varA, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await scopedVars.addScopedVariable(varC, "logs", "e2e_automate", "_timestamp", { scope: "global" });
+    await page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -564,6 +779,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     // Add variable with invalid configuration to cause error
     await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
     await scopedVars.addScopedVariable(
       variableName,
       "logs",
@@ -571,7 +787,14 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       "nonexistent_field",
       { scope: "global" }
     );
+    await page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
     await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });

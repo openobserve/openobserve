@@ -24,7 +24,9 @@ export default class DashboardVariablesScoped {
    * @param {boolean} options.showMultipleValues - Enable multi-select
    * @param {boolean} options.customValueSearch - Enable custom value search
    * @param {string} options.dependsOn - Variable name this depends on
+   * @param {string} options.dependsOnField - Field name of the variable this depends on (used in filter)
    * @param {string[]} options.dependsOnMultiple - Array of variable names for multi-dependency
+   * @param {Object} options.dependencyFieldMap - Map of {variableName: fieldName} for multi-dependency
    * @param {string} options.defaultValue - Default value for the variable
    * @param {boolean} options.hideOnDashboard - Hide variable on dashboard
    */
@@ -37,7 +39,9 @@ export default class DashboardVariablesScoped {
       showMultipleValues = false,
       customValueSearch = false,
       dependsOn = null,
+      dependsOnField = null,
       dependsOnMultiple = [],
+      dependencyFieldMap = {},
       defaultValue = null,
       hideOnDashboard = false,
     } = options;
@@ -191,13 +195,15 @@ export default class DashboardVariablesScoped {
 
     // Add dependency if specified
     if (dependsOn) {
-      await this.addDependency(dependsOn);
+      await this.addDependency(dependsOn, dependsOnField);
     }
 
     // Add multiple dependencies if specified
     if (dependsOnMultiple.length > 0) {
       for (const dep of dependsOnMultiple) {
-        await this.addDependency(dep);
+        // Use the field from dependencyFieldMap if provided, otherwise pass null
+        const depField = dependencyFieldMap[dep] || null;
+        await this.addDependency(dep, depField);
       }
     }
 
