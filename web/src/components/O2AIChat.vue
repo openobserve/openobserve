@@ -129,7 +129,7 @@
                 <!-- Loading indicator inside message box for empty assistant messages -->
                 <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
                   <q-spinner-dots color="primary" size="1.5em" />
-                  <span>Generating response...</span>
+                  <span>{{ currentAnalyzingMessage }}</span>
                 </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
                 <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
@@ -242,7 +242,7 @@
           <!-- Standalone loading indicator - only shown when no assistant message exists yet -->
           <div v-if="isLoading && !activeToolCall && !hasAssistantMessage" id="loading-indicator" class="">
             <q-spinner-dots color="primary" size="2em" />
-            <span>Generating response...</span>
+            <span>{{ currentAnalyzingMessage }}</span>
           </div>
         </div>
         
@@ -451,7 +451,53 @@ export default defineComponent({
 
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
-    
+
+    // Analyzing messages for loading indicator
+    const ANALYZING_MESSAGES = [
+      "Analyzing...",
+      "Thinking...",
+      "Processing...",
+      "Examining data...",
+      "Reviewing context...",
+      "Formulating response...",
+      "Checking details...",
+      "Gathering insights...",
+      "Evaluating options...",
+      "Synthesizing information...",
+      "Working on it...",
+      "Almost there...",
+      "Diving deeper...",
+      "Connecting the dots...",
+      "Crunching numbers...",
+      "Exploring possibilities...",
+      "Refining answer...",
+      "Still thinking...",
+      "Making progress...",
+      "Piecing together..."
+    ];
+    const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
+    const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
+
+    /**
+     * Start rotating the analyzing message every 5 seconds
+     */
+    const startAnalyzingRotation = () => {
+      currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+      analyzingRotationInterval.value = setInterval(() => {
+        currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+      }, 5000);
+    };
+
+    /**
+     * Stop rotating the analyzing message
+     */
+    const stopAnalyzingRotation = () => {
+      if (analyzingRotationInterval.value) {
+        clearInterval(analyzingRotationInterval.value);
+        analyzingRotationInterval.value = null;
+      }
+    };
+
     // Query history functionality
     const queryHistory = ref<string[]>([]);
     const historyIndex = ref(-1);
@@ -576,6 +622,7 @@ export default defineComponent({
         // Update UI state to reflect cancellation
         isLoading.value = false;
         activeToolCall.value = null;
+        stopAnalyzingRotation();
 
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
@@ -624,6 +671,7 @@ export default defineComponent({
         console.error('Error fetching initial message:', error);
       }
       isLoading.value = false;
+      stopAnalyzingRotation();
       scrollToBottom();
     };
 
@@ -1076,6 +1124,7 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
+      startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
@@ -1142,6 +1191,7 @@ export default defineComponent({
 
       isLoading.value = false;
       activeToolCall.value = null;
+      stopAnalyzingRotation();
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
@@ -1532,6 +1582,7 @@ export default defineComponent({
       inputMessage,
       chatMessages,
       isLoading,
+      currentAnalyzingMessage,
       sendMessage,
       handleKeyDown,
       focusInput,
@@ -2284,9 +2335,39 @@ export default defineComponent({
     color: #a0aec0;
   }
 
+  // Error state styling
+  &.error {
+    &.light-mode {
+      background: rgba(244, 67, 54, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(244, 67, 54, 0.12);
+    }
+  }
+
+  // Timeout state styling
+  &.timeout {
+    &.light-mode {
+      background: rgba(255, 152, 0, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(255, 152, 0, 0.12);
+    }
+  }
+
   .tool-call-name {
     font-weight: 500;
     flex: 1;
+  }
+
+  .tool-call-error {
+    font-size: 11px;
+    color: #f44336;
+    font-style: italic;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .tool-call-query {

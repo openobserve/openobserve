@@ -65,17 +65,18 @@ pub async fn put(
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, Error> {
     // Template is now optional - only look it up if one is specified
-    let template_id = if let destinations::Module::Alert {
-        template: Some(template_name),
-        ..
-    } = &destination.module
-    {
-        super::templates::get(&destination.org_id, template_name)
-            .await?
-            .and_then(|temp| temp.id.map(|id| id.to_string()))
-    } else {
-        None
-    };
+    let template_id =
+        if let destinations::Module::Alert {
+            template: Some(template_name),
+            ..
+        } = &destination.module
+        {
+            super::templates::get(&destination.org_id, template_name)
+                .await?
+                .and_then(|temp| temp.id.map(|id| id.to_string()))
+        } else {
+            None
+        };
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;

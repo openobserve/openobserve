@@ -32,6 +32,27 @@ use tracing::Span;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
+/// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
+#[cfg(feature = "enterprise")]
+const DEFAULT_AGENT_TYPE: &str = "o2-ai";
+
+/// Agent type for incident-specific queries (triggered when incident_id is in context)
+#[cfg(feature = "enterprise")]
+const INCIDENT_AGENT_TYPE: &str = "sre";
+
+/// Determine agent type based on context.
+/// - If context contains incident_id, use SRE agent for incident investigation
+/// - Otherwise use default copilot agent
+#[cfg(feature = "enterprise")]
+fn get_agent_type(context: &serde_json::Value) -> &'static str {
+    if let Some(obj) = context.as_object() {
+        if obj.contains_key("incident_id") {
+            return INCIDENT_AGENT_TYPE;
+        }
+    }
+    DEFAULT_AGENT_TYPE
+}
+
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
@@ -81,11 +102,31 @@ use o2_enterprise::enterprise::ai::agent::meta::Role;
         ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
     )
 )]
-pub async fn chat(
-    Path(org_id): Path<String>,
-    Headers(auth_data): Headers<TraceInfo>,
-    Json(body): Json<PromptRequest>,
-) -> Response {
+pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
+    // Extract headers manually to avoid conflict with body extraction
+    let (mut parts, body) = in_req.into_parts();
+
+    // Extract TraceInfo from headers
+    let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
+        Ok(Headers(data)) => data,
+        Err(e) => return e.into_response(),
+    };
+
+    // Parse JSON body
+    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+        }
+    };
+
+    let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+        }
+    };
+
     #[cfg(feature = "enterprise")]
     {
         use config::get_config;
@@ -119,11 +160,10 @@ pub async fn chat(
             return MetaHttpResponse::bad_request("Agent service not configured");
         }
 
-        // Extract user token from Authorization header for per-user MCP auth
-        let user_token = auth_data
-            .authorization
-            .as_ref()
-            .and_then(|s| s.strip_prefix("Basic "))
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
+        let user_token = auth_str
+            .strip_prefix("Basic ")
             .map(|s| s.to_string());
 
         // Create agent client
@@ -147,7 +187,7 @@ pub async fn chat(
 
         // Transform PromptRequest -> QueryRequest
         // Extract the last user message as the query
-        let last_user_message = body
+        let last_user_message = prompt_body
             .messages
             .iter()
             .rfind(|m| m.role == Role::User)
@@ -155,10 +195,10 @@ pub async fn chat(
             .unwrap_or_default();
 
         // Build history from all messages except the last user message
-        let history: Vec<serde_json::Value> = body
+        let history: Vec<serde_json::Value> = prompt_body
             .messages
             .iter()
-            .take(body.messages.len().saturating_sub(1))
+            .take(prompt_body.messages.len().saturating_sub(1))
             .map(|m| {
                 serde_json::json!({
                     "role": format!("{:?}", m.role).to_lowercase(),
@@ -168,7 +208,7 @@ pub async fn chat(
             .collect();
 
         // Merge org_id into context
-        let mut context = serde_json::to_value(&body.context).unwrap_or_default();
+        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
         if let Some(obj) = context.as_object_mut() {
             obj.insert(
                 "org_id".to_string(),
@@ -176,13 +216,17 @@ pub async fn chat(
             );
         }
 
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        // Must be done before context is moved into QueryRequest
+        let agent_type = get_agent_type(&context);
+
         let query_req = QueryRequest {
             query: last_user_message,
             context,
-            model: if body.model.is_empty() {
+            model: if prompt_body.model.is_empty() {
                 None
             } else {
-                Some(body.model)
+                Some(prompt_body.model)
             },
             history: if history.is_empty() {
                 None
@@ -193,7 +237,7 @@ pub async fn chat(
         };
 
         // Query agent
-        match client.query("sre", query_req).await {
+        match client.query(agent_type, query_req).await {
             Ok(response) => {
                 // QueryResponse has a `response: String` field
                 let prompt_response = PromptResponse {
@@ -229,8 +273,9 @@ pub async fn chat(
     #[cfg(not(feature = "enterprise"))]
     {
         drop(org_id);
+        drop(parts);
         drop(auth_data);
-        drop(body);
+        drop(prompt_body);
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
     }
 }
@@ -400,11 +445,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             }
         };
 
-        // Extract user token from Authorization header for per-user MCP auth
-        let user_token = auth_data
-            .authorization
-            .as_ref()
-            .and_then(|s| s.strip_prefix("Basic "))
+        // Extract user token from cookie/header for per-user MCP auth
+        let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
+        let user_token = auth_str
+            .strip_prefix("Basic ")
             .map(|s| s.to_string());
 
         // Transform PromptRequest -> QueryRequest
@@ -434,6 +478,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 serde_json::Value::String(org_id_str.clone()),
             );
         }
+
+        // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
+        // Must be done before context is moved into QueryRequest
+        let agent_type = get_agent_type(&context);
 
         let query_req = QueryRequest {
             query: last_user_message,
@@ -478,7 +526,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             );
 
             // Call the agent service
-            let response = match client.query_stream("sre", query_req).await {
+            let response = match client.query_stream(agent_type, query_req).await {
                 Ok(r) => r,
                 Err(e) => {
                     log::error!(

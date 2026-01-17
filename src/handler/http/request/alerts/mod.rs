@@ -106,6 +106,8 @@ impl From<AlertError> for Response {
             AlertError::PermissionDenied => MetaHttpResponse::forbidden("Unauthorized access"),
             AlertError::UserNotFound => MetaHttpResponse::forbidden("Unauthorized access"),
             AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
+            AlertError::TemplateNotConfigured { .. } => MetaHttpResponse::bad_request(value),
+            AlertError::AlertTemplateNotFound { .. } => MetaHttpResponse::not_found(value),
         }
     }
 }
