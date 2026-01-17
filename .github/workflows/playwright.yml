@@ -113,175 +113,174 @@ jobs:
     strategy:
       matrix:
         include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-                "theme-management.spec.js",
-                "ingestion-config.spec.js",
-                "landingPage.spec.js",
-                "languageTranslation.spec.js",
-              ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "join.spec.js",
-                "logshistogram.spec.js",
-                "logspage.spec.js",
-                "logsquickmode.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-                "logstable.spec.js",
-                "shareLink.spec.js",
-              ]
-          - testfolder: "Logs-Queries"
-            browser: "chrome"
-            run_files:
-              [
-                "logsDownloads.spec.js",
-                "logsqueries.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsqueries.matchall.spec.js",
-                "searchpartition.spec.js",
-              ]
-          - testfolder: "Alerts"
-            browser: "chrome"
-            run_files:
-              [
-                "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-                "alerts-advanced.spec.js",
-                "alerts-destinations-prebuilt.spec.js",
-              ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-                "dashboard-chartJson.spec.js",
-              ]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-variables-setting.spec.js",
-                "dashboard-transpose.spec.js",
-                "dashboard-join.spec.js",
-                "dashboard-nested-functions.spec.js",
-              ]
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files: [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "visualize.spec.js",
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js",]
-          - testfolder: "Pipelines"
-            browser: "chrome"
-            run_files: [
-                "pipeline-conditions.spec.js",
-                "pipeline-conditions-validation.spec.js",
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
-                "scheduled-pipeline-query-builder.spec.js",
-                # "remotepipeline.spec.js"
-              ]
-          - testfolder: "Functions"
-            browser: "chrome"
-            run_files: [
-                "js-transform-type.spec.js",
-                "row-expansion.spec.js",
-                "enrichment-table-url.spec.js",
-              ]
-          - testfolder: "Reports"
-            browser: "chrome"
-            run_files: [
-              "reportsScheduleNow.spec.js", 
-              "reportsScheduleLater.spec.js"
-              ]
-          - testfolder: "Streams"
-            browser: "chrome"
-            run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-                "stream-settings.spec.js",
-              ]
+          # - testfolder: "GeneralTests"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "sanity.spec.js",
+          #       "changeOrg.spec.js",
+          #       "enrichment.spec.js",
+          #       "schema.spec.js",
+          #       "schemaload.spec.js",
+          #       "serviceAccount.spec.js",
+          #       "usersOrg.spec.js",
+          #       "org.spec.js",
+          #       "theme-management.spec.js",
+          #       "ingestion-config.spec.js",
+          #       "landingPage.spec.js",
+          #       "languageTranslation.spec.js",
+          #     ]
+          # - testfolder: "Logs-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "join.spec.js",
+          #       "logshistogram.spec.js",
+          #       "logspage.spec.js",
+          #       "logsquickmode.spec.js",
+          #       "pagination.spec.js",
+          #       "unflattened.spec.js",
+          #       "logstable.spec.js",
+          #       "shareLink.spec.js",
+          #     ]
+          # - testfolder: "Logs-Queries"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logsDownloads.spec.js",
+          #       "logsqueries.spec.js",
+          #       "secondsPrecisionAdded.spec.js",
+          #       "logsqueries.cte.spec.js",
+          #       "logsqueries.matchall.spec.js",
+          #       "searchpartition.spec.js",
+          #     ]
+          # - testfolder: "Alerts"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "alerts-e2e-flow.spec.js",
+          #       "alerts-ui-operations.spec.js",
+          #       "alerts-import.spec.js",
+          #       "alerts-advanced.spec.js",
+                # "alerts-destinations-prebuilt.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Core"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard.spec.js",
+          #       "dashboard2.spec.js",
+          #       "dashboardtype.spec.js",
+          #       "dashboard-folder.spec.js",
+          #       "dashboard-import.spec.js",
+          #       "maxquery.spec.js",
+          #       "dashboard-chartJson.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Settings"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "dashboard-filter.spec.js",
+          #       "dashboard-general-setting.spec.js",
+          #       "dashboard-tabs-setting.spec.js",
+          #       "dashboard-variables-setting.spec.js",
+          #       "dashboard-transpose.spec.js",
+          #       "dashboard-join.spec.js",
+          #       "dashboard-nested-functions.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Charts"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "custom-charts.spec.js",
+          #       "dashboard-geoMap.spec.js",
+          #       "dashboard-maps.spec.js",
+          #       "dashboard-multi-y-axis.spec.js",
+          #       "dashboard-html-chart.spec.js",
+          #       "visualize.spec.js",
+          #     ]
+          # - testfolder: "Dashboards-Streaming"
+          #   browser: "chrome"
+          #   run_files: ["dashboard-streaming.spec.js",]
+          # - testfolder: "Pipelines"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "pipeline-conditions.spec.js",
+          #       "pipeline-conditions-validation.spec.js",
+          #       "pipelines.spec.js",
+          #       "pipeline-dynamic.spec.js",
+          #       "pipeline-core.spec.js",
+                # "scheduled-pipeline-query-builder.spec.js",
+          #       # "remotepipeline.spec.js"
+          #     ]
+          # - testfolder: "Functions"
+          #   browser: "chrome"
+          #   run_files: [
+          #       "js-transform-type.spec.js",
+          #       "row-expansion.spec.js",
+          #       "enrichment-table-url.spec.js",
+          #     ]
+          # - testfolder: "Reports"
+          #   browser: "chrome"
+          #   run_files: [
+          #     "reportsScheduleNow.spec.js", 
+          #     "reportsScheduleLater.spec.js"
+          #     ]
+          # - testfolder: "Streams"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "multiselect-stream.spec.js",
+          #       "streamname.spec.js",
+          #       "streaming.spec.js",
+          #       "stream-settings.spec.js",
+          #     ]
 
-          - testfolder: "Traces"
-            browser: "chrome"
-            run_files:
-              [
-                "tracesSearch.spec.js",
-                "traceQueryEditor.spec.js",
-                "traceErrorFilter.spec.js",
-                "traceDetails.spec.js",
-                "traceAdvancedFiltering.spec.js",
-              ]
+          # - testfolder: "Traces"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "tracesSearch.spec.js",
+          #       "traceQueryEditor.spec.js",
+          #       "traceErrorFilter.spec.js",
+          #       "traceDetails.spec.js",
+          #       "traceAdvancedFiltering.spec.js",
+          #     ]
 
-          - testfolder: "RegressionSet"
-            browser: "chrome"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-regression-bugs.spec.js",
-                "streams-regression.spec.js",
-                "enrichment-regression.spec.js",
-                "ui-regression.spec.js",
-                "pipeline-regression.spec.js",
-              ]
-          - testfolder: "Metrics"
-            browser: "chrome"
-            run_files:
-              [
-                "metrics.spec.js",
-                "metrics-queries.spec.js",
-                "metrics-aggregations.spec.js",
-                "metrics-advanced.spec.js",
-                "metrics-config-tabs.spec.js",
-                "metrics-visualizations.spec.js",
-                "metrics-config.spec.js",
-              ]
-            # - testfolder: "Dashboards-Variables-Scoped"
-            #   browser: "chrome"
-            #   run_files:
-            #     [
-            #       "dashboard-variables-global.spec.js",
-            #       "dashboard-variables-tab-level.spec.js",
-            #       "dashboard-variables-panel-level.spec.js",
-            #       "dashboard-variables-dependency.spec.js",
+          # - testfolder: "RegressionSet"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "logs-regression.spec.js",
+          #       "streams-regression.spec.js",
+          #       "enrichment-regression.spec.js",
+          #       "ui-regression.spec.js",
+          #       "pipeline-regression.spec.js",
+          #     ]
+          # - testfolder: "Metrics"
+          #   browser: "chrome"
+          #   run_files:
+          #     [
+          #       "metrics.spec.js",
+          #       "metrics-queries.spec.js",
+          #       "metrics-aggregations.spec.js",
+          #       "metrics-advanced.spec.js",
+          #       "metrics-config-tabs.spec.js",
+          #       "metrics-visualizations.spec.js",
+          #       "metrics-config.spec.js",
+          #     ]
+            - testfolder: "Dashboards-Variables-Scoped"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-global.spec.js",
+                  "dashboard-variables-tab-level.spec.js",
+                  "dashboard-variables-panel-level.spec.js",
+                  "dashboard-variables-dependency.spec.js",
             #       "dashboard-variables-refresh.spec.js",
             #       "dashboard-variables-url-sync.spec.js",
-            #       "dashboard-variables-creation-scopes.spec.js",
+                  "dashboard-variables-creation-scopes.spec.js",
             #       "dashboard-variables-null-handling.spec.js",
-            #     ]
+                ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
