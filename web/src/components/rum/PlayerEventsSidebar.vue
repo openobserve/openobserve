@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             clearable
             debounce="1"
-            placeholder="Search Event"
+            :placeholder="t('rum.searchEvents')"
             @update:model-value="searchEvents"
           />
         </div>
@@ -121,7 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, watch } from "vue";
 import AppTabs from "../common/AppTabs.vue";
+import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+
+const { t } = useI18n();
 
 const props = defineProps({
   events: {
@@ -137,12 +140,12 @@ const props = defineProps({
 const activeTab = ref<string>("breadcrumbs");
 const tabs = [
   {
-    label: "Breadcrumbs",
+    label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
     style: { width: "fit-content", padding: "0.5rem 0.625rem", "margin-right": "0.25rem" },
   },
   {
-    label: "Tags",
+    label: t("rum.tags"),
     value: "tags",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },

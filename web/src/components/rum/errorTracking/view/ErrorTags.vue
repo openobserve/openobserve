@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tags-title text-bold q-ml-xs">Tags</div>
+    <div class="tags-title text-bold q-ml-xs">{{ t("rum.tags") }}</div>
     <div class="row items-center">
       <div class="q-mr-lg items-center">
         <img
@@ -74,6 +74,9 @@ import ip from "@/assets/images/rum/ip_ad.png";
 import windows from "@/assets/images/rum/windows.png";
 import mac from "@/assets/images/rum/mac.png";
 import linux from "@/assets/images/rum/linux.png";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   error: {

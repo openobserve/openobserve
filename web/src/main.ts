@@ -113,7 +113,9 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
       });
 
-      openobserveRum.startSessionReplayRecording({ force: true });
+      // Don't start session replay automatically - it will be started after login
+      // to avoid capturing login page with "Unknown" user
+      // Session replay will be started in Login.vue and MainLayout.vue after user is authenticated
     }
   });
 };

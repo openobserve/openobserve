@@ -73,6 +73,7 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
     setUser: vi.fn(),
+    startSessionReplayRecording: vi.fn(),
   },
 }));
 
@@ -595,13 +596,16 @@ describe("Login", () => {
       name: "testuser ",
       email: "testuser",
     });
+    expect(rum.openobserveRum.startSessionReplayRecording).toHaveBeenCalledWith({
+      force: true,
+    });
   });
 
   // Test 23: successful sign in handles session storage
   it("should handle session storage operations on successful sign in", async () => {
     const mockGetItem = vi.fn().mockReturnValue("/dashboard");
     const mockRemoveItem = vi.fn();
-    
+
     Object.defineProperty(window, "sessionStorage", {
       value: {
         getItem: mockGetItem,
@@ -611,15 +615,34 @@ describe("Login", () => {
       writable: true,
     });
 
+    const noRumStore = createStore({
+      state: {
+        zoConfig: {
+          sso_enabled: true,
+          native_login_enabled: true,
+          rum: { enabled: false },
+        },
+        userInfo: {
+          email: "test@example.com",
+        },
+      },
+      actions: {
+        setUserInfo: vi.fn(),
+        setCurrentUser: vi.fn(),
+        setSelectedOrganization: vi.fn(),
+      },
+      dispatch: vi.fn(),
+    });
+
     wrapper = mount(Login, {
       global: {
-        plugins: [i18n, store, router],
+        plugins: [i18n, noRumStore, router],
       },
     });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
     expect(mockGetItem).toHaveBeenCalledWith("redirectURI");
     expect(mockRemoveItem).toHaveBeenCalledWith("redirectURI");
@@ -873,6 +896,7 @@ describe("Login", () => {
   // Test 35: organization selection clears mismatched email
   it("should clear organization when user email does not match", async () => {
     const zincUtils = await import("@/utils/zincutils");
+    const mockUseLocalOrganization = vi.fn();
     const mockLocalOrg = {
       value: {
         id: "1",
@@ -880,15 +904,44 @@ describe("Login", () => {
         user_email: "different@example.com",
       }
     };
-    (zincUtils.useLocalOrganization as any).mockReturnValue(mockLocalOrg);
 
-    mountComponentWithMocks();
+    (zincUtils.useLocalOrganization as any).mockImplementation((arg?: any) => {
+      if (arg !== undefined) {
+        mockUseLocalOrganization(arg);
+      }
+      return mockLocalOrg;
+    });
+
+    const noRumStore = createStore({
+      state: {
+        zoConfig: {
+          sso_enabled: true,
+          native_login_enabled: true,
+          rum: { enabled: false },
+        },
+        userInfo: {
+          email: "test@example.com",
+        },
+      },
+      actions: {
+        setUserInfo: vi.fn(),
+        setCurrentUser: vi.fn(),
+        setSelectedOrganization: vi.fn(),
+      },
+      dispatch: vi.fn(),
+    });
+
+    wrapper = mount(Login, {
+      global: {
+        plugins: [i18n, noRumStore, router],
+      },
+    });
 
     wrapper.vm.name = "testuser";
     wrapper.vm.password = "password123";
-    
+
     await wrapper.vm.onSignIn();
-    expect(zincUtils.useLocalOrganization).toHaveBeenCalledWith("");
+    expect(mockUseLocalOrganization).toHaveBeenCalledWith("");
   });
 
   // Test 36-52: Additional comprehensive tests for better coverage

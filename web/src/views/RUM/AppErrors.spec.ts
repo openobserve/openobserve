@@ -182,6 +182,10 @@ describe('AppErrors.vue', () => {
             error: 'Error',
             events: 'Events',
             viewURL: 'View URL',
+            loadingApplicationErrors: "Hold on tight, we're fetching application errors.",
+          },
+          metrics: {
+            runQuery: 'Run query',
           },
         },
       },
@@ -314,7 +318,7 @@ describe('AppErrors.vue', () => {
       await wrapper.vm.$nextTick();
       
       expect(wrapper.find('.q-spinner').exists()).toBe(true);
-      expect(wrapper.text()).toContain('Hold on tight, we\'re fetching your application errors.');
+      expect(wrapper.text()).toContain('Hold on tight, we\'re fetching application errors.');
     });
 
     it('should hide loading spinner when isLoading is false', async () => {

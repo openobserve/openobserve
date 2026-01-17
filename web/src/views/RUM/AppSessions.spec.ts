@@ -268,7 +268,7 @@ describe("AppSessions.vue", () => {
       await nextTick();
 
       expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
-      expect(wrapper.text()).toContain("Hold on tight, we're fetching your sessions.");
+      expect(wrapper.text()).toContain("Hold on tight, we're fetching sessions.");
     });
 
     it("should render app table when not loading", async () => {
