@@ -14,6 +14,21 @@
 
 import { PrebuiltConfig } from './types';
 
+const TEAMS_WEBHOOK_ALLOWED_HOSTS = ['outlook.office.com', 'webhook.office.com'];
+
+function isValidTeamsWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      parsed.protocol === 'https:' &&
+      TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Microsoft Teams prebuilt destination configuration
  * Uses Adaptive Cards for rich formatting
@@ -83,8 +98,7 @@ export const msteamsConfig: PrebuiltConfig = {
     'Content-Type': 'application/json'
   },
   method: 'post',
-  urlValidator: (url: string) =>
-    url.includes('outlook.office.com') || url.includes('webhook.office.com'),
+  urlValidator: (url: string) => isValidTeamsWebhookUrl(url),
   credentialFields: [
     {
       key: 'webhookUrl',
@@ -93,8 +107,7 @@ export const msteamsConfig: PrebuiltConfig = {
       required: true,
       hint: 'Get your webhook URL from Teams channel connectors',
       validator: (url: string) =>
-        (url.includes('outlook.office.com') || url.includes('webhook.office.com')) ||
-        'Invalid Microsoft Teams webhook URL'
+        isValidTeamsWebhookUrl(url) || 'Invalid Microsoft Teams webhook URL'
     }
   ]
 };
