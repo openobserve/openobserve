@@ -897,22 +897,6 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     /**
-     * Verify column mismatch error when appending incompatible CSV
-     */
-    async verifyColumnMismatchError() {
-        testLogger.debug('Verifying column mismatch error');
-
-        // Look for error message containing "mismatch" or "schema" or "column"
-        const errorLocator = this.page.locator('.q-notification, .q-banner, [role="alert"]').filter({
-            hasText: /mismatch|schema|column|incompatible/i
-        });
-
-        await expect(errorLocator.first()).toBeVisible({ timeout: 15000 });
-
-        testLogger.debug('Column mismatch error verified');
-    }
-
-    /**
      * Verify table type in the list (File or Url)
      * @param {string} tableName - Name of the table
      * @param {string} expectedType - "File" or "Url"
