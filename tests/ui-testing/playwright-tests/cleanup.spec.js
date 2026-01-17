@@ -192,7 +192,8 @@ test.describe("Pre-Test Cleanup", () => {
       /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
       /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (validation test)
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
-      /^toggle_test_[a-f0-9]{8}$/                                                            // toggle_test_<uuid> (source toggle test)
+      /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
+      /^update_modes_[a-f0-9]{8}$/                                                           // update_modes_<uuid> (update modes test)
     ]);
 
     // Clean up streams matching test patterns

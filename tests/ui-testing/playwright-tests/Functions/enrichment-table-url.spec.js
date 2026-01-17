@@ -15,6 +15,7 @@ const { randomUUID } = require('crypto');
 
 // Test data - using small protocols.csv (13 rows) for fast processing
 const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
+const APPEND_CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/append.csv';
 const INVALID_URL_NO_PROTOCOL = 'example.com/data.csv';
 
 test.describe('Enrichment Table URL Feature Tests', () => {
@@ -155,6 +156,65 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Verify table does NOT exist (no rows or "No data available" message)
         await enrichmentPage.verifyTableNotCreated(tableName);
         testLogger.info('Verified table was not created');
+    });
+
+    test('@P1 Update modes: reload, append, and replace URLs', async () => {
+        const tableName = generateTableName('update_modes');
+        testLogger.info(`Test: Update modes - ${tableName}`);
+
+        // Step 1: Create enrichment table from URL
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Initial table created with 1 URL');
+
+        // Step 2: Search and verify table exists
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table found in list');
+
+        // ========== TEST RELOAD MODE ==========
+        // Step 3: Click Edit and test Reload mode
+        await enrichmentPage.clickEditButton(tableName);
+        await enrichmentPage.verifyUpdateMode();
+        testLogger.info('Edit form opened');
+
+        // Reload is default mode - just save to trigger re-processing
+        await enrichmentPage.selectUpdateMode('reload');
+        await enrichmentPage.saveUpdateMode();
+        testLogger.info('Reload mode tested - re-processed existing URL');
+
+        // ========== TEST APPEND MODE ==========
+        // Step 4: Edit again and test Append mode
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        await enrichmentPage.clickEditButton(tableName);
+        await enrichmentPage.verifyUpdateMode();
+
+        await enrichmentPage.selectUpdateMode('append');
+        await enrichmentPage.fillNewUrlInput(APPEND_CSV_URL);
+        await enrichmentPage.saveUpdateMode();
+        testLogger.info('Append mode tested - added second URL');
+
+        // ========== TEST REPLACE MODE ==========
+        // Step 5: Edit again and test Replace mode
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        await enrichmentPage.clickEditButton(tableName);
+        await enrichmentPage.verifyUpdateMode();
+
+        await enrichmentPage.selectUpdateMode('replace');
+        await enrichmentPage.fillNewUrlInput(CSV_URL);
+        await enrichmentPage.saveUpdateMode();
+        testLogger.info('Replace mode tested - replaced all URLs with new one');
+
+        // Step 6: Cleanup - delete the table
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
     });
 
     // ============================================================================
