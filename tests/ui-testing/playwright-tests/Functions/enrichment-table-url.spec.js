@@ -254,10 +254,14 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.saveUpdateMode();
         testLogger.info('Append mode tested - added second URL');
 
-        // ========== TEST REPLACE MODE ==========
-        // Step 5: Edit again and test Replace mode
+        // Verify URL count increased to 2 after append
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
+        await enrichmentPage.verifyUrlCount(tableName, 2);
+        testLogger.info('URL count verified: 2 after append');
+
+        // ========== TEST REPLACE MODE ==========
+        // Step 5: Edit again and test Replace mode
         await enrichmentPage.clickEditButton(tableName);
         await enrichmentPage.verifyUpdateMode();
 
@@ -265,6 +269,12 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.fillNewUrlInput(CSV_URL);
         await enrichmentPage.saveUpdateMode();
         testLogger.info('Replace mode tested - replaced all URLs with new one');
+
+        // Verify URL count back to 1 after replace
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        await enrichmentPage.verifyUrlCount(tableName, 1);
+        testLogger.info('URL count verified: 1 after replace');
 
         // Step 6: Cleanup - delete the table
         await enrichmentPage.searchEnrichmentTableInList(tableName);
