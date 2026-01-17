@@ -149,7 +149,7 @@
                     </div>
                     <!-- Expandable details -->
                     <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
-                      <div v-if="block.context?.query" class="detail-item">
+                      <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Query</span>
                           <q-btn
@@ -158,24 +158,56 @@
                             size="xs"
                             icon="content_copy"
                             class="copy-btn"
-                            @click.stop="copyToClipboard(block.context.query)"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query)"
                           >
                             <q-tooltip>Copy query</q-tooltip>
                           </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{ block.context.query }}</code>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.query }}</code>
                       </div>
-                      <div v-if="block.context?.stream" class="detail-item">
+                      <div v-if="getToolCallDisplayData(block.context)?.stream" class="detail-item">
                         <span class="detail-label">Stream</span>
-                        <code class="detail-value">{{ block.context.stream }}</code>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.stream }}</code>
                       </div>
-                      <div v-if="block.context?.start_time" class="detail-item">
+                      <div v-if="getToolCallDisplayData(block.context)?.type" class="detail-item">
+                        <span class="detail-label">Type</span>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.type }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.start_time" class="detail-item">
                         <span class="detail-label">Start</span>
-                        <span class="detail-value">{{ formatTimestamp(block.context.start_time) }}</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.start_time) }}</span>
                       </div>
-                      <div v-if="block.context?.end_time" class="detail-item">
+                      <div v-if="getToolCallDisplayData(block.context)?.end_time" class="detail-item">
                         <span class="detail-label">End</span>
-                        <span class="detail-value">{{ formatTimestamp(block.context.end_time) }}</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.end_time) }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.from !== undefined" class="detail-item">
+                        <span class="detail-label">From</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.from }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.size !== undefined" class="detail-item">
+                        <span class="detail-label">Size</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.size }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.query_type" class="detail-item">
+                        <span class="detail-label">Query Type</span>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.query_type }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.vrl" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">VRL</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl)"
+                          >
+                            <q-tooltip>Copy VRL</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
                       </div>
                     </div>
                   </div>
@@ -262,13 +294,16 @@
               <q-spinner-dots color="primary" size="1.5em" />
               <div class="tool-call-info">
                 <span class="tool-call-message">{{ activeToolCall.message }}</span>
-                <div v-if="Object.keys(activeToolCall.context).length > 0" class="tool-call-context">
-                  <template v-for="(value, key) in activeToolCall.context" :key="key">
-                    <div class="context-item" v-if="key === 'query'">
-                      <code class="context-query">{{ truncateQuery(value) }}</code>
-                    </div>
-                    <span v-else class="context-tag">{{ formatContextKey(key) }}: {{ formatContextValue(value) }}</span>
-                  </template>
+                <div v-if="getToolCallDisplayData(activeToolCall.context)" class="tool-call-context">
+                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
+                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query) }}</code>
+                  </div>
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.stream" class="context-tag">
+                    Stream: {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
+                  </span>
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.query_type" class="context-tag">
+                    Type: {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1686,16 +1721,40 @@ export default defineComponent({
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
     };
 
+    // Extract display fields from tool call context (handles different tool schemas)
+    const getToolCallDisplayData = (context: any) => {
+      if (!context) return null;
+
+      const data: Record<string, any> = {};
+
+      // Handle nested request_body.query structure (SearchSQL, ExtractPatterns)
+      if (context.request_body?.query) {
+        const q = context.request_body.query;
+        if (q.sql) data.query = q.sql;
+        if (q.start_time) data.start_time = q.start_time;
+        if (q.end_time) data.end_time = q.end_time;
+        if (q.from !== undefined) data.from = q.from;
+        if (q.size !== undefined) data.size = q.size;
+        if (q.query_type) data.query_type = q.query_type;
+        if (q.vrl) data.vrl = q.vrl;
+      }
+
+      // Handle flat structure (StreamSchema, etc.)
+      if (context.stream_name) data.stream = context.stream_name;
+      if (context.type) data.type = context.type;
+
+      return Object.keys(data).length > 0 ? data : null;
+    };
+
     const hasToolCallDetails = (block: ContentBlock) => {
-      if (!block.context) return false;
-      return !!(block.context.query || block.context.stream || block.context.start_time || block.context.end_time);
+      return getToolCallDisplayData(block.context) !== null;
     };
 
     const formatToolCallMessage = (block: ContentBlock) => {
       // Interpolate context into message for certain tools
       // Returns object with text and optional highlight for bold rendering
-      if (block.tool === 'StreamSchema' && block.context?.stream) {
-        return { text: 'Fetched ', highlight: block.context.stream, suffix: ' stream schema' };
+      if (block.tool === 'StreamSchema' && block.context?.stream_name) {
+        return { text: 'Fetched ', highlight: block.context.stream_name, suffix: ' stream schema' };
       }
       if (block.tool === 'GetIncident' && block.context?.incident_id) {
         return { text: 'Retrieved incident ', highlight: block.context.incident_id, suffix: '' };
@@ -1797,6 +1856,7 @@ export default defineComponent({
       toggleToolCallExpanded,
       isToolCallExpanded,
       hasToolCallDetails,
+      getToolCallDisplayData,
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
