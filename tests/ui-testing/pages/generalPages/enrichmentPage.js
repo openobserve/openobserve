@@ -47,6 +47,14 @@ class EnrichmentPage {
         this.quasarTable = '.o2-quasar-table';
         this.helpMenuItem = '[data-test="menu-link-help-item"]';
         this.openApiMenuItem = 'text=/openapi/i';
+
+        // URL-based enrichment table locators
+        this.sourceRadioGroup = '.q-option-group'; // Source selector: Upload File / From URL
+        this.urlInputField = 'label:has-text("CSV File URL") + .q-field__control .q-field__native'; // URL input field
+        this.updateModeRadioGroup = 'text=/Update Mode/i'; // Update mode selector
+        this.urlListContainer = 'text=/Existing URLs/i'; // Container showing URL list with statuses
+        this.addEnrichmentTableTitle = 'text=/Add Enrichment Table/i';
+        this.updateEnrichmentTableTitle = 'text=/Update Enrichment Table/i';
     }
 
     // ============================================================================
@@ -704,13 +712,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
         await searchInput.waitFor({ state: 'visible', timeout: 30000 });
 
+        // Clear existing search first
+        await searchInput.clear();
+        await this.page.waitForTimeout(500);
+
         // Fill the search input with table name to filter results
         await searchInput.fill(tableName);
         await this.page.waitForLoadState('networkidle');
 
-        // Wait for filtered results to appear - look for table row containing the searched name
-        const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
-        await tableRow.first().waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for search to process
+        await this.page.waitForTimeout(1000);
     }
 
     async verifyTableVisibleInList(tableName) {
@@ -768,6 +779,522 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async clickDeleteOK() {
         await this.page.getByRole('button', { name: 'OK' }).click();
         await this.page.waitForLoadState('networkidle');
+    }
+
+    // ============================================================================
+    // URL-BASED ENRICHMENT TABLE METHODS
+    // ============================================================================
+
+    /**
+     * Select the data source option (file or url)
+     * @param {string} option - "file" or "url"
+     */
+    async selectSourceOption(option) {
+        testLogger.debug(`Selecting source option: ${option}`);
+
+        // Wait for the radio group to be visible
+        const radioGroup = this.page.locator('.q-option-group').first();
+        await radioGroup.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Click the appropriate radio button by label text
+        if (option === 'url') {
+            await this.page.getByText('From URL', { exact: true }).click();
+        } else {
+            await this.page.getByText('Upload File', { exact: true }).click();
+        }
+
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug(`Selected source option: ${option}`);
+    }
+
+    /**
+     * Fill the URL input field
+     * @param {string} url - CSV file URL
+     */
+    async fillUrlInput(url) {
+        testLogger.debug(`Filling URL input: ${url}`);
+
+        // Wait for URL input to be visible - use label locator for specificity to avoid AI assistant conflict
+        const urlInput = this.page.locator('label:has-text("CSV File URL")').locator('..').locator('input[aria-label="CSV File URL"]');
+
+        await urlInput.waitFor({ state: 'visible', timeout: 10000 });
+        await urlInput.fill(url);
+
+        testLogger.debug('URL input filled');
+    }
+
+    /**
+     * Create enrichment table from URL - Complete workflow
+     * @param {string} tableName - Name of the enrichment table
+     * @param {string} csvUrl - URL to CSV file
+     */
+    async createEnrichmentTableFromUrl(tableName, csvUrl) {
+        testLogger.debug(`Creating enrichment table from URL: ${tableName}`);
+
+        // Fill in table name
+        const nameInput = this.page.locator('.q-field__native').first();
+        await nameInput.waitFor({ state: 'visible', timeout: 10000 });
+        await nameInput.fill(tableName);
+        testLogger.debug(`Table name filled: ${tableName}`);
+
+        // Select "From URL" option
+        await this.selectSourceOption('url');
+
+        // Fill URL input
+        await this.fillUrlInput(csvUrl);
+
+        // Click Save button (wait for it to be actionable)
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        testLogger.debug('Save button clicked');
+
+        // Wait for save to complete
+        await this.page.waitForLoadState('networkidle');
+
+        // Wait for form to close (returned to list)
+        await this.page.locator(this.addEnrichmentTableTitle).waitFor({ state: 'hidden', timeout: 15000 });
+        testLogger.debug('Returned to enrichment tables list');
+
+        // Wait for backend to register the table (CI environments are slower)
+        await this.page.waitForTimeout(5000);
+
+        // Hard reload the page to ensure fresh API data
+        // This is more reliable than menu navigation in CI environments
+        await this.page.reload({ waitUntil: 'networkidle' });
+        testLogger.debug('Page reloaded for fresh data');
+
+        // Wait for the enrichment tables list to be visible after reload
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.debug('Enrichment tables list visible with fresh data');
+    }
+
+    /**
+     * Verify URL validation error message
+     * @param {string} errorMessage - Expected error message
+     */
+    async verifyUrlValidationError(errorMessage) {
+        testLogger.debug(`Verifying URL validation error: ${errorMessage}`);
+
+        const errorLocator = this.page.getByText(errorMessage);
+        await expect(errorLocator).toBeVisible();
+
+        testLogger.debug('URL validation error verified');
+    }
+
+    /**
+     * Verify table type in the list (File or Url)
+     * @param {string} tableName - Name of the table
+     * @param {string} expectedType - "File" or "Url"
+     */
+    async verifyTableType(tableName, expectedType) {
+        testLogger.debug(`Verifying table type for ${tableName}: expecting ${expectedType}`);
+
+        // Find the row with the table name
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Get the "Type" column text - it's the 3rd text-left column (index 2)
+        const typeCell = row.locator('td.text-left').nth(2);
+        const typeText = await typeCell.textContent();
+
+        testLogger.debug(`Table type text: ${typeText}`);
+
+        if (expectedType === 'Url') {
+            // URL-based tables show "Url (N)" format or just "Url"
+            expect(typeText).toMatch(/Url(\s*\(\d+\))?/i);
+        } else {
+            expect(typeText).toContain(expectedType);
+        }
+
+        testLogger.debug('Table type verified');
+    }
+
+    /**
+     * Wait for URL job to complete (poll for status icon)
+     * @param {string} tableName - Name of the table
+     * @param {number} timeout - Max wait time in milliseconds (default 240000 = 4 minutes)
+     * @returns {Promise<string>} Final status: 'completed', 'failed', or 'timeout'
+     */
+    async waitForUrlJobComplete(tableName, timeout = 240000) {
+        testLogger.debug(`Waiting for URL job to complete for table: ${tableName} (timeout: ${timeout}ms)`);
+
+        const startTime = Date.now();
+        let currentStatus = 'processing';
+        let attempts = 0;
+
+        while (Date.now() - startTime < timeout) {
+            attempts++;
+            const elapsed = Date.now() - startTime;
+            testLogger.debug(`Polling attempt ${attempts}, elapsed: ${elapsed}ms`);
+
+            // Reload page to get fresh DOM state from server
+            await this.page.reload({ waitUntil: 'networkidle' });
+
+            // Find the row with table name
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+
+            try {
+                await row.waitFor({ state: 'visible', timeout: 5000 });
+            } catch (error) {
+                testLogger.warn(`Row not found for table ${tableName}, attempt ${attempts}`);
+                await this.page.waitForTimeout(5000);
+                continue;
+            }
+
+            // Check for status icons in the Type column (3rd column)
+            const typeCell = row.locator('td').nth(2);
+
+            // Check for completed icon (green check)
+            const completedIcon = typeCell.locator('[name="check_circle"]');
+            if (await completedIcon.isVisible().catch(() => false)) {
+                currentStatus = 'completed';
+                testLogger.info(`URL job completed for ${tableName} after ${elapsed}ms (${attempts} attempts)`);
+                return 'completed';
+            }
+
+            // Check for failed icon (red warning)
+            const failedIcon = typeCell.locator('[name="warning"]');
+            if (await failedIcon.isVisible().catch(() => false)) {
+                currentStatus = 'failed';
+                testLogger.error(`URL job failed for ${tableName} after ${elapsed}ms (${attempts} attempts)`);
+                return 'failed';
+            }
+
+            // Check for processing icon (blue sync with animation)
+            const processingIcon = typeCell.locator('[name="sync"]');
+            if (await processingIcon.isVisible().catch(() => false)) {
+                testLogger.debug(`URL job still processing for ${tableName}...`);
+                await this.page.waitForTimeout(5000);
+                continue;
+            }
+
+            // Check for pending icon (grey schedule)
+            const pendingIcon = typeCell.locator('[name="schedule"]');
+            if (await pendingIcon.isVisible().catch(() => false)) {
+                testLogger.debug(`URL job pending for ${tableName}...`);
+                await this.page.waitForTimeout(5000);
+                continue;
+            }
+
+            // If no icon found, wait and retry
+            testLogger.debug(`No status icon found, retrying...`);
+            await this.page.waitForTimeout(5000);
+        }
+
+        testLogger.error(`URL job timeout for ${tableName} after ${timeout}ms (${attempts} attempts)`);
+        return 'timeout';
+    }
+
+    /**
+     * Verify URL job status icon in table list
+     * @param {string} tableName - Name of the table
+     * @param {string} expectedStatus - 'completed', 'processing', 'failed', or 'pending'
+     */
+    async verifyUrlJobStatus(tableName, expectedStatus) {
+        testLogger.debug(`Verifying URL job status for ${tableName}: expecting ${expectedStatus}`);
+
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        const typeCell = row.locator('td').nth(2);
+
+        let iconLocator;
+        switch (expectedStatus) {
+            case 'completed':
+                iconLocator = typeCell.locator('[name="check_circle"]');
+                break;
+            case 'processing':
+                iconLocator = typeCell.locator('[name="sync"]');
+                break;
+            case 'failed':
+                iconLocator = typeCell.locator('[name="warning"]');
+                break;
+            case 'pending':
+                iconLocator = typeCell.locator('[name="schedule"]');
+                break;
+            default:
+                throw new Error(`Unknown status: ${expectedStatus}`);
+        }
+
+        await expect(iconLocator).toBeVisible();
+        testLogger.debug(`URL job status verified: ${expectedStatus}`);
+    }
+
+    /**
+     * Select update mode for URL-based tables
+     * @param {string} mode - "reload", "append", "replace_failed", or "replace"
+     */
+    async selectUpdateMode(mode) {
+        testLogger.debug(`Selecting update mode: ${mode}`);
+
+        // Wait for update mode radio group to be visible
+        await this.page.locator('text=/Update Mode/i').waitFor({ state: 'visible', timeout: 10000 });
+
+        // Click the appropriate mode
+        switch (mode) {
+            case 'reload':
+                await this.page.getByText('Reload', { exact: true }).click();
+                break;
+            case 'append':
+                await this.page.getByText('Append', { exact: true }).click();
+                break;
+            case 'replace_failed':
+                await this.page.getByText('Replace Failed URL', { exact: true }).click();
+                break;
+            case 'replace':
+                await this.page.getByText('Replace', { exact: true }).click();
+                break;
+            default:
+                throw new Error(`Unknown update mode: ${mode}`);
+        }
+
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug(`Update mode selected: ${mode}`);
+    }
+
+    /**
+     * Cancel enrichment table form (create or update)
+     */
+    async cancelEnrichmentTableForm() {
+        testLogger.debug('Canceling enrichment table form');
+
+        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.waitForLoadState('networkidle');
+
+        testLogger.debug('Form canceled');
+    }
+
+    /**
+     * Verify table is visible in the list after creation
+     * @param {string} tableName - Name of the table to verify
+     */
+    async verifyTableInList(tableName) {
+        testLogger.debug(`Verifying table ${tableName} is visible in list`);
+
+        // Search for the table first
+        await this.searchEnrichmentTableInList(tableName);
+
+        // Verify table row is visible
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(row).toBeVisible();
+
+        testLogger.debug(`Table ${tableName} verified in list`);
+    }
+
+    /**
+     * Attempt to save enrichment table with invalid URL
+     * @param {string} tableName - Name of the table
+     * @param {string} invalidUrl - Invalid URL to test
+     */
+    async attemptSaveWithInvalidUrl(tableName, invalidUrl) {
+        testLogger.debug(`Attempting to save with invalid URL: ${invalidUrl}`);
+
+        // Fill name
+        const nameInput = this.page.locator('.q-field__native').first();
+        await nameInput.fill(tableName);
+
+        // Select "From URL"
+        await this.selectSourceOption('url');
+
+        // Fill invalid URL
+        await this.fillUrlInput(invalidUrl);
+
+        // Attempt to save
+        await this.page.getByRole('button', { name: 'Save' }).click({ force: true });
+
+        // Wait for validation error to appear
+        await this.page.waitForTimeout(1000);
+
+        testLogger.debug('Save attempted with invalid URL');
+    }
+
+    /**
+     * Toggle source selection between file and URL
+     */
+    async toggleSourceSelection() {
+        testLogger.debug('Toggling source selection');
+
+        // Check current selection
+        const urlRadio = this.page.getByText('From URL', { exact: true });
+        const fileRadio = this.page.getByText('Upload File', { exact: true });
+
+        // Toggle to opposite
+        if (await urlRadio.locator('..').locator('.q-radio__inner--truthy').isVisible().catch(() => false)) {
+            // Currently URL, switch to File
+            await fileRadio.click();
+            testLogger.debug('Toggled from URL to File');
+        } else {
+            // Currently File, switch to URL
+            await urlRadio.click();
+            testLogger.debug('Toggled from File to URL');
+        }
+
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    /**
+     * Verify table row is visible in list
+     * @param {string} tableName - Name of the table
+     */
+    async verifyTableRowVisible(tableName) {
+        testLogger.debug(`Verifying table row visible: ${tableName}`);
+
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(row).toBeVisible({ timeout: 20000 });
+
+        testLogger.debug('Table row verified visible');
+    }
+
+    /**
+     * Fill name input field (for custom form filling)
+     * @param {string} name - Name to fill
+     */
+    async fillNameInput(name) {
+        testLogger.debug(`Filling name input: ${name}`);
+
+        const nameInput = this.page.locator('.q-field__native').first();
+        await nameInput.fill(name);
+
+        testLogger.debug('Name input filled');
+    }
+
+    /**
+     * Verify no data message or empty table
+     * @param {string} tableName - Table name to check doesn't exist
+     */
+    async verifyTableNotCreated(tableName) {
+        testLogger.debug(`Verifying table ${tableName} was NOT created`);
+
+        const noDataMessage = this.page.getByText(/no data available/i);
+        const isNoDataVisible = await noDataMessage.isVisible().catch(() => false);
+
+        if (!isNoDataVisible) {
+            // If no "no data" message, verify the table name is NOT in the list
+            const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const rowCount = await tableRow.count();
+            expect(rowCount).toBe(0);
+        }
+
+        testLogger.debug('Verified table does not exist');
+    }
+
+    /**
+     * Verify table row is hidden after deletion
+     * @param {string} tableName - Name of deleted table
+     */
+    async verifyTableRowHidden(tableName) {
+        testLogger.debug(`Verifying table row hidden: ${tableName}`);
+
+        // Wait a moment for deletion to process
+        await this.page.waitForTimeout(2000);
+
+        const tableRow = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await expect(tableRow).toBeHidden();
+
+        testLogger.debug('Table row verified hidden');
+    }
+
+    /**
+     * Expect URL input to be visible
+     */
+    async expectUrlInputVisible() {
+        testLogger.debug('Verifying URL input is visible');
+
+        const urlInput = this.page.locator('input[placeholder*="http"]');
+        await expect(urlInput).toBeVisible();
+
+        testLogger.debug('URL input verified visible');
+    }
+
+    /**
+     * Expect file input to be visible
+     */
+    async expectFileInputVisible() {
+        testLogger.debug('Verifying file input is visible');
+
+        const fileInput = this.page.locator('input[type="file"]');
+        await expect(fileInput).toBeVisible();
+
+        testLogger.debug('File input verified visible');
+    }
+
+    /**
+     * Save update mode changes
+     */
+    async saveUpdateMode() {
+        testLogger.debug('Saving update mode changes');
+
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        await this.page.waitForLoadState('networkidle');
+
+        testLogger.debug('Update mode saved');
+    }
+
+    // ============================================================================
+    // EXPLORE / LOGS NAVIGATION METHODS
+    // ============================================================================
+
+    /**
+     * Click explore button for a specific table
+     * @param {string} tableName - Name of the table
+     */
+    async clickExploreButton(tableName) {
+        testLogger.debug(`Clicking explore button for: ${tableName}`);
+
+        const exploreBtn = this.page.locator(`[data-test="${tableName}-explore-btn"]`);
+        await exploreBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await exploreBtn.click();
+
+        testLogger.debug('Explore button clicked');
+    }
+
+    /**
+     * Wait for navigation to logs page with enrichment tables stream
+     */
+    async waitForLogsPageNavigation() {
+        testLogger.debug('Waiting for logs page navigation');
+
+        await this.page.waitForURL(/.*logs.*stream_type=enrichment_tables.*/);
+        await this.page.waitForLoadState('networkidle');
+
+        testLogger.debug('Navigated to logs page');
+    }
+
+    /**
+     * Click the first log row in the results table
+     */
+    async clickFirstLogRow() {
+        testLogger.debug('Clicking first log row');
+
+        const firstLogRow = this.page.locator('[data-test="log-table-column-0-_timestamp"]').first();
+        await firstLogRow.waitFor({ state: 'visible', timeout: 30000 });
+        await firstLogRow.click();
+
+        testLogger.debug('First log row clicked');
+    }
+
+    /**
+     * Verify log detail panel is visible after clicking a row
+     */
+    async verifyLogDetailPanelVisible() {
+        testLogger.debug('Verifying log detail panel is visible');
+
+        const logDetailPanel = this.page.locator('.log-detail-container, [data-test="log-detail-json-content"], .q-expansion-item--expanded');
+        await expect(logDetailPanel.first()).toBeVisible({ timeout: 10000 });
+
+        testLogger.debug('Log detail panel verified visible');
+    }
+
+    /**
+     * Close any open dialogs/modals by pressing Escape
+     */
+    async closeAnyOpenDialogs() {
+        testLogger.debug('Closing any open dialogs');
+
+        // Press Escape to close any open dialogs/modals
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(500);
+
+        testLogger.debug('Dialogs closed');
     }
 }
 
