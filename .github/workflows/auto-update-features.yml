@@ -1,0 +1,253 @@
+name: Auto-update Features JSON
+
+on:
+  pull_request:
+    types: [opened, edited]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-features:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse PR description and update features.json
+        uses: actions/github-script@v7
+        id: parse-feature
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Get PR body
+            const prBody = context.payload.pull_request.body || '';
+
+            // Check if PR contains feature update section
+            const featureRegex = /<!-- FEATURE_UPDATE_START -->([\s\S]*?)<!-- FEATURE_UPDATE_END -->/;
+            const match = prBody.match(featureRegex);
+
+            if (!match) {
+              console.log('No feature update section found in PR description');
+              core.setOutput('has_feature', 'false');
+              return;
+            }
+
+            console.log('Feature update section found!');
+            core.setOutput('has_feature', 'true');
+
+            // Parse the feature data from the matched section
+            const featureSection = match[1].trim();
+
+            // Try to parse as JSON or YAML-like format
+            let featureData;
+            try {
+              // Try JSON first
+              const jsonMatch = featureSection.match(/```json\s*([\s\S]*?)\s*```/);
+              if (jsonMatch) {
+                featureData = JSON.parse(jsonMatch[1]);
+              } else {
+                // Parse key-value format
+                featureData = {};
+                const lines = featureSection.split('\n');
+                for (const line of lines) {
+                  const kvMatch = line.match(/^\s*-?\s*\*?\*?(\w+)\*?\*?\s*:\s*(.+)$/);
+                  if (kvMatch) {
+                    const key = kvMatch[1].toLowerCase().replace(/\s+/g, '_');
+                    let value = kvMatch[2].trim();
+
+                    // Handle boolean values
+                    if (value === 'true' || value === 'yes') value = true;
+                    if (value === 'false' || value === 'no') value = false;
+
+                    // Handle nested objects (availability)
+                    if (key.startsWith('availability_')) {
+                      if (!featureData.availability) featureData.availability = {};
+                      const edition = key.replace('availability_', '');
+                      featureData.availability[edition] = value;
+                    } else {
+                      featureData[key] = value;
+                    }
+                  }
+                }
+              }
+
+              console.log('Parsed feature data:', JSON.stringify(featureData, null, 2));
+
+              // Validate required fields
+              if (!featureData.id) {
+                throw new Error('Missing required field: id');
+              }
+              if (!featureData.availability) {
+                throw new Error('Missing required field: availability');
+              }
+              if (!featureData.availability.opensource ||
+                  !featureData.availability.enterprise ||
+                  !featureData.availability.cloud) {
+                throw new Error('Missing required availability fields (opensource, enterprise, cloud)');
+              }
+
+              // Read existing features.json
+              const featuresPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/constants/features.json');
+              const featuresContent = fs.readFileSync(featuresPath, 'utf8');
+              const featuresJson = JSON.parse(featuresContent);
+
+              // Check if feature already exists
+              const existingIndex = featuresJson.features.findIndex(f => f.id === featureData.id);
+
+              if (existingIndex >= 0) {
+                console.log(`Updating existing feature: ${featureData.id}`);
+                featuresJson.features[existingIndex] = featureData;
+                core.setOutput('action', 'updated');
+              } else {
+                console.log(`Adding new feature: ${featureData.id}`);
+
+                // Determine position
+                let position = featureData.position || 'end';
+                delete featureData.position; // Remove position field from feature data
+
+                if (position === 'start') {
+                  featuresJson.features.unshift(featureData);
+                } else if (typeof position === 'number') {
+                  featuresJson.features.splice(position, 0, featureData);
+                } else {
+                  featuresJson.features.push(featureData);
+                }
+                core.setOutput('action', 'added');
+              }
+
+              // Write updated features.json
+              fs.writeFileSync(featuresPath, JSON.stringify(featuresJson, null, 2) + '\n', 'utf8');
+
+              core.setOutput('feature_id', featureData.id);
+              core.setOutput('success', 'true');
+
+            } catch (error) {
+              console.error('Error parsing feature data:', error.message);
+              core.setOutput('success', 'false');
+              core.setOutput('error', error.message);
+              throw error;
+            }
+
+      - name: Check for translation keys
+        if: steps.parse-feature.outputs.success == 'true'
+        id: check-translations
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
+            const expectedKey = `feature_${featureId}`;
+
+            // Check if translation exists in en.json
+            const enJsonPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/locales/languages/en.json');
+            const enJson = JSON.parse(fs.readFileSync(enJsonPath, 'utf8'));
+
+            const hasTranslation = enJson.about && enJson.about[expectedKey];
+            core.setOutput('has_translation', hasTranslation ? 'true' : 'false');
+            core.setOutput('translation_key', `about.${expectedKey}`);
+
+      - name: Commit changes
+        if: steps.parse-feature.outputs.success == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if git diff --quiet web/src/constants/features.json; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git add web/src/constants/features.json
+          git commit -m "chore: auto-update features.json from PR description
+
+          Feature ${{ steps.parse-feature.outputs.action }}: ${{ steps.parse-feature.outputs.feature_id }}
+
+          🤖 Automated update via GitHub Actions"
+
+          git push
+
+      - name: Comment on PR - Success
+        if: steps.parse-feature.outputs.success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
+            const action = '${{ steps.parse-feature.outputs.action }}';
+            const hasTranslation = '${{ steps.check-translations.outputs.has_translation }}' === 'true';
+            const translationKey = '${{ steps.check-translations.outputs.translation_key }}';
+
+            let message = `### ✅ Feature ${action === 'added' ? 'Added' : 'Updated'} Successfully!\n\n`;
+            message += `**Feature ID:** \`${featureId}\`\n`;
+            message += `**Action:** ${action}\n\n`;
+            message += `📝 **File Updated:** \`web/src/constants/features.json\`\n\n`;
+
+            if (!hasTranslation) {
+              message += `### ⚠️ Translation Missing\n\n`;
+              message += `Please add the translation key \`${translationKey}\` to:\n`;
+              message += `- \`web/src/locales/languages/en.json\`\n`;
+              message += `- All other language files\n\n`;
+              message += `Example for \`en.json\`:\n`;
+              message += `\`\`\`json\n`;
+              message += `{\n`;
+              message += `  "about": {\n`;
+              message += `    "feature_${featureId}": "Your Feature Name Here"\n`;
+              message += `  }\n`;
+              message += `}\n`;
+              message += `\`\`\`\n`;
+            } else {
+              message += `✅ Translation key \`${translationKey}\` found!\n`;
+            }
+
+            message += `\n---\n`;
+            message += `🤖 This feature was automatically added from your PR description.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+      - name: Comment on PR - Error
+        if: steps.parse-feature.outputs.success == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const error = '${{ steps.parse-feature.outputs.error }}';
+
+            const message = `### ❌ Feature Update Failed\n\n` +
+              `**Error:** ${error}\n\n` +
+              `Please check your feature definition format in the PR description.\n\n` +
+              `See the [Feature Update Guide](../../web/src/constants/FEATURES_JSON_GUIDE.md) for the correct format.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+      - name: Add label
+        if: steps.parse-feature.outputs.success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['feature-update', 'auto-generated']
+            });
