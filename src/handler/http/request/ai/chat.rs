@@ -515,16 +515,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         // Create streaming response
         let s = stream! {
-            // Send immediate status event
-            let status_event = serde_json::json!({
-                "role": "assistant",
-                "content": "",
-                "status": "processing"
-            });
-            yield Ok::<bytes::Bytes, std::io::Error>(
-                bytes::Bytes::from(format!("data: {}\n\n", status_event))
-            );
-
             // Call the agent service
             let response = match client.query_stream(agent_type, query_req).await {
                 Ok(r) => r,

@@ -126,24 +126,58 @@
                 <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-                <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
-                  <q-spinner-dots color="primary" size="1.5em" />
-                  <span>{{ currentAnalyzingMessage }}</span>
-                </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
                 <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
-                  <!-- Tool call block -->
+                  <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
                     class="tool-call-item"
-                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                    :class="[store.state.theme == 'dark' ? 'dark-mode' : 'light-mode', { 'has-details': hasToolCallDetails(block) }]"
+                    @click="hasToolCallDetails(block) && toggleToolCallExpanded(index, blockIndex)"
                   >
-                    <q-icon name="check_circle" size="14px" color="positive" />
-                    <span class="tool-call-name">{{ block.message }}</span>
-                    <span v-if="block.context && block.context.query" class="tool-call-query">
-                      {{ truncateQuery(block.context.query) }}
-                    </span>
+                    <div class="tool-call-header">
+                      <q-icon name="check_circle" size="14px" color="positive" />
+                      <span class="tool-call-name">
+                        {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
+                      </span>
+                      <q-icon
+                        v-if="hasToolCallDetails(block)"
+                        :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
+                        size="16px"
+                        class="expand-icon"
+                      />
+                    </div>
+                    <!-- Expandable details -->
+                    <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
+                      <div v-if="block.context?.query" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">Query</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(block.context.query)"
+                          >
+                            <q-tooltip>Copy query</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ block.context.query }}</code>
+                      </div>
+                      <div v-if="block.context?.stream" class="detail-item">
+                        <span class="detail-label">Stream</span>
+                        <code class="detail-value">{{ block.context.stream }}</code>
+                      </div>
+                      <div v-if="block.context?.start_time" class="detail-item">
+                        <span class="detail-label">Start</span>
+                        <span class="detail-value">{{ formatTimestamp(block.context.start_time) }}</span>
+                      </div>
+                      <div v-if="block.context?.end_time" class="detail-item">
+                        <span class="detail-label">End</span>
+                        <span class="detail-value">{{ formatTimestamp(block.context.end_time) }}</span>
+                      </div>
+                    </div>
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -239,10 +273,10 @@
               </div>
             </div>
           </div>
-          <!-- Standalone loading indicator - only shown when no assistant message exists yet -->
-          <div v-if="isLoading && !activeToolCall && !hasAssistantMessage" id="loading-indicator" class="">
+          <!-- Standalone loading indicator - only shown when loading with no tool calls -->
+          <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
             <q-spinner-dots color="primary" size="2em" />
-            <span>{{ currentAnalyzingMessage }}</span>
+            <span style="font-size: 14px; opacity: 0.7;">{{ currentAnalyzingMessage }}</span>
           </div>
         </div>
         
@@ -446,8 +480,14 @@ export default defineComponent({
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
+    // Track expanded tool calls by message index and block index
+    const expandedToolCalls = ref<Set<string>>(new Set());
+
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
+
+    // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
+    const pendingToolCalls = ref<ContentBlock[]>([]);
 
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
@@ -705,16 +745,26 @@ export default defineComponent({
                 try {
                   const data = JSON.parse(jsonStr);
 
-                  // Handle tool_call events - add as content block for interleaved display
+                  // Handle tool_call events - show spinner, don't add to chat yet
                   if (data && data.type === 'tool_call') {
-                    const toolCallBlock: ContentBlock = {
-                      type: 'tool_call',
-                      tool: data.tool,
-                      message: data.message,
-                      context: data.context || {}
-                    };
+                    // If there's already an active tool call, complete it first
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                    }
 
-                    // Show active indicator
+                    // Set new active tool call (shows spinner indicator)
                     activeToolCall.value = {
                       tool: data.tool,
                       message: data.message,
@@ -724,41 +774,68 @@ export default defineComponent({
                     // Reset text segment - next text will start a new block
                     currentTextSegment.value = '';
 
-                    // Add block to current assistant message
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (!lastMessage || lastMessage.role !== 'assistant') {
-                      // Create assistant message with this block
-                      chatMessages.value.push({
-                        role: 'assistant',
-                        content: '',
-                        contentBlocks: [toolCallBlock]
-                      });
-                    } else {
-                      // Add to existing assistant message's blocks
-                      if (!lastMessage.contentBlocks) {
-                        lastMessage.contentBlocks = [];
-                      }
-                      lastMessage.contentBlocks.push(toolCallBlock);
-                    }
                     await scrollToBottom();
                     continue;
                   }
 
-                  // Handle complete events - clear tool call state
+                  // Handle complete events - complete any active tool call
                   if (data && data.type === 'complete') {
-                    activeToolCall.value = null;
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
                     continue;
                   }
 
                   // Handle message content (type === 'message' or legacy format with just content)
                   if (data && typeof data.content === 'string') {
-                    // Clear tool call indicator when we get actual message content
-                    activeToolCall.value = null;
+                    // Complete any active tool call first (add green checkmark to chat)
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
 
                     // Format code blocks with proper line breaks
                     let content = data.content;
                     content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
                     content = content.replace(/([^`])\s*```/g, '$1\n```');
+
+                    // Add newline separator if starting a new text segment after tool call
+                    if (currentStreamingMessage.value && currentTextSegment.value === '') {
+                      currentStreamingMessage.value += '\n\n';
+                    }
+                    // Add newline between consecutive message events if needed
+                    // (when current content doesn't end with newline and new content doesn't start with newline)
+                    else if (currentStreamingMessage.value &&
+                             !currentStreamingMessage.value.endsWith('\n') &&
+                             !content.startsWith('\n')) {
+                      currentStreamingMessage.value += '\n\n';
+                      currentTextSegment.value += '\n\n';
+                    }
 
                     // Accumulate to both total content and current segment
                     currentStreamingMessage.value += content;
@@ -767,12 +844,13 @@ export default defineComponent({
                     // Get or create assistant message
                     let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
-                      // Create new assistant message with text block
+                      // Create new assistant message with pending tool calls + text
                       chatMessages.value.push({
                         role: 'assistant',
                         content: currentStreamingMessage.value,
-                        contentBlocks: [{ type: 'text', text: currentTextSegment.value }]
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                       });
+                      pendingToolCalls.value = []; // Clear pending
                     } else {
                       // Update existing assistant message's total content
                       lastMessage.content = currentStreamingMessage.value;
@@ -818,14 +896,26 @@ export default defineComponent({
 
                 const data = JSON.parse(jsonStr);
 
-                // Handle tool_call events - add as content block
+                // Handle tool_call events - show spinner, don't add to chat yet
                 if (data && data.type === 'tool_call') {
-                  const toolCallBlock: ContentBlock = {
-                    type: 'tool_call',
-                    tool: data.tool,
-                    message: data.message,
-                    context: data.context || {}
-                  };
+                  // If there's already an active tool call, complete it first
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                  }
+
+                  // Set new active tool call (shows spinner indicator)
                   activeToolCall.value = {
                     tool: data.tool,
                     message: data.message,
@@ -834,45 +924,78 @@ export default defineComponent({
 
                   // Reset text segment for next text block
                   currentTextSegment.value = '';
-
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                  if (!lastMessage || lastMessage.role !== 'assistant') {
-                    chatMessages.value.push({
-                      role: 'assistant',
-                      content: '',
-                      contentBlocks: [toolCallBlock]
-                    });
-                  } else {
-                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                    lastMessage.contentBlocks.push(toolCallBlock);
-                  }
                   continue;
                 }
 
-                // Handle complete events
+                // Handle complete events - complete any active tool call
                 if (data && data.type === 'complete') {
-                  activeToolCall.value = null;
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
                   continue;
                 }
 
                 // Handle message content
                 if (data && typeof data.content === 'string') {
-                  activeToolCall.value = null;
+                  // Complete any active tool call first (add green checkmark to chat)
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
 
                   let content = data.content;
                   content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
                   content = content.replace(/([^`])\s*```/g, '$1\n```');
+
+                  // Add newline separator if starting a new text segment after tool call
+                  if (currentStreamingMessage.value && currentTextSegment.value === '') {
+                    currentStreamingMessage.value += '\n\n';
+                  }
+                  // Add newline between consecutive message events if needed
+                  else if (currentStreamingMessage.value &&
+                           !currentStreamingMessage.value.endsWith('\n') &&
+                           !content.startsWith('\n')) {
+                    currentStreamingMessage.value += '\n\n';
+                    currentTextSegment.value += '\n\n';
+                  }
 
                   currentStreamingMessage.value += content;
                   currentTextSegment.value += content;
 
                   let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
+                    // Create new assistant message with pending tool calls + text
                     chatMessages.value.push({
                       role: 'assistant',
                       content: currentStreamingMessage.value,
-                      contentBlocks: [{ type: 'text', text: currentTextSegment.value }]
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                     });
+                    pendingToolCalls.value = []; // Clear pending
                   } else {
                     lastMessage.content = currentStreamingMessage.value;
 
@@ -1124,6 +1247,7 @@ export default defineComponent({
       isLoading.value = true;
       currentStreamingMessage.value = '';
       currentTextSegment.value = '';
+      pendingToolCalls.value = []; // Clear any pending tool calls from previous messages
       startAnalyzingRotation(); // Start rotating analyzing messages
 
       // Create new AbortController for this request - enables cancellation via Stop button
@@ -1469,12 +1593,6 @@ export default defineComponent({
       }));
     });
 
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === 'assistant';
-    });
-
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== 'assistant') return;
       
@@ -1554,6 +1672,51 @@ export default defineComponent({
       return String(value);
     };
 
+    // Tool call expansion helpers
+    const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
+      const key = `${messageIndex}-${blockIndex}`;
+      if (expandedToolCalls.value.has(key)) {
+        expandedToolCalls.value.delete(key);
+      } else {
+        expandedToolCalls.value.add(key);
+      }
+    };
+
+    const isToolCallExpanded = (messageIndex: number, blockIndex: number) => {
+      return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
+    };
+
+    const hasToolCallDetails = (block: ContentBlock) => {
+      if (!block.context) return false;
+      return !!(block.context.query || block.context.stream || block.context.start_time || block.context.end_time);
+    };
+
+    const formatToolCallMessage = (block: ContentBlock) => {
+      // Interpolate context into message for certain tools
+      // Returns object with text and optional highlight for bold rendering
+      if (block.tool === 'StreamSchema' && block.context?.stream) {
+        return { text: 'Fetched ', highlight: block.context.stream, suffix: ' stream schema' };
+      }
+      if (block.tool === 'GetIncident' && block.context?.incident_id) {
+        return { text: 'Retrieved incident ', highlight: block.context.incident_id, suffix: '' };
+      }
+      if (block.tool === 'GetAlert' && block.context?.alert_id) {
+        return { text: 'Fetched alert ', highlight: block.context.alert_id, suffix: '' };
+      }
+      if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
+        return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
+      }
+      return { text: block.message, highlight: null, suffix: '' };
+    };
+
+    const formatTimestamp = (timestamp: number) => {
+      if (!timestamp || timestamp === 0) return 'Not specified';
+      // Timestamp is in microseconds, convert to milliseconds
+      const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
+      const date = new Date(ms);
+      return date.toLocaleString();
+    };
+
     const likeCodeBlock = (message: any) => {
       // console.log('likeCodeBlock', message);
     };
@@ -1600,7 +1763,7 @@ export default defineComponent({
       openHistory,
       loadChat,
       processedMessages,
-      hasAssistantMessage,
+      pendingToolCalls,
       processTextBlock,
       copyToClipboard,
       retryGeneration,
@@ -1630,6 +1793,12 @@ export default defineComponent({
       activeToolCall,
       truncateQuery,
       formatContextKey,
+      expandedToolCalls,
+      toggleToolCallExpanded,
+      isToolCallExpanded,
+      hasToolCallDetails,
+      formatToolCallMessage,
+      formatTimestamp,
       formatContextValue,
     }
   }
@@ -2226,6 +2395,21 @@ export default defineComponent({
     min-width: 0;
   }
 
+  .tool-call-status {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.7;
+    margin-bottom: 2px;
+
+    .light-mode & {
+      color: #6b7280;
+    }
+
+    .dark-mode & {
+      color: #9ca3af;
+    }
+  }
+
   .tool-call-message {
     font-weight: 600;
     font-size: 14px;
@@ -2318,12 +2502,24 @@ export default defineComponent({
 // Tool call item - inline in chat flow (interleaved with text)
 .tool-call-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  flex-direction: column;
+  padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
   margin-bottom: 8px;
+
+  &.has-details {
+    cursor: pointer;
+
+    &:hover {
+      &.light-mode {
+        background: rgba(76, 175, 80, 0.12);
+      }
+      &.dark-mode {
+        background: rgba(76, 175, 80, 0.18);
+      }
+    }
+  }
 
   &.light-mode {
     background: rgba(76, 175, 80, 0.08);
@@ -2355,9 +2551,92 @@ export default defineComponent({
     }
   }
 
+  .tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
   .tool-call-name {
     font-weight: 500;
     flex: 1;
+
+    code {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      padding: 1px 4px;
+      border-radius: 3px;
+
+      .light-mode & {
+        background: rgba(0, 0, 0, 0.06);
+      }
+      .dark-mode & {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  .expand-icon {
+    opacity: 0.6;
+    transition: transform 0.2s;
+  }
+
+  .tool-call-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+
+    .copy-btn {
+      opacity: 0.6;
+      &:hover {
+        opacity: 1;
+      }
+    }
+
+    .detail-value {
+      font-size: 12px;
+      user-select: text;
+
+      &.query-value {
+        font-family: 'Fira Code', 'Consolas', monospace;
+        padding: 8px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        user-select: text;
+        cursor: text;
+
+        .light-mode & {
+          background: rgba(0, 0, 0, 0.04);
+        }
+        .dark-mode & {
+          background: rgba(255, 255, 255, 0.06);
+        }
+      }
+    }
   }
 
   .tool-call-error {
