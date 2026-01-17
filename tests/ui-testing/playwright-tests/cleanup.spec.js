@@ -187,7 +187,12 @@ test.describe("Pre-Test Cleanup", () => {
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
       /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
-      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/      // delete_test_<uuid>_csv (delete confirmation test)
+      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
+      // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
+      /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
+      /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (validation test)
+      /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
+      /^toggle_test_[a-f0-9]{8}$/                                                            // toggle_test_<uuid> (source toggle test)
     ]);
 
     // Clean up streams matching test patterns
