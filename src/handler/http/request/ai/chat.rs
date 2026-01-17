@@ -80,7 +80,7 @@ pub async fn chat(
     let config = get_o2_config();
 
     // Create root span for AI tracing if enabled (don't enter to avoid !Send)
-    let span = if config.ai.traces_enabled {
+    let span = if config.ai.tracing_enabled {
         tracing::info_span!(
             "http.request",
             http.method = "POST",
@@ -231,7 +231,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let config = get_o2_config();
 
     // Create root span for AI tracing if enabled (don't enter to avoid !Send)
-    let span = if config.ai.traces_enabled {
+    let span = if config.ai.tracing_enabled {
         tracing::info_span!(
             "http.request",
             http.method = "POST",
