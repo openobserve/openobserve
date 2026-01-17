@@ -824,6 +824,22 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     /**
+     * Fill the New CSV File URL input field (used in append/edit mode)
+     * @param {string} url - New CSV file URL
+     */
+    async fillNewUrlInput(url) {
+        testLogger.debug(`Filling new URL input: ${url}`);
+
+        // In edit/append mode, the field is labeled "New CSV File URL"
+        const newUrlInput = this.page.getByPlaceholder('https://example.com/data.csv');
+
+        await newUrlInput.waitFor({ state: 'visible', timeout: 10000 });
+        await newUrlInput.fill(url);
+
+        testLogger.debug('New URL input filled');
+    }
+
+    /**
      * Create enrichment table from URL - Complete workflow
      * @param {string} tableName - Name of the enrichment table
      * @param {string} csvUrl - URL to CSV file
@@ -878,6 +894,22 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expect(errorLocator).toBeVisible();
 
         testLogger.debug('URL validation error verified');
+    }
+
+    /**
+     * Verify column mismatch error when appending incompatible CSV
+     */
+    async verifyColumnMismatchError() {
+        testLogger.debug('Verifying column mismatch error');
+
+        // Look for error message containing "mismatch" or "schema" or "column"
+        const errorLocator = this.page.locator('.q-notification, .q-banner, [role="alert"]').filter({
+            hasText: /mismatch|schema|column|incompatible/i
+        });
+
+        await expect(errorLocator.first()).toBeVisible({ timeout: 15000 });
+
+        testLogger.debug('Column mismatch error verified');
     }
 
     /**
@@ -1029,19 +1061,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Wait for update mode radio group to be visible
         await this.page.locator('text=/Update Mode/i').waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click the appropriate mode
+        // Click the appropriate mode - using actual UI labels
         switch (mode) {
             case 'reload':
-                await this.page.getByText('Reload', { exact: true }).click();
+                await this.page.getByText('Reload existing URLs').click();
                 break;
             case 'append':
-                await this.page.getByText('Append', { exact: true }).click();
-                break;
-            case 'replace_failed':
-                await this.page.getByText('Replace Failed URL', { exact: true }).click();
+                await this.page.getByText('Add new URL').click();
                 break;
             case 'replace':
-                await this.page.getByText('Replace', { exact: true }).click();
+                await this.page.getByText('Replace all URLs').click();
                 break;
             default:
                 throw new Error(`Unknown update mode: ${mode}`);
