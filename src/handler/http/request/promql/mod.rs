@@ -708,7 +708,7 @@ pub async fn metadata(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus series", "category": "metrics"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series, must have start and end time", "category": "metrics"}))
     )
 )]
 pub async fn series_get(
@@ -879,7 +879,7 @@ async fn series(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus label names", "category": "metrics"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus label names, must have start and end time", "category": "metrics"}))
     )
 )]
 pub async fn labels_get(

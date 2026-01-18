@@ -3142,32 +3142,28 @@ export class LogsPage {
         } else {
             throw new Error('No include/exclude buttons found in log details');
         }
-        await this.page.waitForTimeout(1500);
+        // Wait for menu to appear (with proper wait instead of fixed timeout)
+        const includeMenuItem = this.page.getByText('Include Search Term', { exact: true });
 
-        // Take screenshot to see what menu appears
-        await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
-        testLogger.info('Screenshot saved after clicking include/exclude button');
+        try {
+            await includeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+            testLogger.info('Include Search Term menu item found');
+            await includeMenuItem.click();
+        } catch (e) {
+            // Take screenshot for debugging if menu doesn't appear
+            await this.page.screenshot({ path: 'playwright-tests/Logs/include-menu-after-click.png', fullPage: true });
+            testLogger.info('Screenshot saved after clicking include/exclude button');
 
-        // Try to find the menu in different ways
-        const includeByText = this.page.getByText('Include Search Term');
-        const includeExact = this.page.getByText('Include Search Term', { exact: true });
-        const includePartial = this.page.getByText(/Include.*Search/i);
+            // Try alternative selectors
+            const includePartial = this.page.getByText(/Include.*Search/i);
+            const partialCount = await includePartial.count();
+            testLogger.info(`Found partial match menus: ${partialCount}`);
 
-        const textCount = await includeByText.count();
-        const exactCount = await includeExact.count();
-        const partialCount = await includePartial.count();
-
-        testLogger.info(`Found menus: text=${textCount}, exact=${exactCount}, partial=${partialCount}`);
-
-        // Try clicking whichever is found
-        if (textCount > 0) {
-            await includeByText.first().click();
-        } else if (exactCount > 0) {
-            await includeExact.first().click();
-        } else if (partialCount > 0) {
-            await includePartial.first().click();
-        } else {
-            throw new Error('Include Search Term menu item not found');
+            if (partialCount > 0) {
+                await includePartial.first().click();
+            } else {
+                throw new Error('Include Search Term menu item not found');
+            }
         }
 
         await this.page.waitForTimeout(1000);
