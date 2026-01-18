@@ -763,7 +763,12 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible', timeout: 30000 });
         // Wait for form to fully load
         await this.page.waitForLoadState('networkidle');
-        testLogger.debug('Update mode form verified visible');
+        // Additional wait for form elements to render (radio buttons, inputs, etc.)
+        await this.page.waitForTimeout(3000);
+        // Verify at least one form element is present (Name field or radio group)
+        const formElement = this.page.locator('.q-field, .q-option-group, .q-radio').first();
+        await formElement.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.debug('Update mode form verified visible and loaded');
     }
 
     async verifyNameFieldDisabled() {
@@ -1056,32 +1061,62 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async selectUpdateMode(mode) {
         testLogger.debug(`Selecting update mode: ${mode}`);
 
-        // Wait for update mode radio group to be visible (longer timeout for CI)
-        // Try multiple selectors as the UI label may vary
-        const updateModeLocator = this.page.locator('text=/Update Mode/i');
-        const reloadOptionLocator = this.page.getByText('Reload existing URLs');
+        // Wait for form to fully load - the update mode options may take time to render
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000); // Extra wait for form elements to render
 
-        // Wait for either Update Mode label or the Reload option to be visible
-        try {
-            await updateModeLocator.waitFor({ state: 'visible', timeout: 20000 });
-        } catch {
-            // Fallback: wait for reload option which is always present in edit mode
-            await reloadOptionLocator.waitFor({ state: 'visible', timeout: 10000 });
+        // Try multiple selector strategies for the update mode options
+        // The labels may vary between environments
+        const modeSelectors = {
+            reload: [
+                'Reload existing URLs',
+                'Reload',
+                'Re-process existing URLs'
+            ],
+            append: [
+                'Add new URL',
+                'Append',
+                'Add URL'
+            ],
+            replace: [
+                'Replace all URLs',
+                'Replace',
+                'Replace URLs'
+            ]
+        };
+
+        const selectors = modeSelectors[mode];
+        if (!selectors) {
+            throw new Error(`Unknown update mode: ${mode}`);
         }
 
-        // Click the appropriate mode - using actual UI labels
-        switch (mode) {
-            case 'reload':
-                await this.page.getByText('Reload existing URLs').click();
-                break;
-            case 'append':
-                await this.page.getByText('Add new URL').click();
-                break;
-            case 'replace':
-                await this.page.getByText('Replace all URLs').click();
-                break;
-            default:
-                throw new Error(`Unknown update mode: ${mode}`);
+        // Try each selector until one works
+        let clicked = false;
+        for (const selector of selectors) {
+            const locator = this.page.getByText(selector, { exact: false });
+            try {
+                const isVisible = await locator.isVisible({ timeout: 3000 }).catch(() => false);
+                if (isVisible) {
+                    await locator.click();
+                    clicked = true;
+                    testLogger.debug(`Clicked update mode option: ${selector}`);
+                    break;
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        if (!clicked) {
+            // Last resort: try clicking by radio button value or label
+            const radioOptions = this.page.locator('.q-radio, .q-option-group .q-radio');
+            const count = await radioOptions.count();
+            testLogger.debug(`Found ${count} radio options in form`);
+
+            // Take screenshot for debugging
+            await this.page.screenshot({ path: 'test-results/update-mode-debug.png', fullPage: true });
+
+            throw new Error(`Could not find update mode option for: ${mode}. Tried selectors: ${selectors.join(', ')}`);
         }
 
         await this.page.waitForLoadState('domcontentloaded');
