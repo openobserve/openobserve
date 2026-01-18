@@ -53,16 +53,18 @@ impl From<DestinationError> for Response {
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateDestination",
-    summary = "Create alert destination",
-    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
-                   notifications are sent when alert conditions are met, including webhooks, email addresses, Slack \
-                   channels, PagerDuty integrations, and other notification services. The destination can be used by \
-                   multiple alerts within the organization.",
+    summary = "Create alert or pipeline destination",
+    description = "Creates a new destination configuration for an organization. Destinations define where notifications \
+                   are sent (for alerts) or where data is routed (for pipelines). For alert destinations, this includes \
+                   webhooks, email addresses, Slack channels, PagerDuty integrations, and other notification services. \
+                   For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
@@ -76,10 +78,14 @@ impl From<DestinationError> for Response {
 )]
 pub async fn save_destination(
     Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    // This endpoint is for alert destinations, so is_alert = true
-    let dest = match dest.into(org_id, true) {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
@@ -100,16 +106,18 @@ pub async fn save_destination(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateDestination",
-    summary = "Update alert destination",
-    description = "Updates an existing alert destination configuration. Allows modification of destination settings such as \
-                   webhook URLs, authentication credentials, notification channels, and other delivery parameters. The \
-                   updated configuration will apply to all future alert notifications using this destination.",
+    summary = "Update alert or pipeline destination",
+    description = "Updates an existing destination configuration. For alert destinations, allows modification of settings \
+                   such as webhook URLs, authentication credentials, notification channels, and other delivery parameters. \
+                   For pipeline destinations, allows updating external system endpoints, output formats, and metadata. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
@@ -123,10 +131,14 @@ pub async fn save_destination(
 )]
 pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    // This endpoint is for alert destinations, so is_alert = true
-    let dest = match dest.into(org_id, true) {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
