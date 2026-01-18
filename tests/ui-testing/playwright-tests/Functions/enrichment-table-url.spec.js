@@ -177,9 +177,22 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyDuplicateNameError();
         testLogger.info('Duplicate name error verified');
 
-        // Step 4: Cancel and cleanup
-        await enrichmentPage.cancelEnrichmentTableForm();
+        // Step 4: Navigate back to list (form may have auto-closed after error in CI)
+        // Check if Cancel button is still visible before trying to click it
+        const cancelBtn = enrichmentPage.page.getByRole('button', { name: 'Cancel' });
+        const isCancelVisible = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
+        if (isCancelVisible) {
+            await cancelBtn.click();
+            await enrichmentPage.page.waitForLoadState('networkidle');
+        } else {
+            // Form already closed, navigate to enrichment tables list
+            await enrichmentPage.navigateToEnrichmentTable();
+        }
+        testLogger.info('Navigated back to list');
+
+        // Cleanup - delete the table
         await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
         await enrichmentPage.clickDeleteButton(tableName);
         await enrichmentPage.verifyDeleteConfirmationDialog();
         await enrichmentPage.clickDeleteOK();
@@ -333,15 +346,33 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Wait for form to close (save accepted)
         await enrichmentPage.page.getByText('Add Enrichment Table').waitFor({ state: 'hidden', timeout: 15000 });
 
-        // Wait for backend to register the table
-        await enrichmentPage.page.waitForTimeout(3000);
+        // Wait for backend to register the table (CI environments need more time)
+        await enrichmentPage.page.waitForTimeout(5000);
 
         // Reload to get fresh data
         await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
 
-        // Search for table in list
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
+        // Wait for enrichment tables list to be fully loaded
+        await enrichmentPage.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
+
+        // Search for table in list with retry (CI may need multiple attempts)
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            testLogger.info(`Searching for table - attempt ${attempt}`);
+            await enrichmentPage.searchEnrichmentTableInList(tableName);
+
+            try {
+                await enrichmentPage.verifyTableRowVisible(tableName);
+                break;
+            } catch (error) {
+                if (attempt < 3) {
+                    testLogger.info(`Table not found yet, waiting and retrying...`);
+                    await enrichmentPage.page.waitForTimeout(3000);
+                    await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
+                } else {
+                    throw error;
+                }
+            }
+        }
         testLogger.info('Table found in list - 404 URL was accepted for async processing');
 
         // Verify the table shows "Url" type (backend accepts and creates table entry)

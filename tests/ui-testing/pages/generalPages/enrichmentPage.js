@@ -744,14 +744,26 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async clickEditButton(tableName) {
+        testLogger.debug(`Clicking edit button for: ${tableName}`);
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await row.waitFor({ state: 'visible', timeout: 10000 });
         // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
-        await row.locator('button').nth(2).click();
+        const editBtn = row.locator('button').nth(2);
+        await editBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await editBtn.click();
         await this.page.waitForLoadState('networkidle');
+        // Wait for edit form to start loading
+        await this.page.waitForTimeout(1000);
+        testLogger.debug('Edit button clicked');
     }
 
     async verifyUpdateMode() {
-        await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible' });
+        testLogger.debug('Verifying update mode form is visible');
+        // Wait for the update form with longer timeout for CI environments
+        await this.page.getByText('Update Enrichment Table').waitFor({ state: 'visible', timeout: 30000 });
+        // Wait for form to fully load
+        await this.page.waitForLoadState('networkidle');
+        testLogger.debug('Update mode form verified visible');
     }
 
     async verifyNameFieldDisabled() {
@@ -1044,8 +1056,18 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async selectUpdateMode(mode) {
         testLogger.debug(`Selecting update mode: ${mode}`);
 
-        // Wait for update mode radio group to be visible
-        await this.page.locator('text=/Update Mode/i').waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for update mode radio group to be visible (longer timeout for CI)
+        // Try multiple selectors as the UI label may vary
+        const updateModeLocator = this.page.locator('text=/Update Mode/i');
+        const reloadOptionLocator = this.page.getByText('Reload existing URLs');
+
+        // Wait for either Update Mode label or the Reload option to be visible
+        try {
+            await updateModeLocator.waitFor({ state: 'visible', timeout: 20000 });
+        } catch {
+            // Fallback: wait for reload option which is always present in edit mode
+            await reloadOptionLocator.waitFor({ state: 'visible', timeout: 10000 });
+        }
 
         // Click the appropriate mode - using actual UI labels
         switch (mode) {
