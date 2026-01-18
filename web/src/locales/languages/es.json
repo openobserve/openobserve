@@ -334,7 +334,8 @@
     "report": "Informes",
     "pipeline": "Tuberías",
     "language": "Idioma",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "incidents": "Incidentes"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",

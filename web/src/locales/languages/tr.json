@@ -334,7 +334,8 @@
     "report": "Raporlar",
     "pipeline": "Boru hatları",
     "language": "Dil",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "incidents": "Olaylar"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",

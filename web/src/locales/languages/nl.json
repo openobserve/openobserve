@@ -334,7 +334,8 @@
     "report": "Rapporten",
     "pipeline": "Pijpleidingen",
     "language": "taal",
-    "actions": "Acties"
+    "actions": "Acties",
+    "incidents": "Incidenten"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
