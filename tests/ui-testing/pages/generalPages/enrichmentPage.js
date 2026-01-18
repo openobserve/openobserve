@@ -1061,27 +1061,40 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async selectUpdateMode(mode) {
         testLogger.debug(`Selecting update mode: ${mode}`);
 
-        // Wait for form to fully load - the update mode options may take time to render
+        // Wait for form to fully load - the update mode options may take time to render in CI
         await this.page.waitForLoadState('networkidle');
-        await this.page.waitForTimeout(2000); // Extra wait for form elements to render
+        await this.page.waitForTimeout(5000); // Longer wait for CI form rendering
+
+        // Scroll the dialog content to ensure all elements are visible
+        const dialogContent = this.page.locator('.q-dialog .q-card, .q-dialog__inner');
+        await dialogContent.first().evaluate(el => {
+            el.scrollTop = 0;
+            // Scroll down slowly to trigger any lazy loading
+            const scrollHeight = el.scrollHeight;
+            el.scrollTop = scrollHeight / 2;
+        }).catch(() => {});
+        await this.page.waitForTimeout(1000);
 
         // Try multiple selector strategies for the update mode options
-        // The labels may vary between environments
         const modeSelectors = {
             reload: [
                 'Reload existing URLs',
+                'Reload existing',
                 'Reload',
-                'Re-process existing URLs'
+                'Re-process existing URLs',
+                'Re-process'
             ],
             append: [
                 'Add new URL',
-                'Append',
-                'Add URL'
+                'Add URL',
+                'Append URL',
+                'Append'
             ],
             replace: [
                 'Replace all URLs',
-                'Replace',
-                'Replace URLs'
+                'Replace all',
+                'Replace URLs',
+                'Replace'
             ]
         };
 
@@ -1090,33 +1103,49 @@ abc, err = get_enrichment_table_record("${fileName}", {
             throw new Error(`Unknown update mode: ${mode}`);
         }
 
-        // Try each selector until one works
+        // Try each selector until one works - with multiple attempts
         let clicked = false;
-        for (const selector of selectors) {
-            const locator = this.page.getByText(selector, { exact: false });
-            try {
-                const isVisible = await locator.isVisible({ timeout: 3000 }).catch(() => false);
-                if (isVisible) {
-                    await locator.click();
-                    clicked = true;
-                    testLogger.debug(`Clicked update mode option: ${selector}`);
-                    break;
+        for (let attempt = 1; attempt <= 3 && !clicked; attempt++) {
+            testLogger.debug(`Attempt ${attempt} to find update mode option for: ${mode}`);
+
+            for (const selector of selectors) {
+                const locator = this.page.getByText(selector, { exact: false });
+                try {
+                    // Try to scroll into view first
+                    await locator.first().scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+
+                    const isVisible = await locator.first().isVisible({ timeout: 3000 }).catch(() => false);
+                    if (isVisible) {
+                        await locator.first().click();
+                        clicked = true;
+                        testLogger.debug(`Clicked update mode option: ${selector}`);
+                        break;
+                    }
+                } catch {
+                    continue;
                 }
-            } catch {
-                continue;
+            }
+
+            if (!clicked && attempt < 3) {
+                // Wait and retry
+                await this.page.waitForTimeout(2000);
             }
         }
 
         if (!clicked) {
-            // Last resort: try clicking by radio button value or label
-            const radioOptions = this.page.locator('.q-radio, .q-option-group .q-radio');
-            const count = await radioOptions.count();
-            testLogger.debug(`Found ${count} radio options in form`);
+            // Log visible text in the form for debugging
+            const formText = await this.page.locator('.q-dialog, .q-card').first().textContent().catch(() => 'Unable to get form text');
+            testLogger.error(`Form content: ${formText}`);
+
+            // Count all radio-like elements
+            const radioButtons = this.page.locator('.q-radio, [role="radio"], input[type="radio"]');
+            const count = await radioButtons.count();
+            testLogger.error(`Found ${count} radio elements in form`);
 
             // Take screenshot for debugging
             await this.page.screenshot({ path: 'test-results/update-mode-debug.png', fullPage: true });
 
-            throw new Error(`Could not find update mode option for: ${mode}. Tried selectors: ${selectors.join(', ')}`);
+            throw new Error(`Could not find update mode option for: ${mode}. Tried selectors: ${selectors.join(', ')}. Found ${count} radio elements. Check screenshot at test-results/update-mode-debug.png`);
         }
 
         await this.page.waitForLoadState('domcontentloaded');
