@@ -206,10 +206,17 @@ pub async fn test_destination(
     description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
                    notifications are sent when alert conditions are met, including webhooks, email addresses, and SNS topics.\n\n\
                    IMPORTANT: The `template` field is REQUIRED to create an alert destination. Use 'Default' for the built-in \
+<<<<<<< HEAD
                    template. Without a template, the destination becomes a pipeline destination and cannot be used with alerts.\n\n\
                    For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
                    Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'. \
                    Example HTTP destination:\n\
+=======
+                   template. For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.\n\n\
+                   Without a template, the destination becomes a pipeline destination and cannot be used with alerts.\n\n\
+                   Example HTTP destination:\n\n\
+>>>>>>> 81a834d25 (fix: pipeline destinations incorrectly saved as alert destinations (#10079))
                    ```json\n\
                    {\"name\": \"my_webhook\", \"url\": \"https://example.com/webhook\", \"method\": \"post\", \"type\": \"http\", \"template\": \"Default\"}\n\
                    ```\n\n\
