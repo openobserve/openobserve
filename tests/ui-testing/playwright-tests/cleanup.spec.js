@@ -187,7 +187,12 @@ test.describe("Pre-Test Cleanup", () => {
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
       /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
-      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/      // delete_test_<uuid>_csv (delete confirmation test)
+      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
+      // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
+      /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
+      /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (validation test)
+      /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
+      /^toggle_test_[a-f0-9]{8}$/                                                            // toggle_test_<uuid> (source toggle test)
     ]);
 
     // Clean up streams matching test patterns
@@ -262,6 +267,21 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up saved views matching test patterns
     await pm.apiCleanup.cleanupSavedViews();
+
+    // Clean up metrics streams matching test patterns
+    // Metrics tests use OTLP ingestion which may create test-specific streams
+    await pm.apiCleanup.cleanupMetricsStreams(
+      [
+        /^test_.*_metrics$/,              // test_*_metrics streams (general test streams)
+        /^e2e_metrics_/,                  // e2e_metrics_* (E2E test streams)
+        /^otlp_test_/,                    // otlp_test_* (OTLP ingestion test streams)
+        /^metrics_test_/,                 // metrics_test_* (Metrics-specific test streams)
+        /^prom_test_/,                    // prom_test_* (Prometheus test streams)
+        /^temp_metrics_/                  // temp_metrics_* (Temporary test streams)
+      ],
+      // Protected metrics streams - never delete
+      ['default']  // 'default' is the primary metrics stream used by tests
+    );
 
     // Note: Stream deletion waiting is no longer needed here because:
     // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)

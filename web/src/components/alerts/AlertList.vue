@@ -21,20 +21,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.375rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
           class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <!-- View Mode Tabs (Alerts / Incidents) -->
-            <div class="view-mode-tabs-container">
-              <app-tabs
-                :tabs="viewTabs"
-                v-model:active-tab="viewMode"
-                @update:active-tab="onViewModeChange"
-                data-test="alert-incident-view-tabs"
-              />
+            <div class="flex justify-start">
+              <q-tabs v-model="viewMode" inline-label dense @update:model-value="onViewModeChange" data-test="alert-incident-view-tabs">
+                <q-tab
+                  name="alerts"
+                  :label="t('alerts.header')"
+                  no-caps
+                  data-test="alert-view-tab"
+                />
+                <q-tab
+                  name="incidents"
+                  :label="t('alerts.incidents.title')"
+                  no-caps
+                  data-test="incident-view-tab"
+                />
+              </q-tabs>
             </div>
           </div>
           <div class="flex q-ml-auto tw:ps-2 items-center">
@@ -83,14 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
             <!-- All Folders toggle (only for alerts view) -->
-            <div v-if="viewMode === 'alerts'" class="tw:mb-2">
-              <q-toggle
-                data-test="alert-list-search-across-folders-toggle"
-                v-model="searchAcrossFolders"
-                label="All Folders"
-                class="tw:mr-3 tw:h-[36px] o2-toggle-button-lg"
-                size="lg"
-              >
+            <div v-if="viewMode === 'alerts'" class="tw:ml-2">
+                <q-toggle
+                  data-test="alert-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  label="All Folders"
+                  class="tw:mr-3 tw:h-[32px] o2-toggle-button-lg all-folders-toggle"
+                  size="lg"
+                >
               </q-toggle>
               <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
                 {{
@@ -139,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
-      style="height: calc(100vh - 116px)"
+      style="height: calc(100vh - 110px)"
     >
       <!-- Incidents View (no folders) -->
       <div v-if="viewMode === 'incidents'" class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
@@ -152,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
-        style="height: calc(100vh - 116px)"
+        style="height: calc(100vh - 110px)"
         data-test="alert-list-splitter"
       >
         <template #before>
@@ -2919,6 +2927,14 @@ export default defineComponent({
       background: #5960b2;
       color: #ffffff !important;
     }
+  }
+}
+.all-folders-toggle{
+  :deep(.q-toggle__inner){
+    height: 1.1em !important;
+  }
+  :deep(.q-toggle__label ){
+    margin-top: 2px !important;
   }
 }
 </style>

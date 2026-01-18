@@ -1255,6 +1255,7 @@ const createDestination = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         destination_name: formData.value.name,
         data: payload,
+        module: "pipeline",
       })
       .then(() => {
         dismiss();
@@ -1281,6 +1282,7 @@ const createDestination = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         destination_name: formData.value.name,
         data: payload,
+        module: "pipeline",
       })
       .then(() => {
         dismiss();

@@ -215,6 +215,7 @@ jobs:
             run_files: [
                 "js-transform-type.spec.js",
                 "row-expansion.spec.js",
+                "enrichment-table-url.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
@@ -231,6 +232,19 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
+
+          - testfolder: "Traces"
+            browser: "chrome"
+            run_files:
+              [
+                "tracesSearch.spec.js",
+                "traceQueryEditor.spec.js",
+                "traceErrorFilter.spec.js",
+                "traceDetails.spec.js",
+                "traceAdvancedFiltering.spec.js",
+                "serviceMaps.spec.js",
+              ]
+
           - testfolder: "RegressionSet"
             browser: "chrome"
             run_files:
@@ -240,6 +254,18 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
+              ]
+          - testfolder: "Metrics"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics.spec.js",
+                "metrics-queries.spec.js",
+                "metrics-aggregations.spec.js",
+                "metrics-advanced.spec.js",
+                "metrics-config-tabs.spec.js",
+                "metrics-visualizations.spec.js",
+                "metrics-config.spec.js",
               ]
             # - testfolder: "Dashboards-Variables-Scoped"
             #   browser: "chrome"

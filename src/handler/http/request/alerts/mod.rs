@@ -188,7 +188,13 @@ pub async fn create_alert(
         ("x-o2-mcp" = json!({"description": "Get alert details by ID", "category": "alerts"}))
     )
 )]
-pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
+pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
@@ -229,7 +235,13 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Respo
         ("x-o2-mcp" = json!({"description": "Export alert as JSON", "category": "alerts"}))
     )
 )]
-pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
+pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
@@ -272,10 +284,16 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Re
     )
 )]
 pub async fn update_alert(
-    Path((org_id, alert_id)): Path<(String, Ksuid)>,
+    Path((org_id, alert_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<UpdateAlertRequestBody>,
 ) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let mut alert: MetaAlert = req_body.into();
     alert.last_edited_by = Some(user_email.user_id);
     alert.id = Some(alert_id);
@@ -313,7 +331,13 @@ pub async fn update_alert(
         ("x-o2-mcp" = json!({"description": "Delete an alert by ID", "category": "alerts"}))
     )
 )]
-pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
+pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::delete_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
@@ -491,11 +515,16 @@ pub async fn list_alerts(
     )
 )]
 pub async fn enable_alert(
-    Path((org_id, alert_id)): Path<(String, Ksuid)>,
+    Path((org_id, alert_id)): Path<(String, String)>,
     Query(query): Query<EnableAlertQuery>,
 ) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let should_enable = query.value;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
         Ok(_) => {
@@ -605,7 +634,13 @@ pub async fn enable_alert_bulk(
         ("x-o2-mcp" = json!({"description": "Manually trigger an alert", "category": "alerts"}))
     )
 )]
-pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, Ksuid)>) -> Response {
+pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+    let alert_id = match Ksuid::from_str(&alert_id) {
+        Ok(id) => id,
+        Err(_) => {
+            return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
+        }
+    };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),

@@ -18,7 +18,6 @@ use axum::{
     extract::{Multipart, Path},
     response::Response,
 };
-use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
@@ -41,6 +40,7 @@ use {
     serde_json,
     std::collections::HashMap,
     std::str::FromStr,
+    svix_ksuid::Ksuid,
 };
 
 use crate::{
@@ -93,12 +93,18 @@ fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn delete_action(Path((org_id, ksuid)): Path<(String, Ksuid)>) -> Response {
+pub async fn delete_action(Path((org_id, action_id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match delete_app_from_target_cluster(&org_id, ksuid).await {
+        let action_id = match Ksuid::from_str(&action_id) {
+            Ok(id) => id,
+            Err(_) => {
+                return MetaHttpResponse::not_found(format!("invalid action id {action_id}"));
+            }
+        };
+        match delete_app_from_target_cluster(&org_id, action_id).await {
             Ok(_) => {
-                remove_ownership(&org_id, "actions", Authz::new(&ksuid.to_string())).await;
+                remove_ownership(&org_id, "actions", Authz::new(&action_id.to_string())).await;
                 MetaHttpResponse::ok("Action deleted")
             }
             Err(e) => MetaHttpResponse::bad_request(e),
@@ -107,7 +113,7 @@ pub async fn delete_action(Path((org_id, ksuid)): Path<(String, Ksuid)>) -> Resp
 
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, ksuid);
+        let _ = (org_id, action_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -219,10 +225,16 @@ pub async fn delete_action_bulk(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn serve_action_zip(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) -> Response {
+pub async fn serve_action_zip(Path((org_id, action_id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match serve_file_from_s3(&_org_id, _ksuid).await {
+        let action_id = match Ksuid::from_str(&action_id) {
+            Ok(id) => id,
+            Err(_) => {
+                return MetaHttpResponse::not_found(format!("invalid action id {action_id}"));
+            }
+        };
+        match serve_file_from_s3(&org_id, action_id).await {
             Ok((bytes, file_name)) => {
                 use axum::{
                     body::Body,
@@ -248,6 +260,7 @@ pub async fn serve_action_zip(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) ->
 
     #[cfg(not(feature = "enterprise"))]
     {
+        let _ = (org_id, action_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -282,11 +295,17 @@ pub async fn serve_action_zip(Path((_org_id, _ksuid)): Path<(String, Ksuid)>) ->
     )
 )]
 pub async fn update_action_details(
-    Path((_org_id, _ksuid)): Path<(String, Ksuid)>,
+    Path((org_id, action_id)): Path<(String, String)>,
     Json(req): Json<config::meta::actions::action::UpdateActionDetailsRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let action_id = match Ksuid::from_str(&action_id) {
+            Ok(id) => id,
+            Err(_) => {
+                return MetaHttpResponse::not_found(format!("invalid action id {action_id}"));
+            }
+        };
         let mut req = req;
 
         // Validate environment variables if they are being updated
@@ -298,7 +317,7 @@ pub async fn update_action_details(
 
         let sa = match req.service_account.clone() {
             None => {
-                if let Ok(action) = action_scripts::get(&_ksuid.to_string(), &_org_id).await {
+                if let Ok(action) = action_scripts::get(&action_id.to_string(), &org_id).await {
                     action.service_account
                 } else {
                     return MetaHttpResponse::bad_request("Failed to fetch action");
@@ -306,16 +325,15 @@ pub async fn update_action_details(
             }
             Some(sa) => sa,
         };
-        let passcode = if let Ok(res) =
-            crate::service::organization::get_passcode(Some(&_org_id), &sa).await
-        {
-            res.passcode
-        } else {
-            return MetaHttpResponse::bad_request("Failed to fetch passcode");
-        };
+        let passcode =
+            if let Ok(res) = crate::service::organization::get_passcode(Some(&org_id), &sa).await {
+                res.passcode
+            } else {
+                return MetaHttpResponse::bad_request("Failed to fetch passcode");
+            };
 
         req.service_account = Some(sa);
-        match update_app_on_target_cluster(&_org_id, _ksuid, req, &passcode).await {
+        match update_app_on_target_cluster(&org_id, action_id, req, &passcode).await {
             Ok(uuid) => MetaHttpResponse::json(serde_json::json!({"uuid":uuid})),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
@@ -323,6 +341,8 @@ pub async fn update_action_details(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
+        drop(action_id);
         drop(req);
         MetaHttpResponse::forbidden("Not Supported")
     }
