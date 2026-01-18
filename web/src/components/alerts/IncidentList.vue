@@ -15,10 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-    <!-- Incidents table -->
-    <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class="card-container tw:h-[calc(100vh-120px)]">
+  <div data-test="incident-list" class="flex q-mt-xs">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
+      <!-- Header with title and search -->
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
+          <div class="q-table__title tw:font-[600]" data-test="incidents-list-title">
+            {{ t("alerts.incidents.title") }}
+          </div>
+
+          <div class="tw:flex tw:items-center">
+            <q-input
+              v-model="searchQuery"
+              dense
+              borderless
+              :placeholder="t('alerts.incidents.search')"
+              data-test="incident-search-input"
+              clearable
+              class="o2-search-input"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </q-input>
+          </div>
+        </div>
+      </div>
+      <!-- Incidents table -->
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+      <div class="card-container tw:h-[calc(100vh-128px)]">
         <q-table
           ref="qTableRef"
           v-model:pagination="pagination"
@@ -169,18 +194,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Incident detail drawer -->
-    <q-dialog
-      v-model="showDetailDrawer"
-      position="right"
-      full-height
-      :maximized="true"
-    >
-      <IncidentDetailDrawer
-        @close="closeDrawer"
-        @status-updated="onStatusUpdated"
-      />
-    </q-dialog>
+      <!-- Incident detail drawer -->
+      <q-dialog
+        v-model="showDetailDrawer"
+        position="right"
+        full-height
+        :maximized="true"
+      >
+        <IncidentDetailDrawer
+          @close="closeDrawer"
+          @status-updated="onStatusUpdated"
+        />
+      </q-dialog>
+    </div>
   </div>
 </template>
 
@@ -205,13 +231,7 @@ export default defineComponent({
     O2AIContextAddBtn,
     NoData,
   },
-  props: {
-    searchQuery: {
-      type: String,
-      default: "",
-    },
-  },
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
@@ -223,6 +243,7 @@ export default defineComponent({
     const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
     const showDetailDrawer = ref(false);
     const selectedIncident = ref<Incident | null>(null); // Keep for reference but not passed to drawer
+    const searchQuery = ref("");
 
     // Filter state for status and severity columns
     const statusFilter = ref<string[]>([]);
@@ -375,7 +396,7 @@ export default defineComponent({
         const limit = 1000; // Large limit for FE filtering
         const offset = 0;
         // Keep keyword parameter for future BE implementation
-        const keyword = undefined; // props.searchQuery?.trim() || undefined;
+        const keyword = undefined; // searchQuery.value?.trim() || undefined;
 
         const response = await incidentsService.list(
           org,
@@ -389,7 +410,7 @@ export default defineComponent({
         allIncidents.value = response.data.incidents;
 
         // Apply frontend search filter
-        const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+        const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
 
         // Apply pagination on filtered results
         const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
@@ -414,7 +435,7 @@ export default defineComponent({
       pagination.value.descending = props.pagination.descending;
 
       // For FE filtering, just reapply filters and pagination without API call
-      const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+      const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
       const startIndex = (pagination.value.page - 1) * pagination.value.rowsPerPage;
       const endIndex = startIndex + pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
@@ -548,12 +569,12 @@ export default defineComponent({
     });
 
     // Watch for search query changes and apply FE filter
-    watch(() => props.searchQuery, () => {
+    watch(() => searchQuery.value, () => {
       // Reset to page 1 when search query changes
       pagination.value.page = 1;
 
       // Apply FE search filter without API call
-      const filteredIncidents = applyFrontendSearch(allIncidents.value, props.searchQuery);
+      const filteredIncidents = applyFrontendSearch(allIncidents.value, searchQuery.value);
       const startIndex = 0; // Always start from first page
       const endIndex = pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
@@ -634,6 +655,7 @@ export default defineComponent({
       columns,
       showDetailDrawer,
       selectedIncident,
+      searchQuery,
       loadIncidents,
       onRequest,
       viewIncident,
@@ -666,5 +688,9 @@ export default defineComponent({
   width: 100%;
   justify-content: space-between;
   align-items: center;
+}
+
+.o2-search-input {
+  width: 250px;
 }
 </style>

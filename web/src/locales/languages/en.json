@@ -324,6 +324,7 @@
     "help": "Help",
     "dashboard": "Dashboards",
     "alerts": "Alerts",
+    "incidents": "Incidents",
     "openapi": "OpenAPI",
     "docs": "Docs",
     "billings": "Billing",
@@ -1738,6 +1739,7 @@
     "incidents": {
       "title": "Incidents",
       "header": "Alert Incidents",
+      "search": "Search incidents...",
       "noIncidents": "No incidents found",
       "id": "ID",
       "status": "Status",
