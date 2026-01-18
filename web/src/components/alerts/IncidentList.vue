@@ -193,19 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-table>
       </div>
     </div>
-
-      <!-- Incident detail drawer -->
-      <q-dialog
-        v-model="showDetailDrawer"
-        position="right"
-        full-height
-        :maximized="true"
-      >
-        <IncidentDetailDrawer
-          @close="closeDrawer"
-          @status-updated="onStatusUpdated"
-        />
-      </q-dialog>
     </div>
   </div>
 </template>
@@ -218,7 +205,6 @@ import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, { Incident } from "@/services/incidents";
-import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import NoData from "../shared/grid/NoData.vue";
@@ -226,7 +212,6 @@ import NoData from "../shared/grid/NoData.vue";
 export default defineComponent({
   name: "IncidentList",
   components: {
-    IncidentDetailDrawer,
     QTablePagination,
     O2AIContextAddBtn,
     NoData,
@@ -241,8 +226,6 @@ export default defineComponent({
     const loading = ref(false);
     const incidents = ref<Incident[]>([]);
     const allIncidents = ref<Incident[]>([]); // Store all incidents for FE filtering
-    const showDetailDrawer = ref(false);
-    const selectedIncident = ref<Incident | null>(null); // Keep for reference but not passed to drawer
     const searchQuery = ref("");
 
     // Filter state for status and severity columns
@@ -443,17 +426,12 @@ export default defineComponent({
     };
 
     const viewIncident = (incident: Incident) => {
-      selectedIncident.value = incident;
-
-      // Add incident ID to URL and open drawer after navigation completes
+      // Navigate to incident detail page
       router.push({
-        query: {
-          ...router.currentRoute.value.query,
-          incident_id: incident.id,
+        name: "incidentDetail",
+        params: {
+          id: incident.id,
         },
-      }).then(() => {
-        // Open drawer after URL is updated
-        showDetailDrawer.value = true;
       });
     };
 
@@ -487,20 +465,6 @@ export default defineComponent({
       updateStatus(incident, "open");
     };
 
-    const onStatusUpdated = () => {
-      loadIncidents();
-    };
-
-    const closeDrawer = () => {
-      // Close drawer immediately for better UX
-      showDetailDrawer.value = false;
-      selectedIncident.value = null;
-
-      // Remove incident_id from URL
-      const query = { ...router.currentRoute.value.query };
-      delete query.incident_id;
-      router.replace({ query }); // Use replace instead of push to not add history entry
-    };
 
     const getStatusColor = (status: string) => {
       switch (status) {
@@ -559,13 +523,6 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadIncidents();
-
-      // Check if there's an incident_id in the URL and open the drawer
-      const incidentIdFromUrl = router.currentRoute.value.query.incident_id as string;
-      if (incidentIdFromUrl) {
-        // Just open the drawer - the IncidentDetailDrawer will read the ID from URL
-        showDetailDrawer.value = true;
-      }
     });
 
     // Watch for search query changes and apply FE filter
@@ -579,17 +536,6 @@ export default defineComponent({
       const endIndex = pagination.value.rowsPerPage;
       incidents.value = filteredIncidents.slice(startIndex, endIndex);
       pagination.value.rowsNumber = filteredIncidents.length;
-    });
-
-    // Watch for drawer closing (handles ESC key, clicking outside, etc.)
-    watch(showDetailDrawer, (isOpen) => {
-      if (!isOpen && router.currentRoute.value.query.incident_id) {
-        // Drawer was closed but incident_id is still in URL - clean it up
-        const query = { ...router.currentRoute.value.query };
-        delete query.incident_id;
-        router.replace({ query });
-        selectedIncident.value = null;
-      }
     });
 
     // Filter toggle functions
@@ -653,17 +599,13 @@ export default defineComponent({
       severityOptions,
       pagination,
       columns,
-      showDetailDrawer,
-      selectedIncident,
       searchQuery,
       loadIncidents,
       onRequest,
       viewIncident,
-      closeDrawer,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,
-      onStatusUpdated,
       getStatusColor,
       getStatusLabel,
       getSeverityColor,

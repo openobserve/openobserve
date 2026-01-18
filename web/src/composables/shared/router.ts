@@ -426,6 +426,17 @@ const useRoutes = () => {
       },
     },
     {
+      path: "incidents/:id",
+      name: "incidentDetail",
+      component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
+      meta: {
+        title: "Incident Detail",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "short/:id",
       name: "shortUrl",
       component: ShortUrl,
