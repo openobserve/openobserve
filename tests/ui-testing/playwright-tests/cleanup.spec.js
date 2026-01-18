@@ -193,7 +193,7 @@ test.describe("Pre-Test Cleanup", () => {
       /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (URL format validation test)
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
       /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
-      /^update_modes_[a-f0-9]{8}$/,                                                          // update_modes_<uuid> (update modes test)
+      /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
       /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)

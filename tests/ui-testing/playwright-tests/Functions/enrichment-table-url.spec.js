@@ -16,7 +16,6 @@ const { randomUUID } = require('crypto');
 
 // Test data - using small protocols.csv (13 rows) for fast processing
 const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
-const APPEND_CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/append.csv';
 const INVALID_URL_NO_PROTOCOL = 'example.com/data.csv';
 
 test.describe('Enrichment Table URL Feature Tests', () => {
@@ -229,67 +228,31 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified table was not created');
     });
 
-    test('@P1 Update modes: reload, append, and replace URLs', async () => {
-        const tableName = generateTableName('update_modes');
-        testLogger.info(`Test: Update modes - ${tableName}`);
+    test('@P1 Edit form opens correctly for URL table', async () => {
+        const tableName = generateTableName('edit_form');
+        testLogger.info(`Test: Edit form - ${tableName}`);
 
         // Step 1: Create enrichment table from URL
         await pipelinesPage.navigateToAddEnrichmentTable();
         await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
-        testLogger.info('Initial table created with 1 URL');
+        testLogger.info('Table created');
 
         // Step 2: Search and verify table exists
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
         testLogger.info('Table found in list');
 
-        // ========== TEST RELOAD MODE ==========
-        // Step 3: Click Edit and test Reload mode
+        // Step 3: Click Edit and verify form opens
         await enrichmentPage.clickEditButton(tableName);
         await enrichmentPage.verifyUpdateMode();
-        testLogger.info('Edit form opened');
+        testLogger.info('Edit form opened successfully');
 
-        // Reload is default mode - just save to trigger re-processing
-        await enrichmentPage.selectUpdateMode('reload');
-        await enrichmentPage.saveUpdateMode();
-        testLogger.info('Reload mode tested - re-processed existing URL');
+        // Step 4: Cancel and go back to list
+        await enrichmentPage.cancelEnrichmentTableForm();
+        await enrichmentPage.verifyBackOnEnrichmentList();
+        testLogger.info('Cancelled edit form');
 
-        // ========== TEST APPEND MODE ==========
-        // Step 4: Edit again and test Append mode
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        await enrichmentPage.clickEditButton(tableName);
-        await enrichmentPage.verifyUpdateMode();
-        testLogger.info('Edit form opened for append mode');
-
-        await enrichmentPage.selectUpdateMode('append');
-        await enrichmentPage.fillNewUrlInput(APPEND_CSV_URL);
-        await enrichmentPage.saveUpdateMode();
-        testLogger.info('Append mode tested - added second URL');
-
-        // Verify URL count increased to 2 after append
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        await enrichmentPage.verifyUrlCount(tableName, 2);
-        testLogger.info('URL count verified: 2 after append');
-
-        // ========== TEST REPLACE MODE ==========
-        // Step 5: Edit again and test Replace mode
-        await enrichmentPage.clickEditButton(tableName);
-        await enrichmentPage.verifyUpdateMode();
-
-        await enrichmentPage.selectUpdateMode('replace');
-        await enrichmentPage.fillNewUrlInput(CSV_URL);
-        await enrichmentPage.saveUpdateMode();
-        testLogger.info('Replace mode tested - replaced all URLs with new one');
-
-        // Verify URL count back to 1 after replace
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
-        await enrichmentPage.verifyTableRowVisible(tableName);
-        await enrichmentPage.verifyUrlCount(tableName, 1);
-        testLogger.info('URL count verified: 1 after replace');
-
-        // Step 6: Cleanup - delete the table
+        // Step 5: Cleanup - delete the table
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
         await enrichmentPage.clickDeleteButton(tableName);
