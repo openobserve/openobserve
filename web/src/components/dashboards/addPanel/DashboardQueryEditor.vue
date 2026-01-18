@@ -198,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ].customQuery
                 "
                 :language="dashboardPanelData.data.queryType"
+                :key="dashboardPanelData.data.queryType"
               ></QueryEditor>
             </template>
             <template #after>

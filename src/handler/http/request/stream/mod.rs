@@ -793,7 +793,7 @@ pub async fn delete_stream_data_by_time_range(
     )
 )]
 pub async fn get_delete_stream_data_status(
-    Path((_org_id, _stream_name, ksuid)): Path<(String, String, String)>,
+    Path((_org_id, _stream_name, data_id)): Path<(String, String, String)>,
 ) -> Response {
     // Check if super cluster is enabled
     #[cfg(feature = "enterprise")]
@@ -802,7 +802,7 @@ pub async fn get_delete_stream_data_status(
         .enabled
     {
         // Super cluster is enabled, get status from all regions
-        match get_super_cluster_delete_status(&ksuid).await {
+        match get_super_cluster_delete_status(&data_id).await {
             Ok(res) => res,
             Err(e) => {
                 log::error!("get_super_cluster_delete_status error: {e}");
@@ -818,11 +818,11 @@ pub async fn get_delete_stream_data_status(
         }
     } else {
         // Super cluster not enabled, get local status
-        get_local_delete_status(&ksuid).await
+        get_local_delete_status(&data_id).await
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_delete_status(&ksuid).await;
+    let response = get_local_delete_status(&data_id).await;
 
     (StatusCode::OK, Json(response)).into_response()
 }

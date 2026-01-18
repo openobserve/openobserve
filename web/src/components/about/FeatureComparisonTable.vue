@@ -135,6 +135,7 @@ import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import type { QTableColumn } from "quasar";
+import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
 interface FeatureValue {
   opensource: boolean | string;
@@ -199,42 +200,42 @@ const pagination = ref({
   rowsPerPage: 0 // 0 means show all rows
 });
 
+/**
+ * Converts feature registry to display format
+ * Features are automatically loaded from the centralized registry
+ */
+const loadFeaturesFromRegistry = (): Feature[] => {
+  return FEATURE_REGISTRY.map((feature: FeatureDefinition) => {
+    const nameKey = getFeatureNameKey(feature);
+    const featureValue = feature.availability;
+
+    // Resolve string values to their translations
+    const values: FeatureValue = {
+      opensource: typeof featureValue.opensource === 'string'
+        ? t(featureValue.opensource)
+        : featureValue.opensource,
+      enterprise: typeof featureValue.enterprise === 'string'
+        ? t(featureValue.enterprise)
+        : featureValue.enterprise,
+      cloud: typeof featureValue.cloud === 'string'
+        ? t(featureValue.cloud)
+        : featureValue.cloud,
+    };
+
+    return {
+      name: t(nameKey),
+      values
+    };
+  });
+};
+
 const featureData = ref<FeatureData>({
   editions: [
     { id: 'opensource', name: t('about.edition_opensource') },
     { id: 'enterprise', name: t('about.edition_enterprise') },
     { id: 'cloud', name: t('about.edition_cloud') }
   ],
-  features: [
-    { name: t('about.feature_logs'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_metrics'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_traces'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_rum'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_alerts'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_dashboards'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_reports'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_vrl_functions'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_pipelines'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_high_availability'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_multitenancy'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_dynamic_schema'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_multilingual_gui'), values: { opensource: true, enterprise: true, cloud: true } },
-    { name: t('about.feature_sso'), values: { opensource: false, enterprise: t('about.value_sso_requires_ha'), cloud: true } },
-    { name: t('about.feature_rbac'), values: { opensource: false, enterprise: t('about.value_rbac_requires_ha'), cloud: true } },
-    { name: t('about.feature_federated_search'), values: { opensource: false, enterprise: true, cloud: false } },
-    { name: t('about.feature_query_management'), values: { opensource: false, enterprise: true, cloud: false } },
-    { name: t('about.feature_workload_management'), values: { opensource: false, enterprise: true, cloud: false } },
-    { name: t('about.feature_audit_trail'), values: { opensource: false, enterprise: true, cloud: true } },
-    { name: t('about.feature_action_scripts'), values: { opensource: false, enterprise: true, cloud: false } },
-    { name: t('about.feature_sensitive_data_redaction'), values: { opensource: false, enterprise: true, cloud: true } },
-    { name: t('about.feature_influence_roadmap'), values: { opensource: false, enterprise: true, cloud: t('about.value_roadmap_enterprise_plan') } },
-    { name: t('about.feature_license'), values: { opensource: t('about.value_license_agpl'), enterprise: t('about.value_license_enterprise'), cloud: t('about.value_license_cloud') } },
-    { name: t('about.feature_support'), values: { opensource: t('about.value_support_community'), enterprise: t('about.value_support_enterprise'), cloud: t('about.value_support_cloud') } },
-    { name: t('about.feature_cost'), values: { opensource: t('about.value_cost_free'), enterprise: t('about.value_cost_enterprise'), cloud: t('about.value_cost_cloud') } },
-    { name: t('about.feature_pipelines_external'), values: { opensource: false, enterprise: true, cloud: true } },
-    { name: t('about.feature_extreme_performance'), values: { opensource: false, enterprise: true, cloud: true } },
-    { name: t('about.feature_query_optimizer'), values: { opensource: false, enterprise: true, cloud: true } }
-  ]
+  features: loadFeaturesFromRegistry()
 });
 
 const currentPlanName = computed(() => {
