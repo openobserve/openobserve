@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, computed, nextTick } from "vue";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -895,7 +895,9 @@ const refreshData = () => {
   dashboardPanelData.data.queryType =
     props.selectedTab === "promql" ? "promql" : "sql";
 
-  // Update both refs together to prevent double watcher triggers
+  // Update both refs together
+  // Note: Updating both chartData and selectedTimeObj may trigger two separate watchers
+  // in usePanelDataLoader, resulting in duplicate query_range API calls for PromQL queries
   const newChartData = cloneDeep(dashboardPanelData.data);
   const newTimeObj = { ...dashboardPanelData.meta.dateTime };
 
