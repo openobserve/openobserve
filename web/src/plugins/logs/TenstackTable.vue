@@ -557,9 +557,9 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         true,
         props.highlightQuery,
@@ -583,9 +583,9 @@ watch(
 
     await nextTick();
 
-    if (props.columns?.length && tableRows.value?.length) {
+    if (props.columns?.length && props.rows?.length) {
       processHitsInChunks(
-        tableRows.value,
+        props.rows,
         props.columns,
         false,
         props.highlightQuery,
