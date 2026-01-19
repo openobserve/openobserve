@@ -334,7 +334,8 @@
     "report": "Informes",
     "pipeline": "Tuberías",
     "language": "Idioma",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "incidents": "Incidentes"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",
@@ -1630,7 +1631,8 @@
         "groupedBy": "Agrupados por:",
         "havingConditions": "TENER condiciones:"
       }
-    }
+    },
+    "template": "Anulación de plantillas"
   },
   "alert_templates": {
     "header": "Plantillas",

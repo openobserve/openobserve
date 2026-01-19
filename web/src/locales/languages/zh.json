@@ -334,7 +334,8 @@
     "report": "报表",
     "pipeline": "流水线",
     "language": "语言",
-    "actions": "操作"
+    "actions": "操作",
+    "incidents": "事件"
   },
   "rum": {
     "title": "用户体验监控",
@@ -1626,7 +1627,8 @@
         "groupedBy": "分组依据：",
         "havingConditions": "有条件："
       }
-    }
+    },
+    "template": "模板"
   },
   "alert_templates": {
     "header": "模板",

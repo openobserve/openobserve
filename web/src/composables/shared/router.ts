@@ -39,6 +39,7 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Alerts = () => import("@/views/AppAlerts.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
+const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 const Settings = () => import("@/components/settings/index.vue");
 
 const Functions = () => import("@/views/Functions.vue");
@@ -408,6 +409,28 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
       meta: {
         title: "Import Semantic Groups",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "incidents",
+      name: "incidentList",
+      component: IncidentList,
+      meta: {
+        title: "Incidents",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "incidents/:id",
+      name: "incidentDetail",
+      component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
+      meta: {
+        title: "Incident Detail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

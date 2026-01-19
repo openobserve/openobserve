@@ -202,7 +202,7 @@ async fn main() -> Result<(), anyhow::Error> {
             use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
             let o2_cfg = get_o2_config();
 
-            if o2_cfg.ai.traces_enabled {
+            if o2_cfg.ai.tracing_enabled {
                 tracer_provider = Some(enable_tracing()?);
                 None
             } else {
@@ -1094,7 +1094,7 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 
         // If AI tracing is enabled but general tracing is NOT enabled,
         // we need to add OpenObserve OTLP exporter for AI traces
-        if o2_cfg.ai.traces_enabled
+        if o2_cfg.ai.tracing_enabled
             && !cfg.common.tracing_enabled
             && !cfg.common.tracing_search_enabled
         {

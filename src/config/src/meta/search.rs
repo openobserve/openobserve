@@ -608,15 +608,24 @@ pub struct SearchPartitionResponse {
     pub is_histogram_eligible: bool,
 }
 
+/// Request parameters for querying search history
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct SearchHistoryRequest {
+    /// Organization ID to filter search history by
     pub org_id: Option<String>,
+    /// Type of stream to filter by (e.g., logs, metrics, traces)
     pub stream_type: Option<String>,
+    /// Name of the specific stream to filter by
     pub stream_name: Option<String>,
+    /// start time in micro seconds
     pub start_time: i64,
+    /// end time in micro seconds
     pub end_time: i64,
+    /// Trace ID to filter search history by
     pub trace_id: Option<String>,
+    /// Email of the user to filter search history by
     pub user_email: Option<String>,
+    /// Maximum number of search history records to return
     #[serde(default = "default_size")]
     pub size: i64,
 }

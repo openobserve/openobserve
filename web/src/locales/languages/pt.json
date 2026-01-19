@@ -334,7 +334,8 @@
     "report": "Relatórios",
     "pipeline": "Oleodutos",
     "language": "Idioma",
-    "actions": "Ações"
+    "actions": "Ações",
+    "incidents": "Incidentes"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -1630,7 +1631,8 @@
         "groupedBy": "Agrupados por:",
         "havingConditions": "TENDO condições:"
       }
-    }
+    },
+    "template": "Substituição de modelo"
   },
   "alert_templates": {
     "header": "Modelos",
