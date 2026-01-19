@@ -144,7 +144,6 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
-        confine: true,
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
