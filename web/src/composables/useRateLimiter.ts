@@ -24,10 +24,10 @@ import rateLimiterService from "@/services/rate_limit";
     let isApiLimitsLoading = ref<boolean>(false);
     let isRoleLimitsLoading = ref<boolean>(false);
 
-    const getApiLimitsByOrganization = async ( orgId: string) => {
+    const getApiLimitsByOrganization = async ( orgId: string, interval: string = 'second') => {
       try {
         isApiLimitsLoading.value = true;
-          const response = await rateLimiterService.getApiLimits(orgId);
+          const response = await rateLimiterService.getApiLimits(orgId, interval);
           let transformedData: any = [];
 
           //predefined operation that we get from the api
@@ -55,9 +55,10 @@ import rateLimiterService from "@/services/rate_limit";
               transformedData.push(moduleThresholds);
           });
           transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
+          // Store with interval-specific key
           store.dispatch("setApiLimitsByOrgId", {
             ...store.state.allApiLimitsByOrgId,
-            [orgId]: transformedData,
+            [`${orgId}_${interval}`]: transformedData,
           });
           //this is done because once we update the api limits , we need to reset the role limits so that when we can fetch the latest roles limits from the api (updated one)
           store.dispatch("setRoleLimitsByOrgIdByRole", {
@@ -71,10 +72,10 @@ import rateLimiterService from "@/services/rate_limit";
       console.log(error);
   }
     };
-    const getRoleLimitsByOrganization = async (orgId: string, rolename: string) => {
+    const getRoleLimitsByOrganization = async (orgId: string, rolename: string, interval: string = 'second') => {
       try {
         isRoleLimitsLoading.value = true;
-          const response = await rateLimiterService.getRoleLimits(orgId, rolename);
+          const response = await rateLimiterService.getRoleLimits(orgId, rolename, interval);
           let transformedData: any = [];
 
       //predefined operation that we get from the api
@@ -103,11 +104,12 @@ import rateLimiterService from "@/services/rate_limit";
 
       });
       transformedData.sort((a: any, b: any) => a.module_name.localeCompare(b.module_name));
+      // Store with interval-specific key
       store.dispatch("setRoleLimitsByOrgIdByRole", {
         ...store.state.allRoleLimitsByOrgIdByRole,
         [orgId]: {
           ...store.state.allRoleLimitsByOrgIdByRole[orgId],
-          [rolename]: transformedData,
+          [`${rolename}_${interval}`]: transformedData,
         },
       });
       isRoleLimitsLoading.value = false;
