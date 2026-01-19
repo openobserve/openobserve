@@ -162,16 +162,19 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     }
   }
 
-  // Add plain English summary (only from step 4 onwards)
+  // Build the final summary with plain English first, then bullet points
+  const bulletPoints = parts.join('\n');
+
+  // Add plain English summary first (only from step 4 onwards)
   if (wizardStep >= 4) {
     const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
     if (plainEnglish) {
-      parts.push('');
-      parts.push(`<div class="plain-english-section">"${plainEnglish}"</div>`);
+      // Return plain English first, then bullet points (with single line break for tighter spacing)
+      return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
     }
   }
 
-  return parts.join('\n');
+  return bulletPoints;
 }
 
 /**
