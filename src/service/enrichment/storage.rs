@@ -239,10 +239,13 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to get schema from cache: {}", e))?;
 
-        // Merge the data from db and convert to perquet format
+        // Merge the data from db and convert to parquet format
+        // Pass None for end_time to fetch all data (not in search context)
         let (data, min_ts, max_ts) =
-            crate::service::db::enrichment_table::get_enrichment_data_from_db(org_id, table_name)
-                .await?;
+            crate::service::db::enrichment_table::get_enrichment_data_from_db(
+                org_id, table_name, None,
+            )
+            .await?;
         if data.is_empty() {
             return Ok(());
         }
