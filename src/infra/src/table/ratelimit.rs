@@ -68,6 +68,7 @@ pub async fn fetch_rules(
         .column(Column::ApiGroupOperation)
         .column(Column::UserId)
         .column(Column::Threshold)
+        .column(Column::StatIntervalMs)
         .order_by(Column::Threshold, Order::Asc);
 
     if let Some(org_id) = org_id {
@@ -100,6 +101,7 @@ pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, a
         .column(Column::ApiGroupOperation)
         .column(Column::UserId)
         .column(Column::Threshold)
+        .column(Column::StatIntervalMs)
         .filter(Column::RuleId.eq(rule_id));
     let record = res
         .into_model::<RatelimitRule>()
@@ -169,6 +171,7 @@ async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
             api_group_name: Set(rule.api_group_name.unwrap_or_default()),
             api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
             threshold: Set(rule.threshold),
+            stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
             created_at: Set(current_timestamp),
         })
         .collect();
@@ -224,6 +227,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
             .filter(
                 Column::ApiGroupOperation.eq(rule.api_group_operation.clone().unwrap_or_default()),
             )
+            .filter(Column::StatIntervalMs.eq(rule.stat_interval_ms.unwrap_or(1000)))
             .one(&txn)
             .await
             .map_err(|e| anyhow!("DbError# Failed to fetch existing rule: {}", e))?;
@@ -245,6 +249,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 active_model.api_group_operation =
                     Set(rule.api_group_operation.unwrap_or_default());
                 active_model.threshold = Set(rule.threshold);
+                active_model.stat_interval_ms = Set(rule.stat_interval_ms.unwrap_or(1000));
                 active_model.created_at = Set(existing.created_at);
 
                 if let Err(e) = active_model.save(&txn).await {
@@ -275,6 +280,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                         api_group_name: Set(rule.api_group_name.unwrap_or_default()),
                         api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                         threshold: Set(rule.threshold),
+                        stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
                         created_at: Set(current_time),
                     };
                     log::debug!("add_upsert_batch insert active_model: {active_model:?} ");
@@ -316,6 +322,7 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
                 api_group_name: Set(rule.api_group_name.unwrap_or_default()),
                 api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                 threshold: Set(rule.threshold),
+                stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
                 created_at: Set(now().timestamp()),
             };
             match Entity::insert(active_rule)
@@ -563,6 +570,7 @@ mod tests {
             api_group_name: Some("test_group_name".to_string()),
             api_group_operation: Some("test_operation".to_string()),
             threshold: 100,
+            stat_interval_ms: Some(1000),
         }
     }
 
@@ -576,6 +584,7 @@ mod tests {
             api_group_name: "api_group_name".to_string(),
             api_group_operation: "operation".to_string(),
             threshold: 100,
+            stat_interval_ms: 1000,
             created_at: 0,
         }
     }

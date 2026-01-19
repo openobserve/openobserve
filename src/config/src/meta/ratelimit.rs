@@ -42,6 +42,14 @@ pub struct RatelimitRule {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_group_operation: Option<String>,
     pub threshold: i32,
+    /// Time window for rate limiting in milliseconds.
+    /// Default is 1000ms (1 second) for per-second rate limiting.
+    /// For hierarchical rate limiting, use multiple rules with different intervals:
+    /// - 1000 = 1 second
+    /// - 60000 = 1 minute
+    /// - 3600000 = 1 hour
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stat_interval_ms: Option<i64>,
 }
 
 impl TryFrom<&Bytes> for RatelimitRule {
@@ -76,6 +84,7 @@ impl RatelimitRule {
                         api_group_name: Some(group_name.clone()),
                         api_group_operation: Some(operation.clone().to_lowercase()),
                         threshold: *threshold,
+                        stat_interval_ms: Some(1000), // Default to 1 second
                     })
             })
             .collect()
@@ -143,6 +152,10 @@ impl RatelimitRule {
     pub fn get_threshold(&self) -> i32 {
         self.threshold
     }
+    pub fn get_stat_interval_ms(&self) -> u32 {
+        // Default to 1 second
+        self.stat_interval_ms.unwrap_or(1000) as u32
+    }
 }
 
 pub fn get_resource_from_params(
@@ -189,6 +202,7 @@ mod tests {
         assert_eq!(rule.api_group_name, None);
         assert_eq!(rule.api_group_operation, None);
         assert_eq!(rule.threshold, 0);
+        assert_eq!(rule.stat_interval_ms, None);
     }
 
     #[test]
@@ -202,6 +216,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         assert_eq!(rule.org, "test_org");
@@ -225,6 +240,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         let json = serde_json::to_string(&rule).unwrap();
@@ -342,6 +358,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         assert_eq!(rule.get_rule_id(), "rule123");
@@ -365,6 +382,7 @@ mod tests {
             api_group_name: None,
             api_group_operation: None,
             threshold: 50,
+            stat_interval_ms: None,
         };
 
         assert_eq!(rule.get_rule_id(), "");
@@ -388,6 +406,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         let expected = "test_org:exact:admin:search:query:user123";
@@ -405,6 +424,7 @@ mod tests {
             api_group_name: None,
             api_group_operation: None,
             threshold: 50,
+            stat_interval_ms: None,
         };
 
         let expected = "test_org:::::";
@@ -453,6 +473,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         // Test serialization
@@ -483,6 +504,7 @@ mod tests {
             api_group_name: None,
             api_group_operation: None,
             threshold: 100,
+            stat_interval_ms: None,
         };
 
         let json = serde_json::to_string(&rule).expect("Failed to serialize");
@@ -498,5 +520,96 @@ mod tests {
         // Check that required fields are included
         assert!(json.contains("org"));
         assert!(json.contains("threshold"));
+    }
+
+    #[test]
+    fn test_stat_interval_ms_field() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+            stat_interval_ms: Some(60000), // 1 minute
+        };
+
+        assert_eq!(rule.stat_interval_ms, Some(60000));
+        assert_eq!(rule.get_stat_interval_ms(), 60000);
+    }
+
+    #[test]
+    fn test_stat_interval_ms_default() {
+        let rule = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 100,
+            stat_interval_ms: None,
+        };
+
+        assert_eq!(rule.stat_interval_ms, None);
+        assert_eq!(rule.get_stat_interval_ms(), 1000); // Default to 1 second
+    }
+
+    #[test]
+    fn test_hierarchical_rate_limiting() {
+        // Create 3 rules for the same resource but different time windows
+        let rule_1_sec = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule_1s".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 1,
+            stat_interval_ms: Some(1000), // 1 second
+        };
+
+        let rule_1_min = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule_1m".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 10,
+            stat_interval_ms: Some(60000), // 1 minute
+        };
+
+        let rule_1_hour = RatelimitRule {
+            org: "test_org".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("rule_1h".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user123".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("query".to_string()),
+            threshold: 20,
+            stat_interval_ms: Some(3600000), // 1 hour
+        };
+
+        // All three rules should have the same resource identifier
+        // (so they apply to the same endpoint)
+        assert_eq!(rule_1_sec.get_resource(), rule_1_min.get_resource());
+        assert_eq!(rule_1_min.get_resource(), rule_1_hour.get_resource());
+
+        // But different intervals
+        assert_eq!(rule_1_sec.get_stat_interval_ms(), 1000);
+        assert_eq!(rule_1_min.get_stat_interval_ms(), 60000);
+        assert_eq!(rule_1_hour.get_stat_interval_ms(), 3600000);
+
+        // And different thresholds
+        assert_eq!(rule_1_sec.threshold, 1);
+        assert_eq!(rule_1_min.threshold, 10);
+        assert_eq!(rule_1_hour.threshold, 20);
     }
 }
