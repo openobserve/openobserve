@@ -2063,7 +2063,17 @@
       "filters": "Filters",
       "availableDimensions": "Available Dimensions",
       "semanticFieldGroupsTitle": "Field Mappings",
-      "groupsLabel": "groups"
+      "groupsLabel": "groups",
+      "noMatchingGroups": "No matching groups",
+      "fqnFormulaTitle": "FQN Formula",
+      "fqnFormulaTooltip": "Shows how the Service FQN will be computed. Scope dimensions (blue) are concatenated with '/'. The first matching workload dimension (green) becomes the workload identifier.",
+      "scopeDimension": "Scope dimension",
+      "workloadDimension": "Workload dimension",
+      "noFormulaConfigured": "No FQN formula configured. Add dimensions above.",
+      "scopeLegend": "Scope (concatenated)",
+      "workloadLegend": "Workload (first match)",
+      "scopeTag": "Scope",
+      "workloadTag": "Workload"
     }
   },
   "reports": {
@@ -2307,7 +2317,13 @@
     "deduplicateFields": "Deduplication Fields",
     "deduplicateFieldTooltip": "Select which field mappings to use for deduplication fingerprinting",
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
-    "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication"
+    "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
+    "scope": "Scope",
+    "scopeTooltip": "Scope dimensions define environmental boundaries (cluster, region, host) and are concatenated to form the scope part of the FQN: {scope}/{workload}",
+    "stable": "Stable",
+    "stableTooltip": "Stable dimensions have low cardinality and are used for correlation key computation",
+    "normalize": "Normalize",
+    "noSemanticGroupsInCategory": "No semantic groups in category: {category}"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",

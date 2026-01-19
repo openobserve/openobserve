@@ -75,6 +75,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-expansion-item>
 
+    <!-- FQN Formula Preview -->
+    <div
+      class="tw:mb-4 tw:p-4 tw:rounded-lg tw:border tw:border-solid"
+      :class="store.state.theme === 'dark' ? 'bg-grey-9 tw:border-gray-700' : 'bg-grey-2 tw:border-gray-200'"
+    >
+      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3">
+        <q-icon name="functions" size="sm" color="primary" />
+        <span class="tw:font-semibold">{{ t('settings.correlation.fqnFormulaTitle') }}</span>
+        <q-icon name="info" size="xs" class="tw:text-gray-400 tw:cursor-help">
+          <q-tooltip max-width="350px">{{ t('settings.correlation.fqnFormulaTooltip') }}</q-tooltip>
+        </q-icon>
+      </div>
+
+      <div class="tw:font-mono tw:text-sm tw:p-3 tw:rounded tw:overflow-x-auto" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
+        <!-- Scope Part -->
+        <span v-if="fqnFormula.scopeDims.length > 0" class="tw:whitespace-nowrap">
+          <template v-for="(dim, idx) in fqnFormula.scopeDims" :key="'scope-' + dim">
+            <q-chip
+              dense
+              size="sm"
+              color="blue-7"
+              text-color="white"
+              class="tw:mx-0.5"
+            >
+              {{ getDimensionDisplay(dim) }}
+              <q-tooltip>{{ t('settings.correlation.scopeDimension') }}: {{ dim }}</q-tooltip>
+            </q-chip>
+            <span v-if="idx < fqnFormula.scopeDims.length - 1" class="tw:text-gray-500 tw:mx-1">/</span>
+          </template>
+        </span>
+
+        <!-- Separator between scope and workload -->
+        <span v-if="fqnFormula.scopeDims.length > 0 && fqnFormula.workloadDims.length > 0" class="tw:text-gray-500 tw:mx-1">/</span>
+
+        <!-- Workload Part (first match wins) -->
+        <span v-if="fqnFormula.workloadDims.length > 0" class="tw:whitespace-nowrap">
+          <span class="tw:text-gray-500 tw:mr-1">first(</span>
+          <template v-for="(dim, idx) in fqnFormula.workloadDims" :key="'workload-' + dim">
+            <q-chip
+              dense
+              size="sm"
+              color="green-7"
+              text-color="white"
+              class="tw:mx-0.5"
+            >
+              {{ getDimensionDisplay(dim) }}
+              <q-tooltip>{{ t('settings.correlation.workloadDimension') }}: {{ dim }}</q-tooltip>
+            </q-chip>
+            <span v-if="idx < fqnFormula.workloadDims.length - 1" class="tw:text-gray-400 tw:mx-0.5">,</span>
+          </template>
+          <span class="tw:text-gray-500 tw:ml-1">)</span>
+        </span>
+
+        <!-- Fallback when no dimensions -->
+        <span v-if="fqnFormula.scopeDims.length === 0 && fqnFormula.workloadDims.length === 0" class="tw:text-gray-500 tw:italic">
+          {{ t('settings.correlation.noFormulaConfigured') }}
+        </span>
+      </div>
+
+      <!-- Legend -->
+      <div class="tw:flex tw:gap-4 tw:mt-3 tw:text-xs tw:text-gray-500">
+        <div class="tw:flex tw:items-center tw:gap-1">
+          <span class="tw:w-3 tw:h-3 tw:rounded tw:bg-blue-700"></span>
+          <span>{{ t('settings.correlation.scopeLegend') }}</span>
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-1">
+          <span class="tw:w-3 tw:h-3 tw:rounded tw:bg-green-700"></span>
+          <span>{{ t('settings.correlation.workloadLegend') }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- FQN Priority Dimensions - Collapsible Section -->
     <q-expansion-item
       v-model="fqnSectionExpanded"
@@ -119,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
                 <q-item-section avatar class="tw:min-w-0 tw:mr-3">
                   <q-badge
-                    :color="item.actualIndex < 4 ? 'primary' : 'grey'"
+                    :color="isDimensionScope(item.dim) ? 'blue-7' : 'green-7'"
                     text-color="white"
                     class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
                   >
@@ -127,7 +199,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-badge>
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label class="tw:font-medium">{{ getDimensionDisplay(item.dim) }} <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span></q-item-label>
+                  <q-item-label class="tw:font-medium">
+                    {{ getDimensionDisplay(item.dim) }}
+                    <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span>
+                    <q-badge
+                      :color="isDimensionScope(item.dim) ? 'blue-7' : 'green-7'"
+                      text-color="white"
+                      class="tw:ml-2 tw:text-xs"
+                      dense
+                    >
+                      {{ isDimensionScope(item.dim) ? t('settings.correlation.scopeTag') : t('settings.correlation.workloadTag') }}
+                    </q-badge>
+                  </q-item-label>
                 </q-item-section>
                 <q-item-section side>
                   <div class="tw:flex tw:gap-1">
@@ -312,6 +395,7 @@ interface SemanticFieldGroup {
   fields: string[];
   normalize: boolean;
   is_stable?: boolean;
+  is_scope?: boolean;
 }
 
 interface Props {
@@ -384,6 +468,37 @@ const filteredAvailableGroups = computed(() => {
     g.label.toLowerCase().includes(query) || g.value.toLowerCase().includes(query)
   );
 });
+
+// Computed: Derive FQN formula from priority dimensions and their is_scope property
+// Format: {scope dims joined by /} / {first of: workload dims}
+const fqnFormula = computed(() => {
+  const scopeDims: string[] = [];
+  const workloadDims: string[] = [];
+
+  // Build a lookup map for semantic groups
+  const groupLookup = new Map<string, SemanticFieldGroup>();
+  localSemanticGroups.value.forEach(g => groupLookup.set(g.id, g));
+
+  // Categorize each priority dimension as scope or workload
+  for (const dimId of localFqnPriority.value) {
+    const group = groupLookup.get(dimId);
+    const isScope = group?.is_scope ?? false;
+
+    if (isScope) {
+      scopeDims.push(dimId);
+    } else {
+      workloadDims.push(dimId);
+    }
+  }
+
+  return { scopeDims, workloadDims };
+});
+
+// Check if a dimension is a scope dimension
+const isDimensionScope = (dimId: string): boolean => {
+  const group = localSemanticGroups.value.find(g => g.id === dimId);
+  return group?.is_scope ?? false;
+};
 
 // Toggle selection in priority list
 const togglePrioritySelection = (value: string) => {

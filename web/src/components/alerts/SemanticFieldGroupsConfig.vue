@@ -148,6 +148,8 @@ interface SemanticGroup {
   group?: string;
   fields: string[];
   normalize: boolean;
+  is_stable?: boolean;
+  is_scope?: boolean;
 }
 
 // Reserved IDs that should not be used as semantic groups

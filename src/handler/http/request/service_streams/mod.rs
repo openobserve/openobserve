@@ -231,7 +231,11 @@ pub async fn get_services_grouped(
         let fqn_priority =
             crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
 
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority)
+        // Get semantic groups to determine scope vs workload dimensions
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority, &semantic_groups)
             .await
         {
             Ok(response) => MetaHttpResponse::json(response),

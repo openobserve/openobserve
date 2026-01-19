@@ -18,7 +18,9 @@
 //! This module provides functions to store and retrieve org-level alert configs
 //! using the existing key-value DB interface.
 
-use config::meta::alerts::deduplication::{GlobalDeduplicationConfig, SemanticFieldGroup};
+use config::meta::{
+    alerts::deduplication::GlobalDeduplicationConfig, correlation::SemanticFieldGroup,
+};
 use infra::db;
 
 const MODULE: &str = "alert_config";

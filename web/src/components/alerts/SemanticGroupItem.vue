@@ -49,15 +49,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Actions Column: Normalize and Delete -->
+      <!-- Actions Column: Scope, Stable, Normalize and Delete -->
       <div class="actions-column">
-        <div class="q-mb-sm">
+        <div class="checkboxes-row q-mb-sm">
+          <q-checkbox
+            data-test="semantic-group-action-scope-chkbox"
+            v-model="localGroup.is_scope"
+            size="sm"
+            dense
+            @update:model-value="emitUpdate"
+          >
+            <span class="checkbox-label">{{ t('correlation.scope') }}</span>
+            <q-tooltip max-width="300px">{{ t('correlation.scopeTooltip') }}</q-tooltip>
+          </q-checkbox>
+          <q-checkbox
+            data-test="semantic-group-action-stable-chkbox"
+            v-model="localGroup.is_stable"
+            size="sm"
+            dense
+            @update:model-value="emitUpdate"
+          >
+            <span class="checkbox-label">{{ t('correlation.stable') }}</span>
+            <q-tooltip max-width="300px">{{ t('correlation.stableTooltip') }}</q-tooltip>
+          </q-checkbox>
           <q-checkbox
             data-test="semantic-group-action-normalize-chkbox"
             v-model="localGroup.normalize"
-            :label="t('correlation.actionNormalize')"
+            size="sm"
+            dense
             @update:model-value="emitUpdate"
           >
+            <span class="checkbox-label">{{ t('correlation.normalize') }}</span>
             <q-tooltip>{{ t("correlation.actionNormalize") }}</q-tooltip>
           </q-checkbox>
         </div>
@@ -91,6 +113,8 @@ interface SemanticGroup {
   display: string;
   fields: string[];
   normalize: boolean;
+  is_stable?: boolean;
+  is_scope?: boolean;
 }
 
 interface Props {
@@ -199,6 +223,17 @@ const emitUpdate = () => {
   flex-direction: column;
   justify-content: space-between;
   min-height: 100%;
+}
+
+.checkboxes-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkbox-label {
+  font-size: 12px;
+  margin-left: 4px;
 }
 
 .text-subtitle2 {

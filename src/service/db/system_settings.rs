@@ -410,9 +410,9 @@ pub fn get_default_fqn_priority_dimensions() -> Vec<String> {
 /// Returns empty vec for OSS builds.
 pub async fn get_semantic_field_groups(
     org_id: &str,
-) -> Vec<config::meta::alerts::deduplication::SemanticFieldGroup> {
+) -> Vec<config::meta::correlation::SemanticFieldGroup> {
     use config::meta::{
-        alerts::deduplication::SemanticFieldGroup, system_settings::keys::SEMANTIC_FIELD_GROUPS,
+        correlation::SemanticFieldGroup, system_settings::keys::SEMANTIC_FIELD_GROUPS,
     };
 
     // Try to get from settings v2 (org level)
@@ -431,8 +431,7 @@ pub async fn get_semantic_field_groups(
 ///
 /// For enterprise builds, loads from enterprise JSON file.
 /// For OSS builds, returns empty vec.
-pub fn get_default_semantic_field_groups()
--> Vec<config::meta::alerts::deduplication::SemanticFieldGroup> {
+pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::SemanticFieldGroup> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file()
