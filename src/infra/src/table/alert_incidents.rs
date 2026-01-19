@@ -410,10 +410,35 @@ mod tests {
     #[tokio::test]
     async fn test_topology_serialization() {
         // Test that update_topology properly serializes typed IncidentTopology
+        use config::meta::alerts::incidents::{AlertEdge, AlertNode, EdgeType};
+
+        let node1 = AlertNode {
+            alert_id: "alert_cpu_high".to_string(),
+            alert_name: "High CPU Usage".to_string(),
+            service_name: "api-gateway".to_string(),
+            alert_count: 1,
+            first_fired_at: 1000,
+            last_fired_at: 1000,
+        };
+
+        let node2 = AlertNode {
+            alert_id: "alert_db_pool".to_string(),
+            alert_name: "Connection Pool Exhausted".to_string(),
+            service_name: "database".to_string(),
+            alert_count: 1,
+            first_fired_at: 1500,
+            last_fired_at: 1500,
+        };
+
+        let edge = AlertEdge {
+            from_node_index: 0,
+            to_node_index: 1,
+            edge_type: EdgeType::ServiceDependency,
+        };
+
         let topology = config::meta::alerts::incidents::IncidentTopology {
-            service: "test-service".to_string(),
-            upstream_services: vec!["upstream1".to_string(), "upstream2".to_string()],
-            downstream_services: vec!["downstream1".to_string()],
+            nodes: vec![node1, node2],
+            edges: vec![edge],
             related_incident_ids: vec![],
             suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
         };
@@ -422,9 +447,10 @@ mod tests {
         let json = serde_json::to_value(&topology).unwrap();
 
         // Verify structure
-        assert_eq!(json["service"], "test-service");
-        assert_eq!(json["upstream_services"][0], "upstream1");
-        assert_eq!(json["downstream_services"][0], "downstream1");
+        assert_eq!(json["nodes"][0]["alert_id"], "alert_cpu_high");
+        assert_eq!(json["nodes"][1]["service_name"], "database");
+        assert_eq!(json["edges"][0]["from_node_index"], 0);
+        assert_eq!(json["edges"][0]["edge_type"], "service_dependency");
         assert!(
             json["suggested_root_cause"]
                 .as_str()
@@ -437,9 +463,23 @@ mod tests {
     async fn test_topology_deserialization() {
         // Test that get_topology properly deserializes JSON to typed IncidentTopology
         let json = serde_json::json!({
-            "service": "api-gateway",
-            "upstream_services": ["frontend"],
-            "downstream_services": ["database", "cache"],
+            "nodes": [
+                {
+                    "alert_id": "alert_1",
+                    "alert_name": "High Latency",
+                    "service_name": "api-gateway",
+                    "alert_count": 2,
+                    "first_fired_at": 1000,
+                    "last_fired_at": 2000
+                }
+            ],
+            "edges": [
+                {
+                    "from_node_index": 0,
+                    "to_node_index": 1,
+                    "edge_type": "temporal"
+                }
+            ],
             "related_incident_ids": [],
             "suggested_root_cause": "# Root Cause\n\nDatabase connection pool exhausted"
         });
@@ -448,9 +488,10 @@ mod tests {
         let topology: config::meta::alerts::incidents::IncidentTopology =
             serde_json::from_value(json).unwrap();
 
-        assert_eq!(topology.service, "api-gateway");
-        assert_eq!(topology.upstream_services.len(), 1);
-        assert_eq!(topology.downstream_services.len(), 2);
+        assert_eq!(topology.nodes.len(), 1);
+        assert_eq!(topology.edges.len(), 1);
+        assert_eq!(topology.nodes[0].alert_id, "alert_1");
+        assert_eq!(topology.nodes[0].alert_count, 2);
         assert!(
             topology
                 .suggested_root_cause
@@ -461,18 +502,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_topology_deserialization_handles_missing_fields() {
-        // Test backward compatibility - old data without suggested_root_cause
+        // Test minimal topology structure
         let json = serde_json::json!({
-            "service": "api-gateway",
-            "upstream_services": [],
-            "downstream_services": [],
+            "nodes": [],
+            "edges": [],
             "related_incident_ids": []
         });
 
         let topology: config::meta::alerts::incidents::IncidentTopology =
             serde_json::from_value(json).unwrap();
 
-        assert_eq!(topology.service, "api-gateway");
+        assert!(topology.nodes.is_empty());
+        assert!(topology.edges.is_empty());
         assert_eq!(topology.suggested_root_cause, None);
     }
 
@@ -481,7 +522,7 @@ mod tests {
         // Test that malformed JSON is properly rejected
         let json = serde_json::json!({
             "invalid_field": "value",
-            "service": 123  // Wrong type
+            "nodes": 123  // Wrong type
         });
 
         let result: Result<config::meta::alerts::incidents::IncidentTopology, _> =

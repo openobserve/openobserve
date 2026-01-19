@@ -40,11 +40,25 @@ export interface Incident {
 }
 
 export interface IncidentTopology {
-  service: string;
-  upstream_services: string[];
-  downstream_services: string[];
+  nodes: AlertNode[];
+  edges: AlertEdge[];
   related_incident_ids: string[];
   suggested_root_cause?: string;
+}
+
+export interface AlertNode {
+  alert_id: string;
+  alert_name: string;
+  service_name: string;
+  alert_count: number;
+  first_fired_at: number;
+  last_fired_at: number;
+}
+
+export interface AlertEdge {
+  from_node_index: number;
+  to_node_index: number;
+  edge_type: "temporal" | "service_dependency";
 }
 
 export interface IncidentAlert {
@@ -89,23 +103,9 @@ export interface IncidentCorrelatedStreams {
 
 // Service Graph visualization types
 export interface IncidentServiceGraph {
-  incident_service: string;
-  root_cause_service?: string;
-  nodes: IncidentServiceNode[];
-  edges: IncidentServiceEdge[];
+  nodes: AlertNode[];
+  edges: AlertEdge[];
   stats: IncidentGraphStats;
-}
-
-export interface IncidentServiceNode {
-  service_name: string;
-  alert_count: number;
-  is_root_cause: boolean;
-  is_primary: boolean;
-}
-
-export interface IncidentServiceEdge {
-  from: string;
-  to: string;
 }
 
 export interface IncidentGraphStats {

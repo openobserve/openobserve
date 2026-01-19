@@ -16,6 +16,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="incident-service-graph tw-flex tw-flex-col tw-h-full">
+    <!-- Header with controls -->
+    <div
+      class="tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
+      :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+    >
+      <div class="tw-flex tw-items-center tw-gap-2">
+        <q-select
+          v-model="layout"
+          :options="layoutOptions"
+          dense
+          outlined
+          emit-value
+          map-options
+          class="tw-w-36"
+          :dark="isDarkMode"
+          @update:model-value="onLayoutChange"
+        />
+        <q-btn
+          flat
+          dense
+          round
+          icon="refresh"
+          @click="loadGraph"
+          :loading="loading"
+        >
+          <q-tooltip>Refresh graph</q-tooltip>
+        </q-btn>
+      </div>
+    </div>
+
+    <!-- Stats Banner -->
+    <div
+      v-if="graphData"
+      class="tw-flex tw-gap-4 tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
+      :class="isDarkMode ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-200'"
+    >
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <q-icon name="hub" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Services:</span>
+        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
+          {{ graphData.stats.total_services }}
+        </span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <q-icon name="notifications" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Total Alerts:</span>
+        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
+          {{ graphData.stats.total_alerts }}
+        </span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <q-icon name="gps_fixed" size="16px" class="tw-text-red-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">First Alert:</span>
+        <span class="tw-text-xs tw-font-semibold tw-text-red-500">
+          {{ graphData.nodes[0]?.alert_name }} ({{ graphData.nodes[0]?.service_name }})
+        </span>
+      </div>
+    </div>
+
     <!-- Graph Container -->
       <!-- Loading State -->
       <div
@@ -65,6 +124,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <!-- Legend -->
+    <div
+      class="tw-flex tw-gap-4 tw-px-3 tw-py-2 tw-border-t tw-flex-shrink-0"
+      :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+    >
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-red-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">First Alert</span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-orange-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">High Frequency (&gt;5)</span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <div class="tw-w-3 tw-h-3 tw-rounded-full tw-bg-blue-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Normal</span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <div class="tw-w-4 tw-h-0 tw-border-t-2 tw-border-dashed tw-border-purple-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Temporal Flow</span>
+      </div>
+      <div class="tw-flex tw-items-center tw-gap-1.5">
+        <div class="tw-w-4 tw-h-0 tw-border-t-2 tw-border-gray-500" />
+        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Service Dependency</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -72,7 +159,7 @@ import { defineComponent, ref, computed, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import incidentsService, { IncidentServiceGraph, IncidentServiceNode } from "@/services/incidents";
+import incidentsService, { IncidentServiceGraph, AlertNode } from "@/services/incidents";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
@@ -128,17 +215,18 @@ export default defineComponent({
       }
     };
 
-    const getNodeColor = (node: IncidentServiceNode): string => {
-      if (node.is_root_cause) {
-        return "#ef4444"; // red-500
+    const getNodeColor = (node: AlertNode, index: number): string => {
+      // First node (chronologically first alert) is highlighted as potential root cause
+      if (index === 0) {
+        return "#ef4444"; // red-500 - first alert
       }
       if (node.alert_count > 5) {
-        return "#f97316"; // orange-500
+        return "#f97316"; // orange-500 - high frequency
       }
-      return "#3b82f6"; // blue-500
+      return "#3b82f6"; // blue-500 - normal
     };
 
-    const getNodeSize = (node: IncidentServiceNode): number => {
+    const getNodeSize = (node: AlertNode): number => {
       const size = 30 + node.alert_count * 5;
       return Math.min(size, 100); // Cap at 100 to prevent oversized nodes
     };
@@ -151,13 +239,14 @@ export default defineComponent({
       const { nodes, edges } = graphData.value;
 
       // Convert to ECharts graph format
-      const echartsNodes = nodes.map((node) => ({
-        name: node.service_name,
+      const echartsNodes = nodes.map((node, index) => ({
+        name: `${node.alert_name}\n${node.service_name}`,
+        id: index.toString(),
         symbolSize: getNodeSize(node),
         itemStyle: {
-          color: getNodeColor(node),
-          borderColor: node.is_primary ? "#a855f7" : getNodeColor(node),
-          borderWidth: node.is_primary ? 4 : 2,
+          color: getNodeColor(node, index),
+          borderColor: index === 0 ? "#dc2626" : getNodeColor(node, index),
+          borderWidth: index === 0 ? 4 : 2,
         },
         label: {
           show: true,
@@ -165,17 +254,23 @@ export default defineComponent({
           distance: 5,
           fontSize: 11,
           color: isDarkMode.value ? "#e5e7eb" : "#374151",
+          formatter: `{b}`,
         },
         tooltip: {
           formatter: () => {
+            const firstTime = new Date(node.first_fired_at / 1000).toLocaleString();
+            const lastTime = node.alert_count > 1 ? new Date(node.last_fired_at / 1000).toLocaleString() : null;
+
             let html = `<div style="padding: 8px; font-size: 12px;">`;
-            html += `<strong style="font-size: 14px;">${node.service_name}</strong><br/><br/>`;
-            html += `Alerts: <strong>${node.alert_count}</strong><br/>`;
-            if (node.is_root_cause) {
-              html += `<span style="color: #ef4444;">Suspected Root Cause</span><br/>`;
+            html += `<strong style="font-size: 14px;">${node.alert_name}</strong><br/>`;
+            html += `Service: <strong>${node.service_name}</strong><br/><br/>`;
+            html += `Alert Count: <strong>${node.alert_count}</strong><br/>`;
+            html += `First Fired: ${firstTime}<br/>`;
+            if (lastTime) {
+              html += `Last Fired: ${lastTime}<br/>`;
             }
-            if (node.is_primary) {
-              html += `<span style="color: #a855f7;">Primary Service</span><br/>`;
+            if (index === 0) {
+              html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
             }
             html += `</div>`;
             return html;
@@ -184,15 +279,24 @@ export default defineComponent({
       }));
 
       const echartsEdges = edges.map((edge) => ({
-        source: edge.from,
-        target: edge.to,
+        source: edge.from_node_index.toString(),
+        target: edge.to_node_index.toString(),
         lineStyle: {
-          color: isDarkMode.value ? "#6b7280" : "#9ca3af",
-          width: 2,
+          color: edge.edge_type === "temporal"
+            ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
+            : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
+          width: edge.edge_type === "temporal" ? 3 : 2,
           curveness: 0.2,
+          type: edge.edge_type === "temporal" ? "dashed" : "solid",
         },
         symbol: ["none", "arrow"],
         symbolSize: [0, 10],
+        label: {
+          show: true,
+          formatter: edge.edge_type === "temporal" ? "time →" : "",
+          fontSize: 10,
+          color: isDarkMode.value ? "#a78bfa" : "#8b5cf6",
+        },
       }));
 
       const options = {

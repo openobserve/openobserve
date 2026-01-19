@@ -44,31 +44,35 @@ describe("IncidentServiceGraph.vue", () => {
   let wrapper: VueWrapper<any>;
 
   const mockGraphData = {
-    incident_service: "service-a",
-    root_cause_service: "service-c",
     nodes: [
       {
+        alert_id: "alert_cpu_high",
+        alert_name: "High CPU Usage",
         service_name: "service-a",
         alert_count: 3,
-        is_root_cause: false,
-        is_primary: true,
+        first_fired_at: 1000000,
+        last_fired_at: 2000000,
       },
       {
+        alert_id: "alert_latency",
+        alert_name: "High Latency",
         service_name: "service-b",
         alert_count: 7,
-        is_root_cause: false,
-        is_primary: false,
+        first_fired_at: 1500000,
+        last_fired_at: 3000000,
       },
       {
+        alert_id: "alert_db_pool",
+        alert_name: "DB Pool Exhausted",
         service_name: "service-c",
         alert_count: 12,
-        is_root_cause: true,
-        is_primary: false,
+        first_fired_at: 2000000,
+        last_fired_at: 4000000,
       },
     ],
     edges: [
-      { from: "service-a", to: "service-b" },
-      { from: "service-b", to: "service-c" },
+      { from_node_index: 0, to_node_index: 1, edge_type: "temporal" },
+      { from_node_index: 1, to_node_index: 2, edge_type: "service_dependency" },
     ],
     stats: {
       total_services: 3,

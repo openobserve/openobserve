@@ -456,9 +456,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Topology Context -->
+          <!-- Alert Flow Graph -->
           <div
-            v-if="incidentDetails.topology_context"
+            v-if="incidentDetails.topology_context && incidentDetails.topology_context.nodes.length"
             :class="[
               'tw:rounded-lg tw:border tw:overflow-hidden',
               store.state.theme === 'dark'
@@ -476,42 +476,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-100 tw:border-gray-200'
               ]"
             >
-              <q-icon name="account_tree" size="16px" class="tw:opacity-80" />
+              <q-icon name="timeline" size="16px" class="tw:opacity-80" />
               <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
-                {{ t("alerts.incidents.topology") }}
+                {{ t("alerts.incidents.alertFlow") }}
               </span>
             </div>
             <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3" style="max-height: 150px; overflow-y: auto;">
-              <div class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Service:</span>
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
-              </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.upstreamServices") }}:</span>
-                <span class="tw:ml-1">
-                  <q-badge
-                    v-for="svc in incidentDetails.topology_context.upstream_services"
-                    :key="svc"
-                    color="blue-grey-4"
-                    :label="svc"
-                    class="tw:mr-1 tw:mt-1"
-                    size="xs"
-                  />
-                </span>
-              </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw:text-xs">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.downstreamServices") }}:</span>
-                <span class="tw:ml-1">
-                  <q-badge
-                    v-for="svc in incidentDetails.topology_context.downstream_services"
-                    :key="svc"
-                    color="blue-grey-4"
-                    :label="svc"
-                    class="tw:mr-1 tw:mt-1"
-                    size="xs"
-                  />
-                </span>
+            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3">
+              <div class="tw:text-xs tw:space-y-2">
+                <div
+                  v-for="(node, index) in incidentDetails.topology_context.nodes"
+                  :key="node.alert_id"
+                  :class="[
+                    'tw:p-2 tw:rounded tw:border',
+                    store.state.theme === 'dark'
+                      ? 'tw:bg-gray-700/50 tw:border-gray-600'
+                      : 'tw:bg-gray-50 tw:border-gray-200'
+                  ]"
+                >
+                  <div class="tw:flex tw:items-start tw:justify-between">
+                    <div class="tw:flex-1">
+                      <div class="tw:font-medium tw:mb-1">
+                        <q-badge
+                          :color="index === 0 ? 'red-5' : 'blue-grey-5'"
+                          :label="node.alert_name"
+                          class="tw:mr-2"
+                        />
+                        <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
+                          {{ node.service_name }}
+                        </span>
+                      </div>
+                      <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:space-x-3">
+                        <span>Count: {{ node.alert_count }}</span>
+                        <span>First: {{ formatTimestamp(node.first_fired_at) }}</span>
+                        <span v-if="node.alert_count > 1">Last: {{ formatTimestamp(node.last_fired_at) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
