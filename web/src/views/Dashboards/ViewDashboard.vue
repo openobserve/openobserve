@@ -577,35 +577,33 @@ export default defineComponent({
     };
 
     // Handler for when variables manager is ready from RenderDashboardCharts
-    const onVariablesManagerReady = (manager: any) => {
+    const onVariablesManagerReady = async (manager: any) => {
       variablesManager.value = manager;
 
       // Immediately update URL with initial committed values
       // This handles variables that don't require loading (constant, textbox, custom_value)
-      nextTick(() => {
+      await nextTick();
+      if (selectedDate.value && variablesManager.value) {
+        updateUrlWithCurrentState();
+      }
+    };
+
+    // Watch for changes to committed variables data
+    // This will trigger URL updates when variables finish loading (auto-commit for query_values)
+    watch(
+      () => {
+        if (!variablesManager.value) return null;
+        // Watch the committed variables data deeply
+        return JSON.stringify(variablesManager.value.committedVariablesData);
+      },
+      async () => {
+        // When committed variables change, update the URL
+        await nextTick();
         if (selectedDate.value && variablesManager.value) {
           updateUrlWithCurrentState();
         }
-      });
-
-      // Watch for changes to committed variables data
-      // This will trigger URL updates when variables finish loading (auto-commit for query_values)
-      watch(
-        () => {
-          if (!variablesManager.value) return null;
-          // Watch the committed variables data deeply
-          return JSON.stringify(variablesManager.value.committedVariablesData);
-        },
-        () => {
-          // When committed variables change, update the URL
-          nextTick(() => {
-            if (selectedDate.value && variablesManager.value) {
-              updateUrlWithCurrentState();
-            }
-          });
-        },
-      );
-    };
+      },
+    );
 
     const isVariablesChanged = computed(() => {
       // If using variables manager, access hasUncommittedChanges directly from the manager
