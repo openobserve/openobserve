@@ -153,9 +153,16 @@ describe("IncidentServiceGraph.vue", () => {
       );
     });
 
-    it("should initialize with force layout by default", () => {
+    it("should initialize with force layout by default", async () => {
+      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
+        data: mockGraphData,
+      } as any);
+
       wrapper = mountComponent();
-      expect(wrapper.vm.layout).toBe("force");
+      await flushPromises();
+
+      const chartData = wrapper.vm.chartData;
+      expect(chartData.options.series[0].layout).toBe("force");
     });
   });
 
@@ -172,7 +179,7 @@ describe("IncidentServiceGraph.vue", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should display stats banner when graph data is loaded", async () => {
+    it("should render ChartRenderer when graph data is loaded", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
       } as any);
@@ -181,29 +188,15 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.text()).toContain("Services:");
-      expect(wrapper.text()).toContain("3");
-      expect(wrapper.text()).toContain("Total Alerts:");
-      expect(wrapper.text()).toContain("22");
+      const chartRenderer = wrapper.findComponent({ name: "ChartRenderer" });
+      expect(chartRenderer.exists()).toBe(true);
+      expect(wrapper.vm.chartData.options).toBeDefined();
     });
 
-    it("should display root cause service when available", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent();
-      await flushPromises();
-      await nextTick();
-
-      expect(wrapper.text()).toContain("Root Cause:");
-      expect(wrapper.text()).toContain("service-c");
-    });
-
-    it("should not display root cause when not available", async () => {
+    it("should handle data without root cause service", async () => {
       const dataWithoutRootCause = {
         ...mockGraphData,
-        root_cause_service: undefined,
+        nodes: mockGraphData.nodes.map(n => ({ ...n, is_root_cause: false })),
       };
 
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
@@ -214,7 +207,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.text()).not.toContain("Root Cause:");
+      const chartData = wrapper.vm.chartData;
+      const rootCauseNodes = chartData.options.series[0].data.filter(
+        (n: any) => n.itemStyle.color === "#ef4444"
+      );
+      expect(rootCauseNodes.length).toBe(0);
     });
 
     it("should handle empty graph data", async () => {
@@ -349,7 +346,7 @@ describe("IncidentServiceGraph.vue", () => {
       await loadPromise;
     });
 
-    it("should change layout when layout selector changes", async () => {
+    it("should use force layout for graph", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
       } as any);
@@ -357,30 +354,9 @@ describe("IncidentServiceGraph.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.vm.layout).toBe("force");
-
-      wrapper.vm.layout = "circular";
-      await wrapper.vm.onLayoutChange();
-      await nextTick();
-
-      expect(wrapper.vm.layout).toBe("circular");
-      expect(wrapper.vm.chartKey).toBeGreaterThan(0);
-    });
-
-    it("should increment chartKey when layout changes", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      const initialKey = wrapper.vm.chartKey;
-
-      wrapper.vm.layout = "circular";
-      await wrapper.vm.onLayoutChange();
-
-      expect(wrapper.vm.chartKey).toBe(initialKey + 1);
+      const chartData = wrapper.vm.chartData;
+      expect(chartData.options.series[0].layout).toBe("force");
+      expect(chartData.options.series[0].force).toBeDefined();
     });
 
     it("should allow clicking empty state refresh button", async () => {
@@ -418,15 +394,7 @@ describe("IncidentServiceGraph.vue", () => {
     });
   });
 
-  describe("Layout Options", () => {
-    it("should have force and circular layout options", () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.layoutOptions).toEqual([
-        { label: "Force Directed", value: "force" },
-        { label: "Circular", value: "circular" },
-      ]);
-    });
-
+  describe("Layout Configuration", () => {
     it("should generate force layout configuration", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
@@ -435,31 +403,12 @@ describe("IncidentServiceGraph.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      wrapper.vm.layout = "force";
-      await nextTick();
-
       const chartData = wrapper.vm.chartData;
       expect(chartData.options.series[0].layout).toBe("force");
       expect(chartData.options.series[0].force).toBeDefined();
       expect(chartData.options.series[0].force.repulsion).toBe(300);
       expect(chartData.options.series[0].force.gravity).toBe(0.1);
       expect(chartData.options.series[0].force.edgeLength).toBe(150);
-    });
-
-    it("should generate circular layout configuration", async () => {
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
-      } as any);
-
-      wrapper = mountComponent();
-      await flushPromises();
-
-      wrapper.vm.layout = "circular";
-      await nextTick();
-
-      const chartData = wrapper.vm.chartData;
-      expect(chartData.options.series[0].layout).toBe("circular");
-      expect(chartData.options.series[0].circular).toBeDefined();
     });
   });
 
@@ -864,8 +813,8 @@ describe("IncidentServiceGraph.vue", () => {
     });
   });
 
-  describe("Legend Display", () => {
-    it("should display legend with all node types", async () => {
+  describe("Node Information", () => {
+    it("should include node type information in tooltips", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
       } as any);
@@ -874,10 +823,15 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.text()).toContain("Root Cause");
-      expect(wrapper.text()).toContain("High Alerts (>5)");
-      expect(wrapper.text()).toContain("Normal");
-      expect(wrapper.text()).toContain("Primary Service");
+      const chartData = wrapper.vm.chartData;
+      const rootCauseNode = chartData.options.series[0].data.find(
+        (n: any) => n.name === "service-c"
+      );
+
+      // Root cause node should have tooltip formatter that includes root cause text
+      expect(rootCauseNode.tooltip.formatter).toBeDefined();
+      const tooltipHtml = rootCauseNode.tooltip.formatter();
+      expect(tooltipHtml).toContain("Suspected Root Cause");
     });
   });
 
@@ -1101,8 +1055,14 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      const chartRenderer = wrapper.find('[data-test="chart-renderer"]');
+      const chartRenderer = wrapper.findComponent({ name: "ChartRenderer" });
       expect(chartRenderer.exists()).toBe(true);
+
+      // Verify chartData is computed correctly
+      const chartData = wrapper.vm.chartData;
+      expect(chartData).toBeDefined();
+      expect(chartData.options).toBeDefined();
+      expect(chartData.options.series).toHaveLength(1);
     });
 
     it("should hide ChartRenderer when no data", async () => {
@@ -1125,8 +1085,9 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      const chartContainer = wrapper.find(".tw-w-full.tw-h-full");
-      expect(chartContainer.isVisible()).toBe(false);
+      const chartRenderer = wrapper.findComponent({ name: "ChartRenderer" });
+      expect(chartRenderer.exists()).toBe(false);
+      expect(wrapper.text()).toContain("Service Graph Unavailable");
     });
 
     it("should update chartKey when data changes", async () => {
