@@ -1885,7 +1885,7 @@ class APICleanup {
     /**
      * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
      * Deletes resources in correct dependency order to avoid conflicts
-     * @param {Array<string>} destinationPrefixes - Array of destination name prefixes to match (e.g., ['auto_', 'newdest_'])
+     * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
      */
@@ -2002,13 +2002,18 @@ class APICleanup {
             let deletedDestinations = 0;
 
             if (destinationPrefixes.length > 0) {
-                testLogger.info('Step 3: Deleting destinations matching prefixes', { prefixes: destinationPrefixes });
+                testLogger.info('Step 3: Deleting destinations matching prefixes/patterns', { prefixes: destinationPrefixes });
 
                 const { destinations } = await this.fetchDestinationsWithTemplateMapping();
                 const matchingDestinations = destinations.filter(d =>
-                    destinationPrefixes.some(prefix => d.name.startsWith(prefix))
+                    destinationPrefixes.some(prefix => {
+                        if (prefix instanceof RegExp) {
+                            return prefix.test(d.name);
+                        }
+                        return d.name.startsWith(prefix);
+                    })
                 );
-                testLogger.info('Found destinations matching prefixes', { total: matchingDestinations.length });
+                testLogger.info('Found destinations matching prefixes/patterns', { total: matchingDestinations.length });
 
                 for (const destination of matchingDestinations) {
                     const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
