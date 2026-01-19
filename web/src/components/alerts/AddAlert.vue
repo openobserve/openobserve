@@ -1361,6 +1361,10 @@ export default defineComponent({
           previewQuery.value = response.data.sql;
           // Set flag to indicate we're using backend-generated SQL
           isUsingBackendSql.value = true;
+
+          // Explicitly trigger preview refresh after SQL generation
+          await nextTick();
+          previewAlertRef.value?.refreshData();
         }
       } catch (error) {
         console.error('Error generating SQL from backend:', error);
@@ -1369,6 +1373,10 @@ export default defineComponent({
         generatedSqlQuery.value = localSql;
         previewQuery.value = localSql;
         isUsingBackendSql.value = false;
+
+        // Explicitly trigger preview refresh after fallback SQL generation
+        await nextTick();
+        previewAlertRef.value?.refreshData();
       }
     };
 
