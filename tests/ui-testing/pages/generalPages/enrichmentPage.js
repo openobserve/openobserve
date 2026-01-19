@@ -1095,7 +1095,37 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Wait for form to fully load - the update mode options may take time to render in CI
         await this.page.waitForLoadState('networkidle');
-        await this.page.waitForTimeout(5000); // Longer wait for CI form rendering
+
+        // First, ensure we're on the Update form (wait for title with longer timeout for CI)
+        const updateTitle = this.page.getByText('Update Enrichment Table');
+        await updateTitle.waitFor({ state: 'visible', timeout: 30000 });
+        testLogger.debug('Update form title visible');
+
+        // Wait for option group or radio elements to appear (CI renders slower)
+        const optionGroupIndicators = [
+            '.q-option-group',
+            '.q-radio',
+            '[role="radiogroup"]',
+            'text=/Update Mode/i'
+        ];
+
+        let formReady = false;
+        for (let waitAttempt = 1; waitAttempt <= 6 && !formReady; waitAttempt++) {
+            testLogger.debug(`Waiting for form elements - attempt ${waitAttempt}/6`);
+
+            for (const indicator of optionGroupIndicators) {
+                const locator = this.page.locator(indicator).first();
+                if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    formReady = true;
+                    testLogger.debug(`Form element found: ${indicator}`);
+                    break;
+                }
+            }
+
+            if (!formReady) {
+                await this.page.waitForTimeout(2000);
+            }
+        }
 
         // Scroll the dialog content to ensure all elements are visible
         const dialogContent = this.page.locator('.q-dialog .q-card, .q-dialog__inner');
@@ -1137,7 +1167,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Try each selector until one works - with multiple attempts
         let clicked = false;
-        for (let attempt = 1; attempt <= 3 && !clicked; attempt++) {
+        for (let attempt = 1; attempt <= 5 && !clicked; attempt++) {
             testLogger.debug(`Attempt ${attempt} to find update mode option for: ${mode}`);
 
             for (const selector of selectors) {
@@ -1158,9 +1188,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 }
             }
 
-            if (!clicked && attempt < 3) {
+            if (!clicked && attempt < 5) {
                 // Wait and retry
-                await this.page.waitForTimeout(2000);
+                await this.page.waitForTimeout(3000);
+                // Try scrolling to bottom to reveal options
+                await dialogContent.first().evaluate(el => {
+                    el.scrollTop = el.scrollHeight;
+                }).catch(() => {});
             }
         }
 
@@ -1672,16 +1706,32 @@ abc, err = get_enrichment_table_record("${fileName}", {
     /**
      * Navigate back from form - handles Cancel button visibility check
      * If Cancel button is visible, clicks it; otherwise navigates to enrichment table list
+     * Handles race condition where form may auto-close after error notification
      */
     async navigateBackFromFormIfNeeded() {
         testLogger.debug('Navigating back from form');
+
+        // Wait briefly for any auto-close behavior to complete
+        await this.page.waitForTimeout(1000);
+
         const cancelBtn = this.page.getByRole('button', { name: 'Cancel' });
         const isCancelVisible = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
         if (isCancelVisible) {
-            await cancelBtn.click();
-            await this.page.waitForLoadState('networkidle');
-            testLogger.debug('Clicked Cancel button to navigate back');
+            try {
+                // Use click with shorter timeout and handle detachment gracefully
+                await cancelBtn.click({ timeout: 5000 });
+                await this.page.waitForLoadState('networkidle');
+                testLogger.debug('Clicked Cancel button to navigate back');
+            } catch (clickError) {
+                // Element may have been detached (form auto-closed) - this is okay
+                if (clickError.message.includes('detached') || clickError.message.includes('Target closed')) {
+                    testLogger.debug('Cancel button detached (form auto-closed) - navigating to list');
+                    await this.navigateToEnrichmentTable();
+                } else {
+                    throw clickError;
+                }
+            }
         } else {
             await this.navigateToEnrichmentTable();
             testLogger.debug('Form already closed, navigated to enrichment tables list');
