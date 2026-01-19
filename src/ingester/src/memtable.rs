@@ -111,17 +111,6 @@ impl MemTable {
                 (org_id, stream_key.as_ref())
             };
 
-            // Skip deleted streams (fixes #9866)
-            if crate::immutable::is_stream_deleted(stream_org_id, stream_type, stream_name).await {
-                log::info!(
-                    "[INGESTER:MEM] skipping persist for deleted stream: {}/{}/{}",
-                    stream_org_id,
-                    stream_type,
-                    stream_name
-                );
-                continue;
-            }
-
             let (part_schema_size, partitions) = stream
                 .persist(idx, stream_org_id, stream_type, stream_name)
                 .await?;

@@ -170,10 +170,6 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
-    // If stream was previously deleted, unmark it since we're about to write new data
-    // This prevents memory leak in DELETED_STREAMS set (fixes PR review comment)
-    crate::immutable::unmark_stream_deleted(org_id, stream_type, stream_name).await;
-
     let start = std::time::Instant::now();
     let idx = get_table_idx(thread_id, org_id, stream_name);
     let key = WriterKey::new(idx, org_id, stream_type);
@@ -363,7 +359,7 @@ pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &st
     }
 
     // Clear immutable data for this stream
-    crate::immutable::remove_stream_immutables(org_id, stream_type, stream_name).await;
+    crate::immutable::remove_stream_from_immutables(org_id, stream_name).await;
 
     log::info!(
         "[INGESTER:WAL] cleared WAL data for stream: {}/{}/{}",

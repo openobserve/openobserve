@@ -10,6 +10,7 @@ import "cluster/common.proto";
 
 service Streams {
     rpc stream_stats (StreamStatsRequest) returns (StreamStatsResponse) {}
+    rpc delete_stream_data (DeleteStreamDataRequest) returns (DeleteStreamDataResponse) {}
 }
 
 message StreamStatsRequest {
@@ -36,4 +37,14 @@ message StreamStats {
     double storage_size = 6;
     double compressed_size = 7;
     double index_size = 8;
+}
+
+message DeleteStreamDataRequest {
+    string org_id = 1;
+    string stream_type = 2;
+    string stream_name = 3;
+}
+
+message DeleteStreamDataResponse {
+    bool deleted = 1;
 }

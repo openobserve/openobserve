@@ -16,7 +16,8 @@
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
 use proto::cluster_rpc::{
-    StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
+    DeleteStreamDataRequest, DeleteStreamDataResponse, StreamStats, StreamStatsEntry,
+    StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
 use tonic::{Request, Response, Status};
 
@@ -104,6 +105,26 @@ impl Streams for StreamServiceImpl {
             "[grpc:stream_stats] orgs: {orgs:?}, stream_type: {stream_type:?}, stream_name: {stream_name:?}",
         );
         Ok(Response::new(StreamStatsResponse { entries }))
+    }
+
+    async fn delete_stream_data(
+        &self,
+        request: Request<DeleteStreamDataRequest>,
+    ) -> Result<Response<DeleteStreamDataResponse>, Status> {
+        let req = request.into_inner();
+        log::info!(
+            "[grpc:delete_stream_data] org_id: {}, stream_type: {}, stream_name: {}",
+            req.org_id,
+            req.stream_type,
+            req.stream_name
+        );
+
+        // Delete WAL data (memtable, immutable, parquet files) on this node
+        let deleted = ingester::clear_stream_data(&req.org_id, &req.stream_type, &req.stream_name)
+            .await
+            .is_ok();
+
+        Ok(Response::new(DeleteStreamDataResponse { deleted }))
     }
 }
 

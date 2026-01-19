@@ -66,6 +66,184 @@ use crate::{
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
 
+/// Delete WAL data (memtable, immutable, parquet files) on all ingester nodes in the cluster.
+/// This is called when a stream is deleted to prevent stale data from appearing
+/// if the stream is recreated with the same name (fixes #9866).
+pub async fn delete_stream_data_from_ingesters(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+) -> bool {
+    use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
+    use infra::{client::grpc::get_cached_channel, cluster};
+    use proto::cluster_rpc;
+    use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+    use tracing::{Instrument, info_span};
+
+    let trace_id = format!("{org_id}/{stream_type}/{stream_name}");
+    let mut delete_response = true;
+
+    // Get all online ingester nodes
+    let mut nodes = match cluster::get_cached_online_ingester_nodes().await {
+        Some(nodes) => nodes,
+        None => {
+            log::error!(
+                "[trace_id {trace_id}] delete_stream_data_from_ingesters: no ingester node online"
+            );
+            return false;
+        }
+    };
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+
+    // Remove local node from the list (we'll handle it separately)
+    let local_node = cluster::get_node_by_uuid(LOCAL_NODE.uuid.as_str()).await;
+    nodes.retain(|node| node.is_ingester() && !node.uuid.eq(LOCAL_NODE.uuid.as_str()));
+
+    let ingester_num = nodes.len();
+    if ingester_num == 0 && local_node.is_none() {
+        log::warn!("[trace_id {trace_id}] no ingester node online for WAL deletion");
+        return false;
+    }
+
+    let mut tasks = Vec::new();
+
+    // Send delete request to all remote ingester nodes
+    for node in nodes {
+        let cfg = config::get_config();
+        let node_addr = node.grpc_addr.clone();
+
+        let grpc_span = info_span!(
+            "service:stream:delete_stream_data_from_ingesters",
+            node_id = node.id,
+            node_addr = node_addr.as_str(),
+        );
+
+        let trace_id = trace_id.clone();
+        let org_id = org_id.to_string();
+        let stream_type = stream_type.to_string();
+        let stream_name = stream_name.to_string();
+
+        let task = tokio::task::spawn(
+            async move {
+                let req = cluster_rpc::DeleteStreamDataRequest {
+                    org_id: org_id.clone(),
+                    stream_type: stream_type.clone(),
+                    stream_name: stream_name.clone(),
+                };
+
+                let request = tonic::Request::new(req);
+
+                log::info!(
+                    "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: request node: {}",
+                    &node_addr
+                );
+
+                let token: MetadataValue<_> = match get_internal_grpc_token().parse() {
+                    Ok(token) => token,
+                    Err(_) => {
+                        log::error!("[trace_id {trace_id}] invalid grpc token");
+                        return Err("invalid token".to_string());
+                    }
+                };
+
+                let channel = match get_cached_channel(&node_addr).await {
+                    Ok(channel) => channel,
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        return Err(format!("connect error: {err}"));
+                    }
+                };
+
+                let mut client =
+                    cluster_rpc::streams_client::StreamsClient::with_interceptor(
+                        channel,
+                        move |mut req: Request<()>| {
+                            req.metadata_mut().insert("authorization", token.clone());
+                            Ok(req)
+                        },
+                    );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
+                let response = match client.delete_stream_data(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: node: {}, err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        return Err(format!("grpc error: {err}"));
+                    }
+                };
+
+                Ok((node.clone(), response))
+            }
+            .instrument(grpc_span),
+        );
+        tasks.push(task);
+    }
+
+    // Delete on local node
+    match ingester::clear_stream_data(org_id, stream_type, stream_name).await {
+        Ok(_) => {
+            log::info!(
+                "[trace_id {trace_id}] delete_stream_data_from_ingesters: local node delete success"
+            );
+        }
+        Err(e) => {
+            delete_response = false;
+            log::error!(
+                "[trace_id {trace_id}] delete_stream_data_from_ingesters: local node delete error: {e}"
+            );
+        }
+    }
+
+    // Wait for all remote tasks to complete
+    for task in tasks {
+        match task.await {
+            Ok(res) => match res {
+                Ok((node, node_res)) => {
+                    if node_res.deleted {
+                        log::debug!(
+                            "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: node: {}, delete success",
+                            &node.grpc_addr
+                        );
+                    } else {
+                        delete_response = false;
+                        log::error!(
+                            "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: node delete error: node: {}",
+                            &node.grpc_addr
+                        );
+                    }
+                }
+                Err(err) => {
+                    delete_response = false;
+                    log::error!(
+                        "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: node delete error: {err}"
+                    );
+                }
+            },
+            Err(e) => {
+                delete_response = false;
+                log::error!(
+                    "[trace_id {trace_id}] delete_stream_data_from_ingesters->grpc: task error: {e}"
+                );
+            }
+        }
+    }
+
+    delete_response
+}
+
 pub async fn get_stream(
     org_id: &str,
     stream_name: &str,
@@ -1079,39 +1257,12 @@ pub async fn stream_delete_inner(
         );
     }
 
-    // Delete WAL data (memtable, immutable, and parquet files) on this ingester node (fixes #9866)
+    // Delete WAL data (memtable, immutable, and parquet files) on ALL ingester nodes (fixes #9866)
     // This prevents stale data from appearing if the stream is recreated with the same name.
-    // Note: This only clears WAL on the local node. Other ingesters in the cluster will
-    // process their WAL files independently and upload to object storage.
-    log::info!("Deleting WAL data for stream: {org_id}/{stream_type}/{stream_name}");
-    if let Err(e) =
-        ingester::clear_stream_data(org_id, &stream_type.to_string(), stream_name).await
-    {
+    log::info!("Deleting WAL data for stream on all ingesters: {org_id}/{stream_type}/{stream_name}");
+    if !delete_stream_data_from_ingesters(org_id, &stream_type.to_string(), stream_name).await {
         log::warn!(
-            "Failed to delete WAL data for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
-        );
-    }
-
-    // Delete file_list entries synchronously (fixes #9866 for super clusters)
-    // This ensures that even before the compactor runs, file_list queries won't return
-    // stale files from the deleted stream. The compactor will still run later to clean up
-    // the actual files from object storage.
-    // We use a very wide time range to cover all possible data.
-    let start_time = 0i64; // Beginning of time
-    let end_time = chrono::Utc::now().timestamp_micros() + 86400 * 1000000; // Now + 1 day buffer
-    log::info!(
-        "Deleting file_list entries for stream: {org_id}/{stream_type}/{stream_name}"
-    );
-    if let Err(e) = crate::service::compact::retention::delete_from_file_list(
-        org_id,
-        stream_type,
-        stream_name,
-        (start_time, end_time),
-    )
-    .await
-    {
-        log::warn!(
-            "Failed to delete file_list entries for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
+            "Failed to delete WAL data for stream on some ingesters: {org_id}/{stream_type}/{stream_name}"
         );
     }
 

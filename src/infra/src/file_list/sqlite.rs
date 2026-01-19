@@ -429,7 +429,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let pool = CLIENT_RO.clone();
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND deleted = false;"#,
+            r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;"#,
         )
         .bind(stream_key)
         .bind(time_start)
@@ -523,7 +523,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT_RO.clone();
                     let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND deleted = false;";
+                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)

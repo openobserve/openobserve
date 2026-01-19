@@ -1198,7 +1198,7 @@ pub async fn search_multi_stream(
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-format!("/api/{}/_search_multi_stream", org_id),
+                    format!("/api/{}/_search_multi_stream", org_id),
                     query_string,
                     body_bytes,
                 )
@@ -1387,7 +1387,7 @@ format!("/api/{}/_search_multi_stream", org_id),
                     http_response.status().into(),
                     Some(error_message),
                     "POST".to_string(),
-format!("/api/{}/_search_multi_stream", org_id),
+                    format!("/api/{}/_search_multi_stream", org_id),
                     query
                         .iter()
                         .map(|(k, v)| format!("{}={}", k, v))

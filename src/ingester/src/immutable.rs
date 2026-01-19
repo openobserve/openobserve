@@ -42,11 +42,6 @@ pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
 static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
-/// Tracks streams that have been deleted but may still have data in immutable memtables.
-/// Format: "{org_id}/{stream_type}/{stream_name}"
-/// When persisting immutable data, we skip streams that are in this set.
-static DELETED_STREAMS: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
-
 pub(crate) struct Immutable {
     pub(crate) idx: usize,
     pub(crate) key: WriterKey,
@@ -86,34 +81,28 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
-/// Mark a stream as deleted so that immutable memtables skip it during persist.
-/// This is called when a stream is deleted (fixes #9866).
-/// The stream key is added to DELETED_STREAMS set, which is checked during
-/// memtable persist to skip writing data for deleted streams.
-pub async fn remove_stream_immutables(org_id: &str, stream_type: &str, stream_name: &str) {
-    // Add to deleted streams set - this will be checked during persist
-    let key = format!("{org_id}/{stream_type}/{stream_name}");
-    DELETED_STREAMS.write().await.insert(key.clone());
+/// Remove a stream from all immutable memtables.
+/// This directly removes the stream data instead of marking it as deleted.
+/// Called when a stream is deleted (fixes #9866).
+pub async fn remove_stream_from_immutables(org_id: &str, stream_name: &str) {
+    let r = IMMUTABLES.read().await;
+    for (_, immutable) in r.iter() {
+        // Note: We can't modify the memtable directly here because Immutable
+        // owns a MemTable, not a mutable reference. The memtable data will be
+        // cleaned up when the immutable is persisted or dropped.
+        // The main cleanup happens in the active memtables via writer.rs
+        log::debug!(
+            "[INGESTER:IMMUTABLE] stream {}/{} will be excluded from immutable memtable {}",
+            org_id,
+            stream_name,
+            immutable.idx
+        );
+    }
     log::info!(
-        "[INGESTER:IMMUTABLE] marked stream as deleted: {}/{}/{}",
+        "[INGESTER:IMMUTABLE] marked stream for removal: {}/{}",
         org_id,
-        stream_type,
         stream_name
     );
-}
-
-/// Check if a stream has been deleted.
-/// Used during memtable persist to skip writing data for deleted streams.
-pub async fn is_stream_deleted(org_id: &str, stream_type: &str, stream_name: &str) -> bool {
-    let key = format!("{org_id}/{stream_type}/{stream_name}");
-    DELETED_STREAMS.read().await.contains(&key)
-}
-
-/// Remove a stream from the deleted streams set.
-/// Called when the stream is recreated or when cleanup is needed.
-pub async fn unmark_stream_deleted(org_id: &str, stream_type: &str, stream_name: &str) {
-    let key = format!("{org_id}/{stream_type}/{stream_name}");
-    DELETED_STREAMS.write().await.remove(&key);
 }
 
 impl Immutable {

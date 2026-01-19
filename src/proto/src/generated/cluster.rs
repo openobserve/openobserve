@@ -3867,6 +3867,20 @@ pub struct StreamStats {
     #[prost(double, tag = "8")]
     pub index_size: f64,
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct DeleteStreamDataRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub stream_name: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct DeleteStreamDataResponse {
+    #[prost(bool, tag = "1")]
+    pub deleted: bool,
+}
 /// Generated client implementations.
 pub mod streams_client {
     #![allow(
@@ -3982,6 +3996,30 @@ pub mod streams_client {
                 .insert(GrpcMethod::new("cluster.Streams", "stream_stats"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn delete_stream_data(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteStreamDataRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteStreamDataResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Streams/delete_stream_data",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Streams", "delete_stream_data"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -4002,6 +4040,13 @@ pub mod streams_server {
             request: tonic::Request<super::StreamStatsRequest>,
         ) -> std::result::Result<
             tonic::Response<super::StreamStatsResponse>,
+            tonic::Status,
+        >;
+        async fn delete_stream_data(
+            &self,
+            request: tonic::Request<super::DeleteStreamDataRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteStreamDataResponse>,
             tonic::Status,
         >;
     }
@@ -4111,6 +4156,51 @@ pub mod streams_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = stream_statsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Streams/delete_stream_data" => {
+                    #[allow(non_camel_case_types)]
+                    struct delete_stream_dataSvc<T: Streams>(pub Arc<T>);
+                    impl<
+                        T: Streams,
+                    > tonic::server::UnaryService<super::DeleteStreamDataRequest>
+                    for delete_stream_dataSvc<T> {
+                        type Response = super::DeleteStreamDataResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteStreamDataRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Streams>::delete_stream_data(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = delete_stream_dataSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
