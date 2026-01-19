@@ -24,7 +24,7 @@ use {
         common::meta::http::HttpResponse as MetaHttpResponse,
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
-    config::meta::ratelimit::{RatelimitRule, RatelimitRuleUpdater},
+    config::meta::ratelimit::{Interval, RatelimitRule, RatelimitRuleUpdater},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
         default_rules::{
@@ -47,6 +47,7 @@ pub struct QueryParams {
     pub org_id: String,
     pub update_type: Option<String>,
     pub user_role: Option<String>,
+    pub interval: Option<String>, // second/minute/hour
 }
 #[cfg(feature = "enterprise")]
 impl QueryParams {
@@ -230,6 +231,7 @@ pub async fn api_modules(Path(org_id): Path<String>) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization Name"),
         ("org_id" = String, Query, description = "Organization Name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -274,8 +276,17 @@ pub async fn list_module_ratelimit(
         };
 
         let info = get_ratelimit_global_default_api_info().await;
-        let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
-
+        let interval = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None
+        };
+        let api_group_info = info
+            .api_groups(Some(org_id.as_str()), all_rules, interval)
+            .await;
         MetaHttpResponse::json(api_group_info)
     }
 
@@ -312,6 +323,7 @@ pub async fn list_module_ratelimit(
         ("org_id" = String, Path, description = "Organization Name"),
         ("org_id" = String, Query, description = "Organization Name"),
         ("user_role" = String, Query, description = "User Role Name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -373,10 +385,17 @@ pub async fn list_role_ratelimit(
         };
 
         let info = get_ratelimit_global_default_api_info().await;
+        let interval = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None
+        };
         let api_group_info = info
-            .api_groups(Some(org_id.as_str()), role_level_rules)
+            .api_groups(Some(org_id.as_str()), role_level_rules, interval)
             .await;
-
         MetaHttpResponse::json(api_group_info)
     }
 
@@ -414,6 +433,7 @@ pub async fn list_role_ratelimit(
         ("org_id" = String, Query, description = "Organization name"),
         ("update_type" = String, Query, description = "Update Type"),
         ("user_role" = Option<String>, Query, description = "UserRole name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     request_body(content = String, description = "json array", content_type = "application/json", example = json!({"Key Values": {"list": 0,"create": 0,"delete": 0,"get": 0},"Service Accounts": {"update": 0,"list": 0,"create": 0,"delete": 0,"get": 0}})),
     responses(
@@ -476,7 +496,22 @@ pub async fn update_ratelimit(
             }
         };
 
-        let rules = RatelimitRule::from_updater(org_id.as_str(), user_role.as_str(), &updater);
+        // Determine stat_interval_ms based on interval query param
+        let stat_interval_ms = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None // Use default (1000ms)
+        };
+
+        let rules = RatelimitRule::from_updater(
+            org_id.as_str(),
+            user_role.as_str(),
+            &updater,
+            stat_interval_ms,
+        );
         log::debug!("RatelimitRule::from_updater rules: {rules:?}");
         match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => MetaHttpResponse::ok("Ratelimit rule updated successfully"),
