@@ -1,6 +1,7 @@
 // tracesSearch.spec.js
 // Tests for OpenObserve Traces feature - Search functionality
 // Following the modular pattern from Logs tests
+// CONSOLIDATED: 12 → 9 tests
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -23,6 +24,11 @@ test.describe("Traces Search testcases", () => {
 
     // Navigate to traces page
     await pm.tracesPage.navigateToTraces();
+
+    // Select the default stream as data is ingested for it only
+    if (await pm.tracesPage.isStreamSelectVisible()) {
+      await pm.tracesPage.selectTraceStream('default');
+    }
 
     testLogger.info('Test setup completed for traces search');
   });
@@ -75,10 +81,7 @@ test.describe("Traces Search testcases", () => {
     const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (!hasResults) {
-      testLogger.info('No trace results found');
-      // Verify we're in a valid state
-      expect(await pm.tracesPage.isNoResultsVisible()).toBeTruthy();
-      return;
+      throw new Error('Precondition failed: No trace results available. Ensure trace data is ingested.');
     }
 
     // Click first trace
@@ -118,71 +121,76 @@ test.describe("Traces Search testcases", () => {
     }
   });
 
-
-  test("P1: Toggle field list sidebar", {
+  // P1 - Core Functionality Tests
+  // CONSOLIDATED: Merged "Toggle field list sidebar" + "Share trace search link" + "Toggle metrics dashboard"
+  test("P1: UI controls - field list, share link, metrics toggle", {
     tag: ['@tracesSearch', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing field list toggle');
+    testLogger.info('Testing UI controls: field list, share link, metrics toggle');
 
-    // Wait for page to be ready and check if field list exists using page object
-    await page.waitForTimeout(1000);
-    const fieldListCount = await pm.tracesPage.getIndexListCount();
-    const fieldListExists = fieldListCount > 0;
+    // Setup trace search first to ensure page is fully loaded
+    await pm.tracesPage.setupTraceSearch();
+    await page.waitForTimeout(2000);
 
-    if (!fieldListExists) {
-      testLogger.info('Field list element not found on page - skipping toggle test');
-      // Verify toggle button exists at least using page object
-      await pm.tracesPage.expectFieldListToggleButtonVisible();
-      return;
-    }
+    // === Test 1: Toggle field list sidebar (Original test #4) ===
+    await test.step('Toggle field list sidebar', async () => {
+      testLogger.info('Testing field list toggle');
 
-    // Check initial state of field list using page object
-    const fieldListVisible = await pm.tracesPage.isIndexListVisible();
+      // Check if field list toggle button exists - this is the primary control
+      const toggleButtonVisible = await pm.tracesPage.isFieldListToggleButtonVisible();
 
-    // Toggle field list
-    await pm.tracesPage.toggleFieldList();
-    await page.waitForTimeout(1000); // Animation delay
+      if (!toggleButtonVisible) {
+        throw new Error('Precondition failed: Field list toggle button not found on page. Verify traces page renders correctly.');
+      }
 
-    // Check new state using page object
-    const fieldListVisibleAfter = await pm.tracesPage.isIndexListVisible();
+      // Check initial state of field list using page object
+      const fieldListVisible = await pm.tracesPage.isIndexListVisible();
+      testLogger.info(`Initial field list state: ${fieldListVisible ? 'visible' : 'hidden'}`);
 
-    // Should be opposite of initial state
-    expect(fieldListVisibleAfter).toBe(!fieldListVisible);
+      // Toggle field list
+      await pm.tracesPage.toggleFieldList();
+      await page.waitForTimeout(1000); // Animation delay
 
-    testLogger.info(`Field list toggled: ${fieldListVisible} -> ${fieldListVisibleAfter}`);
-  });
+      // Check new state using page object
+      const fieldListVisibleAfter = await pm.tracesPage.isIndexListVisible();
+      testLogger.info(`After toggle field list state: ${fieldListVisibleAfter ? 'visible' : 'hidden'}`);
 
-  test("P1: Share trace search link", {
-    tag: ['@tracesSearch', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing share link functionality');
+      // Verify toggle functionality worked - state should change
+      expect(fieldListVisibleAfter).not.toBe(fieldListVisible);
 
-    // Click share link button using page object
-    await pm.tracesPage.clickShareLinkButton();
+      testLogger.info(`Field list toggled: ${fieldListVisible} -> ${fieldListVisibleAfter}`);
+    });
 
-    // Wait for share dialog or notification
-    await page.waitForTimeout(1000);
+    // === Test 2: Share trace search link (Original test #5) ===
+    await test.step('Share trace search link', async () => {
+      testLogger.info('Testing share link functionality');
 
-    // Check if URL was copied or share dialog appeared
-    testLogger.info('Share link functionality tested');
-    // Verify page is still in valid state
-    await pm.tracesPage.expectSearchBarVisible();
-  });
+      // Click share link button using page object
+      await pm.tracesPage.clickShareLinkButton();
 
-  test("P1: Toggle metrics dashboard", {
-    tag: ['@tracesSearch', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing metrics dashboard toggle');
+      // Wait for share dialog or notification
+      await page.waitForTimeout(1000);
 
-    // Toggle metrics
-    await pm.tracesPage.toggleMetricsDashboard();
+      // Check if URL was copied or share dialog appeared
+      testLogger.info('Share link functionality tested');
+      // Verify page is still in valid state
+      await pm.tracesPage.expectSearchBarVisible();
+    });
 
-    // Wait for metrics to show/hide
-    await page.waitForTimeout(1000);
+    // === Test 3: Toggle metrics dashboard (Original test #6) ===
+    await test.step('Toggle metrics dashboard', async () => {
+      testLogger.info('Testing metrics dashboard toggle');
 
-    testLogger.info('Metrics dashboard toggled');
-    // Verify page is still functional
-    await pm.tracesPage.expectSearchBarVisible();
+      // Toggle metrics
+      await pm.tracesPage.toggleMetricsDashboard();
+
+      // Wait for metrics to show/hide
+      await page.waitForTimeout(1000);
+
+      testLogger.info('Metrics dashboard toggled');
+      // Verify page is still functional
+      await pm.tracesPage.expectSearchBarVisible();
+    });
   });
 
   // P2 - Edge Cases
@@ -290,52 +298,56 @@ test.describe("Traces Search testcases", () => {
     }
   });
 
-  // Enhanced Edge Cases
-  test("P2: Search with very short time range (1m)", {
+  // CONSOLIDATED: Merged "Search with very short time range (1m)" + "Rapid successive searches"
+  test("P2: Time range edge cases - 1m range and rapid searches", {
     tag: ['@tracesSearch', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing search with 1 minute time range');
+    testLogger.info('Testing time range edge cases: 1m range and rapid searches');
 
-    // Setup trace search with very short time range using page object
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    // === Test 1: Search with very short time range (1m) (Original test #10) ===
+    await test.step('Search with very short time range (1m)', async () => {
+      testLogger.info('Testing search with 1 minute time range');
 
-    // Set 1 minute time range using page object
-    await pm.tracesPage.clickTimeRange1m();
+      // Setup trace search with very short time range using page object
+      if (await pm.tracesPage.isStreamSelectVisible()) {
+        await pm.tracesPage.selectTraceStream('default');
+      }
 
-    await pm.tracesPage.runTraceSearch();
-    await page.waitForTimeout(2000);
+      // Set 1 minute time range using page object
+      await pm.tracesPage.clickTimeRange1m();
 
-    // Verify either results or no results message using page object
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    const noResults = await pm.tracesPage.isNoResultsVisible();
-
-    expect(hasResults || noResults).toBeTruthy();
-    testLogger.info(`1 minute search completed: Results=${hasResults}, NoResults=${noResults}`);
-  });
-
-  test("P2: Rapid successive searches", {
-    tag: ['@tracesSearch', '@traces', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing rapid successive searches');
-
-    await pm.tracesPage.setupTraceSearch();
-
-    // Perform rapid successive searches
-    for (let i = 0; i < 3; i++) {
       await pm.tracesPage.runTraceSearch();
-      await page.waitForTimeout(500); // Short wait between searches
+      await page.waitForTimeout(2000);
 
+      // Verify either results or no results message using page object
       const hasResults = await pm.tracesPage.hasTraceResults();
-      testLogger.info(`Rapid search ${i + 1}: Results=${hasResults}`);
-    }
+      const noResults = await pm.tracesPage.isNoResultsVisible();
 
-    // Final search should complete successfully
-    await page.waitForTimeout(2000);
-    const finalResults = await pm.tracesPage.hasTraceResults();
-    const noResults = await pm.tracesPage.isNoResultsVisible();
-    expect(finalResults || noResults).toBeTruthy();
+      expect(hasResults || noResults).toBeTruthy();
+      testLogger.info(`1 minute search completed: Results=${hasResults}, NoResults=${noResults}`);
+    });
+
+    // === Test 2: Rapid successive searches (Original test #11) ===
+    await test.step('Rapid successive searches', async () => {
+      testLogger.info('Testing rapid successive searches');
+
+      await pm.tracesPage.setupTraceSearch();
+
+      // Perform rapid successive searches
+      for (let i = 0; i < 3; i++) {
+        await pm.tracesPage.runTraceSearch();
+        await page.waitForTimeout(500); // Short wait between searches
+
+        const hasResults = await pm.tracesPage.hasTraceResults();
+        testLogger.info(`Rapid search ${i + 1}: Results=${hasResults}`);
+      }
+
+      // Final search should complete successfully
+      await page.waitForTimeout(2000);
+      const finalResults = await pm.tracesPage.hasTraceResults();
+      const noResults = await pm.tracesPage.isNoResultsVisible();
+      expect(finalResults || noResults).toBeTruthy();
+    });
   });
 
   test("P2: Search with browser refresh", {
