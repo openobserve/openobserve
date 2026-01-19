@@ -16,7 +16,7 @@
 use anyhow::{Context, anyhow};
 use bytes::Bytes;
 use config::{
-    meta::ratelimit::{RatelimitRule, RatelimitRuleType},
+    meta::ratelimit::{DEFAULT_STAT_INTERVAL_MS, RatelimitRule, RatelimitRuleType},
     utils::time::now,
 };
 use sea_orm::{
@@ -171,7 +171,7 @@ async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
             api_group_name: Set(rule.api_group_name.unwrap_or_default()),
             api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
             threshold: Set(rule.threshold),
-            stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
+            stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS)),
             created_at: Set(current_timestamp),
         })
         .collect();
@@ -227,7 +227,10 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
             .filter(
                 Column::ApiGroupOperation.eq(rule.api_group_operation.clone().unwrap_or_default()),
             )
-            .filter(Column::StatIntervalMs.eq(rule.stat_interval_ms.unwrap_or(1000)))
+            .filter(
+                Column::StatIntervalMs
+                    .eq(rule.stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS)),
+            )
             .one(&txn)
             .await
             .map_err(|e| anyhow!("DbError# Failed to fetch existing rule: {}", e))?;
@@ -249,7 +252,8 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 active_model.api_group_operation =
                     Set(rule.api_group_operation.unwrap_or_default());
                 active_model.threshold = Set(rule.threshold);
-                active_model.stat_interval_ms = Set(rule.stat_interval_ms.unwrap_or(1000));
+                active_model.stat_interval_ms =
+                    Set(rule.stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS));
                 active_model.created_at = Set(existing.created_at);
 
                 if let Err(e) = active_model.save(&txn).await {
@@ -280,7 +284,9 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                         api_group_name: Set(rule.api_group_name.unwrap_or_default()),
                         api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                         threshold: Set(rule.threshold),
-                        stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
+                        stat_interval_ms: Set(rule
+                            .stat_interval_ms
+                            .unwrap_or(DEFAULT_STAT_INTERVAL_MS)),
                         created_at: Set(current_time),
                     };
                     log::debug!("add_upsert_batch insert active_model: {active_model:?} ");
@@ -322,7 +328,7 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
                 api_group_name: Set(rule.api_group_name.unwrap_or_default()),
                 api_group_operation: Set(rule.api_group_operation.unwrap_or_default()),
                 threshold: Set(rule.threshold),
-                stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(1000)),
+                stat_interval_ms: Set(rule.stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS)),
                 created_at: Set(now().timestamp()),
             };
             match Entity::insert(active_rule)
@@ -570,7 +576,7 @@ mod tests {
             api_group_name: Some("test_group_name".to_string()),
             api_group_operation: Some("test_operation".to_string()),
             threshold: 100,
-            stat_interval_ms: Some(1000),
+            stat_interval_ms: Some(DEFAULT_STAT_INTERVAL_MS),
         }
     }
 
@@ -584,7 +590,7 @@ mod tests {
             api_group_name: "api_group_name".to_string(),
             api_group_operation: "operation".to_string(),
             threshold: 100,
-            stat_interval_ms: 1000,
+            stat_interval_ms: DEFAULT_STAT_INTERVAL_MS,
             created_at: 0,
         }
     }
