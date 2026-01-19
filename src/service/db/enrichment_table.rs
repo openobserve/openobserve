@@ -22,10 +22,7 @@ use arrow::{
 use config::{
     QUERY_WITH_NO_LIMIT, ider,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
-    utils::{
-        json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{json, time::BASE_TIME},
 };
 use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 use rayon::prelude::*;
@@ -55,9 +52,9 @@ pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
     _apply_primary_region_if_specified: bool,
+    end_time: i64,
 ) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
 
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
@@ -811,6 +808,8 @@ pub async fn claim_stale_url_jobs(
 // write test for convert_to_vrl
 #[cfg(test)]
 mod tests {
+    use config::utils::time::now_micros;
+
     use super::*;
 
     #[test]
@@ -906,7 +905,7 @@ mod tests {
     async fn test_get_enrichment_table_data() {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table", false).await;
+        let result = get_enrichment_table_data("test_org", "test_table", false, now_micros()).await;
         assert!(result.is_err());
     }
 
