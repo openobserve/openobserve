@@ -334,7 +334,8 @@
     "report": "Berichte",
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "incidents": "Vorfälle"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",

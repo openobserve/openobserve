@@ -190,9 +190,14 @@ test.describe("Pre-Test Cleanup", () => {
       /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
       // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
       /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
-      /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (validation test)
+      /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (URL format validation test)
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
-      /^toggle_test_[a-f0-9]{8}$/                                                            // toggle_test_<uuid> (source toggle test)
+      /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
+      /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
+      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
+      /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
+      /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
+      /^url_404_[a-f0-9]{8}$/                                                                // url_404_<uuid> (invalid URL 404 test)
     ]);
 
     // Clean up streams matching test patterns
