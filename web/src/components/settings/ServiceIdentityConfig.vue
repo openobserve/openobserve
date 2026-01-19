@@ -39,25 +39,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="tw:p-4 text-body2 tw:leading-relaxed">
         <div class="tw:mb-3">
-          <div class="tw:font-semibold text-primary tw:mb-1">Service FQN</div>
+          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.serviceIdentityLabel") }}</div>
           <div>{{ t("settings.correlation.howItWorksDescription") }}</div>
         </div>
-        <div class="tw:mb-0">
-          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.priorityOrderLabel") }}</div>
-          <div>{{ t("settings.correlation.priorityOrderDescription") }}</div>
+        <div class="tw:mb-3">
+          <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.compoundFqnLabel") }}</div>
+          <div>{{ t("settings.correlation.compoundFqnDescription") }}</div>
         </div>
-        <div class="tw:mb-0 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
+        <div class="tw:mb-3 tw:p-3 tw:rounded" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
           <div class="tw:font-semibold text-primary tw:mb-1">{{ t("settings.correlation.exampleLabel") }}</div>
           <div>
             <i18n-t keypath="settings.correlation.exampleText" tag="span">
               <template #dim1>
-                <q-chip dense size="13" color="primary" text-color="white" class="tw:mx-1 tw:my-1 example-chip">k8s-deployment=my-app</q-chip>
+                <q-chip dense size="sm" color="primary" text-color="white" class="tw:mx-1 tw:my-1 example-chip">k8s-cluster=prod</q-chip>
               </template>
               <template #dim2>
-                <q-chip dense size="13" color="grey-7" text-color="white" class="tw:mx-1 tw:my-1 example-chip">service=myapp</q-chip>
+                <q-chip dense size="sm" color="secondary" text-color="white" class="tw:mx-1 tw:my-1 example-chip">k8s-deployment=api-server</q-chip>
               </template>
               <template #value>
-                <q-chip dense size="13" color="positive" text-color="white" class="tw:mx-1 tw:my-1 example-chip">my-app</q-chip>
+                <q-chip dense size="sm" color="positive" text-color="white" class="tw:mx-1 tw:my-1 example-chip">prod/api-server</q-chip>
               </template>
             </i18n-t>
           </div>
@@ -88,60 +88,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-icon>
       </div>
 
-      <div class="tw:font-mono tw:text-sm tw:p-3 tw:rounded tw:overflow-x-auto" :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'">
-        <!-- Scope Part -->
-        <span v-if="fqnFormula.scopeDims.length > 0" class="tw:whitespace-nowrap">
-          <template v-for="(dim, idx) in fqnFormula.scopeDims" :key="'scope-' + dim">
-            <q-chip
-              dense
-              size="sm"
-              color="blue-7"
-              text-color="white"
-              class="tw:mx-0.5"
-            >
-              {{ getDimensionDisplay(dim) }}
-              <q-tooltip>{{ t('settings.correlation.scopeDimension') }}: {{ dim }}</q-tooltip>
-            </q-chip>
-            <span v-if="idx < fqnFormula.scopeDims.length - 1" class="tw:text-gray-500 tw:mx-1">/</span>
-          </template>
-        </span>
-
-        <!-- Separator between scope and workload -->
-        <span v-if="fqnFormula.scopeDims.length > 0 && fqnFormula.workloadDims.length > 0" class="tw:text-gray-500 tw:mx-1">/</span>
-
-        <!-- Workload Part (first match wins) -->
-        <span v-if="fqnFormula.workloadDims.length > 0" class="tw:whitespace-nowrap">
-          <span class="tw:text-gray-500 tw:mr-1">first(</span>
-          <template v-for="(dim, idx) in fqnFormula.workloadDims" :key="'workload-' + dim">
-            <q-chip
-              dense
-              size="sm"
-              color="green-7"
-              text-color="white"
-              class="tw:mx-0.5"
-            >
-              {{ getDimensionDisplay(dim) }}
-              <q-tooltip>{{ t('settings.correlation.workloadDimension') }}: {{ dim }}</q-tooltip>
-            </q-chip>
-            <span v-if="idx < fqnFormula.workloadDims.length - 1" class="tw:text-gray-400 tw:mx-0.5">,</span>
-          </template>
-          <span class="tw:text-gray-500 tw:ml-1">)</span>
-        </span>
+      <!-- Environment-grouped FQN patterns -->
+      <div class="fqn-formula-box tw:p-3 tw:rounded tw:overflow-x-auto">
+        <div v-if="fqnFormula.envPatterns.length > 0" class="tw:space-y-2">
+          <div
+            v-for="env in fqnFormula.envPatterns"
+            :key="env.name"
+            class="tw:flex tw:items-center tw:flex-wrap tw:gap-1"
+          >
+            <span class="fqn-env-label tw:font-semibold tw:text-sm tw:min-w-[100px]">{{ env.name }}:</span>
+            <!-- Scope dimensions for this environment -->
+            <template v-for="(dim, idx) in env.scopeDims" :key="'scope-' + dim">
+              <q-chip
+                dense
+                size="sm"
+                color="primary"
+                text-color="white"
+                class="tw:mx-0.5"
+              >
+                {{ getDimensionDisplay(dim) }}
+                <q-tooltip>{{ t('settings.correlation.scopeDimension') }}</q-tooltip>
+              </q-chip>
+              <span v-if="idx < env.scopeDims.length - 1 || env.workloadDims.length > 0" class="fqn-separator">/</span>
+            </template>
+            <!-- Workload dimensions for this environment -->
+            <template v-if="env.workloadDims.length > 0">
+              <template v-if="env.workloadDims.length === 1">
+                <q-chip
+                  dense
+                  size="sm"
+                  color="secondary"
+                  text-color="white"
+                  class="tw:mx-0.5"
+                >
+                  {{ getDimensionDisplay(env.workloadDims[0]) }}
+                  <q-tooltip>{{ t('settings.correlation.workloadDimension') }}</q-tooltip>
+                </q-chip>
+              </template>
+              <template v-else>
+                <span class="fqn-text-muted tw:text-xs tw:italic">{{ t('settings.correlation.firstNonNull') }} (</span>
+                <template v-for="(dim, idx) in env.workloadDims" :key="'workload-' + dim">
+                  <q-chip
+                    dense
+                    size="sm"
+                    color="secondary"
+                    text-color="white"
+                    class="tw:mx-0.5"
+                  >
+                    {{ getDimensionDisplay(dim) }}
+                    <q-tooltip>{{ t('settings.correlation.workloadDimension') }}</q-tooltip>
+                  </q-chip>
+                  <span v-if="idx < env.workloadDims.length - 1" class="fqn-comma">,</span>
+                </template>
+                <span class="fqn-text-muted tw:text-xs">)</span>
+              </template>
+            </template>
+            <!-- Show placeholder if no workload dims -->
+            <span v-if="env.scopeDims.length > 0 && env.workloadDims.length === 0" class="fqn-text-muted tw:text-xs tw:italic">
+              ({{ t('settings.correlation.scopeOnly') }})
+            </span>
+          </div>
+        </div>
 
         <!-- Fallback when no dimensions -->
-        <span v-if="fqnFormula.scopeDims.length === 0 && fqnFormula.workloadDims.length === 0" class="tw:text-gray-500 tw:italic">
+        <span v-if="fqnFormula.envPatterns.length === 0" class="fqn-text-muted tw:italic">
           {{ t('settings.correlation.noFormulaConfigured') }}
         </span>
+
+        <!-- Fallback note when "Other" or "Common" group exists with workload dimensions -->
+        <div
+          v-if="hasFallbackDimensions"
+          class="fqn-fallback-note tw:mt-3 tw:pt-2 tw:border-t tw:border-dashed tw:text-xs tw:italic"
+          :class="store.state.theme === 'dark' ? 'tw:border-gray-600' : 'tw:border-gray-300'"
+        >
+          <q-icon name="info" size="xs" class="tw:mr-1" />
+          {{ t('settings.correlation.fallbackNote') }}
+        </div>
       </div>
 
       <!-- Legend -->
-      <div class="tw:flex tw:gap-4 tw:mt-3 tw:text-xs tw:text-gray-500">
+      <div class="fqn-legend tw:flex tw:gap-4 tw:mt-3 tw:text-xs">
         <div class="tw:flex tw:items-center tw:gap-1">
-          <span class="tw:w-3 tw:h-3 tw:rounded tw:bg-blue-700"></span>
+          <span class="fqn-legend-dot fqn-legend-dot--scope"></span>
           <span>{{ t('settings.correlation.scopeLegend') }}</span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-1">
-          <span class="tw:w-3 tw:h-3 tw:rounded tw:bg-green-700"></span>
+          <span class="fqn-legend-dot fqn-legend-dot--workload"></span>
           <span>{{ t('settings.correlation.workloadLegend') }}</span>
         </div>
       </div>
@@ -191,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
                 <q-item-section avatar class="tw:min-w-0 tw:mr-3">
                   <q-badge
-                    :color="isDimensionScope(item.dim) ? 'blue-7' : 'green-7'"
+                    :color="isDimensionScope(item.dim) ? 'primary' : 'secondary'"
                     text-color="white"
                     class="tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:rounded-full"
                   >
@@ -203,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ getDimensionDisplay(item.dim) }}
                     <span class="tw:font-normal tw:text-xs tw:opacity-70">({{ item.dim }})</span>
                     <q-badge
-                      :color="isDimensionScope(item.dim) ? 'blue-7' : 'green-7'"
+                      :color="isDimensionScope(item.dim) ? 'primary' : 'secondary'"
                       text-color="white"
                       class="tw:ml-2 tw:text-xs"
                       dense
@@ -251,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-item v-if="filteredPriorityDimensions.length === 0" class="tw:py-4 tw:text-center tw:text-gray-500">
-                {{ prioritySearchQuery ? "No matching dimensions" : t("settings.correlation.noDimensionsConfigured") }}
+                {{ prioritySearchQuery ? t("settings.correlation.noMatchingDimensions") : t("settings.correlation.noDimensionsConfigured") }}
               </q-item>
             </q-list>
           </div>
@@ -469,21 +501,65 @@ const filteredAvailableGroups = computed(() => {
   );
 });
 
-// Computed: Derive FQN formula from priority dimensions and their is_scope property
-// Format: {scope dims joined by /} / {first of: workload dims}
-const fqnFormula = computed(() => {
-  const scopeDims: string[] = [];
-  const workloadDims: string[] = [];
+// Environment pattern type for FQN formula display
+interface EnvironmentPattern {
+  name: string;
+  scopeDims: string[];
+  workloadDims: string[];
+}
 
+// Computed: Derive FQN formula grouped by environment/semantic group
+// Shows patterns like: K8s: cluster/deployment, AWS: region/ecs-cluster/task
+const fqnFormula = computed(() => {
   // Build a lookup map for semantic groups
   const groupLookup = new Map<string, SemanticFieldGroup>();
   localSemanticGroups.value.forEach(g => groupLookup.set(g.id, g));
 
-  // Categorize each priority dimension as scope or workload
+  // Group dimensions by their semantic group category
+  const envPatterns: EnvironmentPattern[] = [];
+  const groupedDims = new Map<string, { scope: string[], workload: string[] }>();
+
+  // Categorize each priority dimension by its group
+  // Rename "Common" to "Fallback" for clarity in the UI
+  const fallbackLabel = t('settings.correlation.fallbackGroup');
+  for (const dimId of localFqnPriority.value) {
+    const group = groupLookup.get(dimId);
+    // Use "Fallback" label for "Common" group to make it clearer
+    let groupName = group?.group || t('settings.correlation.otherGroup');
+    if (groupName === 'Common') {
+      groupName = fallbackLabel;
+    }
+    const isScope = group?.is_scope ?? false;
+
+    if (!groupedDims.has(groupName)) {
+      groupedDims.set(groupName, { scope: [], workload: [] });
+    }
+
+    const dims = groupedDims.get(groupName)!;
+    if (isScope) {
+      dims.scope.push(dimId);
+    } else {
+      dims.workload.push(dimId);
+    }
+  }
+
+  // Convert to array of patterns, only include groups that have at least one dimension
+  for (const [name, dims] of groupedDims) {
+    if (dims.scope.length > 0 || dims.workload.length > 0) {
+      envPatterns.push({
+        name,
+        scopeDims: dims.scope,
+        workloadDims: dims.workload
+      });
+    }
+  }
+
+  // Also compute flat lists for legacy display
+  const scopeDims: string[] = [];
+  const workloadDims: string[] = [];
   for (const dimId of localFqnPriority.value) {
     const group = groupLookup.get(dimId);
     const isScope = group?.is_scope ?? false;
-
     if (isScope) {
       scopeDims.push(dimId);
     } else {
@@ -491,7 +567,17 @@ const fqnFormula = computed(() => {
     }
   }
 
-  return { scopeDims, workloadDims };
+  return { scopeDims, workloadDims, envPatterns };
+});
+
+// Check if there are fallback dimensions (in "Fallback" or "Other" group with workload dimensions)
+// This indicates dimensions like "service" that apply across all environments
+const hasFallbackDimensions = computed(() => {
+  const otherGroupName = t('settings.correlation.otherGroup');
+  const fallbackGroupName = t('settings.correlation.fallbackGroup');
+  return fqnFormula.value.envPatterns.some(
+    env => (env.name === otherGroupName || env.name === fallbackGroupName) && env.workloadDims.length > 0
+  );
 });
 
 // Check if a dimension is a scope dimension
@@ -772,11 +858,88 @@ body.body--dark {
     color: white !important;
   }
 }
+
 </style>
 <style lang="scss">
 .expanstion-item-o2 {
   .q-item__section--side {
     min-width: auto;
+  }
+}
+
+// FQN Formula Box styles
+.service-identity-config {
+  .fqn-formula-box {
+    background-color: #f5f5f5;
+  }
+
+  .fqn-env-label {
+    color: #424242;
+  }
+
+  .fqn-separator {
+    color: var(--q-primary);
+    font-weight: 600;
+    margin: 0 2px;
+  }
+
+  .fqn-text-muted {
+    color: #757575;
+  }
+
+  .fqn-comma {
+    color: #757575;
+    margin: 0 2px;
+  }
+
+  .fqn-legend {
+    color: #616161;
+  }
+
+  .fqn-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .fqn-legend-dot--scope {
+    background-color: var(--q-primary);
+  }
+
+  .fqn-legend-dot--workload {
+    background-color: var(--q-secondary);
+  }
+
+  .fqn-fallback-note {
+    color: #616161;
+  }
+}
+
+// Dark mode overrides
+body.body--dark .service-identity-config {
+  .fqn-formula-box {
+    background-color: #1d1d1d;
+  }
+
+  .fqn-env-label {
+    color: #e0e0e0;
+  }
+
+  .fqn-text-muted {
+    color: #9e9e9e;
+  }
+
+  .fqn-comma {
+    color: #9e9e9e;
+  }
+
+  .fqn-legend {
+    color: #9e9e9e;
+  }
+
+  .fqn-fallback-note {
+    color: #9e9e9e;
   }
 }
 </style>
