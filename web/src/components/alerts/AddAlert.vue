@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="saveButtonLabel"
+            :label="t('alerts.save')"
             type="submit"
             no-caps
             flat
@@ -2104,20 +2104,6 @@ export default defineComponent({
       return wizardStep.value >= 4;
     });
 
-    // Dynamic save button label based on current step
-    const saveButtonLabel = computed(() => {
-      if (wizardStep.value === 6) {
-        // On last step (Advanced) - just "Save"
-        return t('alerts.save');
-      } else if (wizardStep.value >= 4) {
-        // On steps 4-5 - indicate optional steps remain
-        return t('alerts.saveAlert');
-      } else {
-        // On steps 1-3 - not ready to save yet
-        return t('alerts.save');
-      }
-    });
-
     return {
       t,
       q,
@@ -2225,7 +2211,6 @@ export default defineComponent({
       goToPreviousStep,
       isLastStep,
       canSaveAlert,
-      saveButtonLabel,
       step2Ref,
       step3Ref,
       step4Ref,

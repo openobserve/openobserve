@@ -930,11 +930,17 @@ export default defineComponent({
 
     // Fetch query schema from result_schema API
     const fetchQuerySchema = async () => {
-      // Only fetch if we have a SQL or PromQL query
+      // Only fetch if we have a SQL query (not PromQL - PromQL doesn't need schema analysis)
       const sqlQuery = props.formData.query_condition?.sql;
-      const promqlQuery = props.formData.query_condition?.promql;
+      const queryType = props.formData.query_condition?.type;
 
-      if (!sqlQuery && !promqlQuery) {
+      // Skip for PromQL mode - it doesn't use result_schema
+      if (queryType === 'promql') {
+        querySchema.value = { group_by: [], having: null, projections: [] };
+        return;
+      }
+
+      if (!sqlQuery) {
         // Reset schema if no query
         querySchema.value = { group_by: [], having: null, projections: [] };
         return;
@@ -943,7 +949,7 @@ export default defineComponent({
       try {
         const query = {
           query: {
-            sql: sqlQuery || promqlQuery || "",
+            sql: sqlQuery,
             query_fn: null,
             size: -1,
             streaming_output: false,
