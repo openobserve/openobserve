@@ -522,8 +522,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Attempt to save the panel without a name
-    await pm.dashboardPanelActions.savePanel();
+    // Attempt to save the panel without a name (should fail validation)
+    await pm.dashboardPanelActions.clickSavePanel();
     await expect(
       page.getByText("There are some errors, please fix them and try again")
     ).toBeVisible();
