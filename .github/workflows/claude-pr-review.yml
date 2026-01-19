@@ -38,7 +38,7 @@ jobs:
 
             ### Step 1: Check for Existing Review
 
-            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("<!-- claude-pr-review -->")) | .id'`
+            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("claude-pr-review")) | .id'`
 
             ### Step 2: Review the Code
 
