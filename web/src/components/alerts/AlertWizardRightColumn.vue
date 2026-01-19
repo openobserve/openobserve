@@ -64,15 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div v-show="expandState.preview" class="section-content">
-        <preview-alert
-          style="height: 100%; overflow: auto;"
-          ref="previewAlertRef"
-          :formData="formData"
-          :query="previewQuery"
-          :selectedTab="selectedTab"
-          :isAggregationEnabled="isAggregationEnabled"
-          :isUsingBackendSql="isUsingBackendSql"
-        />
+        <keep-alive>
+          <preview-alert
+            style="height: 100%; overflow: auto;"
+            ref="previewAlertRef"
+            :formData="formData"
+            :query="previewQuery"
+            :selectedTab="selectedTab"
+            :isAggregationEnabled="isAggregationEnabled"
+            :isUsingBackendSql="isUsingBackendSql"
+          />
+        </keep-alive>
       </div>
     </div>
 
