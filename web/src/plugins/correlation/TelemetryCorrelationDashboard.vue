@@ -1017,23 +1017,20 @@ const activeTab = computed({
 const internalActiveTab = ref("logs");
 
 // Active dimensions that can be modified
-// - matchedDimensions (stable): use actual values
-// - additionalDimensions (unstable): default to SELECT_ALL_VALUE (wildcard)
+// - matchedDimensions (stable): use actual values from current row
+// - additionalDimensions (unstable): use actual values from current row (user can change to "All" if desired)
 // Applied dimensions - these are used to generate queries
 const activeDimensions = ref<Record<string, string>>({
   ...props.matchedDimensions,
-  // Add additional dimensions with SELECT_ALL_VALUE as default (user can switch to actual value)
-  ...Object.fromEntries(
-    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
-  )
+  // Use actual values from additionalDimensions (showing current row values)
+  ...(props.additionalDimensions || {})
 });
 
 // Pending dimensions - these are edited by the user but not yet applied
 const pendingDimensions = ref<Record<string, string>>({
   ...props.matchedDimensions,
-  ...Object.fromEntries(
-    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
-  )
+  // Use actual values from additionalDimensions (showing current row values)
+  ...(props.additionalDimensions || {})
 });
 
 // Track if there are pending changes that haven't been applied
@@ -2033,6 +2030,7 @@ watch(
   async (newVal) => {
     if (newVal) {
       // Load semantic groups first (required for applyUnstableDimensionDefaults)
+      // Note: pendingDimensions and activeDimensions are now managed by the props watcher below
       await loadSemanticGroups();
 
       // Re-apply defaults now that semantic groups are loaded
@@ -2101,6 +2099,12 @@ watch(
       return;
     }
     if (newAdditionalDims && Object.keys(newAdditionalDims).length > 0 && semanticGroups.value.length > 0) {
+      // Update pendingDimensions with new unstable dimension values from current row
+      pendingDimensions.value = {
+        ...props.matchedDimensions,
+        ...newAdditionalDims
+      };
+
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
@@ -2119,6 +2123,13 @@ watch(
     if (!oldMatchedDims || !initialLoadCompleted.value) {
       return;
     }
+
+    // Update pendingDimensions with new matched dimension values from current row
+    pendingDimensions.value = {
+      ...newMatchedDims,
+      ...(props.additionalDimensions || {})
+    };
+
     const hasUnstableInMatched = Object.values(newMatchedDims || {}).some(v => v === SELECT_ALL_VALUE);
     if (hasUnstableInMatched && semanticGroups.value.length > 0) {
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
@@ -2127,6 +2138,41 @@ watch(
       }
     }
   }
+);
+
+// Watch all dimension props together to detect any changes
+// This ensures filter dropdowns are always in sync with current row data
+// Triggers when: component mounts, user switches rows, or props update
+watch(
+  () => ({
+    matched: props.matchedDimensions,
+    additional: props.additionalDimensions,
+    service: props.serviceName
+  }),
+  (newProps, oldProps) => {
+    // Always update dimensions when props change (including initial mount)
+    // This handles: first open, reopen with different row, and navigation between rows
+    const newDimensions = {
+      ...(newProps.matched || {}),
+      ...(newProps.additional || {})
+    };
+
+    // Only update if dimensions actually changed
+    const dimensionsChanged =
+      !oldProps ||
+      JSON.stringify(newDimensions) !== JSON.stringify({
+        ...(oldProps.matched || {}),
+        ...(oldProps.additional || {})
+      });
+
+    if (dimensionsChanged) {
+      pendingDimensions.value = { ...newDimensions };
+      activeDimensions.value = { ...newDimensions };
+
+      console.log('[TelemetryCorrelationDashboard] Updated dimensions from props:', newDimensions);
+    }
+  },
+  { immediate: true, deep: true }
 );
 </script>
 
