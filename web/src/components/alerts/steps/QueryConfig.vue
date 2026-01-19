@@ -285,9 +285,38 @@ export default defineComponent({
         return;
       }
 
+      // When switching to custom mode, check if there's only one empty condition and remove it
+      // This ensures generate_sql API is called
+      if (tab === 'custom' && props.inputData.conditions) {
+        removeSingleEmptyCondition(props.inputData.conditions);
+      }
+
       // No multi-windows, proceed with tab change
       localTab.value = tab;
       emit("update:tab", tab);
+    };
+
+    // Helper function to remove a single empty condition if that's the only condition present
+    const removeSingleEmptyCondition = (conditionsObj: any) => {
+      if (!conditionsObj || !conditionsObj.conditions || !Array.isArray(conditionsObj.conditions)) {
+        return;
+      }
+
+      // Only proceed if there's exactly one condition at the top level
+      if (conditionsObj.conditions.length === 1) {
+        const singleItem = conditionsObj.conditions[0];
+
+        // Check if it's a condition (not a group) with empty column AND empty value
+        if (singleItem.filterType === 'condition') {
+          const hasColumn = singleItem.column && singleItem.column.trim() !== '';
+          const hasValue = singleItem.value !== undefined && singleItem.value !== '' && singleItem.value !== null;
+
+          // If both column and value are empty, remove this condition
+          if (!hasColumn && !hasValue) {
+            conditionsObj.conditions = [];
+          }
+        }
+      }
     };
 
     const handleConfirmClearMultiWindows = () => {
