@@ -137,6 +137,51 @@ pub async fn get_by_org_and_name(
     Ok(records)
 }
 
+/// Get enrichment table records for a specific organization and table name with optional end time
+/// filter
+///
+/// # Arguments
+/// * `org` - Organization name
+/// * `table_name` - Table name
+/// * `end_time_exclusive` - Optional end time (exclusive). If provided, only returns records where
+///   created_at < end_time_exclusive
+///
+/// # Returns
+/// * `Result<Vec<EnrichmentTableRecord>, errors::Error>` - List of records or error
+///
+/// # Note
+/// The end_time is exclusive, meaning records with created_at >= end_time_exclusive are not
+/// included. This aligns with search time ranges where end_time is exclusive.
+pub async fn get_by_org_and_name_with_end_time(
+    org: &str,
+    table_name: &str,
+    end_time_exclusive: Option<i64>,
+) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::Org)
+        .column(Column::Name)
+        .column(Column::Data)
+        .column(Column::CreatedAt)
+        .filter(Column::Org.eq(org))
+        .filter(Column::Name.eq(table_name));
+
+    // Add end_time filter if provided
+    // created_at < end_time_exclusive (exclusive upper bound)
+    if let Some(end_time) = end_time_exclusive {
+        query = query.filter(Column::CreatedAt.lt(end_time));
+    }
+
+    let records = query
+        .order_by(Column::CreatedAt, Order::Desc)
+        .into_model::<EnrichmentTableRecord>()
+        .all(client)
+        .await?;
+
+    Ok(records)
+}
+
 /// Get all enrichment table records for a specific organization
 ///
 /// # Arguments
