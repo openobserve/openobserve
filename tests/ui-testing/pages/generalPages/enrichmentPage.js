@@ -1910,6 +1910,129 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('URL replaced in edit mode');
     }
 
+    // ============================================================================
+    // SCHEMA MISMATCH TEST POM METHODS
+    // ============================================================================
+
+    /**
+     * Get button count in table row (used to check if job is done processing)
+     * @param {string} tableName - Name of the table
+     * @returns {Promise<number>} Number of buttons in the row
+     */
+    async getTableRowButtonCount(tableName) {
+        testLogger.debug(`Getting button count for: ${tableName}`);
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        const buttonCount = await row.locator('button').count();
+        testLogger.debug(`Button count for ${tableName}: ${buttonCount}`);
+        return buttonCount;
+    }
+
+    /**
+     * Check if warning icon is visible in the Type cell for a table
+     * @param {string} tableName - Name of the table
+     * @returns {Promise<boolean>} True if warning icon is visible
+     */
+    async isWarningIconVisibleInRow(tableName) {
+        testLogger.debug(`Checking warning icon for: ${tableName}`);
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        const warningIcon = row.locator('td').filter({ hasText: 'Url' }).locator('[class*="warning"], .text-negative, .text-red');
+        const isVisible = await warningIcon.isVisible({ timeout: 2000 }).catch(() => false);
+        testLogger.debug(`Warning icon visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Wait for URL job to complete (either success with buttons or failure with warning icon)
+     * @param {string} tableName - Name of the table
+     * @param {number} maxAttempts - Maximum number of polling attempts (default 12)
+     * @param {number} pollInterval - Time between polls in ms (default 5000)
+     * @returns {Promise<{completed: boolean, hasFailed: boolean, buttonCount: number}>}
+     */
+    async waitForUrlJobToFinish(tableName, maxAttempts = 12, pollInterval = 5000) {
+        testLogger.info(`Waiting for URL job to finish: ${tableName} (max ${maxAttempts} attempts)`);
+
+        for (let i = 0; i < maxAttempts; i++) {
+            await this.page.waitForTimeout(pollInterval);
+            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.waitForEnrichmentTablesList();
+            await this.searchEnrichmentTableInList(tableName);
+
+            // Check for warning icon (failed job)
+            const hasWarningIcon = await this.isWarningIconVisibleInRow(tableName);
+            if (hasWarningIcon) {
+                testLogger.info(`Job failed (warning icon visible) - attempt ${i + 1}`);
+                return { completed: true, hasFailed: true, buttonCount: 0 };
+            }
+
+            // Check button count as indicator job is done
+            const buttonCount = await this.getTableRowButtonCount(tableName);
+            if (buttonCount >= 2) {
+                testLogger.info(`Job finished - ${buttonCount} buttons visible`);
+                return { completed: true, hasFailed: false, buttonCount };
+            }
+
+            testLogger.info(`Waiting for job - attempt ${i + 1}/${maxAttempts} (${buttonCount} buttons visible)`);
+        }
+
+        testLogger.warn(`Job did not complete within ${maxAttempts} attempts`);
+        return { completed: false, hasFailed: false, buttonCount: 0 };
+    }
+
+    /**
+     * Check if job status dialog is visible
+     * @returns {Promise<boolean>} True if dialog is visible
+     */
+    async isJobsDialogVisible() {
+        const dialog = this.page.locator('.q-dialog');
+        return await dialog.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Get job status from the URL Jobs dialog
+     * @returns {Promise<{status: 'failed'|'completed'|'unknown', hasFailed: boolean, hasCompleted: boolean}>}
+     */
+    async getJobStatusFromDialog() {
+        testLogger.debug('Getting job status from dialog');
+        const dialog = this.page.locator('.q-dialog');
+
+        const failedBadge = dialog.locator('.q-badge').filter({ hasText: /failed/i }).first();
+        const completedBadge = dialog.locator('.q-badge').filter({ hasText: /completed/i }).first();
+
+        const hasFailed = await failedBadge.isVisible({ timeout: 5000 }).catch(() => false);
+        const hasCompleted = await completedBadge.isVisible({ timeout: 2000 }).catch(() => false);
+
+        let status = 'unknown';
+        if (hasFailed) status = 'failed';
+        else if (hasCompleted) status = 'completed';
+
+        testLogger.debug(`Job status: ${status} (failed: ${hasFailed}, completed: ${hasCompleted})`);
+        return { status, hasFailed, hasCompleted };
+    }
+
+    /**
+     * Check if schema-related error message is visible in dialog
+     * @returns {Promise<boolean>} True if schema error message is visible
+     */
+    async isSchemaErrorVisibleInDialog() {
+        testLogger.debug('Checking for schema error in dialog');
+        const dialog = this.page.locator('.q-dialog');
+        const errorText = dialog.locator('text=/schema|column|mismatch/i');
+        const isVisible = await errorText.first().isVisible({ timeout: 3000 }).catch(() => false);
+        testLogger.debug(`Schema error visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Verify any job status badge is visible in dialog
+     */
+    async verifyAnyJobStatusBadgeVisible() {
+        testLogger.debug('Verifying any job status badge is visible');
+        const dialog = this.page.locator('.q-dialog');
+        const anyBadge = dialog.locator('.q-badge').first();
+        await expect(anyBadge).toBeVisible({ timeout: 10000 });
+        testLogger.debug('Job status badge verified visible');
+    }
+
     /**
      * Delete an enrichment table if it exists (for test cleanup)
      * @param {string} tableName - Name of the table to delete

@@ -443,46 +443,16 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 4: Wait for job to complete (poll until buttons appear or warning icon shows)
         testLogger.info('Waiting for URL job to complete (expecting schema mismatch failure)...');
-        const maxAttempts = 12;  // Wait up to 1 minute (12 * 5s)
-        let jobCompleted = false;
+        const jobResult = await enrichmentPage.waitForUrlJobToFinish(tableName, 12, 5000);
 
-        for (let i = 0; i < maxAttempts; i++) {
-            await enrichmentPage.page.waitForTimeout(5000);
-            await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
-            await enrichmentPage.waitForEnrichmentTablesList();
-            await enrichmentPage.searchEnrichmentTableInList(tableName);
-
-            const row = enrichmentPage.page.locator('tbody tr').filter({ hasText: tableName });
-
-            // Check for warning icon (failed job) or buttons (job completed)
-            const warningIcon = row.locator('td').filter({ hasText: 'Url' }).locator('[class*="warning"], .text-negative, .text-red');
-            const hasWarningIcon = await warningIcon.isVisible({ timeout: 2000 }).catch(() => false);
-
-            if (hasWarningIcon) {
-                testLogger.info(`Job failed (warning icon visible) - attempt ${i + 1}`);
-                jobCompleted = true;
-                break;
-            }
-
-            // Also check button count as backup
-            const buttonCount = await row.locator('button').count();
-            if (buttonCount >= 2) {
-                testLogger.info(`Job finished - ${buttonCount} buttons visible`);
-                jobCompleted = true;
-                break;
-            }
-
-            testLogger.info(`Waiting for job - attempt ${i + 1}/${maxAttempts} (${buttonCount} buttons visible)`);
-        }
-
-        if (!jobCompleted) {
+        if (!jobResult.completed) {
             // Take diagnostic screenshot before failing
             await enrichmentPage.takeDebugScreenshot(`schema-mismatch-timeout-${tableName}.png`);
-            testLogger.error(`Job did not complete within ${maxAttempts * 5}s timeout`);
+            testLogger.error('Job did not complete within 60s timeout');
         }
 
         // Assert job completed (or has visible warning) before proceeding
-        expect(jobCompleted, `URL job should complete within ${maxAttempts * 5}s`).toBe(true);
+        expect(jobResult.completed, 'URL job should complete within 60s').toBe(true);
 
         // Step 5: Click on status icon to open URL Jobs dialog
         await enrichmentPage.clickUrlStatusIcon(tableName);
@@ -490,21 +460,16 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('URL Jobs dialog opened');
 
         // Step 6: Verify job shows failed status due to schema mismatch
-        const dialog = enrichmentPage.page.locator('.q-dialog');
-        await expect(dialog).toBeVisible();
+        const isDialogVisible = await enrichmentPage.isJobsDialogVisible();
+        expect(isDialogVisible, 'URL Jobs dialog should be visible').toBe(true);
 
         // Check for failed badge specifically (schema mismatch should cause failure)
-        const failedBadge = dialog.locator('.q-badge').filter({ hasText: /failed/i }).first();
-        const completedBadge = dialog.locator('.q-badge').filter({ hasText: /completed/i }).first();
-
-        const hasFailed = await failedBadge.isVisible({ timeout: 5000 }).catch(() => false);
-        const hasCompleted = await completedBadge.isVisible({ timeout: 2000 }).catch(() => false);
+        const { status, hasFailed, hasCompleted } = await enrichmentPage.getJobStatusFromDialog();
 
         if (hasFailed) {
             testLogger.info('Job failed as expected (schema mismatch)');
             // Optionally verify error message contains schema-related text
-            const errorText = dialog.locator('text=/schema|column|mismatch/i');
-            const hasSchemaError = await errorText.first().isVisible({ timeout: 3000 }).catch(() => false);
+            const hasSchemaError = await enrichmentPage.isSchemaErrorVisibleInDialog();
             if (hasSchemaError) {
                 testLogger.info('Schema mismatch error message found');
             }
@@ -514,12 +479,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         } else {
             // Some other status - take screenshot for debugging
             await enrichmentPage.takeDebugScreenshot(`schema-mismatch-unknown-status-${tableName}.png`);
-            testLogger.warn('Unknown job status - neither failed nor completed badge found');
+            testLogger.warn(`Unknown job status: ${status} - neither failed nor completed badge found`);
         }
 
         // Verify at least some job status is shown
-        const anyBadge = dialog.locator('.q-badge').first();
-        await expect(anyBadge).toBeVisible({ timeout: 10000 });
+        await enrichmentPage.verifyAnyJobStatusBadgeVisible();
         testLogger.info('Job status badge visible in dialog');
 
         // Close dialog
