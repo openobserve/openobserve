@@ -2065,7 +2065,7 @@ export default defineComponent({
     const copyDashboardDataToVisualize = async () => {
       // Extract and assign stream info BEFORE copying
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
-      const currentQuery = dashboardPanelData.data.queries[currentQueryIndex];
+      const currentQuery = dashboardPanelData.data.queries?.[currentQueryIndex];
 
       if (currentQuery) {
         // Try to extract stream from the query if it exists
