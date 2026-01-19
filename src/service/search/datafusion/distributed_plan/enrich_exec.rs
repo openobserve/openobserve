@@ -164,8 +164,19 @@ async fn get_data(
 ) -> Result<SendableRecordBatchStream> {
     let timer = metrics.elapsed_compute().timer();
     let clean_name = name.trim_matches('"');
+
+    // Get enrichment table metadata to determine the end_time for data filtering
+    // Search end_time is exclusive, so we add 1 to include records up to and including
+    // db_stats.end_time
+    let end_time_exclusive =
+        crate::service::db::enrichment_table::get_meta_table_stats(&org_id, clean_name)
+            .await
+            .map(|stats| stats.end_time + 1); // +1 because search end_time is exclusive
+
     let data = match crate::service::db::enrichment_table::get_enrichment_data_from_db(
-        &org_id, clean_name,
+        &org_id,
+        clean_name,
+        end_time_exclusive,
     )
     .await
     {

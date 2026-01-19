@@ -22,10 +22,7 @@ use arrow::{
 use config::{
     QUERY_WITH_NO_LIMIT, ider,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
-    utils::{
-        json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{json, time::BASE_TIME},
 };
 use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 use rayon::prelude::*;
@@ -55,9 +52,9 @@ pub async fn get_enrichment_table_data(
     org_id: &str,
     name: &str,
     _apply_primary_region_if_specified: bool,
+    end_time: i64,
 ) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
 
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
@@ -312,15 +309,90 @@ pub async fn save_enrichment_data_to_db(
     infra::table::enrichment_tables::add(org_id, name, bin_data, created_at).await
 }
 
+/// Get enrichment table data from database with optional time-based filtering
+///
+/// # Arguments
+/// * `org_id` - Organization ID
+/// * `name` - Enrichment table name
+/// * `end_time_exclusive` - Optional end time (exclusive). If provided, only returns records where
+///   created_at < end_time_exclusive
+///
+/// # Returns
+/// * `Result<(Vec<json::Value>, i64, i64), infra::errors::Error>` - Tuple of (data, min_timestamp,
+///   max_timestamp)
+///
+/// # Why end_time filtering is necessary
+///
+/// This function supports optional end_time filtering to handle partial data scenarios in multi-URL
+/// enrichment tables. Here's why this is important:
+///
+/// ## Multi-URL Enrichment Tables Context
+///
+/// With multi-URL support, a single enrichment table can have multiple URL jobs. For example:
+/// - URL Job 1: Completed ✓
+/// - URL Job 2: Completed ✓
+/// - URL Job 3: Failed ✗
+///
+/// ## Partial Data Problem
+///
+/// Since enrichment table data is saved in batches during URL processing, when a URL job fails
+/// mid-way, we may have already saved some of its data to remote storage (or database). This
+/// creates a situation where:
+/// 1. The database contains partial data from the failed job
+/// 2. The enrichment table metadata (db_stats.end_time) reflects only completed data
+/// 3. Incomplete data should not be included in queries or cache
+///
+/// ## Solution: Time-based Filtering
+///
+/// By filtering with `end_time_exclusive`, we ensure:
+/// - Only data up to the last successful upload is retrieved
+/// - Incomplete data from failed/in-progress jobs is excluded
+/// - Cache contains only complete, consistent data
+/// - Search queries don't include partial results
+///
+/// ## Usage Examples
+///
+/// **From search context (enrich_exec.rs):**
+/// ```rust
+/// // Pass db_stats.end_time + 1 to include data up to and including the last complete upload
+/// // (+1 because search end_time is exclusive)
+/// let end_time = db_stats.end_time + 1;
+/// get_enrichment_data_from_db(org_id, name, Some(end_time)).await
+/// ```
+///
+/// **From storage/caching context:**
+/// ```rust
+/// // Pass None to fetch all data (when not in search context)
+/// get_enrichment_data_from_db(org_id, name, None).await
+/// ```
+///
+/// # Note on Exclusivity
+///
+/// The end_time is exclusive, meaning records with created_at >= end_time_exclusive are not
+/// included. This aligns with search time ranges where end_time is exclusive. When calling from
+/// search context, pass `db_stats.end_time + 1` to include records up to and including the
+/// db_stats.end_time.
 pub async fn get_enrichment_data_from_db(
     org_id: &str,
     name: &str,
+    end_time_exclusive: Option<i64>,
 ) -> Result<(Vec<json::Value>, i64, i64), infra::errors::Error> {
     let mut vec = vec![];
     let mut min_ts = 0;
     let mut max_ts = 0;
     // Each record is a json array
-    let records = infra::table::enrichment_tables::get_by_org_and_name(org_id, name).await?;
+    // If end_time is provided, use the filtered function; otherwise use the standard one
+    let records = if end_time_exclusive.is_some() {
+        infra::table::enrichment_tables::get_by_org_and_name_with_end_time(
+            org_id,
+            name,
+            end_time_exclusive,
+        )
+        .await?
+    } else {
+        infra::table::enrichment_tables::get_by_org_and_name(org_id, name).await?
+    };
+
     // Records are in descending order, we need to convert them to a json array
     for record in records {
         if min_ts == 0 || record.created_at < min_ts {
@@ -811,6 +883,8 @@ pub async fn claim_stale_url_jobs(
 // write test for convert_to_vrl
 #[cfg(test)]
 mod tests {
+    use config::utils::time::now_micros;
+
     use super::*;
 
     #[test]
@@ -906,7 +980,7 @@ mod tests {
     async fn test_get_enrichment_table_data() {
         // This will fail in test environment due to missing dependencies,
         // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table", false).await;
+        let result = get_enrichment_table_data("test_org", "test_table", false, now_micros()).await;
         assert!(result.is_err());
     }
 
