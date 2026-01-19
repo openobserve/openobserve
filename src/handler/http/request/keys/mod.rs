@@ -229,11 +229,12 @@ pub async fn get(Path(path): Path<(String, String)>) -> Response {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn list(Path(path): Path<String>) -> Response {
+pub async fn list(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path;
-
+        if org_id.is_empty() {
+            return MetaHttpResponse::not_found("Organization not found");
+        }
         let filter = infra::table::cipher::ListFilter {
             org: Some(org_id),
             kind: Some(infra::table::cipher::EntryKind::CipherKey),
@@ -260,7 +261,7 @@ pub async fn list(Path(path): Path<String>) -> Response {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        drop(org_id);
         MetaHttpResponse::forbidden("not supported")
     }
 }

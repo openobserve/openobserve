@@ -79,11 +79,14 @@ describe("IncidentDetailDrawer.vue", () => {
       Object.assign(store.state, storeOverrides);
     }
 
-    // Set incident_id in router query if provided
+    // Set incident ID in router params if provided (changed from query to params)
     if (incidentId) {
-      await router.push({ query: { incident_id: incidentId } });
-    } else {
-      await router.push({ query: {} });
+      // Set route params directly to avoid async router.push hanging
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        params: { id: incidentId },
+        name: "incidentDetail",
+      } as any;
     }
 
     return mount(IncidentDetailDrawer, {
@@ -93,9 +96,10 @@ describe("IncidentDetailDrawer.vue", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          QDrawer: true,
+          QPage: true,
           TelemetryCorrelationDashboard: true,
           IncidentServiceGraph: true,
+          SREChat: true,
         },
       },
     });
@@ -179,11 +183,13 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("URL-based Incident Loading", () => {
     it("should emit close when drawer closes", async () => {
       wrapper = await createWrapper();
+      const pushSpy = vi.spyOn(router, 'push');
 
       wrapper.vm.close();
       await nextTick();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
+      // Should navigate back to incident list instead of emitting
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -334,10 +340,13 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(mockNotify.mock.calls[0][0].type).toBe("positive");
     });
 
-    it("should emit status-updated event", async () => {
+    it("should not emit status-updated event (removed)", async () => {
+      // This test is no longer relevant as the component doesn't emit events
+      // The component now handles its own state updates
       await wrapper.vm.acknowledgeIncident();
 
-      expect(wrapper.emitted("status-updated")).toBeTruthy();
+      // Just verify the API was called
+      expect(incidentsService.updateStatus).toHaveBeenCalled();
     });
 
     it("should handle status update error", async () => {
@@ -482,35 +491,49 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should open SRE chat with incident context", () => {
-      wrapper.vm.openSREChat();
-
-      expect(store.state.sreChatContext).toBeTruthy();
-      expect(store.state.sreChatContext.type).toBe("incident");
-    });
-
-    it("should dispatch setIsSREChatOpen action", () => {
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
+    it("should toggle SRE chat visibility", () => {
+      expect(wrapper.vm.showAIChat).toBe(false);
 
       wrapper.vm.openSREChat();
+      expect(wrapper.vm.showAIChat).toBe(true);
 
-      expect(dispatchSpy).toHaveBeenCalledWith("setIsSREChatOpen", true);
-    });
-
-    it("should pass incident details to chat", () => {
       wrapper.vm.openSREChat();
-
-      expect(store.state.sreChatContext.data.id).toBe("1");
-      expect(store.state.sreChatContext.data.severity).toBe("P1");
+      expect(wrapper.vm.showAIChat).toBe(false);
     });
 
-    it("should include triggers in chat context", () => {
-      wrapper.vm.openSREChat();
+    it("should compute incident context data correctly", () => {
+      const contextData = wrapper.vm.incidentContextData;
 
-      expect(store.state.sreChatContext.data.triggers).toBeTruthy();
+      expect(contextData).toBeTruthy();
+      expect(contextData.id).toBe("1");
+      expect(contextData.severity).toBe("P1");
+      expect(contextData.status).toBe("open");
     });
 
-    it("should include existing RCA in chat context", () => {
+    it("should include all required fields in context data", () => {
+      const contextData = wrapper.vm.incidentContextData;
+
+      expect(contextData).toHaveProperty("id");
+      expect(contextData).toHaveProperty("title");
+      expect(contextData).toHaveProperty("status");
+      expect(contextData).toHaveProperty("severity");
+      expect(contextData).toHaveProperty("alert_count");
+      expect(contextData).toHaveProperty("first_alert_at");
+      expect(contextData).toHaveProperty("last_alert_at");
+      expect(contextData).toHaveProperty("stable_dimensions");
+      expect(contextData).toHaveProperty("topology_context");
+      expect(contextData).toHaveProperty("triggers");
+      expect(contextData).toHaveProperty("rca_analysis");
+    });
+
+    it("should include triggers in context data", () => {
+      const contextData = wrapper.vm.incidentContextData;
+
+      expect(contextData.triggers).toBeTruthy();
+      expect(Array.isArray(contextData.triggers)).toBe(true);
+    });
+
+    it("should include existing RCA in context data when available", async () => {
       wrapper.vm.incidentDetails.topology_context = {
         service: "api",
         upstream_services: [],
@@ -519,17 +542,20 @@ describe("IncidentDetailDrawer.vue", () => {
         suggested_root_cause: "Existing RCA",
       };
 
-      wrapper.vm.openSREChat();
+      await nextTick();
 
-      expect(store.state.sreChatContext.data.rca_analysis).toBe("Existing RCA");
+      const contextData = wrapper.vm.incidentContextData;
+      expect(contextData.rca_analysis).toBe("Existing RCA");
     });
 
-    it("should include stream content when no existing RCA", () => {
+    it("should include stream content when no existing RCA", async () => {
       wrapper.vm.rcaStreamContent = "Streaming RCA content";
+      wrapper.vm.incidentDetails.topology_context = undefined;
 
-      wrapper.vm.openSREChat();
+      await nextTick();
 
-      expect(store.state.sreChatContext.data.rca_analysis).toBe("Streaming RCA content");
+      const contextData = wrapper.vm.incidentContextData;
+      expect(contextData.rca_analysis).toBe("Streaming RCA content");
     });
   });
 
@@ -881,20 +907,24 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("Close Functionality", () => {
     it("should close drawer", async () => {
       wrapper = await createWrapper();
+      const pushSpy = vi.spyOn(router, 'push');
 
       wrapper.vm.close();
       await nextTick();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
+      // Should navigate back to incident list
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
     });
 
-    it("should emit update:modelValue on close", async () => {
+    it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
+      const pushSpy = vi.spyOn(router, 'push');
 
       wrapper.vm.close();
       await nextTick();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
+      // Verify navigation to incident list
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
     });
   });
 

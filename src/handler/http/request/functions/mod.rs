@@ -57,7 +57,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Functions", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a VRL function", "category": "functions"}))
+        ("x-o2-mcp" = json!({"description": "Create a VRL (Vector Remap Language) function", "category": "functions"}))
     )
 )]
 pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transform>) -> Response {

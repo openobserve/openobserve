@@ -92,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-    <template v-slot:bottom>
-      <slot name="bottom" />
+    <template v-slot:bottom="scope" v-if="$slots.bottom">
+      <slot name="bottom" v-bind="scope" />
     </template>
   </q-table>
 </template>
@@ -304,19 +304,8 @@ export default defineComponent({
           setTimeout(() => {
             copiedCells.value.delete(key);
           }, 3000);
-
-          $q.notify({
-            type: "positive",
-            message: "Copied to clipboard",
-            timeout: 1000,
-          });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy",
-            timeout: 1000,
-          });
         });
     };
 

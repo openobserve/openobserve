@@ -55,13 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <q-btn
                 data-test="log-stream-refresh-stats-btn"
-                class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
+                class="q-ml-sm o2-secondary-button tw:h-[36px]"
                 flat
                 no-caps
                 @click="getLogStream(true)"
               >
-                <q-icon name="refresh" size="18px" />
-                <span class="tw:ml-2">{{ t(`logStream.refreshStats`) }}</span>
+                <span>{{ t(`logStream.refreshStats`) }}</span>
               </q-btn>
               <q-btn
                 v-if="isSchemaUDSEnabled"

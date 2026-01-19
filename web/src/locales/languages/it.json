@@ -334,7 +334,8 @@
     "report": "Rapporti",
     "pipeline": "Oleodotti",
     "language": "Lingua",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "incidents": "Incidenti"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",
