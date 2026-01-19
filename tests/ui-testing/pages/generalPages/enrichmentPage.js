@@ -1960,6 +1960,60 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('URL replaced in edit mode');
     }
 
+    /**
+     * Add a URL in edit mode - simplified version that finds any visible URL input
+     * Use this when update mode radio buttons aren't available
+     * @param {string} newUrl - URL to add
+     */
+    async addUrlInEditMode(newUrl) {
+        testLogger.debug(`Adding URL in edit mode: ${newUrl}`);
+
+        // Wait for update form to be ready
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+
+        // Try multiple strategies to find and fill the URL input
+        const urlInputSelectors = [
+            'input[placeholder*="http"]',
+            'input[aria-label*="URL"]',
+            'input[aria-label*="url"]',
+            '.q-field__native[type="text"]'
+        ];
+
+        let inputFilled = false;
+        for (const selector of urlInputSelectors) {
+            const inputs = this.page.locator(selector);
+            const count = await inputs.count();
+            testLogger.debug(`Found ${count} inputs matching: ${selector}`);
+
+            for (let i = 0; i < count; i++) {
+                const input = inputs.nth(i);
+                if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    // Check if it's empty or a URL field
+                    const value = await input.inputValue().catch(() => '');
+                    const placeholder = await input.getAttribute('placeholder').catch(() => '');
+
+                    if (placeholder?.includes('http') || value === '' || value.startsWith('http')) {
+                        await input.clear();
+                        await input.fill(newUrl);
+                        inputFilled = true;
+                        testLogger.debug(`Filled URL in input: ${selector} (index ${i})`);
+                        break;
+                    }
+                }
+            }
+            if (inputFilled) break;
+        }
+
+        if (!inputFilled) {
+            // Fallback: try fillNewUrlInput
+            testLogger.debug('Fallback: trying fillNewUrlInput');
+            await this.fillNewUrlInput(newUrl);
+        }
+
+        testLogger.debug('URL added in edit mode');
+    }
+
     // ============================================================================
     // SCHEMA MISMATCH TEST POM METHODS
     // ============================================================================
