@@ -905,7 +905,7 @@ const expandRow = async (index: number) => {
       }
 
       // Trigger a full recalculation
-      rowVirtualizer.value.measure();
+      // rowVirtualizer.value.measure();
     }
   }
 };
