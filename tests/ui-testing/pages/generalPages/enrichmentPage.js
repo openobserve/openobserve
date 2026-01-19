@@ -1698,7 +1698,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Searching for table with retry: ${tableName}`);
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            testLogger.info(`Searching for table - attempt ${attempt}`);
+            testLogger.info(`Searching for table - attempt ${attempt}/${maxAttempts}`);
 
             // Clear search and search again
             const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
@@ -1708,18 +1708,20 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await this.page.waitForLoadState('networkidle');
             await this.page.waitForTimeout(2000);
 
-            try {
-                const row = this.page.locator('tbody tr').filter({ hasText: tableName });
-                await expect(row).toBeVisible({ timeout: 10000 });
+            // Use isVisible with catch instead of expect to avoid race condition
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const isVisible = await row.isVisible({ timeout: 10000 }).catch(() => false);
+
+            if (isVisible) {
                 testLogger.info('Table found in list');
                 return { found: true, row };
-            } catch (error) {
-                if (attempt < maxAttempts) {
-                    testLogger.info('Table not found yet, waiting and retrying...');
-                    await this.page.waitForTimeout(5000);
-                    await this.page.reload({ waitUntil: 'networkidle' });
-                    await this.waitForEnrichmentTablesList();
-                }
+            }
+
+            if (attempt < maxAttempts) {
+                testLogger.info('Table not found yet, waiting and retrying...');
+                await this.page.waitForTimeout(5000);
+                await this.page.reload({ waitUntil: 'networkidle' });
+                await this.waitForEnrichmentTablesList();
             }
         }
 
@@ -1844,13 +1846,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
      * Wait for URL job to show failed status (with retry for async processing)
      * @param {string} tableName - Name of the table
      * @param {number} maxWaitTime - Maximum wait time in ms (default 60000 = 1 min)
-     * @returns {Promise<boolean>} True if failed status found
+     * @returns {Promise<{found: boolean, elapsedTime: number}>} Object with found status and elapsed time
      */
     async waitForUrlJobFailed(tableName, maxWaitTime = 60000) {
-        testLogger.debug(`Waiting for URL job to fail for: ${tableName}`);
+        testLogger.info(`Waiting for URL job to fail for: ${tableName} (max ${maxWaitTime / 1000}s)`);
         const startTime = Date.now();
+        let attemptCount = 0;
 
         while (Date.now() - startTime < maxWaitTime) {
+            attemptCount++;
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+
             // Reload to get fresh status
             await this.page.reload({ waitUntil: 'networkidle' });
             await this.waitForEnrichmentTablesList();
@@ -1861,16 +1867,17 @@ abc, err = get_enrichment_table_record("${fileName}", {
             const warningIcon = row.locator('td').nth(2).locator('[class*="warning"], [style*="red"], .text-negative');
 
             if (await warningIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
-                testLogger.info('Failed status icon found');
-                return true;
+                testLogger.info(`Failed status icon found after ${elapsed}s (attempt ${attemptCount})`);
+                return { found: true, elapsedTime: elapsed };
             }
 
-            testLogger.debug('Job still processing, waiting...');
+            testLogger.debug(`Job still processing - attempt ${attemptCount}, elapsed ${elapsed}s`);
             await this.page.waitForTimeout(5000);
         }
 
-        testLogger.warn('Timeout waiting for job to fail');
-        return false;
+        const totalElapsed = Math.round((Date.now() - startTime) / 1000);
+        testLogger.warn(`Timeout waiting for job to fail after ${totalElapsed}s (${attemptCount} attempts)`);
+        return { found: false, elapsedTime: totalElapsed };
     }
 
     /**
@@ -1895,7 +1902,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     /**
      * Delete an enrichment table if it exists (for test cleanup)
      * @param {string} tableName - Name of the table to delete
-     * @returns {Promise<boolean>} True if deleted, false if not found
+     * @returns {Promise<{deleted: boolean, reason: 'deleted'|'not_found'|'deletion_failed', error?: string}>}
      */
     async deleteTableIfExists(tableName) {
         testLogger.debug(`Attempting to delete table if exists: ${tableName}`);
@@ -1918,7 +1925,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
             if (!isVisible) {
                 testLogger.debug(`Table ${tableName} not found - nothing to delete`);
-                return false;
+                return { deleted: false, reason: 'not_found' };
             }
 
             // Delete the table
@@ -1928,10 +1935,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await this.verifyTableRowHidden(tableName);
 
             testLogger.info(`Table ${tableName} deleted successfully`);
-            return true;
+            return { deleted: true, reason: 'deleted' };
         } catch (error) {
-            testLogger.warn(`Failed to delete table ${tableName}: ${error.message}`);
-            return false;
+            testLogger.error(`Failed to delete table ${tableName}: ${error.message}`);
+            return { deleted: false, reason: 'deletion_failed', error: error.message };
         }
     }
 }

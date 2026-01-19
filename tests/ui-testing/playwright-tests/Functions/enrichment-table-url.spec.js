@@ -57,7 +57,14 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         if (currentTableName && enrichmentPage) {
             testLogger.info(`Cleanup: Attempting to delete table ${currentTableName}`);
             try {
-                await enrichmentPage.deleteTableIfExists(currentTableName);
+                const result = await enrichmentPage.deleteTableIfExists(currentTableName);
+                if (result.reason === 'deleted') {
+                    testLogger.info(`Cleanup: Table ${currentTableName} deleted successfully`);
+                } else if (result.reason === 'not_found') {
+                    testLogger.debug(`Cleanup: Table ${currentTableName} not found (already deleted or never created)`);
+                } else if (result.reason === 'deletion_failed') {
+                    testLogger.warn(`Cleanup: Failed to delete ${currentTableName}: ${result.error}`);
+                }
             } catch (error) {
                 testLogger.warn(`Cleanup failed for ${currentTableName}: ${error.message}`);
                 // Don't fail test - cleanup.spec.js will handle it
@@ -435,7 +442,10 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 4: Wait for job to complete (poll until Edit button appears)
         testLogger.info('Waiting for URL job to complete...');
-        for (let i = 0; i < 12; i++) {  // Wait up to 1 minute
+        const maxAttempts = 12;  // Wait up to 1 minute (12 * 5s)
+        let jobCompleted = false;
+
+        for (let i = 0; i < maxAttempts; i++) {
             await enrichmentPage.page.waitForTimeout(5000);
             await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
             await enrichmentPage.waitForEnrichmentTablesList();
@@ -447,9 +457,17 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
             if (buttonCount >= 2) {
                 testLogger.info(`Job finished - ${buttonCount} buttons visible`);
+                jobCompleted = true;
                 break;
             }
-            testLogger.info(`Waiting for job - attempt ${i + 1}/12`);
+            testLogger.info(`Waiting for job - attempt ${i + 1}/${maxAttempts} (${buttonCount} buttons visible)`);
+        }
+
+        if (!jobCompleted) {
+            // Take diagnostic screenshot before failing
+            await enrichmentPage.takeDebugScreenshot(`url-jobs-timeout-${tableName}.png`);
+            testLogger.error(`Job did not complete within ${maxAttempts * 5}s timeout`);
+            // Continue anyway to see what state the dialog is in
         }
 
         // Step 5: Click on status icon to open URL Jobs dialog
