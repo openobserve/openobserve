@@ -475,6 +475,11 @@
     "loading_license_info": "Loading license information...",
     "installation_id_lbl": "Installation ID",
     "expired_lbl": "Expired",
+    "header_button": {
+      "cloud_features": "OpenObserve Features",
+      "enterprise_edition": "Edition: Enterprise",
+      "get_enterprise_free": "Get OpenObserve Enterprise (Free)"
+    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise Features",

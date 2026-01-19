@@ -711,11 +711,11 @@ export default defineComponent({
       const isCloud = props.config.isCloud === 'true';
 
       if (isCloud) {
-        return 'OpenObserve Features';
+        return t('about.header_button.cloud_features');
       } else if (isEnterprise) {
-        return 'Edition: Enterprise';
+        return t('about.header_button.enterprise_edition');
       } else {
-        return 'Get OpenObserve Enterprise (Free)';
+        return t('about.header_button.get_enterprise_free');
       }
     });
 
