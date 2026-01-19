@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "라이선스를 관리할 권한이 없습니다."
       }
+    },
+    "header_button": {
+      "cloud_features": "옵저브 기능 열기",
+      "enterprise_edition": "에디션: 엔터프라이즈",
+      "get_enterprise_free": "오픈옵저브 엔터프라이즈 받기 (무료)"
     }
   },
   "login": {

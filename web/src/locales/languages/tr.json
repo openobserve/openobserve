@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "Lisansı yönetme yetkisiniz yok."
       }
+    },
+    "header_button": {
+      "cloud_features": "OpenObserve Özellikleri",
+      "enterprise_edition": "Baskı: Kurumsal",
+      "get_enterprise_free": "OpenObserve Enterprise'ı edinin (Ücretsiz)"
     }
   },
   "login": {

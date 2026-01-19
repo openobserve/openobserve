@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "您无权管理许可证。"
       }
+    },
+    "header_button": {
+      "cloud_features": "开放观察功能",
+      "enterprise_edition": "版本：企业版",
+      "get_enterprise_free": "获取OpenObserve 企业版（免费）"
     }
   },
   "login": {

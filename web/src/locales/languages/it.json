@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "Non sei autorizzato a gestire la licenza."
       }
+    },
+    "header_button": {
+      "cloud_features": "Funzionalità di OpenObserve",
+      "enterprise_edition": "Edizione: Enterprise",
+      "get_enterprise_free": "Scarica OpenObserve Enterprise (gratuito)"
     }
   },
   "login": {

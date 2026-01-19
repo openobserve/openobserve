@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "Je bent niet bevoegd om de licentie te beheren."
       }
+    },
+    "header_button": {
+      "cloud_features": "OpenObsere-functies",
+      "enterprise_edition": "Editie: Enterprise",
+      "get_enterprise_free": "Download OpenObserve Enterprise (gratis)"
     }
   },
   "login": {

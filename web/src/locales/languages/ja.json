@@ -654,6 +654,11 @@
       "error_messages": {
         "not_authorized_manage_license": "ライセンスを管理する権限がありません。"
       }
+    },
+    "header_button": {
+      "cloud_features": "オープンオブザーバー機能",
+      "enterprise_edition": "エディション:エンタープライズ",
+      "get_enterprise_free": "OpenObserve エンタープライズを入手 (無料)"
     }
   },
   "login": {
