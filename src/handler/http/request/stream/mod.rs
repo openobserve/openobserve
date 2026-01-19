@@ -73,7 +73,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get stream schema"}))
+        ("x-o2-mcp" = json!({"description": "Get stream schema", "category": "streams"}))
     )
 )]
 pub async fn schema(
@@ -165,7 +165,7 @@ pub async fn schema(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new stream"}))
+        ("x-o2-mcp" = json!({"description": "Create a new stream", "category": "streams"}))
     )
 )]
 pub async fn create(
@@ -221,7 +221,7 @@ pub async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update stream settings"}))
+        ("x-o2-mcp" = json!({"description": "Update stream settings", "category": "streams"}))
     )
 )]
 pub async fn update_settings(
@@ -400,7 +400,7 @@ pub async fn delete_fields(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a stream"}))
+        ("x-o2-mcp" = json!({"description": "Delete a stream", "category": "streams"}))
     )
 )]
 pub async fn delete(
@@ -452,7 +452,7 @@ pub async fn delete(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all streams"}))
+        ("x-o2-mcp" = json!({"description": "List all streams", "category": "streams"}))
     )
 )]
 pub async fn list(
@@ -793,7 +793,7 @@ pub async fn delete_stream_data_by_time_range(
     )
 )]
 pub async fn get_delete_stream_data_status(
-    Path((_org_id, _stream_name, ksuid)): Path<(String, String, String)>,
+    Path((_org_id, _stream_name, data_id)): Path<(String, String, String)>,
 ) -> Response {
     // Check if super cluster is enabled
     #[cfg(feature = "enterprise")]
@@ -802,7 +802,7 @@ pub async fn get_delete_stream_data_status(
         .enabled
     {
         // Super cluster is enabled, get status from all regions
-        match get_super_cluster_delete_status(&ksuid).await {
+        match get_super_cluster_delete_status(&data_id).await {
             Ok(res) => res,
             Err(e) => {
                 log::error!("get_super_cluster_delete_status error: {e}");
@@ -818,11 +818,11 @@ pub async fn get_delete_stream_data_status(
         }
     } else {
         // Super cluster not enabled, get local status
-        get_local_delete_status(&ksuid).await
+        get_local_delete_status(&data_id).await
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_delete_status(&ksuid).await;
+    let response = get_local_delete_status(&data_id).await;
 
     (StatusCode::OK, Json(response)).into_response()
 }

@@ -89,6 +89,59 @@ const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
 };
 
 /**
+ * Parses a potential timestamp value (string, number, or Date) and returns a formatted string.
+ * This handles 16-digit microseconds (string or number), ISO strings, and standard milliseconds.
+ * 
+ * @param value - The value to parse
+ * @param timezone - The target timezone for conversion
+ * @returns Formatted timestamp string or null
+ */
+const parseTimestampValue = (value: any, timezone: string) => {
+  if (value === undefined || value === null || value === "") return null;
+
+  let timestamp: number;
+
+  // Handle 16-digit microseconds (string or number)
+  // This is the key fix for the "year 50002" issue where numeric micros were treated as millis
+  if (
+    (typeof value === "number" || typeof value === "string") &&
+    /^\d{16}$/.test(value.toString())
+  ) {
+    timestamp = parseInt(value.toString()) / 1000;
+  } else if (typeof value === "string") {
+    // If the string is already a formatted date (no 'T', looks like "YYYY-MM-DD HH:mm:ss")
+    // return it as-is to avoid double timezone conversion
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
+      return value;
+    }
+
+    // Regular ISO string - treat as UTC timestamp
+    // Only append 'Z' if it looks like an ISO string with 'T' and lacks an offset/timezone indicator
+    const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
+    const hasOffsetOrZ = /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
+
+    const isoString = (iso8601WithT && !hasOffsetOrZ) ? `${value}Z` : value;
+    timestamp = new Date(isoString).getTime();
+
+    // Fallback if the 'Z' trick failed (already has an offset or is invalid)
+    if (isNaN(timestamp)) {
+      timestamp = new Date(value).getTime();
+    }
+  } else if (typeof value === "number") {
+    // Numeric timestamp - assume it's already in milliseconds
+    timestamp = value;
+  } else if (value instanceof Date) {
+    timestamp = value.getTime();
+  } else {
+    timestamp = new Date(value)?.getTime();
+  }
+
+  if (isNaN(timestamp)) return null;
+
+  return formatDate(toZonedTime(timestamp, timezone));
+};
+
+/**
  * Converts table data based on the panel schema and search query data.
  *
  * @param {any} panelSchema - The panel schema containing queries and fields.
@@ -124,6 +177,9 @@ export const convertTableData = (
   const colorConfigMap: Record<string, any> = {};
   const unitConfigMap: Record<string, any> = {};
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
+
+ // Cache timezone to avoid repeated store lookups
+  const timezone = store.state.timezone;
 
   try {
     // Build maps for both color and unit configs
@@ -302,34 +358,17 @@ export const convertTableData = (
         };
       }
 
-      // if current field is histogram field then return formatted date
+      // if current field is histogram field, timestamps are pre-formatted in rows
+      // Just apply value mapping if needed
       if (histogramFields.includes(it.alias)) {
-        // Cache timezone to avoid repeated lookups
-        const timezone = store.state.timezone;
-
-        // if current field is histogram field then return formatted date
         obj["format"] = (val: any) => {
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
-
           if (valueMapping != null) {
             return valueMapping;
           }
-
-          // Handle 16-digit microsecond timestamps
-          let timestamp;
-          if (typeof val === "string" && /^\d{16}$/.test(val)) {
-            // 16-digit string represents microseconds, convert to milliseconds
-            timestamp = parseInt(val) / 1000;
-          } else if (typeof val === "string") {
-            // Regular ISO string, append Z if needed
-            timestamp = `${val}Z`;
-          } else {
-            // Number or Date object
-            timestamp = new Date(val)?.getTime() / 1000;
-          }
-
-          return formatDate(toZonedTime(timestamp, timezone));
+          // Use unified parser to format for display
+          return parseTimestampValue(val, timezone) || val;
         };
       }
       return obj;
@@ -373,16 +412,7 @@ export const convertTableData = (
           }
 
           // Parse and format the base date part
-          const parsedDate =
-            typeof baseVal === "string"
-              ? new Date(`${baseVal}Z`)
-              : new Date(baseVal);
-
-          if (!isNaN(parsedDate.getTime())) {
-            formattedDate = formatDate(
-              toZonedTime(parsedDate, store.state.timezone),
-            );
-          }
+          formattedDate = parseTimestampValue(baseVal, timezone);
 
           // Append the underscore part (if it exists) back to the formatted date
           formattedDate = formattedDate
@@ -462,33 +492,16 @@ export const convertTableData = (
           };
         }
 
-        // Check if it's a histogram field and apply timezone conversion
+        // Check if it's a histogram field
         if (histogramFields.includes(it)) {
-          // Cache timezone
-          const timezone = store.state.timezone;
-
           obj["format"] = (val: any) => {
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
-
             if (valueMapping != null) {
               return valueMapping;
             }
-
-            // Handle 16-digit microsecond timestamps
-            let timestamp;
-            if (typeof val === "string" && /^\d{16}$/.test(val)) {
-              // 16-digit string represents microseconds, convert to milliseconds
-              timestamp = parseInt(val) / 1000;
-            } else if (typeof val === "string") {
-              // Regular ISO string, append Z if needed
-              timestamp = `${val}Z`;
-            } else {
-              // Number or Date object
-              timestamp = new Date(val)?.getTime() / 1000;
-            }
-
-            return formatDate(toZonedTime(timestamp, timezone));
+            // Use unified parser to format for display
+            return parseTimestampValue(val, timezone) || val;
           };
         }
 
@@ -497,8 +510,6 @@ export const convertTableData = (
     ];
 
     // Transpose rows, adding 'label' as the first column
-    // Cache timezone to avoid repeated store lookups
-    const timezone = store.state.timezone;
 
     tableRows = columnData.map((it: any) => {
       const isHistogramField = histogramFields.includes(it.alias);
@@ -506,24 +517,7 @@ export const convertTableData = (
         (acc: any, curr: any, reduceIndex: any) => {
           const value =
             getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
-          acc[curr] = isHistogramField
-            ? (() => {
-                // Handle 16-digit microsecond timestamps
-                let timestamp;
-                if (typeof value === "string" && /^\d{16}$/.test(value)) {
-                  // 16-digit string represents microseconds, convert to milliseconds
-                  timestamp = parseInt(value) / 1000;
-                } else if (typeof value === "string") {
-                  // Regular ISO string, append Z if needed
-                  timestamp = `${value}Z`;
-                } else {
-                  // Number or Date object
-                  timestamp = new Date(value)?.getTime() / 1000;
-                }
-
-                return formatDate(toZonedTime(timestamp, timezone));
-              })()
-            : value;
+          acc[curr] = value;
           return acc;
         },
         {},

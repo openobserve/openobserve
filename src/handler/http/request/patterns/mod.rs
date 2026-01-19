@@ -60,16 +60,14 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Extract log patterns"}))
+        ("x-o2-mcp" = json!({"description": "Extract log patterns", "category": "patterns"}))
     )
 )]
 #[axum::debug_handler]
 pub async fn extract_patterns(
-    Path(org_id): Path<String>,
+    Path((org_id, stream_name)): Path<(String, String)>,
     in_req: axum::extract::Request,
 ) -> Response {
-    let stream_name = "default".to_string();
-
     // Extract headers manually to avoid conflict with body extraction
     let (mut parts, body) = in_req.into_parts();
 

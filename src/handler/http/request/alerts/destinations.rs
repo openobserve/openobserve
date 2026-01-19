@@ -53,16 +53,18 @@ impl From<DestinationError> for Response {
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateDestination",
-    summary = "Create alert destination",
-    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
-                   notifications are sent when alert conditions are met, including webhooks, email addresses, Slack \
-                   channels, PagerDuty integrations, and other notification services. The destination can be used by \
-                   multiple alerts within the organization.",
+    summary = "Create alert or pipeline destination",
+    description = "Creates a new destination configuration for an organization. Destinations define where notifications \
+                   are sent (for alerts) or where data is routed (for pipelines). For alert destinations, this includes \
+                   webhooks, email addresses, Slack channels, PagerDuty integrations, and other notification services. \
+                   For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
@@ -71,18 +73,22 @@ impl From<DestinationError> for Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Create alert/pipeline destination, alert destination must have a template", "category": "alerts"}))
     )
 )]
 pub async fn save_destination(
     Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    let dest = match dest.into(org_id) {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
-    log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
@@ -100,16 +106,18 @@ pub async fn save_destination(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateDestination",
-    summary = "Update alert destination",
-    description = "Updates an existing alert destination configuration. Allows modification of destination settings such as \
-                   webhook URLs, authentication credentials, notification channels, and other delivery parameters. The \
-                   updated configuration will apply to all future alert notifications using this destination.",
+    summary = "Update alert or pipeline destination",
+    description = "Updates an existing destination configuration. For alert destinations, allows modification of settings \
+                   such as webhook URLs, authentication credentials, notification channels, and other delivery parameters. \
+                   For pipeline destinations, allows updating external system endpoints, output formats, and metadata. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
     request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
@@ -118,14 +126,19 @@ pub async fn save_destination(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Update alert destination", "category": "alerts"}))
     )
 )]
 pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
     Json(dest): Json<Destination>,
 ) -> Response {
-    let dest = match dest.into(org_id) {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
@@ -159,7 +172,7 @@ pub async fn update_destination(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get destination details"}))
+        ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
 pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
@@ -194,7 +207,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert destinations"}))
+        ("x-o2-mcp" = json!({"description": "List all alert destinations", "category": "alerts"}))
     )
 )]
 pub async fn list_destinations(
@@ -261,7 +274,7 @@ pub async fn list_destinations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert destination", "category": "alerts"}))
     )
 )]
 pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) -> Response {

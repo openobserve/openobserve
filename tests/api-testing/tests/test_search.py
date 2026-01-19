@@ -1,4 +1,3 @@
-
 import json
 import requests
 import pytest
@@ -18,8 +17,8 @@ def test_e2e_getsearch(create_session, base_url):
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allsearch.status_code == 400
-    ), f"No payload added 400, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+        resp_get_allsearch.status_code == 415
+    ), f"Expected request with `Content-Type: application/json`, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 def test_e2e_query(create_session, base_url):
     """Running an E2E test for valid sql query."""

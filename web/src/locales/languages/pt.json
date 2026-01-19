@@ -334,7 +334,8 @@
     "report": "Relatórios",
     "pipeline": "Oleodutos",
     "language": "Idioma",
-    "actions": "Ações"
+    "actions": "Ações",
+    "incidents": "Incidentes"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -1607,7 +1608,8 @@
       "alertSettings": "Defina suas regras de alerta e escolha como você gostaria de ser notificado.",
       "deduplication": "Evite enviar o mesmo alerta várias vezes agrupando alertas semelhantes.",
       "advanced": "Variáveis de contexto, descrição e modelo de linha"
-    }
+    },
+    "template": "Substituição de modelo"
   },
   "alert_templates": {
     "header": "Modelos",

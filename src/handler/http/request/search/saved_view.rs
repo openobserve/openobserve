@@ -58,7 +58,7 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get saved view details"}))
+        ("x-o2-mcp" = json!({"description": "Get saved view details", "category": "search"}))
     )
 )]
 pub async fn get_view(Path(path): Path<(String, String)>) -> Response {
@@ -101,7 +101,7 @@ pub async fn get_view(Path(path): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all saved views"}))
+        ("x-o2-mcp" = json!({"description": "List all saved views", "category": "search"}))
     )
 )]
 pub async fn get_views(Path(path): Path<String>) -> Response {
@@ -139,7 +139,7 @@ pub async fn get_views(Path(path): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Delete a saved view", "category": "search"}))
     )
 )]
 pub async fn delete_view(Path(path): Path<(String, String)>) -> Response {
@@ -180,7 +180,7 @@ pub async fn delete_view(Path(path): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Create a saved view", "category": "search"}))
     )
 )]
 pub async fn create_view(
@@ -232,7 +232,7 @@ pub async fn create_view(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Update a saved view", "category": "search"}))
     )
 )]
 pub async fn update_view(

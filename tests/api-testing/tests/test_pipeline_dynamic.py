@@ -1067,7 +1067,7 @@ def test_pipeline_performance_multiple_templates(create_session, base_url):
         logger.info(f"Stress test pipeline {i} result: {resp_create_pipeline.status_code}")
         
         # Should handle rapid creation
-        assert resp_create_pipeline.status_code in [200, 400, 429], f"Unexpected status for stress test {i}: {resp_create_pipeline.status_code}"
+        assert resp_create_pipeline.status_code in [200, 400, 422, 429], f"Unexpected status for stress test {i}: {resp_create_pipeline.status_code}"
         
         if resp_create_pipeline.status_code == 200:
             pipeline_data = resp_create_pipeline.json()

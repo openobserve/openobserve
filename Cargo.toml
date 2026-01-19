@@ -64,7 +64,6 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-async-walkdir.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.9"
@@ -185,7 +184,7 @@ pprof = { version = "0.15.0", features = [
 ], optional = true }
 tokio-stream.workspace = true
 mime = "0.3.17"
-pin-project-lite = "0.2.16"
+pin-project-lite.workspace = true
 futures-core = "0.3.31"
 derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
@@ -195,7 +194,6 @@ flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
-async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.22"
 float-cmp = "0.10"
@@ -232,12 +230,16 @@ ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
 axum-extra = { version = "0.10", features = ["typed-header", "query", "cookie"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
+async-fs = "2.2"
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
     "cors",
     "compression-gzip",
     "compression-br",
     "compression-deflate",
+    "decompression-gzip",
+    "decompression-br",
+    "decompression-deflate",
     "trace",
     "timeout",
     "request-id",
@@ -255,7 +257,6 @@ async-nats = "0.42"
 async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
-async-walkdir = "2.1.0"
 aws-config = "1.5.17"
 aws-sdk-sns = "1.61.0"
 base64 = "0.22"
@@ -335,6 +336,7 @@ opentelemetry-proto = { version = "0.31", features = [
     "trace",
 ] }
 parking_lot = "0.12"
+pin-project-lite = "0.2.16"
 prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14.1"
 prost-wkt-types = "0.7"

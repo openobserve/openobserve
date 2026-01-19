@@ -92,7 +92,7 @@ use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Submit async search job"}))
+        ("x-o2-mcp" = json!({"description": "Submit async search job", "category": "search"}))
     )
 )]
 pub async fn submit_job(
@@ -263,7 +263,7 @@ pub async fn submit_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all search jobs"}))
+        ("x-o2-mcp" = json!({"description": "List all search jobs", "category": "search"}))
     )
 )]
 pub async fn list_status(Path(org_id): Path<String>) -> Response {
@@ -290,7 +290,7 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
 
 #[utoipa::path(
     get,
-    path = "/{org_id}/search_jobs/{job_id}/status",
+    path = "/{org_id}/search_jobs/{job_id}",
     context_path = "/api",
     tag = "Search Jobs",
     operation_id = "GetSearchJobStatus",
@@ -324,24 +324,24 @@ pub async fn list_status(Path(org_id): Path<String>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get search job status"}))
+        ("x-o2-mcp" = json!({"description": "Get search job status", "category": "search"}))
     )
 )]
 pub async fn get_status(
-    Path(path): Path<(String, String)>,
+    Path((org_id, job_id)): Path<(String, String)>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let user_id = _user_email.user_id;
-
-        let org_id = path.0.clone();
-        let job_id = path.1.clone();
         let res = get(&job_id, &org_id).await;
         let model = match res {
             Ok(res) => res,
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
+        if model.status == 4 {
+            return MetaHttpResponse::not_found(format!("[Job_Id: {job_id}] Search Job not found"));
+        }
 
         // check permissions
         if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
@@ -352,7 +352,8 @@ pub async fn get_status(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        drop(org_id);
+        drop(job_id);
         (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
@@ -384,7 +385,7 @@ pub async fn get_status(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Cancel a running search job"}))
+        ("x-o2-mcp" = json!({"description": "Cancel a running search job", "category": "search"}))
     )
 )]
 pub async fn cancel_job(
@@ -447,7 +448,7 @@ pub async fn cancel_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get search job results"}))
+        ("x-o2-mcp" = json!({"description": "Get search job results", "category": "search"}))
     )
 )]
 pub async fn get_job_result(
@@ -530,7 +531,7 @@ pub async fn get_job_result(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a search job"}))
+        ("x-o2-mcp" = json!({"description": "Delete a search job", "category": "search"}))
     )
 )]
 pub async fn delete_job(
@@ -595,7 +596,7 @@ pub async fn delete_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Retry a failed search job"}))
+        ("x-o2-mcp" = json!({"description": "Retry a failed search job", "category": "search"}))
     )
 )]
 pub async fn retry_job(
