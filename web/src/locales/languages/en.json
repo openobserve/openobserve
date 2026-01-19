@@ -106,7 +106,8 @@
     "contactUs": "Contact Us",
     "addFolder": "Add Folder",
     "status": "Status",
-    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue."
+    "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue.",
+    "id": "ID"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -846,7 +847,7 @@
     "close": "Close",
     "filterAll": "All",
     "filterFile": "File",
-    "filterUrl": "Url",
+    "filterUrl": "URL",
     "dataSource": "Data Source",
     "uploadFile": "Upload File",
     "fromUrl": "From URL",
@@ -874,7 +875,7 @@
     "dimensionsButton": "Fields ({count})",
     "dimensionsTooltip": "Add or remove dimensions to analyze",
     "selectDimensions": "Select Fields",
-    "analyzeButtonLabel": "Insights",
+    "analyzeButtonLabel": "Analyze",
     "refreshTooltip": "Refresh analysis with updated percentile",
     "customSQLFieldsDisabled": "Field selection is not available for custom SQL queries. Dimensions are extracted from your query results.",
     "timeRangeSelected": "Time Range Selected"
@@ -1545,6 +1546,7 @@
     "multiWindow": "Compare with past",
     "multiWindowSubLabel": "Compare current results with data from another time period",
     "destination": "Destination",
+    "template": "Template Override",
     "additionalVariables": "Additional Variables",
     "description": "Description",
     "stream_name": "Stream Name",
@@ -1663,7 +1665,7 @@
       "defaultWindowDescription": "In absence of semantic field match, alerts and data from given duration is considered related",
       "defaultWindowPlaceholder": "Use alert period by default",
       "cancelButton": "Cancel",
-      "saveButton": "Save Settings"
+      "saveButton": "Save"
     },
     "placeholders": {
       "typeSomething": "Type something",
@@ -2032,7 +2034,7 @@
       "fqnPriorityTitle": "FQN Priority Dimensions",
       "fqnPriorityTooltip": "Defines which dimensions are used to derive the Service FQN for correlation. First dimension with a value wins. Reorder to match your infrastructure.",
       "fqnPriorityDescription": "Drag to reorder or use arrow buttons. First matching dimension determines Service FQN.",
-      "resetToDefaults": "Reset to Defaults",
+      "resetToDefaults": "Reset to defaults",
       "noDimensionsConfigured": "No dimensions configured. Click \"Reset to Defaults\" or add dimensions below.",
       "addDimensionLabel": "Add dimension to priority list",
       "addDimensionHint": "Select a semantic group to add to the priority list.",
@@ -2058,7 +2060,20 @@
       "traces": "Traces",
       "metrics": "Metrics",
       "retry": "Retry",
-      "filters": "Filters"
+      "filters": "Filters",
+      "availableDimensions": "Available Dimensions",
+      "semanticFieldGroupsTitle": "Field Mappings",
+      "groupsLabel": "groups",
+      "noMatchingGroups": "No matching groups",
+      "fqnFormulaTitle": "FQN Formula",
+      "fqnFormulaTooltip": "Shows how the Service FQN will be computed. Scope dimensions (blue) are concatenated with '/'. The first matching workload dimension (green) becomes the workload identifier.",
+      "scopeDimension": "Scope dimension",
+      "workloadDimension": "Workload dimension",
+      "noFormulaConfigured": "No FQN formula configured. Add dimensions above.",
+      "scopeLegend": "Scope (concatenated)",
+      "workloadLegend": "Workload (first match)",
+      "scopeTag": "Scope",
+      "workloadTag": "Workload"
     }
   },
   "reports": {
@@ -2286,7 +2301,29 @@
     "tracesFromService": "Traces from service: {service}",
     "noTracesFound": "No correlated traces found",
     "noTracesDescription": "No traces found for service {service} in the selected time range",
-    "filters": "Filters"
+    "filters": "Filters",
+    "semanticFieldGroupsTitle": "Field Mappings",
+    "semanticFieldGroupsCaption": "Define field name mappings for correlation and deduplication (e.g., host, hostname, node → 'host' group)",
+    "groupsLabel": "groups",
+    "importFromJson": "Import from JSON",
+    "addCustomGroup": "Add Custom Group",
+    "actionNormalize": "Lowercase and trim values for matching",
+    "removeSemanticGroup": "Remove Semantic Group",
+    "fieldNamePlaceholder": "Field names (comma-separated)",
+    "category": "Category",
+    "categoryHint": "Filter groups by category",
+    "noSemanticGroupMessage": "No semantic groups in this category. Select a different category or add a custom group.",
+    "showingGroups": "Showing {filterGroupLength} of {localGroupLength} total groups",
+    "deduplicateFields": "Deduplication Fields",
+    "deduplicateFieldTooltip": "Select which field mappings to use for deduplication fingerprinting",
+    "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
+    "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
+    "scope": "Scope",
+    "scopeTooltip": "Scope dimensions define environmental boundaries (cluster, region, host) and are concatenated to form the scope part of the FQN: {scope}/{workload}",
+    "stable": "Stable",
+    "stableTooltip": "Stable dimensions have low cardinality and are used for correlation key computation",
+    "normalize": "Normalize",
+    "noSemanticGroupsInCategory": "No semantic groups in category: {category}"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",

@@ -17,7 +17,9 @@
 
 use actix_web::{HttpResponse, delete, get, post, put, web};
 #[cfg(feature = "enterprise")]
-use config::meta::alerts::deduplication::{GlobalDeduplicationConfig, SemanticFieldGroup};
+use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
+#[cfg(feature = "enterprise")]
+use config::meta::correlation::SemanticFieldGroup;
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
