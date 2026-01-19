@@ -31,6 +31,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { Quasar } from "quasar";
+import i18n from "@/locales";
 
 // Mock search service
 vi.mock("@/services/search", () => ({
@@ -203,7 +204,7 @@ describe("ErrorViewer.vue", () => {
 
     return mount(ErrorViewer, {
       global: {
-        plugins: [store, router, Quasar],
+        plugins: [store, router, Quasar, i18n],
         stubs: {
           QSpinnerHourglass: {
             template: "<div data-test='spinner'>Loading...</div>",

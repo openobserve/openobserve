@@ -14,39 +14,56 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<q-table
-  :title="t('ticket.header')"
-  :rows="tickets"
-  row-key="id"
-  :pagination="pagination"
-  :filter="filterQuery"
-  :filter-method="filterData"
-  @row-click="editTicket"
->
+<template>
+  <q-table
+    :title="t('ticket.header')"
+    :rows="tickets"
+    row-key="id"
+    :pagination="pagination"
+    :filter="filterQuery"
+    :filter-method="filterData"
+    @row-click="editTicket"
+  >
     <template #top-right>
-    <q-input
+      <q-input
         v-model="filterQuery"
         filled
         borderless
         dense
         :placeholder="t('ticket.search')"
-    >
+      >
         <template #append>
-        <q-icon name="search" class="cursor-pointer" />
+          <q-icon name="search" class="cursor-pointer" />
         </template>
-    </q-input>
-    <q-btn
+      </q-input>
+      <q-btn
         class="q-ml-sm"
         color="primary"
         icon="add"
         :label="t(`ticket.add`)"
         @click="addTicket"
-    />
+      />
     </template>
 
     <template v-slot:body-cell-#="props">
-    <q-td :props="props" width="80" @click="editTicket(props)">
+      <q-td :props="props" width="80" @click="editTicket(props)">
         {{ props.value }}
-    </q-td>
+      </q-td>
     </template>
-</q-table>
+  </q-table>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
+// Stub props and methods for an incomplete component
+const tickets = ref([]);
+const filterQuery = ref("");
+const pagination = ref({});
+const filterData = (rows: readonly any[]) => rows;
+const editTicket = (_props?: any) => {};
+const addTicket = () => {};
+</script>
