@@ -355,7 +355,7 @@ const fetchQuerySchema = async () => {
             ? { encoding: "base64" }
             : {}),
         },
-        page_type: "logs",
+        page_type: props.formData.stream_type || "logs",
         is_streaming: false,
       },
       "ui",

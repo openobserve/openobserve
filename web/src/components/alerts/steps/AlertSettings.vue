@@ -955,10 +955,10 @@ export default defineComponent({
           {
             org_identifier: store.state.selectedOrganization.identifier,
             query,
-            page_type: "dashboards",
-            is_streaming: true,
+            page_type: props.formData.stream_type || "logs",
+            is_streaming: false,
           },
-          "dashboards"
+          "ui"
         );
 
         if (response.data) {
