@@ -2383,7 +2383,13 @@
     "deduplicateFields": "중복 제거 필드",
     "deduplicateFieldTooltip": "중복 제거 핑거프린팅에 사용할 필드 매핑 선택",
     "alertDeduplicationMessage": "이러한 필드에 동일한 값을 가진 알림은 중복 제거됩니다 (예: 동일한 핑거프린트 = 동일한 필드 값).",
-    "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다."
+    "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다.",
+    "scope": "범위",
+    "scopeTooltip": "범위 차원은 환경 경계 (클러스터, 지역, 호스트) 를 정의하고 연결되어 FQN의 범위 부분을 구성합니다. {scope}/{workload}",
+    "stable": "안정적",
+    "stableTooltip": "안정된 차원은 카디널리티가 낮으며 상관관계 키 계산에 사용됩니다.",
+    "normalize": "표준화",
+    "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

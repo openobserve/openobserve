@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Deduplizierungsfelder",
     "deduplicateFieldTooltip": "Wählen Sie aus, welche Feldzuordnungen für das Deduplizierungs-Fingerprinting verwendet werden sollen",
     "alertDeduplicationMessage": "Alarme mit den gleichen Werten für diese Felder werden dedupliziert (z. B. derselbe Fingerabdruck = gleiche Feldwerte)",
-    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich"
+    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich",
+    "scope": "Geltungsbereich",
+    "scopeTooltip": "Scope-Dimensionen definieren Umgebungsgrenzen (Cluster, Region, Host) und werden verkettet, um den Geltungsbereich des FQN zu bilden: {scope}/{workload}",
+    "stable": "Stabil",
+    "stableTooltip": "Stabile Dimensionen haben eine niedrige Kardinalität und werden für die Berechnung von Korrelationsschlüsseln verwendet.",
+    "normalize": "Normalisieren",
+    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

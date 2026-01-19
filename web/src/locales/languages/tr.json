@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Tekilleştirme Alanları",
     "deduplicateFieldTooltip": "Tekilleştirme parmak izi almak için hangi alan eşlemelerinin kullanılacağını seçin",
     "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
-    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir"
+    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir",
+    "scope": "Kapsam",
+    "scopeTooltip": "Kapsam boyutları çevresel sınırları (küme, bölge, ana bilgisayar) tanımlar ve FQN'nin kapsam bölümünü oluşturmak üzere birleştirilir: {scope}/{workspace}",
+    "stable": "Kararlı",
+    "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
+    "normalize": "Normalleştir",
+    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
