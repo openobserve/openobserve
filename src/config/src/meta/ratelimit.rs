@@ -21,6 +21,8 @@ use sea_orm::FromQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub const DEFAULT_STAT_INTERVAL_MS: i64 = 1000;
+
 pub struct CachedUserRoles {
     pub roles: Vec<String>,
     pub expires_at: Instant,
@@ -48,7 +50,6 @@ pub struct RatelimitRule {
     /// - 1000 = 1 second
     /// - 60000 = 1 minute
     /// - 3600000 = 1 hour
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub stat_interval_ms: Option<i64>,
 }
 
@@ -68,7 +69,9 @@ impl RatelimitRule {
         org: &str,
         role: &str,
         updater: &RatelimitRuleUpdater,
+        stat_interval_ms: Option<i64>,
     ) -> Vec<RatelimitRule> {
+        let interval = stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS);
         updater
             .0
             .iter()
@@ -84,7 +87,7 @@ impl RatelimitRule {
                         api_group_name: Some(group_name.clone()),
                         api_group_operation: Some(operation.clone().to_lowercase()),
                         threshold: *threshold,
-                        stat_interval_ms: Some(1000), // Default to 1 second
+                        stat_interval_ms: Some(interval),
                     })
             })
             .collect()
@@ -153,8 +156,7 @@ impl RatelimitRule {
         self.threshold
     }
     pub fn get_stat_interval_ms(&self) -> u32 {
-        // Default to 1 second
-        self.stat_interval_ms.unwrap_or(1000) as u32
+        self.stat_interval_ms.unwrap_or(DEFAULT_STAT_INTERVAL_MS) as u32
     }
 }
 
@@ -167,6 +169,51 @@ pub fn get_resource_from_params(
     user_id: &str,
 ) -> String {
     format!("{org}:{rule_type}:{user_role}:{api_group_name}:{api_group_operation}:{user_id}")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Interval {
+    Second,
+    Minute,
+    Hour,
+}
+
+#[derive(Debug)]
+pub struct InvalidIntervalError(pub String);
+
+impl std::fmt::Display for InvalidIntervalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Invalid interval: {}, only support second/minute/hour",
+            self.0
+        )
+    }
+}
+
+impl std::error::Error for InvalidIntervalError {}
+
+impl TryFrom<&str> for Interval {
+    type Error = InvalidIntervalError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "second" => Ok(Interval::Second),
+            "minute" => Ok(Interval::Minute),
+            "hour" => Ok(Interval::Hour),
+            _ => Err(InvalidIntervalError(s.to_string())),
+        }
+    }
+}
+
+impl Interval {
+    pub fn get_interval_ms(&self) -> i64 {
+        match self {
+            Interval::Second => 1000,
+            Interval::Minute => 60000,
+            Interval::Hour => 3600000,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -292,7 +339,7 @@ mod tests {
         groups.insert("ingest".to_string(), operations.clone());
 
         let updater = RatelimitRuleUpdater(groups);
-        let rules = RatelimitRule::from_updater("test_org", "admin", &updater);
+        let rules = RatelimitRule::from_updater("test_org", "admin", &updater, None);
 
         assert_eq!(rules.len(), 4); // 2 groups × 2 operations
 
@@ -555,7 +602,7 @@ mod tests {
         };
 
         assert_eq!(rule.stat_interval_ms, None);
-        assert_eq!(rule.get_stat_interval_ms(), 1000); // Default to 1 second
+        assert_eq!(rule.get_stat_interval_ms(), DEFAULT_STAT_INTERVAL_MS as u32);
     }
 
     #[test]
@@ -570,7 +617,7 @@ mod tests {
             api_group_name: Some("search".to_string()),
             api_group_operation: Some("query".to_string()),
             threshold: 1,
-            stat_interval_ms: Some(1000), // 1 second
+            stat_interval_ms: Some(DEFAULT_STAT_INTERVAL_MS),
         };
 
         let rule_1_min = RatelimitRule {
