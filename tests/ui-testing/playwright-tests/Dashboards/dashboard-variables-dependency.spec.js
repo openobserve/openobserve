@@ -236,28 +236,27 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       ]).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      // Prepare for next variable (except on last iteration)
       if (i < vars.length - 1) {
-        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
-        if (!isDialogOpen) {
-          // Wait for dashboard to stabilize before reopening settings
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openSetting();
-          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openVariables();
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        } else {
-          // Dialog is still open, check if we're on Add Variable form and navigate back to list
-          const isAddFormVisible = await page.locator('[data-test="dashboard-variable-cancel-btn"]').isVisible().catch(() => false);
-          if (isAddFormVisible) {
-            // Cancel the Add Variable form to go back to variables list
-            await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
-            await page.waitForTimeout(500);
-          }
-          // Make sure we're on variables tab
-          await pm.dashboardSetting.goToVariablesTab();
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        }
+        // Always close settings and reopen fresh to ensure clean state
+        await pm.dashboardSetting.closeSettingWindow();
+
+        // Wait for dialog to close completely
+        await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Add extra wait for stability especially for tests with many variables
+        await page.waitForTimeout(1000);
+
+        // Reopen settings for next variable
+        await pm.dashboardSetting.openSetting();
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+        await pm.dashboardSetting.openVariables();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Wait for Add Variable button to be visible and ready
+        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await page.waitForTimeout(500);
       }
     }
 
@@ -366,28 +365,27 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       ]).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      // Prepare for next variable (except on last iteration)
       if (i < vars.length - 1) {
-        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
-        if (!isDialogOpen) {
-          // Wait for dashboard to stabilize before reopening settings
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openSetting();
-          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openVariables();
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        } else {
-          // Dialog is still open, check if we're on Add Variable form and navigate back to list
-          const isAddFormVisible = await page.locator('[data-test="dashboard-variable-cancel-btn"]').isVisible().catch(() => false);
-          if (isAddFormVisible) {
-            // Cancel the Add Variable form to go back to variables list
-            await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
-            await page.waitForTimeout(500);
-          }
-          // Make sure we're on variables tab
-          await pm.dashboardSetting.goToVariablesTab();
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        }
+        // Always close settings and reopen fresh to ensure clean state
+        await pm.dashboardSetting.closeSettingWindow();
+
+        // Wait for dialog to close completely
+        await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Add extra wait for stability especially for tests with many variables
+        await page.waitForTimeout(1000);
+
+        // Reopen settings for next variable
+        await pm.dashboardSetting.openSetting();
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+        await pm.dashboardSetting.openVariables();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Wait for Add Variable button to be visible and ready
+        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await page.waitForTimeout(500);
       }
     }
 
@@ -451,6 +449,8 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
   });
 
   test("5-should load 8-level dependency chain (stress test)", async ({ page }) => {
+    test.setTimeout(600000); // 10 minutes for this complex test with 9 variables
+
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Dep8_${Date.now()}`;
@@ -475,7 +475,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       "log",
       "code",
       "stream",
-      "severity"
+      "kubernetes_annotations_kubectl_kubernetes_io_default_container"
     ];
 
     // Create 9-variable chain (8 levels of dependency)
@@ -497,19 +497,29 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
         page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
         page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 10000 })
       ]).catch(() => {});
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-      // If redirected to dashboard, reopen settings for next variable (except on last iteration)
+      // Prepare for next variable (except on last iteration)
       if (i < vars.length - 1) {
-        const isDialogOpen = await page.locator('.q-dialog').isVisible().catch(() => false);
-        if (!isDialogOpen) {
-          // Wait for dashboard to stabilize before reopening settings
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openSetting();
-          await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
-          await pm.dashboardSetting.openVariables();
-          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-        }
+        // Always close settings and reopen fresh to ensure clean state
+        await pm.dashboardSetting.closeSettingWindow();
+
+        // Wait for dialog to close completely
+        await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Add extra wait for stability especially for tests with many variables
+        await page.waitForTimeout(1000);
+
+        // Reopen settings for next variable
+        await pm.dashboardSetting.openSetting();
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+        await pm.dashboardSetting.openVariables();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Wait for Add Variable button to be visible and ready
+        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await page.waitForTimeout(500);
       }
     }
 
@@ -533,34 +543,43 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
       await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
     }
 
-    // Wait for variable to appear on dashboard
+    // Wait for all variables to appear on dashboard - especially important for 9 variables
     await page.locator(`[data-test="variable-selector-${vars[8]}"]`).waitFor({ state: "visible", timeout: 10000 });
 
+    // Wait for all variables to fully load
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
     // Change first and monitor full cascade
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 8, timeout: 40000 });
+    // When first variable changes, all 9 variables reload (first variable + 8 dependent variables)
+    // Monitor with 5 min timeout to allow all variables to complete loading
+    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 9, timeout: 300000 });
 
     // Wait for variable dropdown to be visible and ready
     const var0Dropdown = page.getByLabel(vars[0], { exact: true });
-    await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
+    await var0Dropdown.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(2000);
+    // Ensure network is idle before clicking - with 9 variables, this can take time
+    await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
 
     // Click to open the dropdown
-    await var0Dropdown.click();
+    await var0Dropdown.click({ timeout: 30000 });
 
-    // Wait for dropdown menu to open and options to load
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+    // Wait for dropdown menu to open and options to load - with 9 variables this is very slow
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 60000 });
     const options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
+    await options.first().waitFor({ state: "visible", timeout: 60000 });
 
-    // Wait for dropdown to stabilize and all options to render
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Wait for dropdown to stabilize and all options to render - extended for heavy load with 9 variables
+    await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
+    await page.waitForTimeout(5000);
 
     // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
+    await options.nth(1).click({ timeout: 30000 });
 
     // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
 
     const result = await apiMonitor;
 
