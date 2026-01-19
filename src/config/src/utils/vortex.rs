@@ -84,8 +84,7 @@ impl Utf8Compressor {
     }
 
     fn compress_utf8_or_binary(&self, chunk: &dyn Array) -> VortexResult<ArrayRef> {
-        let canonical = chunk.to_canonical();
-        let uncompressed_nbytes = canonical.as_ref().nbytes();
+        let canonical = chunk.to_canonical()?;
         let compressed = match &canonical {
             Canonical::VarBinView(vbv) => {
                 let zstd_array =
@@ -98,9 +97,6 @@ impl Utf8Compressor {
             }
         };
 
-        if compressed.nbytes() >= uncompressed_nbytes {
-            return Ok(canonical.into_array());
-        }
         Ok(compressed)
     }
 }

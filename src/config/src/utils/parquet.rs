@@ -166,7 +166,7 @@ pub async fn get_recordbatch_reader_from_bytes(
             // Read vortex file from bytes and convert to record batches
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
-            let vxf = session.open_options().open(buf).await?;
+            let vxf = session.open_options().open_buffer(buf)?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
 
             // Create a stream that converts vortex arrays to record batches
@@ -227,7 +227,7 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
         Some(FileFormat::Vortex) => {
             // Read vortex file
             let session = VortexSession::default().with_tokio();
-            let vxf = session.open_options().open(path.clone()).await?;
+            let vxf = session.open_options().open_path(path.clone()).await?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
             Ok(schema)
         }
@@ -254,7 +254,7 @@ pub async fn read_schema_from_bytes(
         FileFormat::Vortex => {
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
-            let vxf = session.open_options().open(buf).await?;
+            let vxf = session.open_options().open_buffer(buf)?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
             Ok(schema)
         }

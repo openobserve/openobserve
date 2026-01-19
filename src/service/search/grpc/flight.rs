@@ -16,9 +16,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use ::datafusion::{
-    common::tree_node::{Transformed, TreeNode, TreeNodeRewriter},
-    datasource::TableProvider,
-    physical_plan::ExecutionPlan,
+    common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
 use arrow_schema::Schema;
@@ -35,11 +33,7 @@ use config::{
 };
 use datafusion::{
     common::TableReference,
-    physical_optimizer::{
-        PhysicalOptimizerRule, coalesce_batches::CoalesceBatches, filter_pushdown::FilterPushdown,
-        projection_pushdown::ProjectionPushdown,
-    },
-    physical_plan::{coalesce_batches::CoalesceBatchesExec, coop::CooperativeExec},
+    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
@@ -475,16 +469,6 @@ pub async fn search(
         )
     );
 
-    // remove CooperativeExec in physical plan
-    let mut remove_cooperative_exec = RemoveCooperativeExec::new();
-    physical_plan = physical_plan.rewrite(&mut remove_cooperative_exec)?.data;
-    let pushdown_filter = FilterPushdown::new();
-    physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
-    let projection_pushdown = ProjectionPushdown::new();
-    physical_plan = projection_pushdown.optimize(physical_plan, ctx.state().config_options())?;
-    let coalesce_batches = CoalesceBatches::new();
-    physical_plan = coalesce_batches.optimize(physical_plan, ctx.state().config_options())?;
-
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
         // pushdown filter for dynamic pushdown filter enabled
         let pushdown_filter = FilterPushdown::new_post_optimization();
@@ -532,31 +516,6 @@ pub async fn search(
     );
 
     Ok((ctx, physical_plan, scan_stats))
-}
-
-struct RemoveCooperativeExec {}
-
-impl RemoveCooperativeExec {
-    fn new() -> Self {
-        RemoveCooperativeExec {}
-    }
-}
-
-impl TreeNodeRewriter for RemoveCooperativeExec {
-    type Node = Arc<dyn ExecutionPlan>;
-    fn f_up(&mut self, plan: Self::Node) -> datafusion::common::Result<Transformed<Self::Node>> {
-        if let Some(cooperative_exec) = plan.as_any().downcast_ref::<CooperativeExec>() {
-            return Ok(Transformed::yes(cooperative_exec.input().clone()));
-        }
-        if let Some(coalesce_batches_exec) = plan.as_any().downcast_ref::<CoalesceBatchesExec>() {
-            return Ok(Transformed::yes(coalesce_batches_exec.input().clone()));
-        }
-        Ok(Transformed::no(plan))
-    }
-
-    fn f_down(&mut self, node: Self::Node) -> datafusion::common::Result<Transformed<Self::Node>> {
-        Ok(Transformed::no(node))
-    }
 }
 
 #[allow(clippy::too_many_arguments)]

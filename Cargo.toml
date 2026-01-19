@@ -301,26 +301,26 @@ arrow-json = "57.1.0"
 arrow-schema = { version = "57.1.0", features = ["serde"] }
 parquet = { version = "57.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
-# vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7", features = [
-#     "tokio",
-# ] }
-# vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7" }
-# vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "6d2b64f50199789d8ff02accd3104121f5cdd9e7", features = [
-#     "roaring",
-# ] }
-vortex-scan = { version = "0.58.0" }
-vortex-array = { version = "0.58.0" }
-vortex-buffer = { version = "0.58.0" }
-vortex-file = { version = "0.58.0" }
-vortex-io = { version = "0.58.0" }
-vortex-session = { version = "0.58.0" }
-vortex = { version = "0.58.0", features = ["tokio"] }
-vortex-datafusion = { version = "0.58.0" }
+vortex-array = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex-buffer = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex-file = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex-io = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex-session = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473", features = [
+    "tokio",
+] }
+vortex-datafusion = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473" }
+vortex-scan = { git = "https://github.com/haohuaijin/vortex", rev = "0df286cb11ffcf032742dc8e6cf5f0a568b63473", features = [
+    "roaring",
+] }
+# vortex-scan = { version = "0.58.0" }
+# vortex-array = { version = "0.58.0" }
+# vortex-buffer = { version = "0.58.0" }
+# vortex-file = { version = "0.58.0" }
+# vortex-io = { version = "0.58.0" }
+# vortex-session = { version = "0.58.0" }
+# vortex = { version = "0.58.0", features = ["tokio"] }
+# vortex-datafusion = { version = "0.58.0" }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
