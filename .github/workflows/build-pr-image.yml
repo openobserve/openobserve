@@ -44,9 +44,40 @@ jobs:
             echo "should_build=false" >> $GITHUB_OUTPUT
           fi
 
+  build_frontend:
+    name: build_frontend
+    needs: check_changes
+    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
-    needs: check_changes
+    needs: [check_changes, build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -73,6 +104,11 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.4
+        with:
+          version: "v0.7.7"
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -82,12 +118,11 @@ jobs:
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -97,6 +132,12 @@ jobs:
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+        env:
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -133,7 +174,7 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
-    needs: check_changes
+    needs: [check_changes, build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -158,7 +199,12 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2024-11-11
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.4
+        with:
+          version: "v0.7.7"
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -169,12 +215,11 @@ jobs:
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -184,6 +229,12 @@ jobs:
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
+        env:
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
+
+      - name: Show sccache stats
+        run: sccache --show-stats
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -231,8 +282,10 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          fetch-depth: 0
+          sparse-checkout: .
+          fetch-depth: 1
           fetch-tags: true
+
       - name: Set GIT_TAG env
         run: |
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
