@@ -38,6 +38,22 @@
           <template v-slot:body-cell-value="props">
             <q-td :props="props">
               <div
+                v-if="props.row[0] === 'Original Query' || props.row[0] === 'Query'"
+                style="
+                  max-height: 150px;
+                  overflow-y: auto;
+                  padding: 2px;
+                  font-family: monospace;
+                  font-size: 13px;
+                  white-space: pre-wrap;
+                  word-break: break-all;
+                "
+                class="inspector-query-editor"
+                v-html="colorizedQueries[`${index}-${props.row[0]}`] || props.row[1]"
+              >
+              </div>
+              <div
+                v-else
                 :class="{
                   'scrollable-content':
                     props.row[0] === 'Original Query' ||
@@ -63,9 +79,10 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, ref, watch, onMounted } from "vue";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -152,6 +169,31 @@ export default defineComponent({
     };
     const totalQueries = computed(() => queryData.length);
     const dataTitle = computed(() => props.data.title);
+    const colorizedQueries = ref<Record<string, string>>({});
+
+    const updateColorizedQueries = async () => {
+      const newColorized: Record<string, string> = {};
+      for (const [index, query] of queryData.entries()) {
+        const lang = query.queryType?.toLowerCase() || 'sql';
+        
+        // Original Query
+        if (query.originalQuery) {
+          newColorized[`${index}-Original Query`] = await colorizeQuery(query.originalQuery, lang);
+        }
+        
+        // Query
+        if (query.query) {
+           newColorized[`${index}-Query`] = await colorizeQuery(query.query, lang);
+        }
+      }
+      colorizedQueries.value = newColorized;
+    };
+
+    onMounted(() => {
+        updateColorizedQueries();
+    });
+
+    watch(() => props.metaData, updateColorizedQueries, { deep: true });
 
     return {
       queryData,
@@ -162,6 +204,8 @@ export default defineComponent({
       pagination: ref({
         rowsPerPage: 0,
       }),
+
+      colorizedQueries
     };
   },
 });
