@@ -322,7 +322,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -335,7 +337,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -348,7 +352,9 @@
           "max_record_size": null
         },
         "value": "",
-        "options": []
+        "options": [],
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       }
     ]
   }
