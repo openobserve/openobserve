@@ -1,6 +1,7 @@
 // traceErrorFilter.spec.js
 // Tests for OpenObserve Traces Error Filtering functionality
 // Following the modular pattern from Logs tests
+// CONSOLIDATED: 8 → 7 tests
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -24,6 +25,11 @@ test.describe("Trace Error Filter testcases", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTracesUrl();
 
+    // Select the default stream as data is ingested for it only
+    if (await pm.tracesPage.isStreamSelectVisible()) {
+      await pm.tracesPage.selectTraceStream('default');
+    }
+
     testLogger.info('Test setup completed for trace error filtering');
   });
 
@@ -40,19 +46,18 @@ test.describe("Trace Error Filter testcases", () => {
     // Setup and run search
     await pm.tracesPage.setupTraceSearch();
 
-    // Look for traces with error counts
-    const errorTrace = pm.tracesPage.getErrorTraces();
-    let errorTraceCount = 0;
+    // Look for traces with error counts using POM methods
+    const hasErrorTraces = await pm.tracesPage.isErrorTraceVisible();
 
-    if (await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (hasErrorTraces) {
       testLogger.info('Found traces with error indicators');
 
-      // Count error traces
-      errorTraceCount = await errorTrace.count();
+      // Count error traces using POM method
+      const errorTraceCount = await pm.tracesPage.getErrorTraceCount();
       testLogger.info(`Found ${errorTraceCount} traces with errors`);
 
-      // Get error count text from first trace
-      const errorText = await errorTrace.first().textContent();
+      // Get error count text from first trace using POM method
+      const errorText = await pm.tracesPage.getFirstErrorTraceText();
       testLogger.info(`Error indicator text: ${errorText}`);
 
       // Verify error count is displayed with proper format
@@ -66,9 +71,9 @@ test.describe("Trace Error Filter testcases", () => {
         testLogger.info(`Error count extracted: ${errorCount}`);
       }
 
-      // Verify multiple error traces if available
+      // Verify multiple error traces if available using POM method
       if (errorTraceCount > 1) {
-        const secondErrorText = await errorTrace.nth(1).textContent();
+        const secondErrorText = await pm.tracesPage.getErrorTraceTextAt(1);
         expect(secondErrorText).toMatch(/Errors\s*:\s*\d+/);
         testLogger.info('Multiple error traces verified');
       }
@@ -123,9 +128,8 @@ test.describe("Trace Error Filter testcases", () => {
     // Setup and run search
     await pm.tracesPage.setupTraceSearch();
 
-    // Find and click on a trace with errors
-    const errorTrace = pm.tracesPage.getErrorTraces();
-    const hasErrorTraces = await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false);
+    // Find and click on a trace with errors using POM methods
+    const hasErrorTraces = await pm.tracesPage.isErrorTraceVisible();
 
     if (!hasErrorTraces) {
       testLogger.info('No error traces available - checking for any trace results');
@@ -142,7 +146,7 @@ test.describe("Trace Error Filter testcases", () => {
 
         if (errorStatusVisible || statusCode2Visible) {
           testLogger.info('Found error indicators in trace details');
-          expect(true).toBeTruthy();
+          expect(errorStatusVisible || statusCode2Visible).toBe(true);
         } else if (detailsVisible) {
           testLogger.info('Trace details visible but no error indicators - dataset may not have error traces');
           expect(detailsVisible).toBeTruthy();
@@ -159,7 +163,8 @@ test.describe("Trace Error Filter testcases", () => {
       throw new Error('Precondition failed: No trace results available. Ensure trace data is ingested.');
     }
 
-    await errorTrace.first().click();
+    // Click error trace using POM method
+    await pm.tracesPage.clickFirstErrorTrace();
     testLogger.info('Clicked on trace with errors');
 
     await page.waitForTimeout(3000);
@@ -272,62 +277,67 @@ test.describe("Trace Error Filter testcases", () => {
     expect(noResults || hasResults || hasError).toBeTruthy();
   });
 
-  test("P2: Toggle between error and success traces", {
+  // CONSOLIDATED: Merged "Toggle between error and success traces" + "Error filter with invalid syntax"
+  test("P2: Error edge cases - toggle and invalid syntax", {
     tag: ['@traceErrorFilter', '@traces', '@errors', '@edge', '@P2', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing toggle between error and success traces');
+    testLogger.info('Testing error edge cases: toggle between error/success and invalid syntax');
 
-    // First show error traces
-    await pm.tracesPage.enterTraceQuery("status_code='2'");
-    await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runSearch();
-    await page.waitForTimeout(2000);
+    // === Test 1: Toggle between error and success traces (Original test #7) ===
+    await test.step('Toggle between error and success traces', async () => {
+      testLogger.info('Testing toggle between error and success traces');
 
-    testLogger.info('Viewing error traces');
+      // First show error traces
+      await pm.tracesPage.enterTraceQuery("status_code='2'");
+      await pm.tracesPage.setTimeRange('15m');
+      await pm.tracesPage.runSearch();
+      await page.waitForTimeout(2000);
 
-    // Now switch to success traces
-    await pm.tracesPage.enterTraceQuery("status_code='1'");
-    await pm.tracesPage.runSearch();
-    await page.waitForTimeout(2000);
+      testLogger.info('Viewing error traces');
 
-    testLogger.info('Switched to viewing success traces');
+      // Now switch to success traces
+      await pm.tracesPage.enterTraceQuery("status_code='1'");
+      await pm.tracesPage.runSearch();
+      await page.waitForTimeout(2000);
 
-    // Verify no error indicators in results
-    const errorCount = await pm.tracesPage.getErrorTraces().count();
+      testLogger.info('Switched to viewing success traces');
 
-    if (errorCount === 0) {
-      testLogger.info('Success traces shown without error indicators');
-    }
+      // Verify no error indicators in results
+      const errorCount = await pm.tracesPage.getErrorTraces().count();
 
-    // Verify toggle worked - either has success results or no results
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    const noResults = await pm.tracesPage.isNoResultsVisible();
-    expect(hasResults || noResults).toBeTruthy();
-  });
+      if (errorCount === 0) {
+        testLogger.info('Success traces shown without error indicators');
+      }
 
-  test("P2: Error filter with invalid syntax", {
-    tag: ['@traceErrorFilter', '@traces', '@errors', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing error filter with invalid syntax');
+      // Verify toggle worked - either has success results or no results
+      const hasResults = await pm.tracesPage.hasTraceResults();
+      const noResults = await pm.tracesPage.isNoResultsVisible();
+      expect(hasResults || noResults).toBeTruthy();
+    });
 
-    // Enter invalid syntax
-    await pm.tracesPage.enterTraceQuery("status_code='2 AND"); // Invalid syntax
+    // === Test 2: Error filter with invalid syntax (Original test #8) ===
+    await test.step('Error filter with invalid syntax', async () => {
+      testLogger.info('Testing error filter with invalid syntax');
 
-    await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runSearch();
-    await page.waitForTimeout(3000);
+      // Enter invalid syntax
+      await pm.tracesPage.enterTraceQuery("status_code='2 AND"); // Invalid syntax
 
-    // Check for error message using page object
-    const errorMessage = await pm.tracesPage.isErrorMessageVisible();
+      await pm.tracesPage.setTimeRange('15m');
+      await pm.tracesPage.runSearch();
+      await page.waitForTimeout(3000);
 
-    if (errorMessage) {
-      testLogger.info('Error message displayed for invalid syntax');
-    } else {
-      // May handle invalid syntax differently
-      testLogger.info('System handled invalid syntax');
-    }
+      // Check for error message using page object
+      const errorMessage = await pm.tracesPage.isErrorMessageVisible();
 
-    // Verify test completed - either error message or graceful handling
-    expect(errorMessage || await pm.tracesPage.hasTraceResults() || await pm.tracesPage.isNoResultsVisible()).toBeTruthy();
+      if (errorMessage) {
+        testLogger.info('Error message displayed for invalid syntax');
+      } else {
+        // May handle invalid syntax differently
+        testLogger.info('System handled invalid syntax');
+      }
+
+      // Verify test completed - either error message or graceful handling
+      expect(errorMessage || await pm.tracesPage.hasTraceResults() || await pm.tracesPage.isNoResultsVisible()).toBeTruthy();
+    });
   });
 });
