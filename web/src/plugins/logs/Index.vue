@@ -423,6 +423,7 @@ import {
   buildSqlQuery,
   getFieldsFromQuery,
   isSimpleSelectAllQuery,
+  getStreamFromQuery,
 } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -1783,9 +1784,7 @@ export default defineComponent({
             }
 
             // run query
-            visualizeChartData.value = JSON.parse(
-              JSON.stringify(dashboardPanelData.data),
-            );
+            await copyDashboardDataToVisualize();
 
             // Clear the restoration flag after all operations are complete
             await nextTick();
@@ -1895,7 +1894,7 @@ export default defineComponent({
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
-    const debouncedUpdateChartConfig = debounce((newVal) => {
+    const debouncedUpdateChartConfig = debounce(async (newVal) => {
       if (searchObj.meta.logsVisualizeToggle === "visualize") {
         let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           visualizeChartData.value,
@@ -1903,7 +1902,7 @@ export default defineComponent({
         );
 
         if (!configNeedsApiCall) {
-          visualizeChartData.value = JSON.parse(JSON.stringify(newVal));
+          await copyDashboardDataToVisualize();
           window.dispatchEvent(new Event("resize"));
         }
       }
@@ -2012,9 +2011,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
 
-        visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data),
-        );
+        await copyDashboardDataToVisualize();
 
         // Sync visualization config to URL parameters
         updateUrlQueryParams(dashboardPanelData);
@@ -2062,6 +2059,36 @@ export default defineComponent({
           reject(new DOMException("Aborted", "AbortError"));
         });
       });
+    };
+
+    // Helper function to copy dashboardPanelData while preserving stream info
+    const copyDashboardDataToVisualize = async () => {
+      // Extract and assign stream info BEFORE copying
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentQuery = dashboardPanelData.data.queries?.[currentQueryIndex];
+
+      if (currentQuery) {
+        // Try to extract stream from the query if it exists
+        let streamName = currentQuery.fields.stream;
+        if (currentQuery.query) {
+          const extractedStream = await getStreamFromQuery(currentQuery.query);
+          if (extractedStream) {
+            streamName = extractedStream;
+          }
+        }
+
+        // Assign stream info to dashboardPanelData before copying
+        dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
+        // stream_type should already be set, but ensure it's preserved
+        if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
+          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+        }
+      }
+
+      // Now copy dashboardPanelData with updated stream info
+      visualizeChartData.value = JSON.parse(
+        JSON.stringify(dashboardPanelData.data),
+      );
     };
 
     const extractVisualizationFields = async (
@@ -2240,9 +2267,7 @@ export default defineComponent({
           signal,
         );
 
-        visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data),
-        );
+        await copyDashboardDataToVisualize();
 
         return shouldUseHistogramQuery.value;
       } catch (err) {
