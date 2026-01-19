@@ -162,6 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:vrlFunction="(value) => formData.query_condition.vrl_function = value"
                   @validate-sql="validateSqlQuery"
                   @clear-multi-windows="clearMultiWindows"
+                  @editor-closed="handleEditorClosed"
+                  @editor-state-changed="handleEditorStateChanged"
                 />
               </div>
             </div>
@@ -319,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :focusManager="focusManager"
               :wizardStep="wizardStep"
               :isUsingBackendSql="isUsingBackendSql"
+              :isEditorOpen="isEditorOpen"
             />
           </div>
         </keep-alive>
@@ -594,6 +597,7 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
+    const isEditorOpen = ref(false);
     const expandState = ref({
       alertSetup: true,
       queryMode: true,
@@ -1567,6 +1571,20 @@ export default defineComponent({
       formData.value.query_condition.multi_time_range = [];
     }
 
+    // Handle editor state change - track if editor is open
+    const handleEditorStateChanged = (isOpen: boolean) => {
+      console.log("[AddAlert] SQL Editor state changed:", isOpen);
+      isEditorOpen.value = isOpen;
+    };
+
+    // Handle editor closed event - refresh preview when SQL editor dialog closes
+    const handleEditorClosed = () => {
+      console.log("[AddAlert] SQL Editor closed, refreshing preview");
+      if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === 'function') {
+        previewAlertRef.value.refreshData();
+      }
+    };
+
 
 // Method to handle the emitted changes and update the structure
   const updateGroup = (updatedGroup: any) => {
@@ -2215,6 +2233,9 @@ export default defineComponent({
       clearMultiWindows,
       validateStep,
       handleGoToSqlEditor,
+      handleEditorClosed,
+      handleEditorStateChanged,
+      isEditorOpen,
     };
   },
 
