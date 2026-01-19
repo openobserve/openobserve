@@ -334,7 +334,8 @@
     "report": "レポート",
     "pipeline": "パイプライン",
     "language": "言語",
-    "actions": "アクション"
+    "actions": "アクション",
+    "incidents": "インシデント"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
