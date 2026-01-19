@@ -13,169 +13,105 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! NATS Visibility Metrics Collector
+//!
+//! Collects metrics from NATS JetStream via HTTP monitoring API and ingests
+//! them as Prometheus metrics into the _meta organization.
+//!
+//! Key design:
+//! - Runs on nodes with "router" or "all" role
+//! - Uses Prometheus remote_write format for efficient storage
+//! - Collects 9 high-priority metrics for debugging slow nodes
+
 pub mod collector;
 
-use std::sync::Arc;
+use std::time::Duration;
 
 pub use collector::NatsVisibilityCollector;
-use config::{get_config, meta::self_reporting::nats::NatsVisibilityEvent};
-use once_cell::sync::Lazy;
-use tokio::{
-    sync::RwLock,
-    time::{Duration, interval},
-};
+use config::get_config;
+use tokio::time::interval;
 
-// Global in-memory buffer for NATS visibility events
-static EVENT_BUFFER: Lazy<Arc<RwLock<Vec<NatsVisibilityEvent>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Vec::new())));
+/// Check if this node should run the NATS visibility collector
+///
+/// Design: If node role is "router" or "all", run the collector.
+/// This allows metrics collection to work even in single-node deployments
+/// or during startup before cluster cache is populated.
+///
+/// Criteria:
+/// 1. ZO_CLUSTER_COORDINATOR must be "nats"
+/// 2. Node role must be "router" OR "all"
+pub fn should_run_collector() -> bool {
+    let cfg = get_config();
 
-/// Add events to the global buffer
-pub async fn buffer_events(events: Vec<NatsVisibilityEvent>) {
-    let event_count = events.len();
-    let mut buffer = EVENT_BUFFER.write().await;
-    buffer.extend(events);
+    // Must be NATS coordinator
+    if cfg.common.cluster_coordinator != "nats" {
+        log::debug!(
+            "[NATS Visibility] Skipping: cluster_coordinator is '{}', not 'nats'",
+            cfg.common.cluster_coordinator
+        );
+        return false;
+    }
+
+    // Check local node role from config
+    let node_role = &cfg.common.node_role;
+    let is_eligible = node_role == "router" || node_role == "all";
+
+    if !is_eligible {
+        log::debug!(
+            "[NATS Visibility] Skipping: node role '{}' is not router/all",
+            node_role
+        );
+        return false;
+    }
+
     log::info!(
-        "[NATS Visibility] Buffered {} events (total: {})",
-        event_count,
-        buffer.len()
+        "[NATS Visibility] This node is eligible to run collector (role={})",
+        node_role
     );
+    true
 }
 
-/// Take all buffered events (drains the buffer)
-async fn take_buffered_events() -> Vec<NatsVisibilityEvent> {
-    let mut buffer = EVENT_BUFFER.write().await;
-    std::mem::take(&mut *buffer)
-}
-
-/// Initialize and start NATS visibility collector and ingestion tasks
+/// Initialize and start NATS visibility collector
+///
+/// This should be called once during application startup (after infra::init).
+/// The collector will start if this node has router or all role.
 pub fn start_collector() {
     let cfg = get_config();
 
+    // Check if enabled
     if !cfg.nats_visibility.enabled {
         log::info!("[NATS Visibility] Disabled via ZO_NATS_VISIBILITY_ENABLED=false");
         return;
     }
 
+    // Check if this node should run collector
+    if !should_run_collector() {
+        log::info!("[NATS Visibility] Collector not started on this node (not router/all role)");
+        return;
+    }
+
+    let collection_interval = cfg.nats_visibility.interval_secs;
+
     log::info!(
-        "[NATS Visibility] Starting collector (interval: {}s)",
-        cfg.nats_visibility.interval_secs
+        "[NATS Visibility] Starting collector on this node (interval: {}s)",
+        collection_interval
     );
 
-    // Capture intervals before moving cfg
-    let collection_interval = cfg.nats_visibility.interval_secs;
-    let ingestion_interval = cfg.nats_visibility.interval_secs * 2;
-
-    // Start collection task - writes to in-memory buffer
+    // Spawn collection task
     tokio::spawn(async move {
-        let mut collector = NatsVisibilityCollector::new();
+        let collector = NatsVisibilityCollector::new();
         let mut tick = interval(Duration::from_secs(collection_interval));
 
-        loop {
-            tick.tick().await;
-
-            if let Err(e) = collector.collect_and_buffer().await {
-                log::error!("[NATS Visibility] Collection error: {}", e);
-            }
-        }
-    });
-
-    // Start ingestion task - reads from buffer and writes to WAL
-    // Run at double the collection interval to batch more events
-    tokio::spawn(async move {
-        let mut tick = interval(Duration::from_secs(ingestion_interval));
+        // Skip first tick (immediate trigger)
+        tick.tick().await;
 
         loop {
             tick.tick().await;
 
-            let events = take_buffered_events().await;
-            if events.is_empty() {
-                log::info!("[NATS Visibility] No events to ingest");
-                continue;
-            }
-
-            log::info!(
-                "[NATS Visibility] Ingesting {} buffered events",
-                events.len()
-            );
-
-            if let Err(e) = ingest_events(events).await {
-                log::error!("[NATS Visibility] Ingestion error: {}", e);
+            // Collect and ingest metrics
+            if let Err(e) = collector.collect_and_ingest().await {
+                log::error!("[NATS Visibility] Collection/ingestion error: {}", e);
             }
         }
     });
-
-    log::info!("[NATS Visibility] Collector and ingestion tasks started");
-}
-
-/// Ingest events via HTTP _json API (works across all nodes)
-async fn ingest_events(events: Vec<NatsVisibilityEvent>) -> crate::errors::Result<()> {
-    const META_ORG: &str = "_meta";
-    const STREAM_NAME: &str = "nats_visibility";
-
-    if events.is_empty() {
-        return Ok(());
-    }
-
-    // Convert to JSON array format for _json API
-    let json_array: Vec<serde_json::Value> = events
-        .into_iter()
-        .filter_map(|e| serde_json::to_value(e).ok())
-        .collect();
-
-    if json_array.is_empty() {
-        log::warn!("[NATS Visibility] All events failed to serialize");
-        return Ok(());
-    }
-
-    // Get local HTTP address
-    let cfg = get_config();
-    let base_url = format!("http://127.0.0.1:{}", cfg.http.port);
-    let url = format!("{}/api/{}/{}/_json", base_url, META_ORG, STREAM_NAME);
-
-    // Create HTTP client
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| {
-            crate::errors::Error::Message(format!("Failed to create HTTP client: {}", e))
-        })?;
-
-    // Get root user credentials for authentication
-    let auth_user = cfg.auth.root_user_email.clone();
-    let auth_password = cfg.auth.root_user_password.clone();
-
-    // Send POST request to _json API with Basic Auth
-    match client
-        .post(&url)
-        .basic_auth(&auth_user, Some(&auth_password))
-        .header("Content-Type", "application/json")
-        .json(&json_array)
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                log::info!(
-                    "[NATS Visibility] Successfully ingested {} events via _json API",
-                    json_array.len()
-                );
-            } else {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                log::error!(
-                    "[NATS Visibility] _json API returned error {}: {}",
-                    status,
-                    error_text
-                );
-            }
-        }
-        Err(e) => {
-            log::error!(
-                "[NATS Visibility] Failed to send to _json API: {}. Will retry next cycle.",
-                e
-            );
-        }
-    }
-
-    Ok(())
 }

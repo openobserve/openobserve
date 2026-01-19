@@ -1926,6 +1926,12 @@ pub struct NatsVisibility {
         help = "Monitor KV buckets (can be high cardinality)"
     )]
     pub monitor_kv: bool,
+    #[env_config(
+        name = "ZO_NATS_MONITORING_PORT",
+        default = 8222,
+        help = "NATS server HTTP monitoring port"
+    )]
+    pub monitoring_port: u16,
 }
 
 #[derive(Serialize, Debug, Default, EnvConfig)]
