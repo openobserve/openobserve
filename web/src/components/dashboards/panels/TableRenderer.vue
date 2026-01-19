@@ -269,7 +269,6 @@ export default defineComponent({
       }
       return "";
     };
-
     const isDarkColor = (hex: any) => {
       const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
       const r = parseInt(result[1], 16);
