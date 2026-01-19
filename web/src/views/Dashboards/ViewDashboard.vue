@@ -579,6 +579,32 @@ export default defineComponent({
     // Handler for when variables manager is ready from RenderDashboardCharts
     const onVariablesManagerReady = (manager: any) => {
       variablesManager.value = manager;
+
+      // Immediately update URL with initial committed values
+      // This handles variables that don't require loading (constant, textbox, custom_value)
+      nextTick(() => {
+        if (selectedDate.value && variablesManager.value) {
+          updateUrlWithCurrentState();
+        }
+      });
+
+      // Watch for changes to committed variables data
+      // This will trigger URL updates when variables finish loading (auto-commit for query_values)
+      watch(
+        () => {
+          if (!variablesManager.value) return null;
+          // Watch the committed variables data deeply
+          return JSON.stringify(variablesManager.value.committedVariablesData);
+        },
+        () => {
+          // When committed variables change, update the URL
+          nextTick(() => {
+            if (selectedDate.value && variablesManager.value) {
+              updateUrlWithCurrentState();
+            }
+          });
+        },
+      );
     };
 
     const isVariablesChanged = computed(() => {
@@ -971,6 +997,48 @@ export default defineComponent({
       return {};
     };
 
+    // Helper function to update URL with current state
+    const updateUrlWithCurrentState = () => {
+      // Build variable params - prefer manager if available, otherwise use route.query
+      let variableParams: Record<string, any> = {};
+
+      if (variablesManager.value) {
+        // Get from manager
+        variableParams = getVariableParamsFromManager();
+
+        // If manager returns empty but route.query has variables, use route.query
+        // This handles the case where page just loaded and manager hasn't committed yet
+        if (Object.keys(variableParams).length === 0) {
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              variableParams[key] = route.query[key];
+            }
+          });
+        }
+      } else {
+        // No manager, use route.query
+        Object.keys(route.query).forEach((key) => {
+          if (key.startsWith("var-")) {
+            variableParams[key] = route.query[key];
+          }
+        });
+      }
+
+      router.replace({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: route.query.dashboard,
+          folder: route.query.folder,
+          tab: selectedTabId.value,
+          refresh: generateDurationLabel(refreshInterval.value),
+          ...getQueryParamsForDuration(selectedDate.value),
+          ...variableParams, // Use variables from manager or route
+          print: store.state.printMode,
+          searchtype: route.query.searchtype,
+        },
+      });
+    };
+
     // whenever the refreshInterval is changed, update the query params
     // Note: We're removing the variablesManager.committedVariablesData watch
     // because URL updates should only happen when user clicks refresh (handled in refreshData)
@@ -983,45 +1051,7 @@ export default defineComponent({
       ],
       () => {
         generateNewDashboardRunId();
-
-        // Build variable params - prefer manager if available, otherwise use route.query
-        let variableParams: Record<string, any> = {};
-
-        if (variablesManager.value) {
-          // Get from manager
-          variableParams = getVariableParamsFromManager();
-
-          // If manager returns empty but route.query has variables, use route.query
-          // This handles the case where page just loaded and manager hasn't committed yet
-          if (Object.keys(variableParams).length === 0) {
-            Object.keys(route.query).forEach((key) => {
-              if (key.startsWith("var-")) {
-                variableParams[key] = route.query[key];
-              }
-            });
-          }
-        } else {
-          // No manager, use route.query
-          Object.keys(route.query).forEach((key) => {
-            if (key.startsWith("var-")) {
-              variableParams[key] = route.query[key];
-            }
-          });
-        }
-
-        router.replace({
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            dashboard: route.query.dashboard,
-            folder: route.query.folder,
-            tab: selectedTabId.value,
-            refresh: generateDurationLabel(refreshInterval.value),
-            ...getQueryParamsForDuration(selectedDate.value),
-            ...variableParams, // Use variables from manager or route
-            print: store.state.printMode,
-            searchtype: route.query.searchtype,
-          },
-        });
+        updateUrlWithCurrentState();
       },
       { deep: true },
     );
