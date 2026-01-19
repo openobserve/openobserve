@@ -476,10 +476,13 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         }
 
         if (!jobCompleted) {
-            // Take diagnostic screenshot before continuing
+            // Take diagnostic screenshot before failing
             await enrichmentPage.takeDebugScreenshot(`schema-mismatch-timeout-${tableName}.png`);
-            testLogger.warn(`Job did not complete within ${maxAttempts * 5}s timeout - continuing to check dialog`);
+            testLogger.error(`Job did not complete within ${maxAttempts * 5}s timeout`);
         }
+
+        // Assert job completed (or has visible warning) before proceeding
+        expect(jobCompleted, `URL job should complete within ${maxAttempts * 5}s`).toBe(true);
 
         // Step 5: Click on status icon to open URL Jobs dialog
         await enrichmentPage.clickUrlStatusIcon(tableName);

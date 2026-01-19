@@ -755,6 +755,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const buttonCount = await buttons.count();
         testLogger.debug(`Found ${buttonCount} buttons in row`);
 
+        // Bounds check: need at least 2 buttons (edit + delete)
+        if (buttonCount < 2) {
+            throw new Error(`Expected at least 2 buttons in row for table "${tableName}", found ${buttonCount}. Job may still be processing.`);
+        }
+
         // Edit button is always second-to-last (before delete)
         const editBtnIndex = buttonCount - 2;
         const editBtn = buttons.nth(editBtnIndex);
@@ -797,6 +802,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const buttons = row.locator('button');
         const buttonCount = await buttons.count();
         testLogger.debug(`Found ${buttonCount} buttons in row`);
+
+        // Bounds check: need at least 1 button (delete)
+        if (buttonCount < 1) {
+            throw new Error(`Expected at least 1 button in row for table "${tableName}", found ${buttonCount}. Job may still be processing.`);
+        }
 
         // Delete is always the last button
         const deleteBtn = buttons.nth(buttonCount - 1);
@@ -1862,9 +1872,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await this.waitForEnrichmentTablesList();
             await this.searchEnrichmentTableInList(tableName);
 
-            // Check for red/warning icon in the row
+            // Check for red/warning icon in the row - look in the Type cell (contains "Url")
             const row = this.page.locator('tbody tr').filter({ hasText: tableName });
-            const warningIcon = row.locator('td').nth(2).locator('[class*="warning"], [style*="red"], .text-negative');
+            const typeCell = row.locator('td').filter({ hasText: 'Url' });
+            const warningIcon = typeCell.locator('[class*="warning"], [style*="red"], .text-negative');
 
             if (await warningIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
                 testLogger.info(`Failed status icon found after ${elapsed}s (attempt ${attemptCount})`);
