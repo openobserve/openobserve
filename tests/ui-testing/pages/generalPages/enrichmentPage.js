@@ -787,10 +787,23 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async clickDeleteButton(tableName) {
+        testLogger.debug(`Clicking delete button for: ${tableName}`);
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
-        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
-        await row.locator('button').nth(3).click();
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Delete button is always the last button in the row
+        // For file tables: Explore (0), Schema (1), Edit (2), Delete (3)
+        // For URL tables: Edit (0), Delete (1)
+        const buttons = row.locator('button');
+        const buttonCount = await buttons.count();
+        testLogger.debug(`Found ${buttonCount} buttons in row`);
+
+        // Delete is always the last button
+        const deleteBtn = buttons.nth(buttonCount - 1);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
         await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Delete button clicked');
     }
 
     async verifyDeleteConfirmationDialog() {
@@ -1877,6 +1890,49 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.fillNewUrlInput(newUrl);
 
         testLogger.debug('URL replaced in edit mode');
+    }
+
+    /**
+     * Delete an enrichment table if it exists (for test cleanup)
+     * @param {string} tableName - Name of the table to delete
+     * @returns {Promise<boolean>} True if deleted, false if not found
+     */
+    async deleteTableIfExists(tableName) {
+        testLogger.debug(`Attempting to delete table if exists: ${tableName}`);
+
+        try {
+            // Navigate to enrichment tables list
+            await this.navigateToEnrichmentTable();
+            await this.waitForEnrichmentTablesList();
+
+            // Search for the table
+            const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
+            await searchInput.clear();
+            await searchInput.fill(tableName);
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(1000);
+
+            // Check if table exists
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const isVisible = await row.isVisible({ timeout: 3000 }).catch(() => false);
+
+            if (!isVisible) {
+                testLogger.debug(`Table ${tableName} not found - nothing to delete`);
+                return false;
+            }
+
+            // Delete the table
+            await this.clickDeleteButton(tableName);
+            await this.verifyDeleteConfirmationDialog();
+            await this.clickDeleteOK();
+            await this.verifyTableRowHidden(tableName);
+
+            testLogger.info(`Table ${tableName} deleted successfully`);
+            return true;
+        } catch (error) {
+            testLogger.warn(`Failed to delete table ${tableName}: ${error.message}`);
+            return false;
+        }
     }
 }
 

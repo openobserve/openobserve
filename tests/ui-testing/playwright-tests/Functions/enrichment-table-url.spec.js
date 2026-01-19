@@ -23,12 +23,14 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     let pageManager;
     let enrichmentPage;
     let pipelinesPage;
+    let currentTableName = null; // Track table created in each test for cleanup
 
     // Generate unique table names for each test to avoid conflicts in parallel runs
     const generateTableName = (prefix) => `${prefix}_${randomUUID().split('-')[0]}`;
 
     test.beforeEach(async ({ page }) => {
         testLogger.info('=== Starting test ===');
+        currentTableName = null; // Reset for each test
 
         // Initialize base navigation (login and home page)
         await navigateToBase(page);
@@ -50,6 +52,18 @@ test.describe('Enrichment Table URL Feature Tests', () => {
                 fullPage: true
             });
         }
+
+        // Cleanup: Delete table if it was created during this test
+        if (currentTableName && enrichmentPage) {
+            testLogger.info(`Cleanup: Attempting to delete table ${currentTableName}`);
+            try {
+                await enrichmentPage.deleteTableIfExists(currentTableName);
+            } catch (error) {
+                testLogger.warn(`Cleanup failed for ${currentTableName}: ${error.message}`);
+                // Don't fail test - cleanup.spec.js will handle it
+            }
+        }
+
         testLogger.info('=== Test completed ===');
     });
 
@@ -59,6 +73,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P0 @smoke Full lifecycle: create, explore logs, and delete enrichment table', async () => {
         const tableName = generateTableName('url_lifecycle');
+        currentTableName = tableName; // Track for cleanup if test fails mid-way
         testLogger.info(`Test: Full lifecycle - ${tableName}`);
 
         // Step 1: Create enrichment table from URL
@@ -132,6 +147,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P1 Schema view - verify table columns', async () => {
         const tableName = generateTableName('schema_view');
+        currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema view - ${tableName}`);
 
         // Step 1: Create enrichment table from URL
@@ -158,6 +174,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P1 Duplicate table name - error handling', async () => {
         const tableName = generateTableName('duplicate_test');
+        currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Duplicate table name - ${tableName}`);
 
         // Step 1: Create first table
@@ -222,6 +239,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P1 Edit form opens correctly for URL table', async () => {
         const tableName = generateTableName('edit_form');
+        currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Edit form - ${tableName}`);
 
         // Step 1: Create enrichment table from URL
@@ -279,6 +297,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P1 Invalid URL (404) - backend error handling', async () => {
         const tableName = generateTableName('url_404');
+        currentTableName = tableName; // Track for cleanup (may or may not be created)
         testLogger.info(`Test: Invalid URL (404) - ${tableName}`);
 
         // Click "Add Enrichment Table" button
@@ -386,6 +405,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
     test('@P1 URL Jobs dialog - view failed job status', async () => {
         const tableName = generateTableName('schema_mismatch');
+        currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: URL Jobs dialog - ${tableName}`);
 
         // Step 1: Create enrichment table from protocols.csv
