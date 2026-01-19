@@ -36,6 +36,8 @@ import {
   isTimeStamp,
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
+  createDateFormatter,
+  formatDateWithFormatter,
 } from "./convertDataIntoUnitValue";
 import {
   calculateGridPositions,
@@ -62,48 +64,6 @@ import {
   shouldApplyChartAlignment,
   generateChartAlignmentProperties,
 } from "./legendConfiguration";
-
-/**
- * Creates a reusable date formatter using Intl.DateTimeFormat
- * This is significantly faster than using date-fns format() or toZonedTime() in loops
- * @param {string} timezone - The timezone string (e.g., "UTC", "America/New_York", defaults to "UTC")
- * @returns {Intl.DateTimeFormat} Formatter configured for the specified timezone
- */
-const createDateFormatter = (timezone: string = "UTC"): Intl.DateTimeFormat => {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-};
-
-/**
- * Formats a date to ISO-like string in format: yyyy-MM-dd'T'HH:mm:ss
- * Uses pre-compiled Intl.DateTimeFormat for optimal performance in loops
- * Works with any timezone - 10-20x faster than date-fns or date-fns-tz
- * @param {Date} date - The date to format
- * @param {Intl.DateTimeFormat} formatter - Pre-created formatter from createDateFormatter()
- * @returns {string} Formatted date string (e.g., "2024-01-15T08:30:45")
- */
-const formatDateWithFormatter = (
-  date: Date,
-  formatter: Intl.DateTimeFormat,
-): string => {
-  const parts = formatter.formatToParts(date);
-  const year = parts.find((p) => p.type === "year")?.value;
-  const month = parts.find((p) => p.type === "month")?.value;
-  const day = parts.find((p) => p.type === "day")?.value;
-  const hour = parts.find((p) => p.type === "hour")?.value;
-  const minute = parts.find((p) => p.type === "minute")?.value;
-  const second = parts.find((p) => p.type === "second")?.value;
-
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-};
 
 /**
  * Calculates chart container properties for pie/donut charts based on legend position and chart alignment
