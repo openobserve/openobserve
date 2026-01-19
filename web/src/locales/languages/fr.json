@@ -333,7 +333,8 @@
     "report": "Rapports",
     "pipeline": "Canalisations",
     "language": "Langue",
-    "actions": "Actions"
+    "actions": "Actions",
+    "incidents": "Incidents"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",
