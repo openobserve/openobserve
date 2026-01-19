@@ -243,6 +243,101 @@ describe("Convert PromQL Data Utils", () => {
       );
     });
 
+    it("should NOT show warning when streaming receives duplicate metrics without hitting limit", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: {},
+        queries: [{ config: { promql_legend: "" } }],
+      };
+
+      // Simulate 3 series received across multiple chunks
+      // totalMetricsReceived = 9 (3 metrics × 3 chunks with duplicates)
+      // metricsStored = 3 (actual unique metrics after deduplication)
+      // maxSeries = 100
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            { metric: { job: "job-1" }, values: [[1640435200, "10"]] },
+            { metric: { job: "job-2" }, values: [[1640435200, "20"]] },
+            { metric: { job: "job-3" }, values: [[1640435200, "30"]] },
+          ],
+        },
+      ];
+
+      const metadata = {
+        seriesLimiting: {
+          totalMetricsReceived: 9, // 3 series × 3 chunks
+          metricsStored: 3, // Only 3 unique series
+          maxSeries: 100,
+        },
+      };
+
+      mockStore.state.zoConfig.max_dashboard_series = 100;
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+        metadata,
+      );
+
+      // Should NOT show warning because we didn't hit the limit
+      // (metricsStored=3 < maxSeries=100)
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+
+    it("should show warning when streaming hits the series limit", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: {},
+        queries: [{ config: { promql_legend: "" } }],
+      };
+
+      // Create 100 series (at the limit)
+      const seriesAtLimit = Array(100).fill(null).map((_, index) => ({
+        metric: { job: `job-${index}` },
+        values: [[1640435200, (index + 1).toString()]],
+      }));
+
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: seriesAtLimit,
+        },
+      ];
+
+      const metadata = {
+        seriesLimiting: {
+          totalMetricsReceived: 150, // Received 150 metrics
+          metricsStored: 100, // Only stored 100 (hit the limit)
+          maxSeries: 100,
+        },
+      };
+
+      mockStore.state.zoConfig.max_dashboard_series = 100;
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+        metadata,
+      );
+
+      // Should show warning because we hit the limit and dropped metrics
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Limiting the displayed series to ensure optimal performance"
+      );
+    });
+
     it("should handle gauge chart type", async () => {
       const panelSchema = {
         id: "panel1",
