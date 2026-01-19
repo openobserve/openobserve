@@ -133,7 +133,7 @@ jobs:
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
-          RUSTC_WRAPPER: sccache
+          CARGO_BUILD_RUSTC_WRAPPER: sccache
           SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
@@ -230,7 +230,7 @@ jobs:
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
-          RUSTC_WRAPPER: sccache
+          CARGO_BUILD_RUSTC_WRAPPER: sccache
           SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
