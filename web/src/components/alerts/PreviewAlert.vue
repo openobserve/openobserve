@@ -165,6 +165,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isEditorOpen: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 onBeforeMount(() => {
@@ -940,7 +944,13 @@ watch(
     props.isUsingBackendSql,
   ],
   () => {
-    console.log("[PreviewAlert] Watch triggered, isInitialLoad:", isInitialLoad);
+    console.log("[PreviewAlert] Watch triggered, isInitialLoad:", isInitialLoad, "isEditorOpen:", props.isEditorOpen);
+
+    // Skip if editor is open - we'll refresh when it closes
+    if (props.isEditorOpen) {
+      console.log("[PreviewAlert] Skipping watch - editor is open");
+      return;
+    }
 
     // Skip the first watch trigger on mount since onMounted will handle it
     if (isInitialLoad) {

@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTab="selectedTab"
             :isAggregationEnabled="isAggregationEnabled"
             :isUsingBackendSql="isUsingBackendSql"
+            :isEditorOpen="isEditorOpen"
           />
         </keep-alive>
       </div>
@@ -161,6 +162,10 @@ export default defineComponent({
       default: 1,
     },
     isUsingBackendSql: {
+      type: Boolean,
+      default: false,
+    },
+    isEditorOpen: {
       type: Boolean,
       default: false,
     },

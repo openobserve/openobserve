@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick } from "vue";
+import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -202,7 +202,7 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows"],
+  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -353,6 +353,19 @@ export default defineComponent({
     const handleValidateSql = () => {
       emit("validate-sql");
     };
+
+    // Watch for SQL editor dialog state changes
+    watch(viewSqlEditor, (newValue, oldValue) => {
+      // Emit state change whenever it changes
+      console.log("[QueryConfig] SQL Editor state changed:", oldValue, "->", newValue);
+      emit("editor-state-changed", newValue);
+
+      // When dialog closes (goes from true to false), emit event to refresh preview
+      if (oldValue === true && newValue === false) {
+        console.log("[QueryConfig] SQL Editor Dialog closed, emitting editor-closed event");
+        emit("editor-closed");
+      }
+    });
 
     // Validation function for Step 2
     const validate = async () => {
