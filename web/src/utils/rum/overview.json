@@ -351,7 +351,8 @@
         },
         "value": "",
         "options": [],
-        "selectAllValueForMultiSelect": "custom"
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -365,7 +366,8 @@
         },
         "value": "",
         "options": [],
-        "selectAllValueForMultiSelect": "custom"
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       },
       {
         "type": "query_values",
@@ -379,7 +381,8 @@
         },
         "value": "",
         "options": [],
-        "selectAllValueForMultiSelect": "custom"
+        "selectAllValueForMultiSelect": "all",
+        "multiSelect": true
       }
     ]
   }
