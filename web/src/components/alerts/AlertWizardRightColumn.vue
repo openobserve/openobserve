@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon
               :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
-              class="tw:text-xs"
+              class="tw:text-xs tw:flex-shrink-0"
               :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
             />
-            <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase">
+            <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? 'WOULD TRIGGER' : 'WOULD NOT TRIGGER' }}
             </span>
-            <span class="status-separator tw:text-xs">•</span>
+            <span class="status-separator tw:text-xs tw:flex-shrink-0">•</span>
             <span class="tw:text-xs">
               {{ evaluationStatus.reason }}
             </span>
