@@ -1,12 +1,12 @@
 <template>
   <q-card style="min-width: 700px">
-    <q-card-section class="q-pt-md">
+    <q-card-section class="q-pt-sm">
       <div class="row items-center">
-        <div class="text-bold text-h6 q-pb-lg">Query Inspector</div>
+        <div class="text-bold text-h6 q-pb-none">Query Inspector</div>
         <q-space />
         <q-btn
           icon="close"
-          class="q-mb-lg"
+          class="q-mb-none"
           flat
           round
           dense
@@ -14,13 +14,13 @@
           data-test="query-inspector-close-btn"
         />
       </div>
-      <div class="text-bold q-pb-sm">Panel : {{ dataTitle }}</div>
+      <div class="text-bold q-pb-xs">Panel : {{ dataTitle }}</div>
       <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
       <div
         v-for="(query, index) in ((metaData as any)?.queries ?? [])"
         :key="query?.originalQuery"
       >
-        <div class="text-bold q-py-sm">Query: {{ index + 1 }}</div>
+        <div class="text-bold q-py-xs">Query: {{ index + 1 }}</div>
         <q-table
           class="query-inspector-table"
           :rows="getRows(query)"
@@ -29,6 +29,8 @@
           hide-bottom
           flat
           dense
+          v-model:pagination="pagination"
+          :rows-per-page-options="[0]"
           row-key="index"
           wrap-cells
           data-test="query-inspector"
@@ -167,7 +169,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .query-inspector-table {
-  margin-bottom: 16px;
+  margin-bottom: 5px;
 
   :deep(.q-table__container) {
     border: none;
@@ -176,7 +178,7 @@ export default defineComponent({
 
   :deep(.q-table tbody td) {
     border-bottom: 1px solid #e9ecef;
-    padding: 16px;
+    padding: 5px;
     vertical-align: top;
     background: #ffffff;
   }
