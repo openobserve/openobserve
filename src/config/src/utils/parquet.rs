@@ -160,7 +160,8 @@ pub async fn get_recordbatch_reader_from_bytes(
         FileFormat::Parquet => {
             let schema_reader = Cursor::new(data.clone());
             let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
-            Ok((schema, Box::pin(reader)))
+            let stream: RecordBatchStream = Box::pin(reader);
+            Ok((schema, stream))
         }
         FileFormat::Vortex => {
             // Read vortex file from bytes and convert to record batches
@@ -203,7 +204,8 @@ pub async fn get_recordbatch_reader_from_bytes(
                 }
             });
 
-            Ok((schema, Box::pin(stream)))
+            let stream: RecordBatchStream = Box::pin(stream);
+            Ok((schema, stream))
         }
     }
 }
