@@ -442,9 +442,6 @@ const fetchQuerySchema = async () => {
 // Handle chart data updates from PanelSchemaRenderer
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
-  console.log("[PreviewAlert] Chart data updated, resultMetaData:", resultMetaData);
-  console.log("[PreviewAlert] Current selectedTab:", props.selectedTab);
-
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
@@ -519,14 +516,17 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             console.log("[PreviewAlert] Got count from total field (PromQL fallback):", resultCount);
           }
         }
-        // Custom mode without aggregations: use 'total' field (log count)
+        // Custom mode without aggregations: sum zo_sql_num from all partitions
         else if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
-          if (latestPartition?.total !== undefined) {
-            resultCount = latestPartition.total;
-            console.log("[PreviewAlert] Got count from total field (Custom no agg):", resultCount);
-          } else if (Array.isArray(latestPartition?.hits)) {
-            resultCount = latestPartition.hits.length;
-            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
+          // Iterate through ALL partitions to sum zo_sql_num values
+          for (const partition of firstQueryMetadata) {
+            if (Array.isArray(partition?.hits)) {
+              for (const hit of partition.hits) {
+                if (hit.zo_sql_num !== undefined) {
+                  resultCount += hit.zo_sql_num;
+                }
+              }
+            }
           }
         }
         // Fallback for any other modes
@@ -576,8 +576,6 @@ const handleChartDataUpdate = (resultMetaData: any) => {
 
 // Handle series data update event (for PromQL and other series-based data)
 const handleSeriesDataUpdate = (seriesData: any) => {
-  console.log("[PreviewAlert] Series data updated:", seriesData);
-
   // Only process for PromQL mode
   if (props.selectedTab !== "promql") {
     return;
@@ -828,28 +826,28 @@ const refreshData = () => {
     return;
   }
 
-  // Handle custom mode without aggregations - show histogram of log counts over time
+  // Handle custom mode without aggregations - configure for histogram visualization
+  // The backend automatically converts the query to histogram (zo_sql_key, zo_sql_num)
   if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
-    console.log("[PreviewAlert] Configuring panel for custom mode without aggregations (log count histogram)");
+    console.log("[PreviewAlert] Configuring panel for custom mode without aggregations (histogram)");
 
-    // For custom without aggregations, create a histogram visualization
+    // Configure x-axis for zo_sql_key (timestamp buckets)
     xAxis = [
       {
-        label: store.state.zoConfig.timestamp_column || "_timestamp",
-        alias: "x_axis_1",
-        column: store.state.zoConfig.timestamp_column || "_timestamp",
+        label: "Time",
+        alias: "zo_sql_key",
+        column: "zo_sql_key",
         color: null,
-        aggregationFunction: "histogram"
       }
     ];
 
+    // Configure y-axis for zo_sql_num (counts)
     yAxis = [
       {
         label: "count",
-        alias: "y_axis_1",
-        column: "*",
-        color: null,
-        aggregationFunction: "count"
+        alias: "zo_sql_num",
+        column: "zo_sql_num",
+        color: "#5960b2",
       }
     ];
 
@@ -861,9 +859,8 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].query = props.query;
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
-    dashboardPanelData.data.queries[0].config.show_histogram = true;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.type = "bar"; // Histogram visualization
+    dashboardPanelData.data.type = "bar"; // Bar chart for histogram
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
