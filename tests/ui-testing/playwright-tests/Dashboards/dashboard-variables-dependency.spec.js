@@ -246,6 +246,17 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
           await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
           await pm.dashboardSetting.openVariables();
           await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        } else {
+          // Dialog is still open, check if we're on Add Variable form and navigate back to list
+          const isAddFormVisible = await page.locator('[data-test="dashboard-variable-cancel-btn"]').isVisible().catch(() => false);
+          if (isAddFormVisible) {
+            // Cancel the Add Variable form to go back to variables list
+            await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+            await page.waitForTimeout(500);
+          }
+          // Make sure we're on variables tab
+          await pm.dashboardSetting.goToVariablesTab();
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
         }
       }
     }
@@ -259,6 +270,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for settings dialog to be fully closed
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
+    // If not visible, we may have been redirected to the dashboard list, so navigate back
+    const isDashboardView = await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').isVisible().catch(() => false);
+    if (!isDashboardView) {
+      // Not on dashboard, navigate back to it
+      await pm.dashboardList.clickOnDashboard(dashboardName);
+      await waitForDashboardPage(page);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    }
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -355,6 +376,17 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
           await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
           await pm.dashboardSetting.openVariables();
           await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        } else {
+          // Dialog is still open, check if we're on Add Variable form and navigate back to list
+          const isAddFormVisible = await page.locator('[data-test="dashboard-variable-cancel-btn"]').isVisible().catch(() => false);
+          if (isAddFormVisible) {
+            // Cancel the Add Variable form to go back to variables list
+            await page.locator('[data-test="dashboard-variable-cancel-btn"]').click();
+            await page.waitForTimeout(500);
+          }
+          // Make sure we're on variables tab
+          await pm.dashboardSetting.goToVariablesTab();
+          await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
         }
       }
     }
@@ -368,6 +400,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for settings dialog to be fully closed
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
+    // If not visible, we may have been redirected to the dashboard list, so navigate back
+    const isDashboardView = await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').isVisible().catch(() => false);
+    if (!isDashboardView) {
+      // Not on dashboard, navigate back to it
+      await pm.dashboardList.clickOnDashboard(dashboardName);
+      await waitForDashboardPage(page);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    }
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[5]}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -480,6 +522,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for settings dialog to be fully closed
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
+    // If not visible, we may have been redirected to the dashboard list, so navigate back
+    const isDashboardView = await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').isVisible().catch(() => false);
+    if (!isDashboardView) {
+      // Not on dashboard, navigate back to it
+      await pm.dashboardList.clickOnDashboard(dashboardName);
+      await waitForDashboardPage(page);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    }
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[8]}"]`).waitFor({ state: "visible", timeout: 10000 });
