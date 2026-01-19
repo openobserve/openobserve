@@ -140,7 +140,6 @@ export class GaugeConverter implements PromQLChartConverter {
       tooltip: {
         show: true,
         trigger: "item",
-        confine: true,
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
