@@ -191,7 +191,7 @@ pub async fn get_enrichment_table_inner(
             org_id,
             table_name,
             apply_primary_region_if_specified,
-            db_stats.end_time,
+            db_stats.end_time + 1, // search query end time is not inclusive
         )
         .await?
     } else {
