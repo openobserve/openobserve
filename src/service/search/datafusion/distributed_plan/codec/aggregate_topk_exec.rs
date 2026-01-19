@@ -87,6 +87,7 @@ mod tests {
             vec![(col("a", &schema)?, "a".to_string())],
             vec![],
             vec![vec![false]],
+            false,
         );
 
         let aggregates = vec![Arc::new(

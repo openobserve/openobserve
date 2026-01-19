@@ -228,7 +228,11 @@ flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
-axum-extra = { version = "0.10", features = ["typed-header", "query", "cookie"] }
+axum-extra = { version = "0.10", features = [
+    "typed-header",
+    "query",
+    "cookie",
+] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 async-fs = "2.2"
 tower = { version = "0.5", features = ["full"] }
@@ -249,7 +253,12 @@ http = "1.2"
 http-body = "1.0"
 http-body-util = "0.1"
 hyper = { version = "1.6", features = ["full"] }
-hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = [
+    "tokio",
+    "server",
+    "http1",
+    "http2",
+] }
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -273,16 +282,16 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "51.0.0"
-datafusion-proto = "51.0.0"
-datafusion-functions-aggregate-common = "51.0.0"
-datafusion-functions-json = "0.51.0"
+datafusion = "52.0.0"
+datafusion-proto = "52.0.0"
+datafusion-functions-aggregate-common = "52.0.0"
+datafusion-functions-json = "0.52.0"
 expect-test = "1.4"
-arrow = { version = "57.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "57.0.0"
-arrow-json = "57.0.0"
-arrow-schema = { version = "57.0.0", features = ["serde"] }
-parquet = { version = "57.0.0", features = ["arrow", "async", "object_store"] }
+arrow = { version = "57.1.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "57.1.0"
+arrow-json = "57.1.0"
+arrow-schema = { version = "57.1.0", features = ["serde"] }
+parquet = { version = "57.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.4", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.59.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
@@ -418,6 +427,11 @@ utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 uuid = { version = "1.18.1", features = ["v7"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", branch = "v0.51" }
-vrl = { version = "0.28.1", features = ["arbitrary", "value", "compiler", "test"] }
+vrl = { version = "0.28.1", features = [
+    "arbitrary",
+    "value",
+    "compiler",
+    "test",
+] }
 zip = "6.0.0"
 zstd = "0.13"

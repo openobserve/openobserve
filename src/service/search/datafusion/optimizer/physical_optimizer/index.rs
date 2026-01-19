@@ -378,12 +378,15 @@ mod tests {
     }
 
     fn in_list(field: &str, list: Vec<&str>) -> Arc<dyn PhysicalExpr> {
-        Arc::new(InListExpr::new(
-            column(field),
-            list.iter().map(|lit| literal(lit)).collect(),
-            false,
-            None,
-        ))
+        Arc::new(
+            InListExpr::try_new(
+                column(field),
+                list.iter().map(|lit| literal(lit)).collect(),
+                false,
+                &Schema::new(vec![Field::new(field, DataType::Utf8, true)]),
+            )
+            .unwrap(),
+        )
     }
 
     #[test]
