@@ -442,12 +442,6 @@ export default defineComponent({
           name: "alertList",
         },
         {
-          title: t("menu.incidents"),
-          icon: outlinedNotificationsActive,
-          link: "/incidents",
-          name: "incidentList",
-        },
-        {
           title: t("menu.ingestion"),
           icon: outlinedFilterAlt,
           link: "/ingestion",
@@ -567,6 +561,27 @@ export default defineComponent({
       }
     });
 
+    const updateIncidentsMenu = () => {
+      if (config.isCloud == "true" || config.isEnterprise == "true") {
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+
+        const incidentExists = linksList.value.some(
+          (link) => link.name === "incidentList",
+        );
+
+        if (alertIndex !== -1 && !incidentExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.incidents"),
+            icon: outlinedNotificationsActive,
+            link: "/incidents",
+            name: "incidentList",
+          });
+        }
+      }
+    };
+
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
         const incidentIndex = linksList.value.findIndex(
@@ -592,6 +607,7 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     const filterMenus = () => {
+      updateIncidentsMenu();
       updateActionsMenu();
 
       const disableMenus = new Set(
