@@ -307,7 +307,6 @@ export default defineComponent({
         .catch(() => {
         });
     };
-
     return {
       pagination: ref({
         rowsPerPage: 0,
