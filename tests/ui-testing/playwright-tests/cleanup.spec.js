@@ -31,7 +31,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
         'incident_e2e_dest_',
-        'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
+        'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
+        /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
       [
@@ -125,7 +126,7 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up pipeline destinations matching test patterns
     await pm.apiCleanup.cleanupPipelineDestinations([
-      /^destination\d{2,3}$/  // destination12, destination123, etc.
+      /^destination\d{1,3}$/  // destination4, destination44, destination444, etc.
     ]);
 
     // Clean up functions matching test patterns
