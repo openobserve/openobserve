@@ -24,6 +24,11 @@ test.describe("Trace Error Filter testcases", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTracesUrl();
 
+    // Select the default stream as data is ingested for it only
+    if (await pm.tracesPage.isStreamSelectVisible()) {
+      await pm.tracesPage.selectTraceStream('default');
+    }
+
     testLogger.info('Test setup completed for trace error filtering');
   });
 
@@ -40,19 +45,18 @@ test.describe("Trace Error Filter testcases", () => {
     // Setup and run search
     await pm.tracesPage.setupTraceSearch();
 
-    // Look for traces with error counts
-    const errorTrace = pm.tracesPage.getErrorTraces();
-    let errorTraceCount = 0;
+    // Look for traces with error counts using POM methods
+    const hasErrorTraces = await pm.tracesPage.isErrorTraceVisible();
 
-    if (await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (hasErrorTraces) {
       testLogger.info('Found traces with error indicators');
 
-      // Count error traces
-      errorTraceCount = await errorTrace.count();
+      // Count error traces using POM method
+      const errorTraceCount = await pm.tracesPage.getErrorTraceCount();
       testLogger.info(`Found ${errorTraceCount} traces with errors`);
 
-      // Get error count text from first trace
-      const errorText = await errorTrace.first().textContent();
+      // Get error count text from first trace using POM method
+      const errorText = await pm.tracesPage.getFirstErrorTraceText();
       testLogger.info(`Error indicator text: ${errorText}`);
 
       // Verify error count is displayed with proper format
@@ -66,9 +70,9 @@ test.describe("Trace Error Filter testcases", () => {
         testLogger.info(`Error count extracted: ${errorCount}`);
       }
 
-      // Verify multiple error traces if available
+      // Verify multiple error traces if available using POM method
       if (errorTraceCount > 1) {
-        const secondErrorText = await errorTrace.nth(1).textContent();
+        const secondErrorText = await pm.tracesPage.getErrorTraceTextAt(1);
         expect(secondErrorText).toMatch(/Errors\s*:\s*\d+/);
         testLogger.info('Multiple error traces verified');
       }
@@ -123,9 +127,8 @@ test.describe("Trace Error Filter testcases", () => {
     // Setup and run search
     await pm.tracesPage.setupTraceSearch();
 
-    // Find and click on a trace with errors
-    const errorTrace = pm.tracesPage.getErrorTraces();
-    const hasErrorTraces = await errorTrace.first().isVisible({ timeout: 5000 }).catch(() => false);
+    // Find and click on a trace with errors using POM methods
+    const hasErrorTraces = await pm.tracesPage.isErrorTraceVisible();
 
     if (!hasErrorTraces) {
       testLogger.info('No error traces available - checking for any trace results');
@@ -142,7 +145,7 @@ test.describe("Trace Error Filter testcases", () => {
 
         if (errorStatusVisible || statusCode2Visible) {
           testLogger.info('Found error indicators in trace details');
-          expect(true).toBeTruthy();
+          expect(errorStatusVisible || statusCode2Visible).toBe(true);
         } else if (detailsVisible) {
           testLogger.info('Trace details visible but no error indicators - dataset may not have error traces');
           expect(detailsVisible).toBeTruthy();
@@ -159,7 +162,8 @@ test.describe("Trace Error Filter testcases", () => {
       throw new Error('Precondition failed: No trace results available. Ensure trace data is ingested.');
     }
 
-    await errorTrace.first().click();
+    // Click error trace using POM method
+    await pm.tracesPage.clickFirstErrorTrace();
     testLogger.info('Clicked on trace with errors');
 
     await page.waitForTimeout(3000);

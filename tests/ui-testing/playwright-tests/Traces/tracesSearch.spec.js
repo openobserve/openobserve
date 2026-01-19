@@ -24,6 +24,11 @@ test.describe("Traces Search testcases", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTraces();
 
+    // Select the default stream as data is ingested for it only
+    if (await pm.tracesPage.isStreamSelectVisible()) {
+      await pm.tracesPage.selectTraceStream('default');
+    }
+
     testLogger.info('Test setup completed for traces search');
   });
 
@@ -75,10 +80,7 @@ test.describe("Traces Search testcases", () => {
     const hasResults = await pm.tracesPage.hasTraceResults();
 
     if (!hasResults) {
-      testLogger.info('No trace results found');
-      // Verify we're in a valid state
-      expect(await pm.tracesPage.isNoResultsVisible()).toBeTruthy();
-      return;
+      throw new Error('Precondition failed: No trace results available. Ensure trace data is ingested.');
     }
 
     // Click first trace
@@ -124,20 +126,22 @@ test.describe("Traces Search testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing field list toggle');
 
-    // Wait for page to be ready and check if field list exists using page object
-    await page.waitForTimeout(1000);
-    const fieldListCount = await pm.tracesPage.getIndexListCount();
-    const fieldListExists = fieldListCount > 0;
+    // Setup trace search first to ensure page is fully loaded
+    await pm.tracesPage.setupTraceSearch();
 
-    if (!fieldListExists) {
-      testLogger.info('Field list element not found on page - skipping toggle test');
-      // Verify toggle button exists at least using page object
-      await pm.tracesPage.expectFieldListToggleButtonVisible();
-      return;
+    // Wait for page to stabilize after search
+    await page.waitForTimeout(2000);
+
+    // Check if field list toggle button exists - this is the primary control
+    const toggleButtonVisible = await pm.tracesPage.isFieldListToggleButtonVisible();
+
+    if (!toggleButtonVisible) {
+      throw new Error('Precondition failed: Field list toggle button not found on page. Verify traces page renders correctly.');
     }
 
     // Check initial state of field list using page object
     const fieldListVisible = await pm.tracesPage.isIndexListVisible();
+    testLogger.info(`Initial field list state: ${fieldListVisible ? 'visible' : 'hidden'}`);
 
     // Toggle field list
     await pm.tracesPage.toggleFieldList();
@@ -145,9 +149,10 @@ test.describe("Traces Search testcases", () => {
 
     // Check new state using page object
     const fieldListVisibleAfter = await pm.tracesPage.isIndexListVisible();
+    testLogger.info(`After toggle field list state: ${fieldListVisibleAfter ? 'visible' : 'hidden'}`);
 
-    // Should be opposite of initial state
-    expect(fieldListVisibleAfter).toBe(!fieldListVisible);
+    // Verify toggle functionality worked - state should change
+    expect(fieldListVisibleAfter).not.toBe(fieldListVisible);
 
     testLogger.info(`Field list toggled: ${fieldListVisible} -> ${fieldListVisibleAfter}`);
   });

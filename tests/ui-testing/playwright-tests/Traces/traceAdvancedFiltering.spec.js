@@ -24,6 +24,11 @@ test.describe("Trace Advanced Filtering testcases", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTracesUrl();
 
+    // Select the default stream as data is ingested for it only
+    if (await pm.tracesPage.isStreamSelectVisible()) {
+      await pm.tracesPage.selectTraceStream('default');
+    }
+
     testLogger.info('Test setup completed for advanced trace filtering');
   });
 
@@ -119,6 +124,11 @@ test.describe("Trace Advanced Filtering testcases", () => {
     const notQuery = "NOT status_code='2'";
     await pm.tracesPage.enterTraceQuery(notQuery);
 
+    // Verify query is in the editor
+    const editorContent = await pm.tracesPage.getQueryEditorContent();
+    expect(editorContent).toContain('NOT');
+    testLogger.info('NOT query entered in editor');
+
     // Set time range and run search
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runSearch();
@@ -126,27 +136,23 @@ test.describe("Trace Advanced Filtering testcases", () => {
 
     // Check results
     const hasResults = await pm.tracesPage.hasTraceResults();
+    const noResults = await pm.tracesPage.isNoResultsVisible();
+    const hasError = await pm.tracesPage.isErrorMessageVisible();
+
+    // Verify the NOT query executed properly (no syntax error)
+    if (hasError) {
+      const errorText = await pm.tracesPage.getErrorMessageText();
+      throw new Error(`NOT query failed with error: ${errorText}`);
+    }
+
+    // Verify we got a valid response (either results or no results)
+    expect(hasResults || noResults).toBeTruthy();
+    testLogger.info(`NOT query completed: Results=${hasResults}, NoResults=${noResults}`);
 
     if (hasResults) {
-      testLogger.info('NOT query returned results');
-
-      // Click on first result to verify no errors
-      await pm.tracesPage.clickFirstTraceResult();
-      await page.waitForTimeout(2000);
-
-      // Check that status_code is not 2 using page object
-      const statusCode2 = await pm.tracesPage.isStatusCode2Visible();
-
-      if (statusCode2) {
-        testLogger.info('Warning: Found status_code=2 in NOT query results - may be from different field');
-      } else {
-        testLogger.info('Verified: No error status codes in results');
-      }
-      // Test passes - we verified the query executed and checked results
-      expect(true).toBeTruthy();
-    } else {
-      testLogger.info('No results for NOT query');
-      expect(await pm.tracesPage.isNoResultsVisible() || !hasResults).toBeTruthy();
+      testLogger.info('NOT query returned results - filter applied successfully');
+      // The results should only contain traces where status_code is NOT 2
+      // We verify by checking that the query executed without errors
     }
   });
 
