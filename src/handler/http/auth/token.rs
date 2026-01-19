@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,11 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-use actix_web::http::{Method, header};
-use actix_web::{Error, dev::ServiceRequest, error::ErrorUnauthorized};
-#[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 
+use super::validator::{AuthError, AuthValidationResult, RequestData};
 use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::jwt;
@@ -27,30 +25,29 @@ use crate::service::{db, users};
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
-    req: ServiceRequest,
-    auth_info: AuthExtractor,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use actix_web::error::ErrorForbidden;
-
+    req_data: &RequestData,
+    auth_info: &AuthExtractor,
+) -> Result<AuthValidationResult, AuthError> {
     use super::validator::check_permissions;
     use crate::common::utils::auth::V2_API_PREFIX;
 
     let user;
     let keys = get_dex_jwks().await;
-    let path = match req
-        .request()
+    let path = match req_data
+        .uri
         .path()
         .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
         Some(path) => path,
-        None => req.request().path(),
+        None => req_data.uri.path(),
     };
+    let path = path.strip_prefix("/").unwrap_or(path);
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     // Check if this is an MCP endpoint request or has the MCP header
     let is_mcp_endpoint = path_columns.get(1).map(|s| *s == "mcp").unwrap_or(false);
-    let has_mcp_header = req
-        .headers()
+    let has_mcp_header = req_data
+        .headers
         .get("x-o2-mcp")
         .and_then(|v| v.to_str().ok())
         .map(|v| v == "true")
@@ -127,7 +124,31 @@ pub async fn token_validator(
                         }
                         None => {
                             if path_columns.len() == 1 && path_columns[0] == "license" {
-                                users::get_user(Some("_meta"), user_id).await
+                                // for get license, as long as user is part of o2, it is fine
+                                if &req_data.method.to_string() == "GET" {
+                                    if let Ok(v) = db::user::get_user_record(user_id).await {
+                                        Some(config::meta::user::User {
+                                            email: v.email,
+                                            first_name: v.first_name,
+                                            last_name: v.last_name,
+                                            password: v.password,
+                                            salt: v.salt,
+                                            token: "".into(),
+                                            rum_token: None,
+                                            role: config::meta::user::UserRole::User,
+                                            org: "".into(),
+                                            is_external: v.user_type
+                                                == config::meta::user::UserType::External,
+                                            password_ext: v.password_ext,
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    // for anything else, which will mostly be PUT/POST calls,
+                                    // the user must be in _meta org
+                                    users::get_user(Some("_meta"), user_id).await
+                                }
                             } else {
                                 users::get_user(None, user_id).await
                             }
@@ -147,58 +168,42 @@ pub async fn token_validator(
                         || is_member_subscription
                         || allow_nonexistent_user) =>
                     {
-                        let mut req = req;
-
-                        if req.method().eq(&Method::POST)
-                            && !req.headers().contains_key("content-type")
-                        {
-                            req.headers_mut().insert(
-                                header::CONTENT_TYPE,
-                                header::HeaderValue::from_static(
-                                    "application/x-www-form-urlencoded",
-                                ),
-                            );
-                        }
-                        req.headers_mut().insert(
-                            header::HeaderName::from_static("user_id"),
-                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
-                        );
-                        Ok(req)
+                        // Allow these special cases without requiring user in DB
+                        Ok(AuthValidationResult {
+                            user_email: res.0.user_email.clone(),
+                            user_role: None,
+                            is_internal_user: false,
+                        })
                     }
                     Some(user) => {
-                        // / Hack for prometheus, need support POST and check the header
-                        let mut req = req;
-
-                        if req.method().eq(&Method::POST)
-                            && !req.headers().contains_key("content-type")
-                        {
-                            req.headers_mut().insert(
-                                header::CONTENT_TYPE,
-                                header::HeaderValue::from_static(
-                                    "application/x-www-form-urlencoded",
-                                ),
-                            );
-                        }
-                        req.headers_mut().insert(
-                            header::HeaderName::from_static("user_id"),
-                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
-                        );
+                        // Check permissions for the user
+                        let user_role = user.role;
+                        let is_external = user.is_external;
                         if auth_info.bypass_check
-                            || check_permissions(user_id, auth_info, user.role, user.is_external)
-                                .await
+                            || check_permissions(
+                                user_id,
+                                auth_info.clone(),
+                                user_role.clone(),
+                                is_external,
+                            )
+                            .await
                         {
-                            Ok(req)
+                            Ok(AuthValidationResult {
+                                user_email: res.0.user_email.clone(),
+                                user_role: Some(user_role),
+                                is_internal_user: !is_external,
+                            })
                         } else {
-                            Err((ErrorForbidden("Forbidden"), req))
+                            Err(AuthError::Forbidden("Forbidden".to_string()))
                         }
                     }
-                    _ => Err((ErrorUnauthorized("Unauthorized Access"), req)),
+                    _ => Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
                 }
             } else {
-                Err((ErrorUnauthorized("Unauthorized Access"), req))
+                Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
             }
         }
-        Err(err) => Err((ErrorUnauthorized(err), req)),
+        Err(err) => Err(AuthError::Unauthorized(err.to_string())),
     }
 }
 
@@ -225,8 +230,8 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn token_validator(
-    req: ServiceRequest,
-    _token: AuthExtractor,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    Err((ErrorUnauthorized("Not Supported"), req))
+    _req_data: &RequestData,
+    _token: &AuthExtractor,
+) -> Result<AuthValidationResult, AuthError> {
+    Err(AuthError::Unauthorized("Not Supported".to_string()))
 }

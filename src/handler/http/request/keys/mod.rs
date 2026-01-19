@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-#[cfg(not(feature = "enterprise"))]
-use actix_web::HttpRequest;
-use actix_web::{HttpResponse, delete, get, post, put, web};
+use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
     crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
@@ -30,8 +26,7 @@ use {
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    actix_web::http,
-    actix_web::web::Json,
+    axum::{Json, http::StatusCode, response::IntoResponse},
     config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
@@ -43,6 +38,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 /// Store a key credential in db
 #[utoipa::path(
     post,
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "CreateCipherKey",
     summary = "Create encryption key",
@@ -68,25 +64,22 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/cipher_keys")]
 pub async fn save(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    body: web::Json<KeyAddRequest>,
-) -> Result<HttpResponse, Error> {
-    let req = body.into_inner();
+    Json(body): Json<KeyAddRequest>,
+) -> Response {
+    let req = body;
 
     let user_id = user_email.user_id;
 
     if req.name.contains(":") {
-        return Ok(MetaHttpResponse::bad_request(
-            "Key name cannot have ':' in it",
-        ));
+        return MetaHttpResponse::bad_request("Key name cannot have ':' in it");
     }
 
     let cd: CipherData = match req.key.try_into() {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
     match cd.get_key().await {
@@ -94,9 +87,9 @@ pub async fn save(
         // it is set up correctly. We don't care what the actual entrypted string is.
         Ok(mut k) => match k.encrypt("hello world") {
             Ok(_) => {}
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         },
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
     match crate::service::db::keys::add(CipherEntry {
@@ -111,12 +104,16 @@ pub async fn save(
     {
         Ok(_) => {
             set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK,
-                "Key created successfully",
-            )))
+            (
+                StatusCode::OK,
+                Json(MetaHttpResponse::message(
+                    StatusCode::OK,
+                    "Key created successfully",
+                )),
+            )
+                .into_response()
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -124,11 +121,15 @@ pub async fn save(
 /// Store a key credential in db
 #[utoipa::path(
     post,
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "CreateCipherKey",
     summary = "Create encryption key",
     description = "Creates a new encryption key for data encryption and decryption operations. This feature is only \
                    available in enterprise deployments.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     responses(
         (status = 403, description = "Feature not supported", content_type = "application/json")
     ),
@@ -137,18 +138,14 @@ pub async fn save(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/cipher_keys")]
-pub async fn save(
-    _org_id: web::Path<String>,
-    _body: web::Payload,
-    _in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    Ok(MetaHttpResponse::forbidden("not supported"))
+pub async fn save(Path(_org_id): Path<String>) -> Response {
+    MetaHttpResponse::forbidden("not supported")
 }
 
 /// get key with given name if present
 #[utoipa::path(
     get,
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "GetCipherKey",
     summary = "Get encryption key details",
@@ -173,11 +170,10 @@ pub async fn save(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/cipher_keys/{key_name}")]
-pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get(Path(path): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let (org_id, key_name) = path.into_inner();
+        let (org_id, key_name) = path;
 
         let kdata = match infra::table::cipher::get_data(
             &org_id,
@@ -188,11 +184,9 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         {
             Ok(Some(k)) => k,
             Ok(None) => {
-                return Ok(MetaHttpResponse::not_found(format!(
-                    "Key {key_name} not found"
-                )));
+                return MetaHttpResponse::not_found(format!("Key {key_name} not found"));
             }
-            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+            Err(e) => return MetaHttpResponse::internal_error(e),
         };
 
         // we can be fairly certain that in db we have proper json
@@ -202,18 +196,19 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
             name: key_name,
             key: cd.into(),
         };
-        Ok(HttpResponse::Ok().json(res))
+        Json(res).into_response()
     }
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+        MetaHttpResponse::forbidden("not supported")
     }
 }
 
 /// list all keys for given org
 #[utoipa::path(
     get,
+    path = "/{org_id}/cipher_keys",
     context_path = "/api",
     operation_id = "ListCipherKeys",
     summary = "List encryption keys",
@@ -234,12 +229,12 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/cipher_keys")]
-pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path.into_inner();
-
+        if org_id.is_empty() {
+            return MetaHttpResponse::not_found("Organization not found");
+        }
         let filter = infra::table::cipher::ListFilter {
             org: Some(org_id),
             kind: Some(infra::table::cipher::EntryKind::CipherKey),
@@ -247,7 +242,7 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
 
         let kdata = match infra::table::cipher::list_filtered(filter, None).await {
             Ok(list) => list,
-            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+            Err(e) => return MetaHttpResponse::internal_error(e),
         };
 
         let kdata = kdata
@@ -262,18 +257,19 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
             .collect::<Vec<_>>();
 
         let res = KeyListResponse { keys: kdata };
-        Ok(HttpResponse::Ok().json(res))
+        Json(res).into_response()
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+        drop(org_id);
+        MetaHttpResponse::forbidden("not supported")
     }
 }
 
 /// delete key credentials for given key name
 #[utoipa::path(
     delete,
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "DeleteCipherKey",
     summary = "Delete encryption key",
@@ -297,11 +293,10 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/cipher_keys/{key_name}")]
-pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let (org_id, key_name) = path.into_inner();
+        let (org_id, key_name) = path;
         match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
@@ -311,18 +306,22 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         {
             Ok(_) => {
                 remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    http::StatusCode::OK,
-                    "cipher key removed successfully",
-                )))
+                (
+                    StatusCode::OK,
+                    Json(MetaHttpResponse::message(
+                        StatusCode::OK,
+                        "cipher key removed successfully",
+                    )),
+                )
+                    .into_response()
             }
-            Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+            Err(e) => MetaHttpResponse::internal_error(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
         drop(path);
-        Ok(MetaHttpResponse::forbidden("not supported"))
+        MetaHttpResponse::forbidden("not supported")
     }
 }
 
@@ -330,6 +329,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
+    path = "/{org_id}/cipher_keys/bulk",
     context_path = "/api",
     operation_id = "DeleteCipherKeysBulk",
     summary = "Delete multiple encryption key",
@@ -354,53 +354,52 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/cipher_keys/bulk")]
 pub async fn delete_bulk(
-    path: web::Path<String>,
-    body: web::Json<BulkDeleteRequest>,
+    Path(path): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let body = body.into_inner();
+    Json(body): Json<BulkDeleteRequest>,
+) -> Response {
+    let org_id = path;
     let user_id = &user_email.user_id;
     for key in &body.ids {
         if !check_permissions(key, &org_id, user_id, "cipher_keys", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
     let mut successful = Vec::with_capacity(body.ids.len());
     let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
-    for key_name in body.ids {
+    for key_name in &body.ids {
         match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
-            &key_name,
+            key_name,
         )
         .await
         {
             Ok(_) => {
-                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
-                successful.push(key_name);
+                remove_ownership(&org_id, "cipher_keys", Authz::new(key_name)).await;
+                successful.push(key_name.clone());
             }
             Err(e) => {
                 log::error!("error in deleting key {key_name} : {e}");
-                unsuccessful.push(key_name);
+                unsuccessful.push(key_name.clone());
                 err = Some(e.to_string());
             }
         }
     }
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 #[cfg(feature = "enterprise")]
 /// update the credentials for given key
 #[utoipa::path(
-    post,
+    put,
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "UpdateCipherKey",
     summary = "Update encryption key",
@@ -431,31 +430,26 @@ pub async fn delete_bulk(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/cipher_keys/{key_name}")]
 pub async fn update(
-    path: web::Path<(String, String)>,
+    Path(path): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<KeyAddRequest>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, key_name) = path.into_inner();
+) -> Response {
+    let (org_id, key_name) = path;
 
     if key_name != req.name {
-        return Ok(MetaHttpResponse::bad_request(
-            "Key name from request does not match path",
-        ));
+        return MetaHttpResponse::bad_request("Key name from request does not match path");
     }
 
     let user_id = user_email.user_id;
 
     if req.name.contains(":") {
-        return Ok(MetaHttpResponse::bad_request(
-            "Key name cannot have ':' in it",
-        ));
+        return MetaHttpResponse::bad_request("Key name cannot have ':' in it");
     }
 
     let incoming: CipherData = match req.key.try_into() {
         Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     };
 
     let kdata = match infra::table::cipher::get_data(
@@ -467,11 +461,9 @@ pub async fn update(
     {
         Ok(Some(k)) => k,
         Ok(None) => {
-            return Ok(MetaHttpResponse::not_found(format!(
-                "Key {key_name} not found"
-            )));
+            return MetaHttpResponse::not_found(format!("Key {key_name} not found"));
         }
-        Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
+        Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
     // we can be fairly certain that in db we have proper json
@@ -484,9 +476,9 @@ pub async fn update(
         // it is set up correctly. We don't care what the actual entrypted string is.
         Ok(mut k) => match k.encrypt("hello world") {
             Ok(_) => {}
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+            Err(e) => return MetaHttpResponse::bad_request(e),
         },
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
     match crate::service::db::keys::update(CipherEntry {
@@ -499,11 +491,15 @@ pub async fn update(
     })
     .await
     {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
-            "key updated successfully",
-        ))),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(MetaHttpResponse::message(
+                StatusCode::OK,
+                "key updated successfully",
+            )),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -511,12 +507,14 @@ pub async fn update(
 /// update the credentials for given key
 #[utoipa::path(
     put,
+    path = "/{org_id}/cipher_keys/{key_name}",
     context_path = "/api",
     operation_id = "UpdateCipherKey",
     summary = "Update encryption key",
     description = "Updates the configuration and parameters of an existing encryption key. This feature is only \
                    available in enterprise deployments.",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
     ),
     responses(
@@ -527,11 +525,6 @@ pub async fn update(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/cipher_keys/{key_name}")]
-pub async fn update(
-    _path: web::Path<(String, String)>,
-    _body: web::Payload,
-    _in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    Ok(MetaHttpResponse::forbidden("not supported"))
+pub async fn update(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("not supported")
 }

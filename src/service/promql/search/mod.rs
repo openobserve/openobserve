@@ -357,7 +357,9 @@ async fn search_in_cluster(
     } else if result_type == "exemplars" {
         merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
-        return Err(server_internal_error("invalid result type"));
+        return Err(server_internal_error(format!(
+            "invalid result type: {result_type}"
+        )));
     };
     let result_time = stop_watch.record_split("result").as_secs_f64();
     log::info!(

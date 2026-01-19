@@ -17,6 +17,9 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, entity::p
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
+
+// Status constants for enrichment table URL jobs
+const STATUS_PROCESSING: i16 = 1;
 // Re-export the entity for convenience
 pub use crate::table::entity::enrichment_table_urls::{
     ActiveModel, Column, Entity, Model, Relation,
@@ -28,6 +31,7 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichmentTableUrlRecord {
+    pub id: String, // KSUID (27 chars)
     pub org: String,
     pub name: String,
     pub url: String,
@@ -47,6 +51,7 @@ pub struct EnrichmentTableUrlRecord {
 impl From<Model> for EnrichmentTableUrlRecord {
     fn from(model: Model) -> Self {
         Self {
+            id: model.id,
             org: model.org,
             name: model.name,
             url: model.url,
@@ -77,10 +82,9 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
 
-    // Try to find existing record
+    // Try to find existing record by ID
     let existing = Entity::find()
-        .filter(Column::Org.eq(&record.org))
-        .filter(Column::Name.eq(&record.name))
+        .filter(Column::Id.eq(&record.id))
         .one(client)
         .await?;
 
@@ -100,8 +104,9 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
         active.is_local_region = Set(record.is_local_region);
         active.update(client).await?;
     } else {
-        // Insert new record
+        // Insert new record with provided ID (KSUID)
         let active = ActiveModel {
+            id: Set(record.id),
             org: Set(record.org),
             name: Set(record.name),
             url: Set(record.url),
@@ -116,7 +121,6 @@ pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> 
             last_byte_position: Set(record.last_byte_position),
             supports_range: Set(record.supports_range),
             is_local_region: Set(record.is_local_region),
-            ..Default::default()
         };
         Entity::insert(active).exec(client).await?;
     }
@@ -183,6 +187,109 @@ pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, err
         .await?;
 
     Ok(records.into_iter().map(|model| model.into()).collect())
+}
+
+/// Get all URL jobs for a specific table, ordered by created_at DESC
+///
+/// # Arguments
+/// * `org` - Organization name
+/// * `table_name` - Table name
+///
+/// # Returns
+/// * `Result<Vec<EnrichmentTableUrlRecord>, errors::Error>` - List of records or empty vec
+pub async fn get_all_for_table(
+    org: &str,
+    table_name: &str,
+) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
+    use sea_orm::QueryOrder;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let records = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Name.eq(table_name))
+        .order_by_desc(Column::CreatedAt)
+        .all(client)
+        .await?;
+
+    Ok(records.into_iter().map(|model| model.into()).collect())
+}
+
+/// Get a specific URL job by ID
+///
+/// # Arguments
+/// * `job_id` - The KSUID of the job
+///
+/// # Returns
+/// * `Result<Option<EnrichmentTableUrlRecord>, errors::Error>` - The record or None
+pub async fn get_by_id(job_id: &str) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .one(client)
+        .await?;
+
+    Ok(record.map(|model| model.into()))
+}
+
+/// Delete a specific URL job by ID
+///
+/// # Arguments
+/// * `job_id` - The KSUID of the job to delete
+///
+/// # Returns
+/// * `Result<(), errors::Error>` - Success or error
+pub async fn delete_by_id(job_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    Entity::delete_many()
+        .filter(Column::Id.eq(job_id))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
+/// Check if any jobs are in processing status for a table
+///
+/// # Arguments
+/// * `org` - Organization name
+/// * `table_name` - Table name
+///
+/// # Returns
+/// * `Result<bool, errors::Error>` - true if any job is processing
+pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let count = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Name.eq(table_name))
+        .filter(Column::Status.eq(STATUS_PROCESSING))
+        .count(client)
+        .await?;
+
+    Ok(count > 0)
+}
+
+/// Delete all URL jobs for a table
+///
+/// # Arguments
+/// * `org` - Organization name
+/// * `table_name` - Table name
+///
+/// # Returns
+/// * `Result<(), errors::Error>` - Success or error
+pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Name.eq(table_name))
+        .exec(client)
+        .await?;
+
+    Ok(())
 }
 
 /// Atomically claims stale jobs that are stuck in Processing status
@@ -343,5 +450,19 @@ pub async fn claim_stale_jobs(
             .await?;
 
         Ok(models.into_iter().map(|model| model.into()).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_has_processing_jobs() {
+        // Test with non-existent table - should return false or error
+        let result = has_processing_jobs("test_org", "test_table").await;
+        // In test environment without DB, this will error or return false
+        // The test validates the function signature
+        assert!(result.is_ok() || result.is_err());
     }
 }

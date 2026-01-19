@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="backfill-jobs-list-page" class="q-pa-none flex">
-    <div class="tw-w-full tw-h-full tw-pr-[0.625rem]">
+  <q-page data-test="backfill-jobs-list-page">
+    <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header -->
-      <div class="card-container tw-mb-[0.625rem]">
-        <div class="flex justify-between full-width tw-h-[68px] tw-px-4 tw-py-3">
-          <div class="flex items-center">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
+          <div class="tw:flex tw:items-center">
             <q-btn
               no-caps
               padding="xs"
@@ -35,11 +35,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="backfill-jobs-back-btn"
             />
-            <div class="q-table__title tw-font-[600] q-ml-sm">
+            <div class="q-table__title tw:font-[600] q-ml-sm">
               Backfill Jobs
             </div>
           </div>
-          <div class="flex items-center">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <!-- Filters -->
+            <q-select
+              v-model="filters.status"
+              :options="statusOptions"
+              label="Status"
+              outlined
+              dense
+              clearable
+              style="width: 150px"
+              data-test="status-filter"
+            />
+            <q-select
+              v-model="filters.pipelineId"
+              :options="pipelineOptions"
+              option-label="label"
+              option-value="value"
+              label="Pipeline"
+              outlined
+              dense
+              clearable
+              use-input
+              input-debounce="300"
+              @filter="filterPipelines"
+              style="width: 250px"
+              data-test="pipeline-filter"
+            />
+            <q-btn
+              label="Clear Filters"
+              outline
+              no-caps
+              padding="xs sm"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              @click="clearFilters"
+              data-test="clear-filters-btn"
+            />
             <q-btn
               icon="refresh"
               flat
@@ -55,79 +94,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Filters -->
-      <div class="card-container tw-mb-[0.625rem] q-pa-md">
-        <div class="flex items-center tw-gap-4">
-          <q-select
-            v-model="filters.status"
-            :options="statusOptions"
-            label="Status"
-            outlined
-            dense
-            clearable
-            style="width: 150px"
-            data-test="status-filter"
-          />
-          <q-select
-            v-model="filters.pipelineId"
-            :options="pipelineOptions"
-            option-label="label"
-            option-value="value"
-            label="Pipeline"
-            outlined
-            dense
-            clearable
-            use-input
-            input-debounce="300"
-            @filter="filterPipelines"
-            style="width: 250px"
-            data-test="pipeline-filter"
-          />
-          <q-btn
-            label="Clear Filters"
-            outline
-            no-caps
-            padding="xs sm"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="clearFilters"
-            data-test="clear-filters-btn"
-          />
-        </div>
-      </div>
-
       <!-- Jobs Table -->
-      <div class="card-container">
+      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
+        <div class="card-container tw:h-[calc(100vh-127px)]">
         <q-table
+          ref="qTableRef"
           :rows="filteredJobs"
           :columns="columns"
           row-key="job_id"
           :loading="loading"
           :pagination="pagination"
-          @request="onRequest"
           binary-state-sort
-          flat
+          :style="filteredJobs.length > 0
+            ? 'width: 100%; height: calc(100vh - 130px)'
+            : 'width: 100%'"
+          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="backfill-jobs-table"
         >
           <!-- Empty State -->
           <template v-slot:no-data>
-            <div class="full-width tw-py-12 tw-text-center">
-              <q-icon name="inbox" size="48px" color="grey-5" />
-              <div class="text-h6 q-mt-md text-grey-7">No backfill jobs yet</div>
-              <div class="text-caption text-grey-6 q-mt-sm">
-                Create your first backfill job to fill gaps in your pipeline data
-              </div>
-            </div>
+            <NoData />
           </template>
 
           <!-- Pipeline Name Column -->
           <template v-slot:body-cell-pipeline_name="props">
             <q-td :props="props">
-              <div class="tw-font-medium">{{ props.row.pipeline_name || props.row.pipeline_id }}</div>
-              <div class="text-caption text-grey-6">
+              <div class="tw:font-medium">{{ props.row.pipeline_name || props.row.pipeline_id }}</div>
+            </q-td>
+          </template>
+
+          <!-- Time Range Column -->
+          <template v-slot:body-cell-time_range="props">
+            <q-td :props="props">
+              <div class="text-caption">
                 {{ formatTimeRange(props.row.start_time, props.row.end_time) }}
               </div>
             </q-td>
@@ -136,17 +135,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress Column -->
           <template v-slot:body-cell-progress_percent="props">
             <q-td :props="props">
-              <div class="tw-w-full">
-                <div class="text-caption q-mb-xs">{{ props.row.progress_percent }}%</div>
-                <q-linear-progress
-                  :value="props.row.progress_percent / 100"
-                  :color="getProgressColor(props.row.deletion_status)"
-                  size="8px"
-                  rounded
-                  data-test="progress-bar"
-                />
-                <div v-if="props.row.chunks_total" class="text-caption text-grey-6 q-mt-xs">
-                  {{ props.row.chunks_completed || 0 }} / {{ props.row.chunks_total }} chunks
+              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="tw:flex-1 tw:relative">
+                  <q-linear-progress
+                    :value="props.row.progress_percent / 100"
+                    :color="getProgressColor(props.row.deletion_status)"
+                    size="20px"
+                    rounded
+                    data-test="progress-bar"
+                  >
+                    <div class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center">
+                      <div class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm">
+                        {{ props.row.progress_percent }}%
+                      </div>
+                    </div>
+                  </q-linear-progress>
+                </div>
+                <div v-if="props.row.chunks_total" class="text-caption text-grey-6 tw:whitespace-nowrap tw:pr-8">
+                  {{ props.row.chunks_completed || 0 }}/{{ props.row.chunks_total }} chunks
                 </div>
               </div>
             </q-td>
@@ -173,15 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Actions Column -->
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <div class="flex items-center justify-end tw-gap-1">
+              <div class="tw:flex tw:items-center tw:justify-center">
                 <q-btn
                   v-if="canPauseJob(props.row.status)"
-                  flat
-                  dense
-                  round
-                  icon="pause"
+                  padding="sm"
+                  unelevated
                   size="sm"
-                  color="warning"
+                  icon="pause"
+                  round
+                  flat
                   @click="confirmPauseJob(props.row)"
                   data-test="pause-job-btn"
                 >
@@ -189,12 +195,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
                 <q-btn
                   v-if="canResumeJob(props.row.status)"
-                  flat
-                  dense
-                  round
-                  icon="play_arrow"
+                  padding="sm"
+                  unelevated
                   size="sm"
-                  color="positive"
+                  icon="play_arrow"
+                  round
+                  flat
                   @click="confirmResumeJob(props.row)"
                   data-test="resume-job-btn"
                 >
@@ -202,12 +208,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
                 <q-btn
                   v-if="canEditJob(props.row.status)"
-                  flat
-                  dense
-                  round
-                  icon="edit"
+                  padding="sm"
+                  unelevated
                   size="sm"
-                  color="primary"
+                  icon="edit"
+                  round
+                  flat
                   @click="editJob(props.row)"
                   data-test="edit-job-btn"
                 >
@@ -215,48 +221,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn>
                 <q-btn
                   v-if="canDeleteJob(props.row.status)"
-                  flat
-                  dense
-                  round
-                  icon="delete"
+                  padding="sm"
+                  unelevated
                   size="sm"
-                  color="negative"
+                  icon="delete"
+                  round
+                  flat
                   @click="confirmDeleteJob(props.row)"
                   data-test="delete-job-btn"
                 >
                   <q-tooltip>Delete Job</q-tooltip>
                 </q-btn>
                 <q-btn
-                  flat
-                  dense
-                  round
-                  icon="info"
+                  padding="sm"
+                  unelevated
                   size="sm"
+                  icon="info"
+                  round
+                  flat
                   @click="viewJob(props.row)"
                   data-test="view-job-btn"
                 >
                   <q-tooltip>View Details</q-tooltip>
                 </q-btn>
-                <!-- Error Indicator - Always render to maintain alignment -->
-                <div class="backfill-error-slot">
-                  <q-btn
-                    v-if="props.row.error"
-                    flat
-                    dense
-                    round
-                    icon="error"
-                    size="sm"
-                    color="negative"
-                    @click="showErrorDialog(props.row)"
-                    data-test="error-indicator-btn"
-                  >
-                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
-                  </q-btn>
-                </div>
+                <q-btn
+                  v-if="props.row.error"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  icon="error"
+                  round
+                  flat
+                  color="negative"
+                  @click="showErrorDialog(props.row)"
+                  data-test="error-indicator-btn"
+                >
+                  <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+                </q-btn>
               </div>
             </q-td>
           </template>
+
+          <template v-slot:header="props">
+              <q-tr :props="props">
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+          </template>
+
+          <!-- Bottom Pagination -->
+          <template #bottom="scope">
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="filteredJobs.length"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+          </template>
         </q-table>
+        </div>
       </div>
     </div>
 
@@ -312,7 +344,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </div>
+
+    <!-- Confirm Dialogs -->
+    <ConfirmDialog
+      ref="confirmPauseDialogRef"
+      title="Pause Backfill Job"
+      :message="`Are you sure you want to pause the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;? You can resume it later.`"
+      @confirm="pauseJob(selectedJobForAction!.job_id)"
+    />
+
+    <ConfirmDialog
+      ref="confirmResumeDialogRef"
+      title="Resume Backfill Job"
+      :message="`Are you sure you want to resume the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;?`"
+      @confirm="resumeJob(selectedJobForAction!.job_id)"
+    />
+
+    <ConfirmDialog
+      ref="confirmDeleteDialogRef"
+      title="Delete Backfill Job"
+      :message="`Are you sure you want to delete the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;? This will remove the job from the list but will not affect the backfilled data.`"
+      @confirm="deleteJob(selectedJobForAction!.job_id)"
+    />
+  </q-page>
 </template>
 
 <script setup lang="ts">
@@ -323,10 +377,16 @@ import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
+import NoData from "../shared/grid/NoData.vue";
+import QTablePagination from "../shared/grid/Pagination.vue";
+import ConfirmDialog from "../ConfirmDialog.vue";
 
 const router = useRouter();
 const $q = useQuasar();
 const store = useStore();
+
+// Refs
+const qTableRef = ref();
 
 const loading = ref(false);
 const jobs = ref<BackfillJob[]>([]);
@@ -337,16 +397,35 @@ const selectedJob = ref<BackfillJob | null>(null);
 const errorDialogVisible = ref(false);
 const errorDialogData = ref<BackfillJob | null>(null);
 
+// Confirm dialogs
+const confirmPauseDialogRef = ref();
+const confirmResumeDialogRef = ref();
+const confirmDeleteDialogRef = ref();
+const selectedJobForAction = ref<BackfillJob | null>(null);
+
 const filters = ref({
   status: null as string | null,
   pipelineId: null as any,
 });
 
 const pagination = ref({
-  page: 1,
-  rowsPerPage: 10,
-  rowsNumber: 0,
+  rowsPerPage: 20,
 });
+
+const selectedPerPage = ref(10);
+
+const perPageOptions = [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+];
+
+const changePagination = (key:any) => {
+  selectedPerPage.value = key.value;
+  pagination.value.rowsPerPage = key.value;
+  qTableRef.value?.setPagination(pagination.value);
+};
 
 const columns = [
   {
@@ -354,6 +433,13 @@ const columns = [
     label: "Pipeline",
     align: "left" as const,
     field: "pipeline_name",
+    sortable: true,
+  },
+  {
+    name: "time_range",
+    label: "Time Range",
+    align: "left" as const,
+    field: "start_time",
     sortable: true,
   },
   {
@@ -380,8 +466,10 @@ const columns = [
   {
     name: "actions",
     label: "Actions",
-    align: "right" as const,
+    align: "center" as const,
     field: "actions",
+    classes:'actions-column',
+    style: 'width: 150px;',
   },
 ];
 
@@ -401,7 +489,6 @@ const loadJobs = async () => {
       org_id: store.state.selectedOrganization.identifier,
     });
     jobs.value = response;
-    pagination.value.rowsNumber = response.length;
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
@@ -471,10 +558,6 @@ const refreshJobs = () => {
   loadJobs();
 };
 
-const onRequest = (props: any) => {
-  pagination.value = props.pagination;
-};
-
 const goBack = () => {
   router.back();
 };
@@ -510,36 +593,18 @@ const canDeleteJob = (status: string) => {
 };
 
 const confirmPauseJob = (job: BackfillJob) => {
-  $q.dialog({
-    title: "Pause Backfill Job",
-    message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    await pauseJob(job.job_id);
-  });
+  selectedJobForAction.value = job;
+  confirmPauseDialogRef.value.show();
 };
 
 const confirmResumeJob = (job: BackfillJob) => {
-  $q.dialog({
-    title: "Resume Backfill Job",
-    message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    await resumeJob(job.job_id);
-  });
+  selectedJobForAction.value = job;
+  confirmResumeDialogRef.value.show();
 };
 
 const confirmDeleteJob = (job: BackfillJob) => {
-  $q.dialog({
-    title: "Delete Backfill Job",
-    message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
-    cancel: true,
-    persistent: true,
-  }).onOk(async () => {
-    await deleteJob(job.job_id);
-  });
+  selectedJobForAction.value = job;
+  confirmDeleteDialogRef.value.show();
 };
 
 const pauseJob = async (jobId: string) => {

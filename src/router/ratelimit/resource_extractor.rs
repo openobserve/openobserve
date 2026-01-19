@@ -15,10 +15,9 @@
 
 use std::collections::HashMap;
 
-use actix_http::Method;
-use actix_web::dev::ServiceRequest;
 use config::meta::ratelimit::{RatelimitRule, RatelimitRuleType, get_resource_from_params};
 use futures_util::future::BoxFuture;
+use http::Method;
 use o2_ratelimit::{
     dataresource::{
         db::RATELIMIT_RULES_CACHE,
@@ -32,12 +31,9 @@ use o2_ratelimit::{
 use regex::Regex;
 use utoipa::OpenApi;
 
-use crate::{
-    common::utils::auth::extract_basic_auth_str,
-    handler::http::{
-        auth::validator::get_user_email_from_auth_str,
-        request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc,
-    },
+use crate::handler::http::{
+    auth::validator::get_user_email_from_auth_str, request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG,
+    router::openapi::ApiDoc,
 };
 
 fn extract_org_id(path: &str) -> String {
@@ -77,7 +73,7 @@ fn rule_extractor(
         .strip_prefix(format!("{}/api/", config::get_config().common.base_uri).as_str())
     {
         Some(path) => path,
-        None => &local_path,
+        None => local_path.strip_prefix("/").unwrap_or(&local_path),
     };
 
     let (path, org_id) = (path.to_string(), extract_org_id(path));
@@ -135,10 +131,21 @@ fn rule_extractor(
     })
 }
 
-pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, ExtractorRuleResult> {
-    let auth_str = extract_basic_auth_str(req.request());
-    let local_path = req.path().to_string();
+// Commented out: This function uses actix-web types and is not currently used
+/// Default extractor for axum Request
+pub fn default_extractor(req: &axum::extract::Request) -> BoxFuture<'_, ExtractorRuleResult> {
+    let auth_str = extract_basic_auth_str_axum(req);
+    let local_path = req.uri().path().to_string();
     rule_extractor(auth_str, local_path, req.method())
+}
+
+/// Extract basic auth string from axum Request
+fn extract_basic_auth_str_axum(req: &axum::extract::Request) -> String {
+    req.headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string()
 }
 
 async fn find_default_and_custom_rules(

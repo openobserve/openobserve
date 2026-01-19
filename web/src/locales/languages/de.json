@@ -107,7 +107,8 @@
     "manageTheme": "Theme verwalten",
     "url": "URL",
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
-    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren."
+    "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
+    "id": "ID"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -333,7 +334,8 @@
     "report": "Berichte",
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "incidents": "Vorfälle"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -412,7 +414,53 @@
     "community_lbl": "Gemeinschaft",
     "loading_license_info": "Lizenzinformationen werden geladen...",
     "installation_id_lbl": "Installations-ID",
-    "expired_lbl": "Abgelaufen"
+    "expired_lbl": "Abgelaufen",
+    "feature_comparision_subtitle": "Vergleichen Sie Funktionen aus Open Source-, Enterprise- und Cloud-Angeboten",
+    "feature_column_name": "Merkmal",
+    "edition_opensource": "Open Source (selbst gehostet)",
+    "edition_enterprise": "Enterprise (selbst gehostet)",
+    "edition_cloud": "Wolke",
+    "feature_logs": "Logs",
+    "feature_metrics": "Metriken",
+    "feature_traces": "Spuren",
+    "feature_rum": "RUM",
+    "feature_alerts": "Warnmeldungen",
+    "feature_dashboards": "Dashboards",
+    "feature_reports": "Berichte",
+    "feature_vrl_functions": "VRL-Funktionen",
+    "feature_pipelines": "Rohrleitungen",
+    "feature_high_availability": "Hohe Verfügbarkeit",
+    "feature_multitenancy": "Mehrmandantenfähigkeit (Organisationen)",
+    "feature_dynamic_schema": "Dynamisches Schema und Schemaentwicklung",
+    "feature_multilingual_gui": "Fortgeschrittene mehrsprachige GUI",
+    "feature_sso": "Einmaliges Anmelden",
+    "feature_rbac": "Rollenbasierte Zugriffskontrolle (RBAC)",
+    "feature_federated_search": "Föderierte Suche//Supercluster",
+    "feature_query_management": "Verwaltung von Abfragen",
+    "feature_workload_management": "Workload-Management (QoS)",
+    "feature_audit_trail": "Audit-Trail",
+    "feature_action_scripts": "Aktionsskripte",
+    "feature_sensitive_data_redaction": "Redaktion sensibler Daten",
+    "feature_influence_roadmap": "Fähigkeit, die Roadmap zu beeinflussen",
+    "feature_license": "Lizenz",
+    "feature_support": "Unterstützung",
+    "feature_cost": "Kosten",
+    "feature_pipelines_external": "Pipelines - Externe Ziele",
+    "feature_extreme_performance": "Extreme Leistung (100-fache Verbesserung für viele Abfragen)",
+    "feature_query_optimizer": "Abfrageoptimierer",
+    "value_sso_requires_ha": "✅ Erfordert den HA-Modus",
+    "value_rbac_requires_ha": "✅ Erfordert den HA-Modus",
+    "value_roadmap_enterprise_plan": "✅ auf Unternehmenstarif",
+    "value_license_agpl": "AGPL",
+    "value_license_enterprise": "Unternehmen",
+    "value_license_cloud": "Wolke",
+    "value_support_community": "Gemeinschaft",
+    "value_support_enterprise": "Unternehmen",
+    "value_support_cloud": "Wolke",
+    "value_cost_free": "Kostenlos",
+    "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 200 GB/Tag aufgenommene Daten. Danach bezahlt",
+    "value_cost_cloud": "14-tägige kostenlose Testversion. Danach bezahlt",
+    "feature_comparison_lbl": "Vergleich der Funktionen"
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -1560,7 +1608,8 @@
       "alertSettings": "Lege deine Alarmregeln fest und wähle aus, wie du benachrichtigt werden möchtest.",
       "deduplication": "Vermeiden Sie es, dieselbe Warnung mehrmals zu senden, indem Sie ähnliche Warnungen zu Gruppen zusammenfassen.",
       "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
-    }
+    },
+    "template": "Vorlage überschreiben"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -1997,7 +2046,13 @@
     "backToLogs": "Zurück zu Logs",
     "RedMetrics": "RED-Metriken",
     "loadingStream": "Stream wird geladen...",
-    "viewRelated": "Verwandtes anzeigen"
+    "viewRelated": "Verwandtes anzeigen",
+    "noTracesFound": "Ergebnis nicht gefunden.",
+    "configureFullTextSearch": "um ein Volltextsuchfeld für den Stream zu konfigurieren.",
+    "collapseFields": "Felder ausblenden",
+    "openFields": "Felder öffnen",
+    "timeRangeUpdated": "Der gewählte Zeitraum enthielt diese Spur nicht. Der Zeitbereich wurde aktualisiert, sodass er dem Zeitstempel der Spur entspricht.",
+    "fetchingMoreTraces": "Weitere Spuren werden abgerufen..."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -2312,7 +2367,23 @@
     "noTracesFound": "Keine korrelierten Spuren gefunden",
     "noTracesDescription": "Keine Spuren für Service {service} im ausgewählten Zeitraum gefunden",
     "openTraceInNewWindow": "Trace in neuem Fenster öffnen",
-    "filters": "Filter"
+    "filters": "Filter",
+    "semanticFieldGroupsTitle": "Feldzuordnungen",
+    "semanticFieldGroupsCaption": "Definieren Sie Feldnamenzuordnungen für Korrelation und Deduplizierung (z. B. Host, Hostname, Knoten → Hostgruppe)",
+    "groupsLabel": "Gruppen",
+    "importFromJson": "Aus JSON importieren",
+    "addCustomGroup": "Benutzerdefinierte Gruppe hinzufügen",
+    "actionNormalize": "Kleinbuchstaben und Trimmwerte für den Abgleich",
+    "removeSemanticGroup": "Semantische Gruppe entfernen",
+    "fieldNamePlaceholder": "Feldnamen (kommagetrennt)",
+    "category": "Kategorie",
+    "categoryHint": "Gruppen nach Kategorie filtern",
+    "noSemanticGroupMessage": "Keine semantischen Gruppen in dieser Kategorie. Wählen Sie eine andere Kategorie oder fügen Sie eine benutzerdefinierte Gruppe hinzu.",
+    "showingGroups": "{filterGroupLength} von insgesamt {localGroupLength} Gruppen werden angezeigt",
+    "deduplicateFields": "Deduplizierungsfelder",
+    "deduplicateFieldTooltip": "Wählen Sie aus, welche Feldzuordnungen für das Deduplizierungs-Fingerprinting verwendet werden sollen",
+    "alertDeduplicationMessage": "Alarme mit den gleichen Werten für diese Felder werden dedupliziert (z. B. derselbe Fingerabdruck = gleiche Feldwerte)",
+    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

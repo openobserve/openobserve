@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, post, web};
+use axum::{
+    extract::{FromRequestParts, Path},
+    response::{IntoResponse, Response},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
@@ -32,6 +35,8 @@ use crate::{
 ///
 /// POST /api/{org_id}/streams/{stream_name}/patterns/extract
 #[utoipa::path(
+    post,
+    path = "/{org_id}/streams/{stream_name}/patterns/extract",
     context_path = "/api",
     tag = "Patterns",
     operation_id = "ExtractPatterns",
@@ -55,20 +60,32 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Extract log patterns"}))
+        ("x-o2-mcp" = json!({"description": "Extract log patterns", "category": "patterns"}))
     )
 )]
-#[post("/{org_id}/streams/{stream_name}/patterns/extract")]
+#[axum::debug_handler]
 pub async fn extract_patterns(
-    path: web::Path<(String, String)>,
-    #[allow(unused_variables)] in_req: actix_web::HttpRequest,
-    #[allow(unused_variables)] body: web::Bytes,
-    #[allow(unused_variables)] Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, actix_web::Error> {
-    #[allow(unused_variables)]
-    let (org_id, stream_name) = path.into_inner();
-    #[allow(unused_variables)]
+    Path((org_id, stream_name)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    // Extract headers manually to avoid conflict with body extraction
+    let (mut parts, body) = in_req.into_parts();
+
+    // Extract UserEmail from headers
+    let user_email = match Headers::<UserEmail>::from_request_parts(&mut parts, &()).await {
+        Ok(Headers(email)) => email,
+        Err(e) => return e.into_response(),
+    };
+
     let user_id = user_email.user_id;
+
+    // Extract body bytes
+    let body = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+        }
+    };
 
     #[cfg(feature = "enterprise")]
     {
@@ -97,18 +114,16 @@ pub async fn extract_patterns(
                     trace_id,
                     e
                 );
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "Invalid request body: {e}"
-                )));
+                return MetaHttpResponse::bad_request(format!("Invalid request body: {e}"));
             }
         };
 
         // Create audit context
         #[cfg(feature = "enterprise")]
         let audit_ctx = Some(crate::common::meta::search::AuditContext {
-            method: in_req.method().to_string(),
-            path: in_req.path().to_string(),
-            query_params: in_req.query_string().to_string(),
+            method: parts.method.to_string(),
+            path: parts.uri.path().to_string(),
+            query_params: parts.uri.query().unwrap_or("").to_string(),
             body: String::from_utf8_lossy(&body_bytes).to_string(),
         });
         #[cfg(not(feature = "enterprise"))]
@@ -126,9 +141,7 @@ pub async fn extract_patterns(
                     trace_id,
                     e
                 );
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "Invalid SQL query: {e}"
-                )));
+                return MetaHttpResponse::bad_request(format!("Invalid SQL query: {e}"));
             }
         };
 
@@ -155,7 +168,7 @@ pub async fn extract_patterns(
                     user_id,
                     stream_name_check
                 );
-                return Ok(res);
+                return res;
             }
         }
 
@@ -254,9 +267,9 @@ pub async fn extract_patterns(
                         trace_id,
                         e
                     );
-                    return Ok(MetaHttpResponse::internal_error(format!(
+                    return MetaHttpResponse::internal_error(format!(
                         "Pattern extraction failed: {e}"
-                    )));
+                    ));
                 }
             }
         }
@@ -272,13 +285,13 @@ pub async fn extract_patterns(
                 "[PATTERNS trace_id {}] Successfully extracted patterns",
                 trace_id
             );
-            Ok(MetaHttpResponse::json(patterns))
+            MetaHttpResponse::json(patterns)
         } else {
             log::warn!(
                 "[PATTERNS trace_id {}] No patterns were extracted",
                 trace_id
             );
-            Ok(MetaHttpResponse::json(serde_json::json!({
+            MetaHttpResponse::json(serde_json::json!({
                 "patterns": [],
                 "statistics": {
                     "total_logs_analyzed": 0,
@@ -286,15 +299,17 @@ pub async fn extract_patterns(
                     "coverage_percentage": 0.0,
                     "extraction_time_ms": 0
                 }
-            })))
+            }))
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(MetaHttpResponse::forbidden(
-            "Pattern extraction is an enterprise feature",
-        ))
+        drop(org_id);
+        drop(stream_name);
+        drop(body);
+        drop(user_id);
+        MetaHttpResponse::forbidden("Pattern extraction is an enterprise feature")
     }
 }
 

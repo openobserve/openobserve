@@ -81,6 +81,25 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing condition operator toggle', { uniqueSuffix });
 
+        // Create prerequisite template and destination to ensure Add Alert button is enabled
+        // This fixes flaky behavior where button is disabled when no destinations exist
+        const templateName = 'auto_template_toggle_' + uniqueSuffix;
+        const destinationName = 'auto_dest_toggle_' + uniqueSuffix;
+
+        await pm.alertTemplatesPage.navigateToTemplates();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        await pm.alertTemplatesPage.createTemplate(templateName);
+        testLogger.info('Template created', { templateName });
+
+        await pm.alertDestinationsPage.navigateToDestinations();
+        await page.waitForTimeout(SHORT_WAIT_MS);
+        const webhookUrl = 'https://webhook.site/test-toggle-' + uniqueSuffix;
+        await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
+        testLogger.info('Destination created', { destinationName });
+
+        // Navigate back to alerts page
+        const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+        await page.goto(alertsUrl);
         await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR

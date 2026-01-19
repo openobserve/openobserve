@@ -318,206 +318,297 @@ async fn process_url_jobs(mut rx: mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>
 /// the status check prevents duplicate processing. Only jobs in Pending or Failed status
 /// will proceed past the initial checks.
 async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
-    use crate::service::db::enrichment_table::{get_url_job, notify_update, save_url_job};
-
-    // Fetch the latest job state from database.
-    // We always fetch fresh state rather than passing it through events because:
-    // 1. Job state may have been updated since the event was queued
-    // 2. Events remain lightweight (just identifiers)
-    // 3. Database is the single source of truth for job state
-    let mut job = match get_url_job(org_id, table_name).await? {
-        Some(job) => job,
-        None => {
-            return Err(anyhow!("Job not found for {}/{}", org_id, table_name));
-        }
+    use crate::service::db::enrichment_table::{
+        get_url_jobs_for_table, notify_update, save_url_job,
     };
 
-    // Check if job is already being processed by another task/ingester.
-    // This prevents duplicate work if multiple events are triggered for the same job.
-    // The Processing state acts as a distributed lock via the database.
-    if job.status == EnrichmentTableStatus::Processing {
-        log::warn!(
-            "[ENRICHMENT::URL] Job {}/{} is already being processed",
-            org_id,
-            table_name
-        );
-        return Ok(());
+    // ===== MULTI-URL SUPPORT: Process all pending jobs sequentially =====
+    // Fetch all jobs for this table. We process them one by one in the order they appear.
+    // This ensures data is ingested in a predictable sequence.
+    let all_jobs = get_url_jobs_for_table(org_id, table_name).await?;
+
+    if all_jobs.is_empty() {
+        return Err(anyhow!("No jobs found for {}/{}", org_id, table_name));
     }
 
-    // Don't reprocess successfully completed jobs. This check prevents unnecessary
-    // work if an event is triggered for an already-completed job (e.g., from a retry).
-    if job.status == EnrichmentTableStatus::Completed {
+    // Filter to only pending or failed jobs (skip completed/processing)
+    let pending_jobs: Vec<_> = all_jobs
+        .into_iter()
+        .filter(|job| {
+            job.status == EnrichmentTableStatus::Pending
+                || job.status == EnrichmentTableStatus::Failed
+        })
+        .collect();
+
+    if pending_jobs.is_empty() {
         log::info!(
-            "[ENRICHMENT::URL] Job {}/{} is already completed",
+            "[ENRICHMENT::URL] No pending jobs for {}/{} (all completed or processing)",
             org_id,
             table_name
         );
         return Ok(());
     }
-
-    // Mark job as processing and persist to database.
-    // This atomically transitions from Pending/Failed → Processing and serves as a
-    // distributed lock to prevent other ingesters from picking up the same job.
-    job.mark_processing();
-    save_url_job(&job).await?;
 
     log::info!(
-        "[ENRICHMENT::URL] Processing job for {}/{} from {} (resume capable: {}, last byte: {})",
+        "[ENRICHMENT::URL] Found {} pending job(s) for {}/{}, processing sequentially",
+        pending_jobs.len(),
         org_id,
-        table_name,
-        job.url,
-        job.supports_range,
-        job.last_byte_position
+        table_name
     );
 
-    // Delegate to the main CSV processing function which handles:
-    // - URL validation via HEAD request (or header fetch if resuming)
-    // - Streaming CSV data in configurable chunks (with optional Range request)
-    // - Batch-by-batch parsing and storage
-    // - Progress tracking (bytes and records)
-    let result =
-        process_enrichment_table_url(org_id, table_name, &job.url, job.append_data, &job).await;
-
-    match result {
-        // ===== SUCCESS PATH =====
-        Ok((records, bytes)) => {
-            log::info!(
-                "[ENRICHMENT::URL] Successfully processed {}/{}: {} records, {} bytes",
+    // Process each job sequentially
+    for mut job in pending_jobs {
+        // Check if job is already being processed by another task/ingester.
+        // This prevents duplicate work if multiple events are triggered for the same job.
+        // The Processing state acts as a distributed lock via the database.
+        if job.status == EnrichmentTableStatus::Processing {
+            log::warn!(
+                "[ENRICHMENT::URL] Job {} for {}/{} is already being processed, skipping",
+                job.id,
                 org_id,
-                table_name,
-                records,
-                bytes
+                table_name
             );
-
-            // Fetch the latest job state to preserve progress updates made during processing.
-            // The process_enrichment_table_url function updates progress after each batch,
-            // so we need the latest state before marking as completed.
-            let mut job = match get_url_job(org_id, table_name).await? {
-                Some(j) => j,
-                None => {
-                    log::warn!(
-                        "[ENRICHMENT::URL] Job {}/{} not found after successful processing",
-                        org_id,
-                        table_name
-                    );
-                    return Ok(());
-                }
-            };
-
-            // Mark as completed (progress already updated during processing)
-            job.mark_completed();
-            save_url_job(&job).await?;
-
-            // Broadcast NATS notification to all nodes in the cluster.
-            // This is CRITICAL - we only notify after complete success. This ensures:
-            // 1. All nodes refresh their in-memory enrichment table cache
-            // 2. New data is immediately available for lookups across the cluster
-            // 3. Partial failures don't trigger premature cache invalidation
-            //
-            // Note: We don't fail the job if notification fails. The data is already
-            // saved; worst case, nodes will pick up changes on next periodic sync.
-            let stream_name = crate::service::format_stream_name(table_name.to_string());
-            if let Err(e) = notify_update(org_id, &stream_name).await {
-                log::error!("[ENRICHMENT::URL] Failed to notify update: {}", e);
-            }
-
-            Ok(())
+            continue;
         }
 
-        // ===== FAILURE PATH with RETRY LOGIC =====
-        Err(e) => {
+        // Don't reprocess successfully completed jobs. This check prevents unnecessary
+        // work if an event is triggered for an already-completed job (e.g., from a retry).
+        if job.status == EnrichmentTableStatus::Completed {
+            log::info!(
+                "[ENRICHMENT::URL] Job {} for {}/{} is already completed, skipping",
+                job.id,
+                org_id,
+                table_name
+            );
+            continue;
+        }
+
+        // Mark job as processing and persist to database.
+        // This atomically transitions from Pending/Failed → Processing and serves as a
+        // distributed lock to prevent other ingesters from picking up the same job.
+        job.mark_processing();
+        if let Err(e) = save_url_job(&job).await {
             log::error!(
-                "[ENRICHMENT::URL] Failed to process {}/{}: {}",
+                "[ENRICHMENT::URL] Failed to save job {} for {}/{}: {}, skipping",
+                job.id,
                 org_id,
                 table_name,
                 e
             );
+            continue;
+        }
 
-            // Fetch the latest job state to preserve progress updates (last_byte_position, etc.)
-            // made during processing before the failure occurred.
-            let mut job = match get_url_job(org_id, table_name).await? {
-                Some(j) => j,
-                None => {
-                    log::warn!(
-                        "[ENRICHMENT::URL] Job {}/{} not found after failure",
-                        org_id,
-                        table_name
-                    );
-                    return Err(e);
-                }
-            };
+        log::info!(
+            "[ENRICHMENT::URL] Processing job {} for {}/{} from {} (resume capable: {}, last byte: {})",
+            job.id,
+            org_id,
+            table_name,
+            job.url,
+            job.supports_range,
+            job.last_byte_position
+        );
 
-            let cfg = get_config();
-            job.retry_count += 1;
+        // Delegate to the main CSV processing function which handles:
+        // - URL validation via HEAD request (or header fetch if resuming)
+        // - Streaming CSV data in configurable chunks (with optional Range request)
+        // - Batch-by-batch parsing and storage
+        // - Progress tracking (bytes and records)
+        let job_id = job.id.clone(); // Save ID before moving job
+        let result =
+            process_enrichment_table_url(org_id, table_name, &job.url, job.append_data, &job).await;
 
-            // Check if we've exhausted all retry attempts.
-            // Retries are useful for transient failures like:
-            // - Network timeouts
-            // - Temporary DNS issues
-            // - Rate limiting from the source server
-            // - Brief downtime of the source URL
-            if job.retry_count >= cfg.enrichment_table.url_max_retries {
-                // Permanent failure - mark job as failed with error details.
-                // The user can see this in the status API and decide whether to:
-                // 1. Fix the URL and create a new job
-                // 2. Check if the CSV format is invalid
-                // 3. Verify the URL is publicly accessible
-                job.mark_failed(format!("Failed after {} retries: {}", job.retry_count, e));
-                save_url_job(&job).await?;
-            } else {
-                // Still have retries left - update job state and schedule retry.
-                // We keep the job in Pending status so it can be picked up again.
-                job.increment_retry(format!(
-                    "Retry {}/{}: {}",
-                    job.retry_count, cfg.enrichment_table.url_max_retries, e
-                ));
-                save_url_job(&job).await?;
-
-                // Schedule retry with configurable delay.
-                // Why use delay:
-                // 1. Gives transient issues time to resolve (e.g., network congestion)
-                // 2. Prevents hammering a slow/rate-limited source server
-                // 3. Reduces thundering herd if many jobs fail simultaneously
-                //
-                // Why spawn separate task:
-                // We don't want to block this function for the delay duration.
-                // The delay task sleeps, then sends a new event to trigger retry.
-                let delay = cfg.enrichment_table.url_retry_delay_secs;
+        match result {
+            // ===== SUCCESS PATH =====
+            Ok((records, bytes)) => {
                 log::info!(
-                    "[ENRICHMENT::URL] Retrying job {}/{} after {} seconds",
+                    "[ENRICHMENT::URL] Successfully processed job {} for {}/{}: {} records, {} bytes",
+                    job_id,
                     org_id,
                     table_name,
-                    delay
+                    records,
+                    bytes
                 );
 
-                // Convert to owned strings before moving into async block.
-                // The spawned task needs 'static lifetime, so we can't pass references.
-                let org_id = org_id.to_string();
-                let table_name = table_name.to_string();
-
-                tokio::spawn(async move {
-                    // Sleep for configured delay. This doesn't block the event loop
-                    // because we're in a separate tokio task.
-                    tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-
-                    // Trigger a new event to retry the job. This goes through the
-                    // same MPSC channel as the original request, maintaining consistency.
-                    if let Err(e) = trigger_url_job_processing(org_id.clone(), table_name.clone()) {
-                        log::error!(
-                            "[ENRICHMENT::URL] Failed to re-trigger job {}/{}: {}",
+                // Fetch the latest job state to preserve progress updates made during processing.
+                // The process_enrichment_table_url function updates progress after each batch,
+                // so we need the latest state before marking as completed.
+                let mut job = match crate::service::db::enrichment_table::get_url_job_by_id(&job_id)
+                    .await
+                {
+                    Ok(Some(j)) => j,
+                    Ok(None) => {
+                        log::warn!(
+                            "[ENRICHMENT::URL] Job {} for {}/{} not found after successful processing",
+                            job_id,
                             org_id,
-                            table_name,
+                            table_name
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[ENRICHMENT::URL] Failed to fetch job {} after success: {}",
+                            job_id,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                // Mark as completed (progress already updated during processing)
+                job.mark_completed();
+                if let Err(e) = save_url_job(&job).await {
+                    log::error!(
+                        "[ENRICHMENT::URL] Failed to mark job {} as completed: {}",
+                        job_id,
+                        e
+                    );
+                    continue;
+                }
+
+                // Broadcast NATS notification to all nodes in the cluster.
+                // This is CRITICAL - we only notify after complete success. This ensures:
+                // 1. All nodes refresh their in-memory enrichment table cache
+                // 2. New data is immediately available for lookups across the cluster
+                // 3. Partial failures don't trigger premature cache invalidation
+                //
+                // Note: We don't fail the job if notification fails. The data is already
+                // saved; worst case, nodes will pick up changes on next periodic sync.
+                let stream_name = crate::service::format_stream_name(table_name.to_string());
+                if let Err(e) = notify_update(org_id, &stream_name).await {
+                    log::error!("[ENRICHMENT::URL] Failed to notify update: {}", e);
+                }
+
+                // Continue to next job
+            }
+
+            // ===== FAILURE PATH with RETRY LOGIC =====
+            Err(e) => {
+                log::error!(
+                    "[ENRICHMENT::URL] Failed to process job {} for {}/{}: {}",
+                    job_id,
+                    org_id,
+                    table_name,
+                    e
+                );
+
+                // Fetch the latest job state to preserve progress updates (last_byte_position,
+                // etc.) made during processing before the failure occurred.
+                let mut job =
+                    match crate::service::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                        Ok(Some(j)) => j,
+                        Ok(None) => {
+                            log::warn!(
+                                "[ENRICHMENT::URL] Job {} for {}/{} not found after failure",
+                                job_id,
+                                org_id,
+                                table_name
+                            );
+                            continue;
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[ENRICHMENT::URL] Failed to fetch job {} after failure: {}",
+                                job_id,
+                                e
+                            );
+                            continue;
+                        }
+                    };
+
+                let cfg = get_config();
+                job.retry_count += 1;
+
+                // Check if we've exhausted all retry attempts.
+                // Retries are useful for transient failures like:
+                // - Network timeouts
+                // - Temporary DNS issues
+                // - Rate limiting from the source server
+                // - Brief downtime of the source URL
+                if job.retry_count >= cfg.enrichment_table.url_max_retries {
+                    // Permanent failure - mark job as failed with error details.
+                    // The user can see this in the status API and decide whether to:
+                    // 1. Fix the URL and create a new job
+                    // 2. Check if the CSV format is invalid
+                    // 3. Verify the URL is publicly accessible
+                    job.mark_failed(format!("Failed after {} retries: {}", job.retry_count, e));
+                    if let Err(e) = save_url_job(&job).await {
+                        log::error!(
+                            "[ENRICHMENT::URL] Failed to mark job {} as failed: {}",
+                            job_id,
                             e
                         );
                     }
-                });
-            }
+                    // Continue to next job despite failure
+                    continue;
+                } else {
+                    // Still have retries left - update job state and schedule retry.
+                    // We keep the job in Pending status so it can be picked up again.
+                    job.increment_retry(format!(
+                        "Retry {}/{}: {}",
+                        job.retry_count, cfg.enrichment_table.url_max_retries, e
+                    ));
+                    if let Err(e) = save_url_job(&job).await {
+                        log::error!(
+                            "[ENRICHMENT::URL] Failed to save retry state for job {}: {}",
+                            job_id,
+                            e
+                        );
+                        continue;
+                    }
 
-            // Propagate error up. This will be caught by the spawned task in
-            // process_url_jobs() and logged, but won't crash the event loop.
-            Err(e)
+                    // Schedule retry with configurable delay.
+                    // Why use delay:
+                    // 1. Gives transient issues time to resolve (e.g., network congestion)
+                    // 2. Prevents hammering a slow/rate-limited source server
+                    // 3. Reduces thundering herd if many jobs fail simultaneously
+                    //
+                    // Why spawn separate task:
+                    // We don't want to block this function for the delay duration.
+                    // The delay task sleeps, then sends a new event to trigger retry.
+                    let delay = cfg.enrichment_table.url_retry_delay_secs;
+                    log::info!(
+                        "[ENRICHMENT::URL] Retrying job {} for {}/{} after {} seconds",
+                        job_id,
+                        org_id,
+                        table_name,
+                        delay
+                    );
+
+                    // Convert to owned strings before moving into async block.
+                    // The spawned task needs 'static lifetime, so we can't pass references.
+                    let org_id_owned = org_id.to_string();
+                    let table_name_owned = table_name.to_string();
+
+                    tokio::spawn(async move {
+                        // Sleep for configured delay. This doesn't block the event loop
+                        // because we're in a separate tokio task.
+                        tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
+
+                        // Trigger a new event to retry the job. This goes through the
+                        // same MPSC channel as the original request, maintaining consistency.
+                        if let Err(e) = trigger_url_job_processing(
+                            org_id_owned.clone(),
+                            table_name_owned.clone(),
+                        ) {
+                            log::error!(
+                                "[ENRICHMENT::URL] Failed to re-trigger job for {}/{}: {}",
+                                org_id_owned,
+                                table_name_owned,
+                                e
+                            );
+                        }
+                    });
+
+                    // Continue to next job (this job will be retried later)
+                    continue;
+                }
+            }
         }
     }
+
+    // All jobs processed
+    Ok(())
 }
 
 // ============================================================================
@@ -1373,9 +1464,8 @@ async fn process_enrichment_table_url(
     let has_schema_clone = has_schema.clone();
     let last_batch_timestamp_clone = last_batch_timestamp.clone();
 
-    // Clone job data for callback (need to save progress after each batch)
-    let org_id_for_save = org_id.to_string();
-    let table_name_for_save = table_name.to_string();
+    // Clone job ID for callback (need to save progress after each batch)
+    let job_id_for_save = job.id.clone();
 
     // Process each batch as it arrives using a callback
     let total_batches = processor
@@ -1390,8 +1480,7 @@ async fn process_enrichment_table_url(
             // Clone variables needed in async block
             let org_id = org_id.to_string();
             let table_name = table_name.to_string();
-            let org_id_for_save = org_id_for_save.clone();
-            let table_name_for_save = table_name_for_save.clone();
+            let job_id_for_save = job_id_for_save.clone();
             let total_records = total_records_clone.clone();
             let total_bytes = total_bytes_clone.clone();
             let has_schema = has_schema_clone.clone();
@@ -1469,7 +1558,7 @@ async fn process_enrichment_table_url(
                         // Calculate absolute byte position (add resume offset if resuming)
                         let absolute_byte_position = resume_from_byte.unwrap_or(0) + bytes_processed_so_far;
 
-                        if let Ok(Some(mut current_job)) = db::enrichment_table::get_url_job(&org_id_for_save, &table_name_for_save).await {
+                        if let Ok(Some(mut current_job)) = db::enrichment_table::get_url_job_by_id(&job_id_for_save).await {
                             current_job.last_byte_position = absolute_byte_position;
                             current_job.total_bytes_fetched = absolute_byte_position;
                             current_job.total_records_processed += record_count as i64;
@@ -1477,16 +1566,18 @@ async fn process_enrichment_table_url(
                             if let Err(e) = db::enrichment_table::save_url_job(&current_job).await {
                                 // Log error but don't fail the batch - progress tracking is best-effort
                                 log::warn!(
-                                    "[ENRICHMENT::URL] {}/{} - Failed to save progress checkpoint: {}",
+                                    "[ENRICHMENT::URL] {}/{} (job {}) - Failed to save progress checkpoint: {}",
                                     org_id,
                                     table_name,
+                                    job_id_for_save,
                                     e
                                 );
                             } else {
                                 log::debug!(
-                                    "[ENRICHMENT::URL] {}/{} - Saved progress checkpoint at byte {}",
+                                    "[ENRICHMENT::URL] {}/{} (job {}) - Saved progress checkpoint at byte {}",
                                     org_id,
                                     table_name,
+                                    job_id_for_save,
                                     absolute_byte_position
                                 );
                             }

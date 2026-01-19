@@ -107,7 +107,8 @@
     "manageTheme": "Tema Yönet",
     "url": "URL",
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
-    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin."
+    "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
+    "id": "KİMLİK"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -333,7 +334,8 @@
     "report": "Raporlar",
     "pipeline": "Boru hatları",
     "language": "Dil",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "incidents": "Olaylar"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -412,7 +414,53 @@
     "community_lbl": "Topluluk",
     "loading_license_info": "Lisans bilgileri yükleniyor...",
     "installation_id_lbl": "Kurulum Kimliği",
-    "expired_lbl": "Süresi doldu"
+    "expired_lbl": "Süresi doldu",
+    "feature_comparision_subtitle": "Açık Kaynak, Kurumsal ve Bulut tekliflerindeki özellikleri karşılaştırın",
+    "feature_column_name": "Özellik",
+    "edition_opensource": "Açık Kaynak (Kendi kendine barındırılan)",
+    "edition_enterprise": "Kurumsal (Kendi kendine barındırılan)",
+    "edition_cloud": "Bulut",
+    "feature_logs": "Günlükler",
+    "feature_metrics": "Metrikler",
+    "feature_traces": "İzleri",
+    "feature_rum": "ROM",
+    "feature_alerts": "Uyarılar",
+    "feature_dashboards": "Gösterge panoları",
+    "feature_reports": "Raporlar",
+    "feature_vrl_functions": "VRL fonksiyonları",
+    "feature_pipelines": "Boru hatları",
+    "feature_high_availability": "Yüksek Kullanılabilirlik",
+    "feature_multitenancy": "Çoklu Kiracılık (Organizasyonlar)",
+    "feature_dynamic_schema": "Dinamik şema ve şema gelişimi",
+    "feature_multilingual_gui": "Gelişmiş çok dilli GUI",
+    "feature_sso": "Tek Oturum Açma",
+    "feature_rbac": "Rol Tabanlı Erişim Kontrolü (RBAC)",
+    "feature_federated_search": "Birleşik arama/Süper küme",
+    "feature_query_management": "Sorgu yönetimi",
+    "feature_workload_management": "İş yükü yönetimi (QoS)",
+    "feature_audit_trail": "Denetim izi",
+    "feature_action_scripts": "Eylem Komut Dosyaları",
+    "feature_sensitive_data_redaction": "Hassas veri düzenlemesi",
+    "feature_influence_roadmap": "Yol haritasını etkileme yeteneği",
+    "feature_license": "Lisans",
+    "feature_support": "Destek",
+    "feature_cost": "Maliyet",
+    "feature_pipelines_external": "Boru hatları - Dış hedefler",
+    "feature_extreme_performance": "Olağanüstü performans (birçok sorgu için 100x iyileştirme)",
+    "feature_query_optimizer": "Sorgu iyileştirici",
+    "value_sso_requires_ha": "✅ HA modu gerektirir",
+    "value_rbac_requires_ha": "✅ HA modu gerektirir",
+    "value_roadmap_enterprise_plan": "✅ kurumsal planda",
+    "value_license_agpl": "AGGL",
+    "value_license_enterprise": "Kurumsal",
+    "value_license_cloud": "Bulut",
+    "value_support_community": "Topluluk",
+    "value_support_enterprise": "Kurumsal",
+    "value_support_cloud": "Bulut",
+    "value_cost_free": "Bedava",
+    "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 200 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
+    "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir",
+    "feature_comparison_lbl": "Özellik Karşılaştırması"
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -1560,7 +1608,8 @@
       "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
       "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
       "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
-    }
+    },
+    "template": "Şablon Geçersiz Kılma"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -1997,7 +2046,13 @@
     "backToLogs": "Günlüklere Dön",
     "RedMetrics": "KIRMIZI Metrikler",
     "loadingStream": "Akış Yükleniyor...",
-    "viewRelated": "İlgili Görüntüle"
+    "viewRelated": "İlgili Görüntüle",
+    "noTracesFound": "Sonuç bulunamadı.",
+    "configureFullTextSearch": "akışa tam metin arama alanını yapılandırmak için.",
+    "collapseFields": "Alanları Daralt",
+    "openFields": "Açık Alanlar",
+    "timeRangeUpdated": "Seçilen zaman aralığı bu izi içermiyordu. Zaman aralığı, izlemenin zaman damgasıyla eşleşecek şekilde güncellendi.",
+    "fetchingMoreTraces": "Daha fazla iz getiriyor..."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -2312,7 +2367,23 @@
     "noTracesFound": "İlişkili iz bulunamadı",
     "noTracesDescription": "Seçilen zaman aralığında {service} hizmeti için iz bulunamadı",
     "openTraceInNewWindow": "İzini yeni pencerede aç",
-    "filters": "Filtreler"
+    "filters": "Filtreler",
+    "semanticFieldGroupsTitle": "Alan Eşlemeleri",
+    "semanticFieldGroupsCaption": "Korelasyon ve tekilleştirme için alan adı eşlemelerini tanımlayın (örn., ana bilgisayar adı, düğüm → 'ana bilgisayar' grubu)",
+    "groupsLabel": "gruplar",
+    "importFromJson": "JSON'dan içe aktarma",
+    "addCustomGroup": "Özel Grup Ekle",
+    "actionNormalize": "Eşleştirme için küçük harf ve kırpma değerleri",
+    "removeSemanticGroup": "Anlamsal Grubu Kaldır",
+    "fieldNamePlaceholder": "Alan adları (virgülle ayrılmış)",
+    "category": "Kategoriler",
+    "categoryHint": "Grupları kategoriye göre filtrele",
+    "noSemanticGroupMessage": "Bu kategoride semantik grup yok. Farklı bir kategori seçin veya özel bir grup ekleyin.",
+    "showingGroups": "{localGroupLength} toplam grubundan {filterGroupLength} gösteriliyor",
+    "deduplicateFields": "Tekilleştirme Alanları",
+    "deduplicateFieldTooltip": "Tekilleştirme parmak izi almak için hangi alan eşlemelerinin kullanılacağını seçin",
+    "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
+    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

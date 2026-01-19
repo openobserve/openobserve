@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,9 +18,12 @@
 //! Provides REST API endpoints for multi-level system settings.
 //! Settings resolution order (most specific wins): User -> Org -> System
 
-use std::io::Error as StdErr;
-
-use actix_web::{HttpResponse, delete, get, post, web};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use config::meta::system_settings::{
     SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery,
 };
@@ -29,6 +32,8 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
 
 /// Get a specific system setting with resolution (user -> org -> system)
 #[utoipa::path(
+    get,
+    path = "/{org_id}/settings/v2/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingGetResolved",
@@ -50,25 +55,25 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::s
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get resolved system setting"}))
+        ("x-o2-mcp" = json!({"description": "Get resolved system setting", "category": "system"}))
     )
 )]
-#[get("/{org_id}/settings/v2/{key}")]
-async fn get_setting(
-    path: web::Path<(String, String)>,
-    query: web::Query<SystemSettingQuery>,
-) -> Result<HttpResponse, StdErr> {
-    let (org_id, key) = path.into_inner();
+pub async fn get_setting(
+    Path((org_id, key)): Path<(String, String)>,
+    Query(query): Query<SystemSettingQuery>,
+) -> Response {
     let user_id = query.user_id.as_deref();
 
     match system_settings::get_resolved(Some(&org_id), user_id, &key).await {
-        Ok(setting) => Ok(HttpResponse::Ok().json(setting)), // Returns setting or null
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(setting) => (StatusCode::OK, Json(setting)).into_response(), // Returns setting or null
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// List all resolved settings for an organization/user
 #[utoipa::path(
+    get,
+    path = "/{org_id}/settings/v2",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingListResolved",
@@ -89,26 +94,26 @@ async fn get_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List resolved system settings"}))
+        ("x-o2-mcp" = json!({"description": "List resolved system settings", "category": "system"}))
     )
 )]
-#[get("/{org_id}/settings/v2")]
-async fn list_settings(
-    path: web::Path<String>,
-    query: web::Query<SystemSettingQuery>,
-) -> Result<HttpResponse, StdErr> {
-    let org_id = path.into_inner();
+pub async fn list_settings(
+    Path(org_id): Path<String>,
+    Query(query): Query<SystemSettingQuery>,
+) -> Response {
     let user_id = query.user_id.as_deref();
     let category = query.category.as_deref();
 
     match system_settings::list_resolved(Some(&org_id), user_id, category).await {
-        Ok(settings) => Ok(HttpResponse::Ok().json(settings)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(settings) => (StatusCode::OK, Json(settings)).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// Create or update a setting at org level
 #[utoipa::path(
+    post,
+    path = "/{org_id}/settings/v2",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingSetOrg",
@@ -128,17 +133,13 @@ async fn list_settings(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Set org-level system setting"}))
+        ("x-o2-mcp" = json!({"description": "Set org-level system setting", "category": "system"}))
     )
 )]
-#[post("/{org_id}/settings/v2")]
-async fn set_org_setting(
-    path: web::Path<String>,
-    payload: web::Json<SystemSettingPayload>,
-) -> Result<HttpResponse, StdErr> {
-    let org_id = path.into_inner();
-    let payload = payload.into_inner();
-
+pub async fn set_org_setting(
+    Path(org_id): Path<String>,
+    Json(payload): Json<SystemSettingPayload>,
+) -> Response {
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {
         setting.setting_category = Some(cat.to_string());
@@ -148,13 +149,15 @@ async fn set_org_setting(
     }
 
     match system_settings::set(&setting).await {
-        Ok(result) => Ok(HttpResponse::Ok().json(result)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// Create or update a setting at user level
 #[utoipa::path(
+    post,
+    path = "/{org_id}/settings/v2/user/{user_id}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingSetUser",
@@ -175,17 +178,13 @@ async fn set_org_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Set user-level system setting"}))
+        ("x-o2-mcp" = json!({"description": "Set user-level system setting", "category": "system"}))
     )
 )]
-#[post("/{org_id}/settings/v2/user/{user_id}")]
-async fn set_user_setting(
-    path: web::Path<(String, String)>,
-    payload: web::Json<SystemSettingPayload>,
-) -> Result<HttpResponse, StdErr> {
-    let (org_id, user_id) = path.into_inner();
-    let payload = payload.into_inner();
-
+pub async fn set_user_setting(
+    Path((org_id, user_id)): Path<(String, String)>,
+    Json(payload): Json<SystemSettingPayload>,
+) -> Response {
     let mut setting = SystemSetting::new_user(
         &org_id,
         &user_id,
@@ -200,13 +199,15 @@ async fn set_user_setting(
     }
 
     match system_settings::set(&setting).await {
-        Ok(result) => Ok(HttpResponse::Ok().json(result)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(result) => (StatusCode::OK, Json(result)).into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// Delete an organization-level setting
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/v2/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingDeleteOrg",
@@ -227,22 +228,21 @@ async fn set_user_setting(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete org system setting"}))
+        ("x-o2-mcp" = json!({"description": "Delete org system setting", "category": "system"}))
     )
 )]
-#[delete("/{org_id}/settings/v2/{key}")]
-async fn delete_org_setting(path: web::Path<(String, String)>) -> Result<HttpResponse, StdErr> {
-    let (org_id, key) = path.into_inner();
-
+pub async fn delete_org_setting(Path((org_id, key)): Path<(String, String)>) -> Response {
     match system_settings::delete(&SettingScope::Org, Some(&org_id), None, &key).await {
-        Ok(true) => Ok(HttpResponse::Ok().json(serde_json::json!({"deleted": true}))),
-        Ok(false) => Ok(MetaHttpResponse::not_found("Setting not found")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(true) => (StatusCode::OK, Json(serde_json::json!({"deleted": true}))).into_response(),
+        Ok(false) => MetaHttpResponse::not_found("Setting not found"),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// Delete a user-level setting
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/v2/user/{user_id}/{key}",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SystemSettingDeleteUser",
@@ -264,18 +264,15 @@ async fn delete_org_setting(path: web::Path<(String, String)>) -> Result<HttpRes
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete user system setting"}))
+        ("x-o2-mcp" = json!({"description": "Delete user system setting", "category": "system"}))
     )
 )]
-#[delete("/{org_id}/settings/v2/user/{user_id}/{key}")]
-async fn delete_user_setting(
-    path: web::Path<(String, String, String)>,
-) -> Result<HttpResponse, StdErr> {
-    let (org_id, user_id, key) = path.into_inner();
-
+pub async fn delete_user_setting(
+    Path((org_id, user_id, key)): Path<(String, String, String)>,
+) -> Response {
     match system_settings::delete(&SettingScope::User, Some(&org_id), Some(&user_id), &key).await {
-        Ok(true) => Ok(HttpResponse::Ok().json(serde_json::json!({"deleted": true}))),
-        Ok(false) => Ok(MetaHttpResponse::not_found("Setting not found")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(true) => (StatusCode::OK, Json(serde_json::json!({"deleted": true}))).into_response(),
+        Ok(false) => MetaHttpResponse::not_found("Setting not found"),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }

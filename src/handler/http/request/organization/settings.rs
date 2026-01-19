@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error as StdErr;
-
-use actix_web::{HttpResponse, delete, get, post, web};
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
-    actix_multipart::Multipart,
-    futures::{StreamExt, TryStreamExt},
+    axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
 };
 
@@ -37,6 +39,8 @@ use crate::{
 /// Organization specific settings
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/settings",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingCreate",
@@ -57,23 +61,20 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create/update org settings"}))
+        ("x-o2-mcp" = json!({"description": "Create/update org settings", "category": "users"}))
     )
 )]
-#[post("/{org_id}/settings")]
-async fn create(
-    path: web::Path<String>,
-    settings: web::Json<OrganizationSettingPayload>,
-) -> Result<HttpResponse, StdErr> {
-    let org_id = path.into_inner();
-    let settings = settings.into_inner();
+pub async fn create(
+    Path(org_id): Path<String>,
+    Json(settings): Json<OrganizationSettingPayload>,
+) -> Response {
     let mut data = match get_org_setting(&org_id).await {
         Ok(data) => data,
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 OrganizationSetting::default()
             } else {
-                return Ok(MetaHttpResponse::bad_request(&err));
+                return MetaHttpResponse::bad_request(&err);
             }
         }
     };
@@ -81,9 +82,7 @@ async fn create(
     let mut field_found = false;
     if let Some(scrape_interval) = settings.scrape_interval {
         if scrape_interval == 0 {
-            return Ok(MetaHttpResponse::bad_request(
-                "scrape_interval should be a positive value",
-            ));
+            return MetaHttpResponse::bad_request("scrape_interval should be a positive value");
         }
         field_found = true;
         data.scrape_interval = scrape_interval;
@@ -127,9 +126,9 @@ async fn create(
     if let Some(max_series_per_query) = settings.max_series_per_query {
         // Validate max_series_per_query is within acceptable range
         if !(1_000..=1_000_000).contains(&max_series_per_query) {
-            return Ok(MetaHttpResponse::bad_request(
+            return MetaHttpResponse::bad_request(
                 "max_series_per_query must be between 1,000 and 1,000,000",
-            ));
+            );
         }
         field_found = true;
         data.max_series_per_query = Some(max_series_per_query);
@@ -142,20 +141,26 @@ async fn create(
     }
 
     if !field_found {
-        return Ok(MetaHttpResponse::bad_request("No valid field found"));
+        return MetaHttpResponse::bad_request("No valid field found");
     }
 
     // this will always be taken from orgs table, never from settings
     data.free_trial_expiry = None;
     match set_org_setting(&org_id, &data).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e.to_string().as_str())),
+        Ok(()) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string().as_str()),
     }
 }
 
 /// Retrieve organization specific settings
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/settings",
     context_path = "/api",
     tag = "Organizations",
     operation_id = "OrganizationSettingGet",
@@ -175,113 +180,114 @@ async fn create(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get organization settings"}))
+        ("x-o2-mcp" = json!({"description": "Get organization settings", "category": "users"}))
     )
 )]
-#[get("/{org_id}/settings")]
-async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
-    let org_id = path.into_inner();
+pub async fn get(Path(org_id): Path<String>) -> Response {
     match get_org_setting(&org_id).await {
-        Ok(data) => Ok(HttpResponse::Ok().json(OrganizationSettingResponse { data })),
+        Ok(data) => (StatusCode::OK, Json(OrganizationSettingResponse { data })).into_response(),
         Err(err) => {
             if let Error::DbError(DbError::KeyNotExists(_e)) = &err {
                 let setting = OrganizationSetting::default();
                 if let Ok(()) = set_org_setting(&org_id, &setting).await {
-                    return Ok(
-                        HttpResponse::Ok().json(OrganizationSettingResponse { data: setting })
-                    );
+                    return (
+                        StatusCode::OK,
+                        Json(OrganizationSettingResponse { data: setting }),
+                    )
+                        .into_response();
                 }
             };
-            Ok(MetaHttpResponse::bad_request(&err))
+            MetaHttpResponse::bad_request(&err)
         }
     }
 }
 
 #[cfg(feature = "enterprise")]
-#[post("/{org_id}/settings/logo")]
-async fn upload_logo(
+pub async fn upload_logo(
+    Query(query): Query<std::collections::HashMap<String, String>>,
     mut payload: Multipart,
-    query: web::Query<std::collections::HashMap<String, String>>,
-) -> Result<HttpResponse, StdErr> {
+) -> Response {
     let theme = query.get("theme").map(|s| s.to_string());
 
-    match payload.try_next().await {
-        Ok(field) => {
-            let mut data: Vec<u8> = Vec::<u8>::new();
-            if let Some(mut field) = field {
-                while let Some(chunk) = field.next().await {
-                    let chunk = chunk.unwrap();
-                    data.extend(chunk);
-                }
-                if data.is_empty() {
-                    return Ok(MetaHttpResponse::bad_request("Image data not present"));
-                }
-
-                match settings::upload_logo(data, theme).await {
-                    Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-                    Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-                }
-            } else {
-                Ok(MetaHttpResponse::bad_request("Payload file not present"))
-            }
+    let mut data: Vec<u8> = Vec::<u8>::new();
+    while let Ok(Some(field)) = payload.next_field().await {
+        if let Ok(bytes) = field.bytes().await {
+            data.extend(bytes);
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+
+    if data.is_empty() {
+        return MetaHttpResponse::bad_request("Image data not present");
+    }
+
+    match settings::upload_logo(data, theme).await {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[post("/{org_id}/settings/logo")]
-async fn upload_logo() -> Result<HttpResponse, StdErr> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+pub async fn upload_logo() -> Response {
+    (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
-#[delete("/{org_id}/settings/logo")]
-async fn delete_logo(
-    query: web::Query<std::collections::HashMap<String, String>>,
-) -> Result<HttpResponse, StdErr> {
+pub async fn delete_logo(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
     let theme = query.get("theme").map(|s| s.to_string());
 
     match settings::delete_logo(theme).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[delete("/{org_id}/settings/logo")]
-async fn delete_logo() -> Result<HttpResponse, StdErr> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+pub async fn delete_logo() -> Response {
+    (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
-#[post("/{org_id}/settings/logo/text")]
-async fn set_logo_text(body: web::Bytes) -> Result<HttpResponse, StdErr> {
+pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
     match settings::set_logo_text(body).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[post("/{org_id}/settings/logo/text")]
-async fn set_logo_text() -> Result<HttpResponse, StdErr> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+pub async fn set_logo_text() -> Response {
+    (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
-#[delete("/{org_id}/settings/logo/text")]
-async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
+pub async fn delete_logo_text() -> Response {
     match settings::delete_logo_text().await {
-        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
-        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(serde_json::json!({"successful": "true"})),
+        )
+            .into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[delete("/{org_id}/settings/logo/text")]
-async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+pub async fn delete_logo_text() -> Response {
+    (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(test)]

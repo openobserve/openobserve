@@ -107,7 +107,8 @@
     "manageTheme": "Thema beheren",
     "url": "URL",
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
-    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan."
+    "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
+    "id": "ID"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -333,7 +334,8 @@
     "report": "Rapporten",
     "pipeline": "Pijpleidingen",
     "language": "taal",
-    "actions": "Acties"
+    "actions": "Acties",
+    "incidents": "Incidenten"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -412,7 +414,53 @@
     "community_lbl": "Gemeenschap",
     "loading_license_info": "Licentie-informatie wordt geladen...",
     "installation_id_lbl": "Installatie-ID",
-    "expired_lbl": "Vervallen"
+    "expired_lbl": "Vervallen",
+    "feature_comparision_subtitle": "Vergelijk functies van het Open Source-, Enterprise- en Cloud-aanbod",
+    "feature_column_name": "Functie",
+    "edition_opensource": "Open source (zelf gehost)",
+    "edition_enterprise": "Enterprise (zelf gehost)",
+    "edition_cloud": "Wolk",
+    "feature_logs": "Logboeken",
+    "feature_metrics": "Metrieken",
+    "feature_traces": "Sporen",
+    "feature_rum": "RUM",
+    "feature_alerts": "Waarschuwingen",
+    "feature_dashboards": "Dashboards",
+    "feature_reports": "Rapporten",
+    "feature_vrl_functions": "VRL-functies",
+    "feature_pipelines": "Pijpleidingen",
+    "feature_high_availability": "Hoge beschikbaarheid",
+    "feature_multitenancy": "Multitenancy (organisaties)",
+    "feature_dynamic_schema": "Dynamisch schema en schema-evolutie",
+    "feature_multilingual_gui": "Geavanceerde meertalige GUI",
+    "feature_sso": "Eenmalige aanmelding",
+    "feature_rbac": "Op rollen gebaseerde toegangscontrole (RBAC)",
+    "feature_federated_search": "Gefedereerd zoeken/Supercluster",
+    "feature_query_management": "Beheer van zoekopdrachten",
+    "feature_workload_management": "Beheer van de werklast (QoS)",
+    "feature_audit_trail": "Auditspoor",
+    "feature_action_scripts": "Actiescripts",
+    "feature_sensitive_data_redaction": "Redactie van gevoelige gegevens",
+    "feature_influence_roadmap": "Mogelijkheid om de routekaart te beïnvloeden",
+    "feature_license": "Licentie",
+    "feature_support": "Ondersteuning",
+    "feature_cost": "Kost",
+    "feature_pipelines_external": "Pijpleidingen - Externe bestemmingen",
+    "feature_extreme_performance": "Extreme prestaties (100x verbetering voor veel vragen)",
+    "feature_query_optimizer": "Optimizer voor query's",
+    "value_sso_requires_ha": "✅ HA-modus vereist",
+    "value_rbac_requires_ha": "✅ HA-modus vereist",
+    "value_roadmap_enterprise_plan": "✅ op ondernemingsplan",
+    "value_license_agpl": "AGPL",
+    "value_license_enterprise": "Onderneming",
+    "value_license_cloud": "Wolk",
+    "value_support_community": "Gemeenschap",
+    "value_support_enterprise": "Onderneming",
+    "value_support_cloud": "Wolk",
+    "value_cost_free": "Gratis",
+    "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 200 GB aan data die per dag wordt opgenomen. Daarna betaald",
+    "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald",
+    "feature_comparison_lbl": "Vergelijking van functies"
   },
   "login": {
     "userid": "Gebruikers-ID",
@@ -1560,7 +1608,8 @@
       "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
       "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
       "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
-    }
+    },
+    "template": "Sjabloon overschrijven"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -1997,7 +2046,13 @@
     "backToLogs": "Terug naar de logboeken",
     "RedMetrics": "RED-statistieken",
     "loadingStream": "Stream wordt geladen...",
-    "viewRelated": "Gerelateerd bekijken"
+    "viewRelated": "Gerelateerd bekijken",
+    "noTracesFound": "Resultaat niet gevonden.",
+    "configureFullTextSearch": "om een volledig tekstzoekveld voor de stream in te stellen.",
+    "collapseFields": "Velden samenvouwen",
+    "openFields": "Open velden",
+    "timeRangeUpdated": "Dit spoor is niet opgenomen in het geselecteerde tijdbereik. Het tijdbereik is bijgewerkt zodat het overeenkomt met de tijdstempel van de trace.",
+    "fetchingMoreTraces": "Nog meer sporen ophalen..."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -2312,7 +2367,23 @@
     "noTracesFound": "Geen gecorreleerde sporen gevonden",
     "noTracesDescription": "Geen sporen gevonden voor service {service} in de geselecteerde periode",
     "openTraceInNewWindow": "Open trace in nieuw venster",
-    "filters": "Filters"
+    "filters": "Filters",
+    "semanticFieldGroupsTitle": "Veldtoewijzingen",
+    "semanticFieldGroupsCaption": "Definieer veldnaamtoewijzingen voor correlatie en deduplicatie (bijv. host, hostnaam, knooppunt → 'host'-groep)",
+    "groupsLabel": "groepen",
+    "importFromJson": "Importeren vanuit JSON",
+    "addCustomGroup": "Aangepaste groep toevoegen",
+    "actionNormalize": "Kleine letters en trimwaarden om te matchen",
+    "removeSemanticGroup": "Semantic Group verwijderen",
+    "fieldNamePlaceholder": "Veldnamen (gescheiden door komma's)",
+    "category": "Categorie",
+    "categoryHint": "Groepen per categorie filteren",
+    "noSemanticGroupMessage": "Geen semantische groepen in deze categorie. Selecteer een andere categorie of voeg een aangepaste groep toe.",
+    "showingGroups": "{filterGroupLength} van het totale aantal groepen van {localGroupLength} wordt weergegeven",
+    "deduplicateFields": "Deduplicatievelden",
+    "deduplicateFieldTooltip": "Selecteer welke veldtoewijzingen u wilt gebruiken voor deduplicatie van vingerafdrukken",
+    "alertDeduplicationMessage": "Waarschuwingen met dezelfde waarden voor deze velden worden ontdubbeld (bijvoorbeeld dezelfde vingerafdruk = dezelfde veldwaarden)",
+    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

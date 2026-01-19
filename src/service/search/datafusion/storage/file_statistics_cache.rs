@@ -13,10 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use dashmap::DashMap;
-use datafusion::{common::Statistics, execution::cache::CacheAccessor};
+use datafusion::{
+    common::Statistics,
+    execution::cache::{CacheAccessor, cache_manager::FileStatisticsCacheEntry},
+};
 use object_store::{ObjectMeta, path::Path};
 use once_cell::sync::Lazy;
 
@@ -185,7 +191,7 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
         self.statistics.insert(k, (e.clone(), value)).map(|x| x.1)
     }
 
-    fn remove(&mut self, k: &Path) -> Option<Arc<Statistics>> {
+    fn remove(&self, k: &Path) -> Option<Arc<Statistics>> {
         let k = self.format_key(k);
         self.statistics.remove(&k).map(|x| x.1.1)
     }
@@ -204,6 +210,29 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
     }
     fn name(&self) -> String {
         "FileStatisticsCache".to_string()
+    }
+}
+
+impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileStatisticsCache {
+    fn list_entries(&self) -> HashMap<Path, FileStatisticsCacheEntry> {
+        let mut entries = HashMap::<Path, FileStatisticsCacheEntry>::new();
+
+        for entry in &self.statistics {
+            let path = Path::from(entry.key().as_str());
+            let (object_meta, stats) = entry.value();
+            entries.insert(
+                path,
+                FileStatisticsCacheEntry {
+                    object_meta: object_meta.clone(),
+                    num_rows: stats.num_rows,
+                    num_columns: stats.column_statistics.len(),
+                    table_size_bytes: stats.total_byte_size,
+                    statistics_size_bytes: 0,
+                },
+            );
+        }
+
+        entries
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, prelude::*};
+use std::io::prelude::*;
 
-use actix_multipart::form::{MultipartForm, bytes::Bytes};
-use actix_web::{HttpResponse, post, web};
+use axum::{
+    Extension,
+    body::Bytes,
+    extract::{Multipart, Path},
+    response::Response,
+};
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
@@ -40,12 +44,12 @@ pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
 pub const RUM_DATA_STREAM: &str = "_rumdata";
 
 /// Multipart form data being ingested in the form of session-replay
-#[derive(MultipartForm, ToSchema)]
+#[derive(ToSchema)]
 pub struct SegmentEvent {
     #[schema(value_type = String, format = Binary)]
-    pub segment: Bytes,
+    pub segment: Vec<u8>,
     #[schema(value_type = String, format = Binary)]
-    pub event: Bytes,
+    pub event: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -98,6 +102,8 @@ pub struct View {
 
 /// Rum data ingestion API
 #[utoipa::path(
+    post,
+    path = "/v1/{org_id}/rum",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "RumIngestionMulti",
@@ -121,36 +127,34 @@ pub struct View {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/v1/{org_id}/rum")]
 pub async fn data(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    body: web::Bytes,
-    rum_query_data: web::ReqData<RumExtraData>,
-) -> Result<HttpResponse, Error> {
-    let org_id: String = path.into_inner();
+    Extension(rum_query_data): Extension<RumExtraData>,
+    body: Bytes,
+) -> Response {
     let extend_json = &rum_query_data.data;
     let user_email = &user_email.user_id;
-    Ok(
-        match logs::ingest::ingest(
-            0,
-            &org_id,
-            RUM_DATA_STREAM,
-            IngestionRequest::RUM(body),
-            IngestUser::from_user_email(user_email.clone()),
-            Some(extend_json),
-            false,
-        )
-        .await
-        {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
-        },
+    match logs::ingest::ingest(
+        0,
+        &org_id,
+        RUM_DATA_STREAM,
+        IngestionRequest::RUM(body),
+        IngestUser::from_user_email(user_email.clone()),
+        Some(extend_json),
+        false,
     )
+    .await
+    {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }
 
 /// Rum log ingestion API
 #[utoipa::path(
+    post,
+    path = "/v1/{org_id}/logs",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "LogIngestionJson",
@@ -174,36 +178,34 @@ pub async fn data(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/v1/{org_id}/logs")]
 pub async fn log(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    body: web::Bytes,
-    rum_query_data: web::ReqData<RumExtraData>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    Extension(rum_query_data): Extension<RumExtraData>,
+    body: Bytes,
+) -> Response {
     let extend_json = &rum_query_data.data;
     let user_email = &user_email.user_id;
-    Ok(
-        match logs::ingest::ingest(
-            0,
-            &org_id,
-            RUM_LOG_STREAM,
-            IngestionRequest::RUM(body),
-            IngestUser::from_user_email(user_email.clone()),
-            Some(extend_json),
-            false,
-        )
-        .await
-        {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
-        },
+    match logs::ingest::ingest(
+        0,
+        &org_id,
+        RUM_LOG_STREAM,
+        IngestionRequest::RUM(body),
+        IngestUser::from_user_email(user_email.clone()),
+        Some(extend_json),
+        false,
     )
+    .await
+    {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }
 
 /// Rum session-replay ingestion API
 #[utoipa::path(
+    post,
+    path = "/v1/{org_id}/replay",
     context_path = "/rum",
     tag = "Rum",
     operation_id = "ReplayIngestionJson",
@@ -225,52 +227,88 @@ pub async fn log(
         content = inline(SegmentEvent), content_type = "multipart/form-data",
         description = "Multipart form data containing compressed session replay segment and event metadata"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", 
+        (status = 200, description = "Success", content_type = "application/json",
             body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]}),
     ),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[post("/v1/{org_id}/replay")]
 pub async fn sessionreplay(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    payload: MultipartForm<SegmentEvent>,
-    rum_query_data: web::ReqData<RumExtraData>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let mut segment_payload = String::new();
-    if let Err(_e) =
-        ZlibDecoder::new(&payload.segment.data[..]).read_to_string(&mut segment_payload)
-    {
-        return Ok(MetaHttpResponse::bad_request(
-            "Failed to decompress the incoming payload",
-        ));
+    Extension(rum_query_data): Extension<RumExtraData>,
+    mut payload: Multipart,
+) -> Response {
+    // Extract segment and event from multipart form
+    let mut segment_data: Option<Vec<u8>> = None;
+    let mut event_data: Option<Vec<u8>> = None;
+
+    while let Ok(Some(field)) = payload.next_field().await {
+        let name = field.name().map(|s| s.to_string());
+        if let Ok(data) = field.bytes().await {
+            match name.as_deref() {
+                Some("segment") => segment_data = Some(data.to_vec()),
+                Some("event") => event_data = Some(data.to_vec()),
+                _ => {}
+            }
+        }
     }
 
-    let event: Event = json::from_slice(&payload.event.data[..]).unwrap();
+    let segment_bytes = match segment_data {
+        Some(data) => data,
+        None => {
+            return MetaHttpResponse::bad_request("Missing 'segment' field in multipart form");
+        }
+    };
+
+    let event_bytes = match event_data {
+        Some(data) => data,
+        None => {
+            return MetaHttpResponse::bad_request("Missing 'event' field in multipart form");
+        }
+    };
+
+    let mut segment_payload = String::new();
+    if ZlibDecoder::new(&segment_bytes[..])
+        .read_to_string(&mut segment_payload)
+        .is_err()
+    {
+        return MetaHttpResponse::bad_request("Failed to decompress the incoming payload");
+    }
+
+    let event: Event = match json::from_slice(&event_bytes[..]) {
+        Ok(e) => e,
+        Err(_) => {
+            return MetaHttpResponse::bad_request("Failed to parse event data");
+        }
+    };
+
     let ingestion_payload = SegmentEventSerde {
         segment: segment_payload,
         event,
     };
 
-    let body = json::to_vec(&ingestion_payload).unwrap();
+    let body = match json::to_vec(&ingestion_payload) {
+        Ok(b) => b,
+        Err(_) => {
+            return MetaHttpResponse::bad_request("Failed to serialize ingestion payload");
+        }
+    };
+
     let extend_json = &rum_query_data.data;
     let user_email = &user_email.user_id;
-    Ok(
-        match logs::ingest::ingest(
-            0,
-            &org_id,
-            RUM_SESSION_REPLAY_STREAM,
-            IngestionRequest::RUM(body.into()),
-            IngestUser::from_user_email(user_email.clone()),
-            Some(extend_json),
-            false,
-        )
-        .await
-        {
-            Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
-        },
+    match logs::ingest::ingest(
+        0,
+        &org_id,
+        RUM_SESSION_REPLAY_STREAM,
+        IngestionRequest::RUM(body.into()),
+        IngestUser::from_user_email(user_email.clone()),
+        Some(extend_json),
+        false,
     )
+    .await
+    {
+        Ok(v) => MetaHttpResponse::json(v),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
 }

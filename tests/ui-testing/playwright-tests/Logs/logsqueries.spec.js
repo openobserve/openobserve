@@ -486,16 +486,16 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@pagination', '@logs', '@all']
   }, async ({ page }) => {
     testLogger.info('Testing pagination reset behavior after re-running query');
-    
+
     // Set up conditions to ensure we have enough data for pagination
     await pm.logsPage.waitForTimeout(2000);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.waitForTimeout(1000);
-    
+
     // Use wider time range to capture ingested data
     const oneHourButton = page.getByText('Last 1 hour');
     const twelveHourButton = page.getByText('Last 12 hours');
-    
+
     if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await oneHourButton.click();
       testLogger.info('Set time range to Last 1 hour to capture ingested data');
@@ -506,47 +506,47 @@ test.describe("Logs Queries testcases", () => {
       await pm.logsPage.clickRelative15MinButton();
       testLogger.info('Fallback to 15 minute time range');
     }
-    
+
     // Run initial query to get results
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.waitForTimeout(3000);
-    
+
     // Pagination should exist after ingesting data - expect it to be visible
     await pm.logsPage.expectResultPaginationVisible();
     testLogger.info('Pagination controls found, proceeding with test');
-    
+
     // Get available page count using POM
     const pageCount = await pm.logsPage.getPaginationPageCount();
     testLogger.info(`Found ${pageCount} page buttons`);
-    
+
     // Navigate to page 4 using POM
     testLogger.info('Navigating to page 4');
     await pm.logsPage.clickPaginationPage(4);
     await pm.logsPage.waitForTimeout(2000);
-    
+
     // Verify we're on page 4 using POM
     await pm.logsPage.waitForTimeout(3000);
     const page4Classes = await pm.logsPage.getPaginationPageClasses(4);
     testLogger.info(`Page 4 button classes: ${page4Classes}`);
-    
+
     // Run query again while on page 4
     testLogger.info('Running query again while on page 4');
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.waitForTimeout(3000);
-    
+
     // Verify pagination resets to page 1 using POM
     await pm.logsPage.waitForTimeout(2000);
-    
+
     const page4ClassesAfter = await pm.logsPage.getPaginationPageClasses(4).catch(() => null);
     const page1ClassesAfter = await pm.logsPage.getPaginationPageClasses(1).catch(() => null);
-    
+
     testLogger.info(`After query - Page 1 classes: ${page1ClassesAfter}`);
     testLogger.info(`After query - Page 4 classes: ${page4ClassesAfter}`);
-    
+
     // Check pagination state using POM methods
     const isStillOnPage4 = await pm.logsPage.isPaginationPageActive(4).catch(() => false);
     const isBackToPage1 = await pm.logsPage.isPaginationPageActive(1).catch(() => false);
-    
+
     if (isStillOnPage4) {
       testLogger.error('🐛 BUG DETECTED: Pagination stayed on page 4 instead of resetting to page 1');
       expect(isStillOnPage4).toBeFalsy();
@@ -557,7 +557,7 @@ test.describe("Logs Queries testcases", () => {
       testLogger.info('Using fallback method to check pagination state');
       const activePage = await page.locator('[data-test="logs-search-result-pagination"] .q-btn--unelevated').first().textContent({ timeout: 5000 }).catch(() => 'unknown');
       testLogger.info(`Active page (fallback): ${activePage}`);
-      
+
       if (activePage === '4') {
         testLogger.error('🐛 BUG DETECTED: Pagination stayed on page 4 (fallback method)');
         expect(activePage).toBe('1');
@@ -565,7 +565,7 @@ test.describe("Logs Queries testcases", () => {
         testLogger.info('✅ Pagination appears to have reset correctly (fallback method)');
       }
     }
-    
+
     testLogger.info('Pagination reset behavior test completed');
   });
 });

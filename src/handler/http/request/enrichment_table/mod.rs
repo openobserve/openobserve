@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_multipart::Multipart;
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use axum::{
+    Json,
+    extract::{Multipart, Path, Query},
+    http::HeaderMap,
+    response::Response,
+};
 use config::SIZE_IN_MB;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -24,12 +26,14 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::{extract_multipart, save_enrichment_data},
+    service::enrichment_table::save_enrichment_data,
 };
 
 /// CreateEnrichmentTable
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/enrichment_tables/{table_name}",
     context_path = "/api",
     tag = "Functions",
     operation_id = "CreateUpdateEnrichmentTable",
@@ -48,17 +52,15 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create/update enrichment table"}))
+        ("x-o2-mcp" = json!({"description": "Create/update enrichment table", "category": "enrichment"}))
     )
 )]
-#[post("/{org_id}/enrichment_tables/{table_name}")]
 pub async fn save_enrichment_table(
-    path: web::Path<(String, String)>,
-    payload: Multipart,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, table_name) = path.into_inner();
-
+    Path((org_id, table_name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+    mut payload: Multipart,
+) -> Response {
     let bad_req_msg = if org_id.trim().is_empty() {
         Some("Organization cannot be empty")
     } else if table_name.trim().is_empty() {
@@ -68,10 +70,11 @@ pub async fn save_enrichment_table(
     };
 
     if let Some(msg) = bad_req_msg {
-        return Ok(MetaHttpResponse::bad_request(msg));
+        return MetaHttpResponse::bad_request(msg);
     }
-    let content_type = req.headers().get("content-type");
-    let content_length = match req.headers().get("content-length") {
+
+    let content_type = headers.get("content-type");
+    let content_length = match headers.get("content-length") {
         None => 0.0,
         Some(content_length) => {
             content_length
@@ -90,11 +93,12 @@ pub async fn save_enrichment_table(
         cfg.limit.enrichment_table_max_size
     );
     if content_length > cfg.limit.enrichment_table_max_size as f64 {
-        return Ok(MetaHttpResponse::bad_request(format!(
+        return MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
             cfg.limit.enrichment_table_max_size
-        )));
+        ));
     }
+
     match content_type {
         Some(content_type) => {
             if content_type
@@ -102,24 +106,107 @@ pub async fn save_enrichment_table(
                 .unwrap_or("")
                 .starts_with("multipart/form-data")
             {
-                let query =
-                    web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
                 let append_data = match query.get("append") {
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                let json_record = extract_multipart(payload, append_data).await?;
-                save_enrichment_data(&org_id, &table_name, json_record, append_data).await
+
+                // Extract multipart data using axum's Multipart
+                match extract_multipart_axum(&mut payload, append_data).await {
+                    Ok(json_record) => {
+                        match save_enrichment_data(&org_id, &table_name, json_record, append_data)
+                            .await
+                        {
+                            Ok(resp) => resp,
+                            Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+                        }
+                    }
+                    Err(e) => MetaHttpResponse::bad_request(e),
+                }
             } else {
-                Ok(MetaHttpResponse::bad_request(
+                MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",
-                ))
+                )
             }
         }
-        None => Ok(MetaHttpResponse::bad_request(
-            "Bad Request, content-type must be multipart/form-data",
-        )),
+        None => {
+            MetaHttpResponse::bad_request("Bad Request, content-type must be multipart/form-data")
+        }
     }
+}
+
+/// Extract multipart data using axum's Multipart extractor
+async fn extract_multipart_axum(
+    payload: &mut Multipart,
+    append_data: bool,
+) -> Result<Vec<config::utils::json::Map<String, config::utils::json::Value>>, String> {
+    use hashbrown::HashSet;
+
+    let mut records = Vec::new();
+    let mut headers_set = HashSet::new();
+
+    while let Ok(Some(field)) = payload.next_field().await {
+        let file_name = match field.file_name() {
+            Some(name) => name.to_string(),
+            None => continue,
+        };
+
+        let data = match field.bytes().await {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                return Err(format!("Failed to read multipart field: {}", e));
+            }
+        };
+
+        // Determine file type and parse accordingly
+        if file_name.ends_with(".csv") {
+            let data_vec = data.to_vec();
+            let mut rdr = csv::Reader::from_reader(data_vec.as_slice());
+            let headers: Vec<String> = rdr
+                .headers()
+                .map_err(|e| format!("Failed to read CSV headers: {}", e))?
+                .iter()
+                .map(|h| h.to_lowercase())
+                .collect();
+
+            for result in rdr.records() {
+                let record = result.map_err(|e| format!("Failed to read CSV record: {}", e))?;
+                let mut map = config::utils::json::Map::new();
+                for (i, value) in record.iter().enumerate() {
+                    if let Some(header) = headers.get(i) {
+                        // Skip duplicate headers if append_data is false
+                        if !append_data && headers_set.contains(header) {
+                            continue;
+                        }
+                        headers_set.insert(header.clone());
+                        map.insert(
+                            header.clone(),
+                            config::utils::json::Value::String(value.to_string()),
+                        );
+                    }
+                }
+                if !map.is_empty() {
+                    records.push(map);
+                }
+            }
+        } else if file_name.ends_with(".json") {
+            let json_data: Vec<config::utils::json::Map<String, config::utils::json::Value>> =
+                config::utils::json::from_slice(&data)
+                    .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+            records.extend(json_data);
+        } else {
+            return Err(format!(
+                "Unsupported file type: {}. Only .csv and .json files are supported.",
+                file_name
+            ));
+        }
+    }
+
+    if records.is_empty() {
+        return Err("No valid records found in the uploaded file".to_string());
+    }
+
+    Ok(records)
 }
 
 // ============================================================================
@@ -157,10 +244,20 @@ pub struct EnrichmentTableUrlRequest {
     /// - Should return CSV content-type (not enforced but recommended)
     /// - File can be any size - streaming handles large files efficiently
     pub url: String,
+
+    /// Replace only the failed job's URL (optional, default: false)
+    ///
+    /// When true, only updates the failed job with the new URL while keeping
+    /// all successful jobs unchanged. Useful for fixing typos or broken URLs
+    /// without re-downloading working data sources.
+    #[serde(default)]
+    pub replace_failed: bool,
 }
 
 /// CreateEnrichmentTableFromUrl
 #[utoipa::path(
+    post,
+    path = "/{org_id}/enrichment_tables/{table_name}/url",
     context_path = "/api",
     tag = "Functions",
     operation_id = "CreateEnrichmentTableFromUrl",
@@ -186,32 +283,29 @@ pub struct EnrichmentTableUrlRequest {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create table from URL"}))
+        ("x-o2-mcp" = json!({"description": "Create table from URL", "category": "enrichment"}))
     )
 )]
-#[post("/{org_id}/enrichment_tables/{table_name}/url")]
 pub async fn save_enrichment_table_from_url(
-    path: web::Path<(String, String)>,
-    body: web::Json<EnrichmentTableUrlRequest>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    use std::collections::HashMap;
-
+    Path((org_id, table_name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(body): Json<EnrichmentTableUrlRequest>,
+) -> Response {
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
 
     use crate::service::{
-        db::enrichment_table::{get_url_job, save_url_job},
+        db::enrichment_table::{delete_url_job, get_url_jobs_for_table, save_url_job},
         enrichment_table::url_processor::trigger_url_job_processing,
     };
 
-    let (org_id, table_name) = path.into_inner();
-    let request_body = body.into_inner();
+    let request_body = body;
 
     // ===== PARSE QUERY PARAMETERS =====
     // Extract append_data from query parameter to match file upload endpoint consistency.
     // This keeps both endpoints (file upload and URL) using the same parameter pattern.
     // Also extract resume parameter to support resuming from last byte position on retry.
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    // Also extract retry parameter to distinguish between retry (recreate all jobs) vs update (new
+    // URL).
     let append_data = match query.get("append") {
         Some(append_str) => append_str.parse::<bool>().unwrap_or(false),
         None => false,
@@ -220,253 +314,279 @@ pub async fn save_enrichment_table_from_url(
         Some(resume_str) => resume_str.parse::<bool>().unwrap_or(false),
         None => false,
     };
+    let retry = match query.get("retry") {
+        Some(retry_str) => retry_str.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
+
+    // Extract replace_failed from request body
+    let replace_failed = request_body.replace_failed;
 
     // ===== INPUT VALIDATION =====
     // We validate all inputs before doing any database operations to fail fast
     // and provide clear error messages to users.
 
     if org_id.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Organization cannot be empty",
-        ));
+        return MetaHttpResponse::bad_request("Organization cannot be empty");
     }
     if table_name.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request("Table name cannot be empty"));
+        return MetaHttpResponse::bad_request("Table name cannot be empty");
     }
     if request_body.url.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request("URL cannot be empty"));
+        return MetaHttpResponse::bad_request("URL cannot be empty");
     }
 
-    // Validate URL scheme to prevent potential security issues.
-    // We only support http/https, not file://, ftp://, etc.
-    // This prevents:
-    // - Local file access via file:// URLs
-    // - SSRF attacks via internal network protocols
-    // - Confusion with non-HTTP transports
-    if !request_body.url.starts_with("http://") && !request_body.url.starts_with("https://") {
-        return Ok(MetaHttpResponse::bad_request(
-            "URL must start with http:// or https://",
-        ));
+    // URL validation: Skip if retry mode (we're just reprocessing existing URLs)
+    // Apply validation for normal updates and replace_failed mode
+    if !retry && let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+        return MetaHttpResponse::bad_request(err_msg);
     }
 
-    // SSRF protection: Block internal IPs and localhost
-    if let Ok(parsed_url) = url::Url::parse(&request_body.url)
-        && let Some(host) = parsed_url.host_str()
-    {
-        // Block localhost
-        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-            return Ok(MetaHttpResponse::bad_request(
-                "Cannot access localhost URLs",
-            ));
-        }
-
-        // Block private IP ranges and AWS metadata endpoint
-        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-            match ip {
-                std::net::IpAddr::V4(v4) => {
-                    let octets = v4.octets();
-                    // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-                    // AWS metadata: 169.254.169.254
-                    if octets[0] == 10
-                        || (octets[0] == 172 && (16..=31).contains(&octets[1]))
-                        || (octets[0] == 192 && octets[1] == 168)
-                        || (octets[0] == 169 && octets[1] == 254)
-                    {
-                        return Ok(MetaHttpResponse::bad_request(
-                            "Cannot access private IP addresses",
-                        ));
-                    }
-                }
-                std::net::IpAddr::V6(v6) => {
-                    // Block IPv6 localhost and private ranges
-                    if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
-                        return Ok(MetaHttpResponse::bad_request(
-                            "Cannot access private IP addresses",
-                        ));
-                    }
-                }
-            }
-        }
-    }
-
-    // ===== DUPLICATE JOB PREVENTION & RESUME HANDLING =====
-    // Check if there's already a job in progress for this table.
-    // This prevents:
-    // 1. Wasted resources from duplicate downloads
-    // 2. Race conditions where two jobs write to the same table
-    // 3. Confusing UI state where multiple jobs exist for same table
-    //
-    // We allow replacing completed/failed jobs to support retrying with
-    // different URLs or re-importing updated data.
-    let existing_job = match get_url_job(&org_id, &table_name).await {
-        Ok(Some(existing_job)) => {
-            // Only block if job is actively processing.
-            // This check is eventually consistent (job could complete between
-            // check and new job creation), but the race window is milliseconds
-            // and worst case is a harmless duplicate completion.
-            if existing_job.status == EnrichmentTableStatus::Processing {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "Job already in progress for table {}/{}",
-                    org_id, table_name
-                )));
-            }
-            // If status is Completed or Failed, we allow creating a new job.
-            // Store existing job for potential resume.
-            Some(existing_job)
-        }
-        Ok(None) => {
-            // No existing job found - this is the common case for first-time
-            // imports. Proceed with creating new job.
-            None
-        }
+    // ===== MULTI-URL SUPPORT: JOB STATUS VALIDATION =====
+    // Fetch all existing jobs for this table
+    let existing_jobs = match get_url_jobs_for_table(&org_id, &table_name).await {
+        Ok(jobs) => jobs,
         Err(e) => {
-            // Database error while checking for existing job.
-            // We fail the request rather than proceeding blindly, because:
-            // 1. There might actually be a job in progress that we can't see
-            // 2. Database issues indicate broader system problems
-            // 3. Better to fail safe than risk duplicate work or data corruption
             log::error!(
-                "[ENRICHMENT::URL] Failed to check existing job for {}/{}: {}",
+                "[ENRICHMENT::URL] Failed to fetch existing jobs for {}/{}: {}",
                 org_id,
                 table_name,
                 e
             );
-            return Ok(MetaHttpResponse::internal_error(
-                "Failed to check job status",
-            ));
+            return MetaHttpResponse::internal_error("Failed to check job status");
         }
     };
 
-    // ===== JOB CREATION OR RESUME =====
-    // If resume=true and there's an existing failed job with Range support,
-    // preserve its progress (last_byte_position, etc.) and just reset to Pending.
-    // Otherwise, create a fresh job from scratch.
-    // Validate URL matches to prevent resuming from wrong position if user changes URL.
-    let mut job = if let Some(existing) = existing_job {
-        if resume
-            && existing.status == EnrichmentTableStatus::Failed
-            && existing.supports_range
-            && existing.url == request_body.url
-        {
+    // Check job statuses
+    let has_processing = existing_jobs
+        .iter()
+        .any(|j| j.status == EnrichmentTableStatus::Processing);
+    let has_failed = existing_jobs
+        .iter()
+        .any(|j| j.status == EnrichmentTableStatus::Failed);
+
+    // RULE 1: Block ALL operations if any job is processing
+    // Reason: Cannot safely write to table while another job is writing
+    if has_processing {
+        return MetaHttpResponse::bad_request(format!(
+            "Cannot create new job: a job is currently processing for table {}/{}. Please wait for it to complete.",
+            org_id, table_name
+        ));
+    }
+
+    // RULE 2: Block APPEND (adding new URL) if any job has failed
+    // Reason: Failed jobs indicate data integrity issues; user should resolve them first
+    // Allow: retry (reload all), replace_failed (fix failed URL), or replace mode (start fresh)
+    if append_data && has_failed && !retry && !replace_failed {
+        return MetaHttpResponse::bad_request(format!(
+            "Cannot add new URL: table {}/{} has failed jobs. Please reload, replace the failed URL, or use replace mode to start fresh.",
+            org_id, table_name
+        ));
+    }
+
+    // ===== RETRY vs UPDATE vs RESUME LOGIC =====
+    // Three scenarios:
+    // 1. resume=true: Resume a specific failed job from last byte position
+    // 2. retry=true: Retry all existing jobs from scratch (reset their state)
+    // 3. Neither: Update mode - replace all jobs with this new URL
+
+    let jobs_to_save: Vec<EnrichmentTableUrlJob> = if resume {
+        // ===== SCENARIO 1: RESUME =====
+        // Find failed job with matching URL that supports Range requests
+        let resumable_job = existing_jobs
+            .iter()
+            .find(|j| {
+                j.status == EnrichmentTableStatus::Failed
+                    && j.supports_range
+                    && j.url == request_body.url
+            })
+            .cloned();
+
+        if let Some(existing) = resumable_job {
             log::info!(
-                "[ENRICHMENT::URL] Resuming job for {}/{} from byte {}",
+                "[ENRICHMENT::URL] Resuming job {} for {}/{} from byte {}",
+                existing.id,
                 org_id,
                 table_name,
                 existing.last_byte_position
             );
             let mut job = existing;
-            // Reset status to Pending but preserve progress
             job.status = EnrichmentTableStatus::Pending;
             job.error_message = None;
             job.updated_at = chrono::Utc::now().timestamp_micros();
-            job
+            vec![job]
         } else {
-            // Create a new job record with Pending status from scratch.
             log::info!(
-                "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+                "[ENRICHMENT::URL] No resumable job found, creating new job for {}/{}",
                 org_id,
                 table_name
             );
-            EnrichmentTableUrlJob::new(
+            vec![EnrichmentTableUrlJob::new(
                 org_id.clone(),
                 table_name.clone(),
                 request_body.url.clone(),
-                append_data,
-            )
+                false, // retry from scratch, so don't append
+            )]
         }
-    } else {
-        // No existing job - create a new job record with Pending status from scratch.
-        // This immediately makes the job visible to the status API, allowing
-        // the UI to start polling for updates even before processing begins.
+    } else if retry {
+        // ===== SCENARIO 2: RETRY ALL JOBS =====
+        // Reset all existing jobs to start from scratch
+        // This preserves job IDs and created_at timestamps
         log::info!(
-            "[ENRICHMENT::URL] Creating new job for {}/{} from scratch",
+            "[ENRICHMENT::URL] Retry mode: resetting all {} job(s) for {}/{} to retry from scratch",
+            existing_jobs.len(),
             org_id,
             table_name
         );
-        EnrichmentTableUrlJob::new(
+
+        existing_jobs
+            .into_iter()
+            .enumerate()
+            .map(|(idx, mut job)| {
+                // Reset job state to retry from beginning
+                job.status = EnrichmentTableStatus::Pending;
+                job.last_byte_position = 0;
+                job.total_bytes_fetched = 0;
+                job.total_records_processed = 0;
+                job.retry_count = 0;
+                job.error_message = None;
+                // First job deletes+recreates table (replace mode)
+                // Subsequent jobs append to the table
+                job.append_data = idx > 0;
+                job.updated_at = chrono::Utc::now().timestamp_micros();
+                job
+            })
+            .collect()
+    } else if replace_failed {
+        // ===== SCENARIO 3: REPLACE FAILED URL ONLY =====
+        // Replace only the failed job's URL while keeping successful jobs
+        log::info!(
+            "[ENRICHMENT::URL] Replace failed mode: updating failed job URL for {}/{}",
+            org_id,
+            table_name
+        );
+
+        // Find the failed job
+        // Note: We block adding new URLs when a job has failed (see RULE 2 validation above),
+        // so there should ideally be only one failed job at any given time. We find the first
+        // failed job if multiple exist (which shouldn't happen in normal operation).
+        let failed_job = existing_jobs
+            .iter()
+            .find(|j| j.status == EnrichmentTableStatus::Failed)
+            .cloned();
+
+        if let Some(mut job) = failed_job {
+            // Update the failed job with new URL and reset its state
+            job.url = request_body.url.clone();
+            job.status = EnrichmentTableStatus::Pending;
+            job.last_byte_position = 0;
+            job.total_bytes_fetched = 0;
+            job.total_records_processed = 0;
+            job.retry_count = 0;
+            job.error_message = None;
+            job.updated_at = chrono::Utc::now().timestamp_micros();
+            // Keep append_data as-is to maintain the original job order behavior
+
+            vec![job]
+        } else {
+            return MetaHttpResponse::bad_request("No failed job found to replace");
+        }
+    } else {
+        // ===== SCENARIO 4: UPDATE MODE =====
+        // Replace all existing jobs with this new URL
+        log::info!(
+            "[ENRICHMENT::URL] Update mode: replacing all jobs with new URL for {}/{}",
+            org_id,
+            table_name
+        );
+
+        // Delete all existing job records if in replace mode
+        if !append_data
+            && !existing_jobs.is_empty()
+            && let Err(e) = delete_url_job(&org_id, &table_name).await
+        {
+            log::error!(
+                "[ENRICHMENT::URL] Failed to delete existing jobs for {}/{}: {}",
+                org_id,
+                table_name,
+                e
+            );
+            // Continue anyway - we'll create the new job
+        }
+
+        vec![EnrichmentTableUrlJob::new(
             org_id.clone(),
             table_name.clone(),
             request_body.url.clone(),
             append_data,
-        )
+        )]
     };
 
-    // ===== CHECK RANGE REQUEST SUPPORT =====
-    // Check if the URL supports HTTP Range requests for resumable downloads.
-    // This check is done once at job creation and cached in the database.
-    // The processor will use this flag to decide whether to use Range requests on retry.
-    //
-    // Skip this check if we're resuming (we already have the cached value).
-    //
-    // Why check now instead of during processing:
-    // 1. Fail fast - detect unsupported URLs before accepting the job
-    // 2. Cache the capability - avoid redundant checks on every retry
-    // 3. Simplify retry logic - processor just reads the flag from DB
-    //
-    // Why we don't fail if check fails:
-    // Range support is optional. If the check fails (network error, timeout),
-    // we still create the job and assume no Range support (safer fallback).
-    if !resume || !job.supports_range {
-        let supports_range = {
-            use crate::service::enrichment_table::url_processor::check_range_support_for_url;
-            match check_range_support_for_url(&request_body.url, &org_id, &table_name).await {
-                Ok(true) => {
-                    log::info!(
-                        "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
-                        request_body.url
-                    );
-                    true
+    // ===== CHECK RANGE REQUEST SUPPORT & PERSIST JOBS =====
+    // For each job, check Range support (if needed) and save to database
+    let mut saved_job_count = 0;
+    for mut job in jobs_to_save {
+        // Check Range support only for new jobs (not resume or retry)
+        // Resume: already has cached value
+        // Retry: already checked before, reuse the value
+        if !resume && !retry {
+            let supports_range = {
+                use crate::service::enrichment_table::url_processor::check_range_support_for_url;
+                match check_range_support_for_url(&job.url, &org_id, &table_name).await {
+                    Ok(true) => {
+                        log::info!(
+                            "[ENRICHMENT::URL] URL {} supports Range requests - resume capability enabled",
+                            job.url
+                        );
+                        true
+                    }
+                    Ok(false) => {
+                        log::info!(
+                            "[ENRICHMENT::URL] URL {} does not support Range requests - will use delete-and-retry on failure",
+                            job.url
+                        );
+                        false
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[ENRICHMENT::URL] Failed to check Range support for {}: {}. Assuming no support.",
+                            job.url,
+                            e
+                        );
+                        false
+                    }
                 }
-                Ok(false) => {
-                    log::info!(
-                        "[ENRICHMENT::URL] URL {} does not support Range requests - will use delete-and-retry on failure",
-                        request_body.url
-                    );
-                    false
-                }
-                Err(e) => {
-                    log::warn!(
-                        "[ENRICHMENT::URL] Failed to check Range support for {}: {}. Assuming no support.",
-                        request_body.url,
-                        e
-                    );
-                    false
-                }
-            }
-        };
-        job.supports_range = supports_range;
-    }
+            };
+            job.supports_range = supports_range;
+        }
 
-    // ===== PERSIST JOB TO DATABASE =====
-    // Save job to database before triggering processing.
-    // This ordering is critical:
-    // 1. If save succeeds but trigger fails → Job exists in DB but not processing. User can retry
-    //    or we can add recovery mechanism.
-    // 2. If trigger succeeds but save fails → Processing starts without job record. Status API
-    //    returns 404, UI shows no progress, chaos ensues.
-    //
-    // Therefore: save first, trigger second.
-    if let Err(e) = save_url_job(&job).await {
-        log::error!(
-            "[ENRICHMENT::URL] Failed to save job for {}/{}: {}",
+        // ===== PERSIST JOB TO DATABASE =====
+        // Save job to database before triggering processing.
+        // This ordering is critical - see comments in original single-job flow.
+        if let Err(e) = save_url_job(&job).await {
+            log::error!(
+                "[ENRICHMENT::URL] Failed to save job {} for {}/{}: {}",
+                job.id,
+                org_id,
+                table_name,
+                e
+            );
+            return MetaHttpResponse::internal_error("Failed to save job");
+        }
+
+        saved_job_count += 1;
+        log::info!(
+            "[ENRICHMENT::URL] Saved job {} for {}/{} (URL: {})",
+            job.id,
             org_id,
             table_name,
-            e
+            job.url
         );
-        return Ok(MetaHttpResponse::internal_error("Failed to create job"));
     }
 
     // ===== TRIGGER BACKGROUND PROCESSING =====
-    // Send MPSC event to background processor.
-    // This is a non-blocking operation that just queues an event.
-    // Actual processing begins when the background task receives the event.
-    //
-    // Why we can fail here:
-    // If this fails, the job exists in the database but will never process.
-    // That's acceptable because:
-    // 1. This only fails during process shutdown (channel closed)
-    // 2. We return 500, so user knows the request failed
-    // 3. User can retry, which will trigger processing of the existing job
+    // Send MPSC event to background processor to process all pending jobs for this table.
+    // The processor will pick up all pending jobs and process them sequentially.
     if let Err(e) = trigger_url_job_processing(org_id.clone(), table_name.clone()) {
         log::error!(
             "[ENRICHMENT::URL] Failed to trigger job processing for {}/{}: {}",
@@ -474,16 +594,14 @@ pub async fn save_enrichment_table_from_url(
             table_name,
             e
         );
-        return Ok(MetaHttpResponse::internal_error(
-            "Failed to trigger job processing",
-        ));
+        return MetaHttpResponse::internal_error("Failed to trigger job processing");
     }
 
     log::info!(
-        "[ENRICHMENT::URL] Created and triggered job for {}/{} from URL: {}",
+        "[ENRICHMENT::URL] Created and triggered {} job(s) for {}/{}",
+        saved_job_count,
         org_id,
-        table_name,
-        request_body.url
+        table_name
     );
 
     // ===== SUCCESS RESPONSE =====
@@ -492,16 +610,18 @@ pub async fn save_enrichment_table_from_url(
     // - Processing happens asynchronously in the background
     // - Final outcome (success/failure) is unknown at this point
     // - Client should poll the status endpoint for progress
-    Ok(MetaHttpResponse::json(serde_json::json!({
+    MetaHttpResponse::json(serde_json::json!({
         "message": "Enrichment table job created successfully",
         "org_id": org_id,
         "table_name": table_name,
         "status": "pending"
-    })))
+    }))
 }
 
 /// GetAllEnrichmentTableStatuses
 #[utoipa::path(
+    get,
+    path = "/{org_id}/enrichment_tables/status",
     context_path = "/api",
     tag = "Functions",
     operation_id = "GetAllEnrichmentTableStatuses",
@@ -514,28 +634,23 @@ pub async fn save_enrichment_table_from_url(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>),
+        (status = StatusCode::OK, description = "Statuses retrieved", body = HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
         (status = StatusCode::FORBIDDEN, description = "Forbidden", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
     )
 )]
-#[get("/{org_id}/enrichment_tables/status")]
 pub async fn get_all_enrichment_table_statuses(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     crate::handler::http::extractors::Headers(_user_email): crate::handler::http::extractors::Headers<
         crate::common::utils::auth::UserEmail,
     >,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     use crate::service::db::enrichment_table::list_url_jobs;
-
-    let org_id = path.into_inner();
 
     // ===== INPUT VALIDATION =====
     if org_id.trim().is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Organization cannot be empty",
-        ));
+        return MetaHttpResponse::bad_request("Organization cannot be empty");
     }
 
     // ===== OPENFGA PERMISSION CHECK (ENTERPRISE) =====
@@ -557,7 +672,7 @@ pub async fn get_all_enrichment_table_statuses(
         {
             Ok(table_list) => table_list,
             Err(e) => {
-                return Ok(MetaHttpResponse::forbidden(e.to_string()));
+                return MetaHttpResponse::forbidden(e.to_string());
             }
         }
     };
@@ -593,14 +708,21 @@ pub async fn get_all_enrichment_table_statuses(
                 jobs
             };
 
-            // Convert Vec<Job> to HashMap<table_name, Job> for easier frontend lookup
-            let job_map: HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob> =
-                filtered_jobs
-                    .into_iter()
-                    .map(|job| (job.table_name.clone(), job))
-                    .collect();
+            // Convert Vec<Job> to HashMap<table_name, Vec<Job>> for multi-URL support
+            // Group jobs by table_name
+            let mut job_map: HashMap<
+                String,
+                Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>,
+            > = HashMap::new();
 
-            Ok(MetaHttpResponse::json(job_map))
+            for job in filtered_jobs {
+                job_map
+                    .entry(job.table_name.clone())
+                    .or_insert_with(Vec::new)
+                    .push(job);
+            }
+
+            MetaHttpResponse::json(job_map)
         }
         Err(e) => {
             log::error!(
@@ -608,9 +730,171 @@ pub async fn get_all_enrichment_table_statuses(
                 org_id,
                 e
             );
-            Ok(MetaHttpResponse::internal_error(
-                "Failed to retrieve enrichment table statuses",
-            ))
+            MetaHttpResponse::internal_error("Failed to retrieve enrichment table statuses")
         }
+    }
+}
+
+/// Validates a URL for enrichment table ingestion
+///
+/// Performs security checks including:
+/// - Non-empty URL
+/// - HTTP/HTTPS scheme only
+/// - SSRF protection (blocks localhost and private IPs)
+///
+/// # Returns
+/// - `Ok(())` if validation passes
+/// - `Err(String)` with error message if validation fails
+fn validate_enrichment_url(url: &str) -> Result<(), String> {
+    // Check for empty URL
+    if url.trim().is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+
+    // Validate URL scheme
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("URL must start with http:// or https://".to_string());
+    }
+
+    // Parse URL for SSRF protection
+    let parsed_url = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+    let host = parsed_url
+        .host_str()
+        .ok_or_else(|| "URL must have a valid host".to_string())?;
+
+    // Block localhost
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        return Err("Cannot access localhost URLs".to_string());
+    }
+
+    // Block private IP ranges
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                let octets = v4.octets();
+                // RFC1918 private ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+                // AWS metadata: 169.254.169.254
+                if octets[0] == 10
+                    || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                    || (octets[0] == 192 && octets[1] == 168)
+                    || (octets[0] == 169 && octets[1] == 254)
+                {
+                    return Err("Cannot access private IP addresses".to_string());
+                }
+            }
+            std::net::IpAddr::V6(v6) => {
+                // Block IPv6 localhost and private ranges
+                if v6.is_loopback() || v6.segments()[0] & 0xfe00 == 0xfc00 {
+                    return Err("Cannot access private IP addresses".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_enrichment_url_valid_http() {
+        assert!(validate_enrichment_url("http://example.com/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_valid_https() {
+        assert!(validate_enrichment_url("https://example.com/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_empty() {
+        let result = validate_enrichment_url("");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "URL cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_whitespace() {
+        let result = validate_enrichment_url("   ");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "URL cannot be empty");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_invalid_scheme() {
+        let result = validate_enrichment_url("ftp://example.com/data.csv");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_file_scheme() {
+        let result = validate_enrichment_url("file:///etc/passwd");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "URL must start with http:// or https://"
+        );
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_localhost() {
+        let result = validate_enrichment_url("http://localhost/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_127_0_0_1() {
+        let result = validate_enrichment_url("http://127.0.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access localhost URLs");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_10() {
+        let result = validate_enrichment_url("http://10.0.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_192_168() {
+        let result = validate_enrichment_url("http://192.168.1.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_private_ip_172() {
+        let result = validate_enrichment_url("http://172.16.0.1/data.csv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_aws_metadata() {
+        let result = validate_enrichment_url("http://169.254.169.254/latest/meta-data/");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot access private IP addresses");
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_public_ip() {
+        assert!(validate_enrichment_url("http://8.8.8.8/data.csv").is_ok());
+    }
+
+    #[test]
+    fn test_validate_enrichment_url_github() {
+        assert!(
+            validate_enrichment_url("https://raw.githubusercontent.com/user/repo/main/data.csv")
+                .is_ok()
+        );
     }
 }

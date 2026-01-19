@@ -276,7 +276,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Threshold -->
+        <!-- PromQL Trigger Condition (for promql queries only) -->
+        <div v-if="queryType === 'promql' && formData.query_condition.promql_condition" class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+            Trigger if the value is *
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Defines when the alert should trigger based on the PromQL query result value.<br />
+                  Example: If set to ">= 100", the alert triggers when the query result is greater than or equal to 100.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div style="width: calc(100% - 190px)">
+            <div class="flex justify-start items-start">
+              <div class="tw:flex tw:flex-col">
+                <q-select
+                  v-model="formData.query_condition.promql_condition.operator"
+                  :options="triggerOperators"
+                  class="showLabelOnTop no-case q-py-none"
+                  borderless
+                  dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  :style="{
+                    width: (formData.query_condition.promql_condition.operator === 'Contains' || formData.query_condition.promql_condition.operator === 'NotContains')
+                      ? '124px'
+                      : '88px',
+                    minWidth: '88px'
+                  }"
+                  @update:model-value="emitPromqlConditionUpdate"
+                />
+                <div
+                  v-if="!formData.query_condition.promql_condition.operator"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+              <div class="flex items-start tw:flex-col" style="border-left: none">
+                <div class="tw:flex tw:items-center">
+                  <div style="width: 179px; margin-left: 0 !important">
+                    <q-input
+                      v-model.number="formData.query_condition.promql_condition.value"
+                      type="number"
+                      dense
+                      borderless
+                      style="background: none"
+                      debounce="300"
+                      @update:model-value="emitPromqlConditionUpdate"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-if="formData.query_condition.promql_condition.value === undefined || formData.query_condition.promql_condition.value === null || formData.query_condition.promql_condition.value === ''"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Threshold (for custom and sql queries, always shown for promql) -->
         <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
@@ -295,8 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div style="width: calc(100% - 190px)">
-            <!-- With Aggregation -->
-            <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
+            <!-- With Aggregation (only for custom queries with aggregation enabled) -->
+            <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation && queryType === 'custom'">
               <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:gap-2">
                 <div class="tw:flex tw:items-center">
                   <div class="q-mr-xs">
@@ -369,8 +442,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <!-- Without Aggregation -->
-            <template v-else>
+            <!-- Without Aggregation (for custom without aggregation, sql, and promql queries) -->
+            <template v-if="!localIsAggregationEnabled || queryType !== 'custom'">
               <div ref="thresholdFieldRef" class="flex justify-start items-start">
                 <div class="tw:flex tw:flex-col">
                   <q-select
@@ -794,6 +867,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Template Override -->
+        <div class="flex items-start q-mr-sm alert-settings-row">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+            {{ t("alerts.template") }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Optional: Select a template to use for all destinations in this alert.
+                  This overrides any templates configured on individual destinations.
+                  If not selected, each destination will use its own configured template.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div>
+            <div class="flex items-center">
+              <q-select
+                ref="templateFieldRef"
+                v-model="localTemplate"
+                :options="filteredTemplates"
+                class="no-case q-py-none"
+                borderless
+                dense
+                use-input
+                fill-input
+                clearable
+                emit-value
+                :input-debounce="400"
+                hide-bottom-space
+                @filter="filterTemplates"
+                @update:model-value="emitTemplateUpdate"
+                style="width: 180px; max-width: 300px"
+                placeholder="Use destination templates"
+              >
+                <template v-slot:no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No templates available</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <q-btn
+                icon="refresh"
+                class="iconHoverBtn q-ml-xs"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Refresh latest Templates"
+                @click="$emit('refresh:templates')"
+                style="min-width: auto"
+              />
+            </div>
+          </div>
+        </div>
       </template>
       </q-form>
     </div>
@@ -801,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, watch, type PropType, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -838,13 +973,24 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    template: {
+      type: String,
+      default: "",
+    },
+    templates: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
     "update:aggregation",
     "update:isAggregationEnabled",
     "update:destinations",
+    "update:template",
+    "update:promqlCondition",
     "refresh:destinations",
+    "refresh:templates",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -859,6 +1005,7 @@ export default defineComponent({
     const thresholdFieldRef = ref(null);
     const silenceFieldRef = ref(null);
     const destinationsFieldRef = ref(null);
+    const templateFieldRef = ref(null);
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
@@ -867,6 +1014,7 @@ export default defineComponent({
       queryType.value === "custom" && props.isAggregationEnabled
     );
     const localDestinations = ref(props.destinations);
+    const localTemplate = ref(props.template);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -942,6 +1090,13 @@ export default defineComponent({
       }
     );
 
+    watch(
+      () => props.template,
+      (newVal) => {
+        localTemplate.value = newVal;
+      }
+    );
+
     // Watch for frequency type changes to manage timezone
     watch(
       () => props.formData.trigger_condition.frequency_type,
@@ -998,6 +1153,31 @@ export default defineComponent({
         }
       });
     };
+
+    // Filtered templates
+    const formattedTemplates = computed(() => props.templates.map((t: any) => t.name));
+    const filteredTemplates = ref<string[]>([]);
+    const filterTemplates = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          filteredTemplates.value = [...formattedTemplates.value];
+        } else {
+          const needle = val.toLowerCase();
+          filteredTemplates.value = formattedTemplates.value.filter(
+            (v: string) => v.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
+    };
+
+    // Watch for templates prop changes
+    watch(
+      () => props.templates,
+      () => {
+        filteredTemplates.value = [...formattedTemplates.value];
+      },
+      { immediate: true }
+    );
 
     // Timezone filter function
     const timezoneFilterFn = (val: string, update: any) => {
@@ -1176,6 +1356,14 @@ export default defineComponent({
       emit("update:destinations", localDestinations.value);
     };
 
+    const emitTemplateUpdate = () => {
+      emit("update:template", localTemplate.value || "");
+    };
+
+    const emitPromqlConditionUpdate = () => {
+      emit("update:promqlCondition", props.formData.query_condition.promql_condition);
+    };
+
     const routeToCreateDestination = () => {
       const url = router.resolve({
         name: "alertDestinations",
@@ -1218,8 +1406,33 @@ export default defineComponent({
       }
 
       // For Scheduled Alerts
-      // Check if aggregation is enabled
-      if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+      // Check if query type is PromQL - validate both promql_condition AND threshold
+      if (queryType.value === 'promql') {
+        // Validate PromQL condition
+        if (!props.formData.query_condition.promql_condition) {
+          return { valid: false, message: 'PromQL condition is required' };
+        }
+        if (!props.formData.query_condition.promql_condition.operator) {
+          return { valid: false, message: null };
+        }
+        if (
+          props.formData.query_condition.promql_condition.value === undefined ||
+          props.formData.query_condition.promql_condition.value === null ||
+          props.formData.query_condition.promql_condition.value === ''
+        ) {
+          return { valid: false, message: null };
+        }
+
+        // Also validate threshold for PromQL
+        if (!props.formData.trigger_condition.operator) {
+          return { valid: false, message: null };
+        }
+        const threshold = Number(props.formData.trigger_condition.threshold);
+        if (isNaN(threshold) || threshold < 1) {
+          return { valid: false, message: `${t('alerts.threshold')} should be greater than 0` };
+        }
+      } else if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation) {
+        // Check if aggregation is enabled
         // Validate group by fields (if any are added, they must not be empty)
         const groupByFields = props.formData.query_condition.aggregation.group_by;
         if (groupByFields && groupByFields.length > 0) {
@@ -1293,6 +1506,7 @@ export default defineComponent({
       queryType,
       localIsAggregationEnabled,
       localDestinations,
+      localTemplate,
       aggFunctions,
       triggerOperators,
       filteredFields,
@@ -1301,12 +1515,16 @@ export default defineComponent({
       filterNumericColumns,
       filteredDestinations,
       filterDestinations,
+      filteredTemplates,
+      filterTemplates,
       toggleAggregation,
       addGroupByColumn,
       deleteGroupByColumn,
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,
+      emitTemplateUpdate,
+      emitPromqlConditionUpdate,
       routeToCreateDestination,
       handleFrequencyTypeChange,
       handlePeriodChange,
@@ -1326,6 +1544,7 @@ export default defineComponent({
       thresholdFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
+      templateFieldRef,
     };
   },
 });

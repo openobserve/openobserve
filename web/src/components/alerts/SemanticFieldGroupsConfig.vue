@@ -17,10 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="semantic-field-groups-config">
     <div class="section-header q-mb-md">
-      <div class="text-h6">Field Mappings</div>
+      <div class="text-h6">{{ t("settings.correlation.semanticFieldGroupsTitle") }}</div>
       <div class="text-caption text-grey-7">
-        Define field name mappings for correlation and deduplication (e.g.,
-        host, hostname, node → "host" group)
+        {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
 
@@ -28,10 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-col-gutter-md q-mb-md">
       <div class="col-12 col-md-4">
         <q-select
+          data-test="semantic-group-category-select"
           v-model="selectedCategory"
           :options="categoryOptions"
-          label="Category"
-          hint="Filter groups by category"
+          :label="t('correlation.category')"
+          :hint="t('correlation.categoryHint')"
           dense
           borderless
           stack-label
@@ -43,8 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="scope">
             <q-item v-bind="scope.itemProps">
               <q-item-section>
-                <q-item-label>{{ scope.opt.label }}</q-item-label>
-                <q-item-label caption>{{ scope.opt.count }} groups</q-item-label>
+                <q-item-label>
+                  <span class="tw:font-medium">{{ scope.opt.label }}</span>
+                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2">({{ scope.opt.count }} {{ t("settings.correlation.groupsLabel") }})</span>
+                </q-item-label>
               </q-item-section>
             </q-item>
           </template>
@@ -52,18 +54,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
         <q-btn
-          outline
-          color="primary"
-          label="Import from JSON"
-          icon="upload_file"
-          size="sm"
+          data-test="correlation-semanticfieldgroup-import-json-btn"
+          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          no-caps
+          flat
+          :label="t('correlation.importFromJson')"
           @click="navigateToImport"
         />
         <q-btn
+          data-test="correlation-semanticfieldgroup-add-custom-group-btn"
+          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          no-caps
+          flat
           color="primary"
-          label="Add Custom Group"
-          icon="add"
-          size="sm"
+          :label="t('correlation.addCustomGroup')"
           @click="addGroup"
         />
       </div>
@@ -82,30 +88,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="text-center q-pa-lg text-grey-7">
       <q-icon name="info" size="md" class="q-mb-sm" />
       <div>
-        No semantic groups in this category. Select a different category or add a custom group.
+        {{ t("correlation.noSemanticGroupsInCategory", { category: selectedCategory || t("correlation.other") }) }}
       </div>
     </div>
 
     <!-- Total groups indicator -->
     <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
-      Showing {{ filteredGroups.length }} of {{ localGroups.length }} total groups
+      {{ t("correlation.showingGroups", { filterGroupLength: filteredGroups.length, localGroupLength: localGroups.length }) }}
     </div>
 
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div v-if="localGroups.length > 0 && showFingerprintFields" class="fingerprint-section q-mt-lg">
       <div class="text-subtitle1 q-mb-sm">
-        Deduplication Fields *
+        {{ t("correlation.deduplicateFields") }} *
         <q-tooltip
-          >Select which field mappings to use for deduplication
-          fingerprinting</q-tooltip
+          >{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip
         >
       </div>
       <div class="text-caption text-grey-7 q-mb-md">
-        Alerts with the same values for these fields will be deduplicated (e.g.,
-        same fingerprint = same field values)
+        {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="fingerprint-checkboxes">
         <q-checkbox
+          :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
@@ -119,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="localFingerprintFields.length === 0"
         class="text-negative text-caption q-mt-sm"
       >
-        At least one field mapping is required for deduplication
+        {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
   </div>
@@ -128,9 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 
 const router = useRouter();
+
+const store = useStore();
+const { t } = useI18n();
 
 interface SemanticGroup {
   id: string;

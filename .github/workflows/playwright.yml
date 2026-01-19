@@ -52,7 +52,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: repo-openobserve-standard-16
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -106,7 +106,7 @@ jobs:
     name: e2e / ${{ matrix.testfolder }}
     needs: [build_binary]
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
     # container:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
     #   options: --user root 
@@ -196,7 +196,6 @@ jobs:
                 "dashboard-multi-y-axis.spec.js",
                 "dashboard-html-chart.spec.js",
                 "visualize.spec.js",
-                # "visualization-vrl.spec.js"
               ]
           - testfolder: "Dashboards-Streaming"
             browser: "chrome"
@@ -210,6 +209,13 @@ jobs:
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
                 # "remotepipeline.spec.js"
+              ]
+          - testfolder: "Functions"
+            browser: "chrome"
+            run_files: [
+                "js-transform-type.spec.js",
+                "row-expansion.spec.js",
+                "enrichment-table-url.spec.js",
               ]
           - testfolder: "Reports"
             browser: "chrome"
@@ -226,6 +232,19 @@ jobs:
                 "streaming.spec.js",
                 "stream-settings.spec.js",
               ]
+
+          - testfolder: "Traces"
+            browser: "chrome"
+            run_files:
+              [
+                "tracesSearch.spec.js",
+                "traceQueryEditor.spec.js",
+                "traceErrorFilter.spec.js",
+                "traceDetails.spec.js",
+                "traceAdvancedFiltering.spec.js",
+                "serviceMaps.spec.js",
+              ]
+
           - testfolder: "RegressionSet"
             browser: "chrome"
             run_files:
@@ -235,6 +254,18 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
+              ]
+          - testfolder: "Metrics"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics.spec.js",
+                "metrics-queries.spec.js",
+                "metrics-aggregations.spec.js",
+                "metrics-advanced.spec.js",
+                "metrics-config-tabs.spec.js",
+                "metrics-visualizations.spec.js",
+                "metrics-config.spec.js",
               ]
             # - testfolder: "Dashboards-Variables-Scoped"
             #   browser: "chrome"
@@ -645,7 +676,7 @@ jobs:
     needs: [ui_integration_tests]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
 
     steps:
       - name: Clone the current repo
@@ -799,7 +830,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: repo-openobserve-standard-8
+    runs-on: ubicloud-standard-8
     if: success() || failure()
 
     steps:
@@ -836,7 +867,7 @@ jobs:
 
   playwright_summary:
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
     permissions: {}
     needs: [build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
     if: always()

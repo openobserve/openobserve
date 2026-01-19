@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,6 +43,7 @@ use datafusion::{
     },
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
+    physical_expr_adapter::DefaultPhysicalExprAdapterFactory,
     physical_optimizer::PhysicalOptimizerRule,
     prelude::{SessionContext, col},
 };
@@ -284,9 +285,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
-        super::udaf::percentile_cont::PercentileCont::new(),
-    ));
-    ctx.register_udaf(AggregateUDF::from(
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
@@ -344,7 +342,7 @@ pub async fn register_table(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sorted_by_time: bool,
-    file_stat_cache: Option<FileStatisticsCache>,
+    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 }
@@ -364,7 +362,10 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(mut self, file_stat_cache: Option<FileStatisticsCache>) -> Self {
+    pub fn file_stat_cache(
+        mut self,
+        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    ) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -527,6 +528,7 @@ impl TableBuilder {
             schema
         };
         config = config.with_schema(schema);
+        config = config.with_expr_adapter_factory(Arc::new(DefaultPhysicalExprAdapterFactory {}));
         let mut table = ListingTableAdapter::try_new(
             config,
             session.id,

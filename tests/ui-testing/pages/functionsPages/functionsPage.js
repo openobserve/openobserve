@@ -31,20 +31,51 @@ class FunctionsPage {
 
   // ==================== Navigation Methods ====================
 
-  async navigate() {
+  async navigate(org = null) {
     // Functions is under Pipeline menu
-    await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${process.env.ORGID}`);
+    const targetOrg = org || process.env.ORGID;
+    await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForTimeout(2000);
   }
 
   // ==================== Action Methods ====================
 
-  async clickAddFunctionButton() {
+  /**
+   * Click Add Function button with auto-recovery
+   * @param {string} [org] - Optional org to navigate to if button isn't visible (use '_meta' for JS functions)
+   */
+  async clickAddFunctionButton(org = null) {
+    // Wait for page to stabilize (in case we just closed a dialog)
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForTimeout(500);
+
     const addButton = this.page.locator(this.addFunctionButton);
+
+    // Quick check if button is visible - if not, navigate to ensure we're on list page
+    const isVisible = await addButton.isVisible({ timeout: 3000 }).catch(() => false);
+    if (!isVisible) {
+      // Navigate to functions page (uses provided org or current URL's org)
+      const targetOrg = org || this.getCurrentOrgFromUrl() || process.env.ORGID;
+      await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
+      await this.page.waitForLoadState('networkidle');
+      await this.page.waitForTimeout(1000);
+    }
+
     await expect(addButton).toBeVisible({ timeout: 10000 });
     await addButton.click();
-    await this.page.waitForTimeout(1000);
+    // Wait for the function dialog to actually open
+    const nameInput = this.page.locator(this.functionNameInput);
+    await expect(nameInput).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Extract org identifier from current URL
+   */
+  getCurrentOrgFromUrl() {
+    const url = this.page.url();
+    const match = url.match(/org_identifier=([^&]+)/);
+    return match ? match[1] : null;
   }
 
   async selectJavaScriptType() {
@@ -67,6 +98,7 @@ class FunctionsPage {
 
   async fillFunctionName(name) {
     const nameInput = this.page.locator(this.functionNameInput);
+    await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill(name);
   }
 
@@ -90,7 +122,7 @@ class FunctionsPage {
   async clickCancelButton() {
     const cancelButton = this.page.locator(this.cancelButton);
     await cancelButton.click();
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(1500); // Wait for dialog to fully close
   }
 
   async clickTestButton() {
@@ -203,15 +235,41 @@ class FunctionsPage {
     expect(outputText).toContain(text);
   }
 
+  async expectFunctionInList(functionName) {
+    const functionRow = this.page.locator(`text=${functionName}`);
+    await expect(functionRow).toBeVisible({ timeout: 10000 });
+  }
+
+  async isCancelButtonVisible() {
+    const cancelButton = this.page.locator(this.cancelButton);
+    return await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
+  }
+
+  async getEditorContent() {
+    const editor = this.page.locator(this.functionEditor);
+    return await editor.textContent();
+  }
+
+  async isJsRadioVisible() {
+    const jsRadio = this.page.locator(this.jsRadio);
+    return await jsRadio.isVisible().catch(() => false);
+  }
+
+  async expectJsRadioHidden() {
+    const jsRadio = this.page.locator(this.jsRadio);
+    await expect(jsRadio).not.toBeVisible();
+  }
+
   // ==================== Complex Workflows ====================
 
   /**
    * Complete workflow to create a JS function
+   * NOTE: JS functions only work in _meta org, so this defaults to _meta for recovery
    * @param {string} functionName - Name of the function
    * @param {string} jsCode - JavaScript code
    */
   async createJavaScriptFunction(functionName, jsCode) {
-    await this.clickAddFunctionButton();
+    await this.clickAddFunctionButton('_meta'); // JS functions require _meta org
     await this.fillFunctionName(functionName);
     await this.selectJavaScriptType();
     await this.enterFunctionCode(jsCode);
@@ -222,9 +280,10 @@ class FunctionsPage {
    * Complete workflow to create a VRL function
    * @param {string} functionName - Name of the function
    * @param {string} vrlCode - VRL code
+   * @param {string} [org] - Optional org identifier for recovery navigation
    */
-  async createVRLFunction(functionName, vrlCode) {
-    await this.clickAddFunctionButton();
+  async createVRLFunction(functionName, vrlCode, org = null) {
+    await this.clickAddFunctionButton(org);
     await this.fillFunctionName(functionName);
     await this.selectVRLType();
     await this.enterFunctionCode(vrlCode);
@@ -234,15 +293,19 @@ class FunctionsPage {
   /**
    * Delete a function by name
    * @param {string} functionName - Name of the function to delete
+   * @param {string} [org] - Optional org identifier (defaults to ORGID, use '_meta' for JS functions)
    */
-  async deleteFunctionByName(functionName) {
+  async deleteFunctionByName(functionName, org = null) {
     // Make sure we're on the functions list page (not in edit mode)
     const searchInput = this.page.locator(this.searchInput);
     const isOnListPage = await searchInput.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (!isOnListPage) {
-      // Navigate back to functions list
-      await this.navigate();
+      // Navigate back to functions list with correct org
+      const targetOrg = org || process.env.ORGID;
+      await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
+      await this.page.waitForLoadState('networkidle');
+      await this.page.waitForTimeout(2000);
     }
 
     await this.searchFunction(functionName);

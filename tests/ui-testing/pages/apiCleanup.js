@@ -359,12 +359,13 @@ class APICleanup {
     }
 
     /**
-     * Fetch all functions
+     * Fetch all functions in a specific organization
+     * @param {string} org - The organization identifier (defaults to 'default')
      * @returns {Promise<Array>} Array of function objects
      */
-    async fetchFunctions() {
+    async fetchFunctionsInOrg(org = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -373,26 +374,27 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to fetch functions', { status: response.status });
+                testLogger.error('Failed to fetch functions', { org, status: response.status });
                 return [];
             }
 
             const data = await response.json();
             return data.list || [];
         } catch (error) {
-            testLogger.error('Failed to fetch functions', { error: error.message });
+            testLogger.error('Failed to fetch functions', { org, error: error.message });
             return [];
         }
     }
 
     /**
-     * Delete a single function
+     * Delete a single function in a specific organization
+     * @param {string} org - The organization identifier
      * @param {string} functionName - The function name
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteFunction(functionName) {
+    async deleteFunctionInOrg(org, functionName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/functions/${functionName}`, {
+            const response = await fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -401,15 +403,61 @@ class APICleanup {
             });
 
             if (!response.ok) {
-                testLogger.error('Failed to delete function', { functionName, status: response.status });
+                testLogger.error('Failed to delete function', { org, functionName, status: response.status });
                 return { code: response.status, message: 'Failed to delete function' };
             }
 
             const result = await response.json();
             return result;
         } catch (error) {
-            testLogger.error('Failed to delete function', { functionName, error: error.message });
+            testLogger.error('Failed to delete function', { org, functionName, error: error.message });
             return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up functions matching patterns in a specific organization
+     * @param {string} org - The organization identifier
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
+     */
+    async cleanupFunctionsInOrg(org, patterns = []) {
+        testLogger.info(`Starting functions cleanup in ${org} org`, { patterns: patterns.map(p => p.source) });
+
+        try {
+            // Fetch all functions in the specified org
+            const functions = await this.fetchFunctionsInOrg(org);
+            testLogger.info(`Fetched functions from ${org}`, { total: functions.length });
+
+            // Filter functions matching patterns
+            const matchingFunctions = functions.filter(f =>
+                patterns.some(pattern => pattern.test(f.name))
+            );
+            testLogger.info(`Found functions matching cleanup patterns in ${org}`, { count: matchingFunctions.length });
+
+            if (matchingFunctions.length === 0) {
+                testLogger.info(`No functions to clean up in ${org}`);
+                return;
+            }
+
+            // Delete each function
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const func of matchingFunctions) {
+                const result = await this.deleteFunctionInOrg(org, func.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.debug('Deleted function', { org, name: func.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete function', { org, name: func.name, result });
+                }
+            }
+
+            testLogger.info(`Functions cleanup completed in ${org}`, { deletedCount, failedCount });
+        } catch (error) {
+            testLogger.error(`Failed to cleanup functions in ${org}`, { error: error.message });
         }
     }
 
@@ -515,56 +563,6 @@ class APICleanup {
 
         } catch (error) {
             testLogger.error('Enrichment tables cleanup failed', { error: error.message });
-        }
-    }
-
-    /**
-     * Clean up functions matching specified patterns
-     * @param {Array<RegExp>} patterns - Array of regex patterns to match function names
-     */
-    async cleanupFunctions(patterns = []) {
-        testLogger.info('Starting functions cleanup', { patterns: patterns.map(p => p.source) });
-
-        try {
-            // Fetch all functions
-            const functions = await this.fetchFunctions();
-            testLogger.info('Fetched functions', { total: functions.length });
-
-            // Filter functions matching patterns
-            const matchingFunctions = functions.filter(f =>
-                patterns.some(pattern => pattern.test(f.name))
-            );
-            testLogger.info('Found functions matching cleanup patterns', { count: matchingFunctions.length });
-
-            if (matchingFunctions.length === 0) {
-                testLogger.info('No functions to clean up');
-                return;
-            }
-
-            // Delete each function
-            let deletedCount = 0;
-            let failedCount = 0;
-
-            for (const func of matchingFunctions) {
-                const result = await this.deleteFunction(func.name);
-
-                if (result.code === 200) {
-                    deletedCount++;
-                    testLogger.debug('Deleted function', { name: func.name });
-                } else {
-                    failedCount++;
-                    testLogger.warn('Failed to delete function', { name: func.name, result });
-                }
-            }
-
-            testLogger.info('Functions cleanup completed', {
-                total: matchingFunctions.length,
-                deleted: deletedCount,
-                failed: failedCount
-            });
-
-        } catch (error) {
-            testLogger.error('Functions cleanup failed', { error: error.message });
         }
     }
 
@@ -973,6 +971,123 @@ class APICleanup {
         }
 
         return { ready: readyCount, blocked: blockedStreams };
+    }
+
+    /**
+     * Fetch all metrics streams
+     * @returns {Promise<Array>} Array of metrics stream objects
+     */
+    async fetchMetricsStreams() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch metrics streams', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch metrics streams', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a single metrics stream
+     * @param {string} streamName - The metrics stream name
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteMetricsStream(streamName) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete metrics stream', { streamName, status: response.status });
+                return { code: response.status, message: 'Failed to delete metrics stream' };
+            }
+
+            const result = await response.json();
+            // Ensure success response has code: 200 for consistency
+            return { code: 200, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete metrics stream', { streamName, error: error.message });
+            return { code: 500, message: error.message };
+        }
+    }
+
+    /**
+     * Clean up metrics streams matching specified patterns
+     * @param {Array<RegExp>} patterns - Array of regex patterns to match metrics stream names
+     * @param {Array<string>} protectedStreams - Array of metrics stream names to never delete (optional, e.g., 'default')
+     */
+    async cleanupMetricsStreams(patterns = [], protectedStreams = ['default']) {
+        testLogger.info('Starting metrics streams cleanup', {
+            patterns: patterns.map(p => p.source),
+            protectedStreams
+        });
+
+        // Safety check: If no patterns provided, don't delete anything
+        if (patterns.length === 0) {
+            testLogger.info('No patterns provided for metrics cleanup - skipping');
+            return;
+        }
+
+        try {
+            // Fetch all metrics streams
+            const streams = await this.fetchMetricsStreams();
+            testLogger.info('Fetched metrics streams', { total: streams.length });
+
+            // Filter streams matching patterns but excluding protected streams
+            const matchingStreams = streams.filter(s =>
+                patterns.some(pattern => pattern.test(s.name)) &&
+                !protectedStreams.includes(s.name)
+            );
+            testLogger.info('Found metrics streams matching cleanup patterns', { count: matchingStreams.length });
+
+            if (matchingStreams.length === 0) {
+                testLogger.info('No metrics streams to clean up');
+                return;
+            }
+
+            // Delete all matching metrics streams
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const stream of matchingStreams) {
+                const result = await this.deleteMetricsStream(stream.name);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted metrics stream', { name: stream.name });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete metrics stream', { name: stream.name, result });
+                }
+            }
+
+            testLogger.info('Metrics streams cleanup completed', {
+                total: matchingStreams.length,
+                deleted: deletedCount,
+                failed: failedCount
+            });
+
+        } catch (error) {
+            testLogger.error('Metrics streams cleanup failed', { error: error.message });
+        }
     }
 
     /**
@@ -1770,7 +1885,7 @@ class APICleanup {
     /**
      * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
      * Deletes resources in correct dependency order to avoid conflicts
-     * @param {Array<string>} destinationPrefixes - Array of destination name prefixes to match (e.g., ['auto_', 'newdest_'])
+     * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
      */
@@ -1887,13 +2002,18 @@ class APICleanup {
             let deletedDestinations = 0;
 
             if (destinationPrefixes.length > 0) {
-                testLogger.info('Step 3: Deleting destinations matching prefixes', { prefixes: destinationPrefixes });
+                testLogger.info('Step 3: Deleting destinations matching prefixes/patterns', { prefixes: destinationPrefixes });
 
                 const { destinations } = await this.fetchDestinationsWithTemplateMapping();
                 const matchingDestinations = destinations.filter(d =>
-                    destinationPrefixes.some(prefix => d.name.startsWith(prefix))
+                    destinationPrefixes.some(prefix => {
+                        if (prefix instanceof RegExp) {
+                            return prefix.test(d.name);
+                        }
+                        return d.name.startsWith(prefix);
+                    })
                 );
-                testLogger.info('Found destinations matching prefixes', { total: matchingDestinations.length });
+                testLogger.info('Found destinations matching prefixes/patterns', { total: matchingDestinations.length });
 
                 for (const destination of matchingDestinations) {
                     const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {

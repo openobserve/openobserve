@@ -13,25 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::OnceLock;
+use std::{collections::HashMap as StdHashMap, sync::OnceLock};
 
-use ::config::{
+use axum::{
+    body::{Body, Bytes},
+    extract::Request,
+    http::{HeaderMap, Method, StatusCode, header},
+    response::{IntoResponse, Response},
+};
+use config::{
     META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
-        promql::RequestRangeQuery,
         search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
     router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
     utils::{json, rand::get_rand_element},
 };
-use actix_web::{
-    FromRequest, HttpRequest, HttpResponse,
-    http::{Error, Method, header},
-    route, web,
-};
 use futures::StreamExt;
 use hashbrown::HashMap;
+use http_body_util::BodyExt;
 use infra::cluster;
 
 use crate::common::utils::http::get_search_type_from_request;
@@ -43,12 +44,8 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 /// Returns a reference to the global HTTP client, initializing it if necessary.
 fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
-        let cfg = get_config();
-        reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(cfg.route.timeout))
-            .pool_max_idle_per_host(cfg.route.max_connections)
-            .build()
-            .expect("Failed to create HTTP client")
+        crate::service::tls::reqwest_client_tls_config()
+            .expect("Failed to create HTTP client with TLS config")
     })
 }
 
@@ -64,99 +61,17 @@ enum QuerierPayload {
     /// No payload (GET request)
     Empty,
     /// PromQL query form data
-    PromQL(web::Form<RequestRangeQuery>),
+    PromQL(HashMap<String, String>),
     /// Search request JSON
-    Search(Box<web::Json<SearchRequest>>),
+    Search(Box<SearchRequest>),
     /// Search partition request JSON
-    SearchPartition(Box<web::Json<SearchPartitionRequest>>),
+    SearchPartition(Box<SearchPartitionRequest>),
     /// Values stream request JSON
-    Values(Box<web::Json<ValuesRequest>>),
+    Values(Box<ValuesRequest>),
 }
 
-#[route(
-    "/config",
-    method = "GET",
-    method = "POST",
-    method = "PUT",
-    method = "DELETE"
-)]
-pub async fn config(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-#[route(
-    "/config/{path:.*}",
-    method = "GET",
-    method = "POST",
-    method = "PUT",
-    method = "DELETE"
-)]
-pub async fn config_paths(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-#[route(
-    "/api/{path:.*}",
-    method = "GET",
-    method = "POST",
-    method = "PUT",
-    method = "DELETE",
-    method = "PATCH"
-)]
-pub async fn api(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-#[route(
-    "/aws/{path:.*}",
-    method = "GET",
-    method = "POST",
-    method = "PUT",
-    method = "DELETE"
-)]
-pub async fn aws(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-#[route(
-    "/gcp/{path:.*}",
-    method = "GET",
-    method = "POST",
-    method = "PUT",
-    method = "DELETE"
-)]
-pub async fn gcp(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-#[route("/rum/{path:.*}", method = "POST")]
-pub async fn rum(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
-}
-
-/// Main dispatch function that routes requests to appropriate backend nodes.
-async fn dispatch(
-    req: HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<HttpResponse, Error> {
+/// Main dispatch handler for all routes
+pub async fn dispatch(req: Request) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
     let path = req
@@ -168,7 +83,7 @@ async fn dispatch(
 
     // Handle node list API locally (special case)
     if path.contains("/api/_meta/node/list") {
-        return handle_node_list_request(&req).await;
+        return handle_node_list_request(req).await;
     }
 
     // Resolve target node
@@ -181,33 +96,28 @@ async fn dispatch(
                 error,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().force_close().body(error));
+            return (StatusCode::SERVICE_UNAVAILABLE, error).into_response();
         }
     };
 
     // Route based on request type
     if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
-        proxy_with_body_routing(req, payload, target, start).await
+        proxy_with_body_routing(req, target, start).await
     } else {
-        proxy_request(req, payload, target, start).await
+        proxy_request(req, target, start).await
     }
 }
 
 /// Handles the special node list API request locally.
-async fn handle_node_list_request(req: &HttpRequest) -> actix_web::Result<HttpResponse, Error> {
-    let query =
-        web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
-            .ok()
-            .map(|x| x.into_inner())
-            .unwrap_or_default();
+async fn handle_node_list_request(req: Request) -> Response {
+    let query_string = req.uri().query().unwrap_or("");
+    let query: StdHashMap<String, String> = url::form_urlencoded::parse(query_string.as_bytes())
+        .into_owned()
+        .collect();
 
     crate::handler::http::request::organization::org::node_list_impl(META_ORG_ID, query)
         .await
-        .map_err(|e| {
-            Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                format!("Failed to get node list: {e}"),
-            )))
-        })
+        .into_response()
 }
 
 /// Resolves the target node for a given request path.
@@ -247,13 +157,14 @@ async fn resolve_target(path: &str, base_uri: &str) -> Result<ProxyTarget, Strin
 /// Gets available querier nodes for the request.
 async fn get_querier_nodes(path: &str) -> Option<Vec<Node>> {
     let query_str = &path[path.find('?').unwrap_or(path.len())..];
-    let role_group = web::Query::<HashMap<String, String>>::from_query(query_str)
-        .map(|params| {
-            get_search_type_from_request(&params)
-                .unwrap_or(None)
-                .map(RoleGroup::from)
-                .unwrap_or(RoleGroup::Interactive)
-        })
+    let query_str = query_str.strip_prefix('?').unwrap_or(query_str);
+    let params: HashMap<String, String> = url::form_urlencoded::parse(query_str.as_bytes())
+        .into_owned()
+        .collect();
+
+    let role_group = get_search_type_from_request(&params)
+        .unwrap_or(None)
+        .map(RoleGroup::from)
         .unwrap_or(RoleGroup::Interactive);
 
     let nodes = cluster::get_cached_online_querier_nodes(Some(role_group)).await;
@@ -275,25 +186,30 @@ fn select_node(nodes: &[Node]) -> &Node {
 }
 
 /// Proxies a request to the target node.
-async fn proxy_request(
-    req: HttpRequest,
-    payload: web::Payload,
-    target: ProxyTarget,
-    start: std::time::Instant,
-) -> actix_web::Result<HttpResponse, Error> {
+async fn proxy_request(req: Request, target: ProxyTarget, start: std::time::Instant) -> Response {
     let query_path = extract_path_without_query(&target.path);
     let is_streaming = is_streaming_endpoint(query_path);
-    let headers = build_request_headers(&req, is_streaming);
+
+    // Extract method and headers before consuming the request
+    let method = req.method().clone();
+    let headers = build_request_headers(req.headers(), is_streaming);
 
     // Read request body
-    let body = payload.to_bytes().await.map_err(|e| {
-        log::error!("Failed to read request body: {:?}", e);
-        into_payload_error("Failed to read request body")
-    })?;
+    let body = match req.into_body().collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            log::error!("Failed to read request body: {:?}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read request body",
+            )
+                .into_response();
+        }
+    };
 
     // Build upstream request
     let client = get_http_client();
-    let upstream_req = match *req.method() {
+    let upstream_req = match method {
         Method::GET => client.get(&target.full_url).headers(headers),
         Method::POST => client
             .post(&target.full_url)
@@ -311,48 +227,35 @@ async fn proxy_request(
             .patch(&target.full_url)
             .headers(headers)
             .body(body.to_vec()),
-        _ => return Ok(HttpResponse::MethodNotAllowed().finish()),
+        _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
     };
-
-    send_and_respond(upstream_req, &target, is_streaming, start).await
-}
-
-/// Proxies a request without body (for fallback cases).
-async fn proxy_request_no_body(
-    req: HttpRequest,
-    target: ProxyTarget,
-    start: std::time::Instant,
-) -> actix_web::Result<HttpResponse, Error> {
-    let query_path = extract_path_without_query(&target.path);
-    let is_streaming = is_streaming_endpoint(query_path);
-    let headers = build_request_headers(&req, is_streaming);
-
-    let client = get_http_client();
-    let method = reqwest::Method::from_bytes(req.method().as_str().as_bytes())
-        .unwrap_or(reqwest::Method::GET);
-    let upstream_req = client.request(method, &target.full_url).headers(headers);
 
     send_and_respond(upstream_req, &target, is_streaming, start).await
 }
 
 /// Proxies a querier request with body-based routing for consistent hashing.
 async fn proxy_with_body_routing(
-    req: HttpRequest,
-    payload: web::Payload,
+    req: Request,
     mut target: ProxyTarget,
     start: std::time::Instant,
-) -> actix_web::Result<HttpResponse, Error> {
+) -> Response {
     let query_path = extract_path_without_query(&target.path);
+    let headers = req.headers().clone();
 
     // Parse request payload based on endpoint type
-    let (routing_key, querier_payload) =
-        match parse_querier_payload(&req, payload, query_path).await? {
-            Some(result) => result,
-            None => {
-                // Fall back to default proxy without payload
-                return proxy_request_no_body(req, target, start).await;
-            }
-        };
+    let (routing_key, querier_payload) = match parse_querier_payload(req, query_path).await {
+        Ok(Some(result)) => result,
+        Ok(None) => {
+            // For None case, we can't fall back because we consumed the request
+            // This shouldn't happen in practice since None is only for unknown endpoints
+            return (
+                StatusCode::BAD_REQUEST,
+                "Unsupported endpoint for body-based routing",
+            )
+                .into_response();
+        }
+        Err(e) => return e,
+    };
 
     // Use routing_key for consistent hash node selection
     let Some(node_name) =
@@ -365,9 +268,7 @@ async fn proxy_with_body_routing(
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return Ok(HttpResponse::ServiceUnavailable()
-            .force_close()
-            .body("No online querier nodes"));
+        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
     };
     // get node by name
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
@@ -378,9 +279,7 @@ async fn proxy_with_body_routing(
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return Ok(HttpResponse::ServiceUnavailable()
-            .force_close()
-            .body("No online querier nodes"));
+        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
     };
     target.full_url = format!("{}{}", node.http_addr, target.path);
     target.node_addr = node
@@ -389,28 +288,18 @@ async fn proxy_with_body_routing(
         .replace("https://", "");
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let headers = build_request_headers(&req, is_streaming);
+    let headers = build_request_headers(&headers, is_streaming);
     let client = get_http_client();
 
     // Build upstream request based on payload type
     let upstream_req = match querier_payload {
         QuerierPayload::Empty => client.get(&target.full_url).headers(headers),
-        QuerierPayload::PromQL(form) => client
-            .post(&target.full_url)
-            .headers(headers)
-            .form(&form.into_inner()),
-        QuerierPayload::Search(json) => client
-            .post(&target.full_url)
-            .headers(headers)
-            .json(&json.into_inner()),
-        QuerierPayload::SearchPartition(json) => client
-            .post(&target.full_url)
-            .headers(headers)
-            .json(&json.into_inner()),
-        QuerierPayload::Values(json) => client
-            .post(&target.full_url)
-            .headers(headers)
-            .json(&json.into_inner()),
+        QuerierPayload::PromQL(form) => client.post(&target.full_url).headers(headers).form(&form),
+        QuerierPayload::Search(json) => client.post(&target.full_url).headers(headers).json(&*json),
+        QuerierPayload::SearchPartition(json) => {
+            client.post(&target.full_url).headers(headers).json(&*json)
+        }
+        QuerierPayload::Values(json) => client.post(&target.full_url).headers(headers).json(&*json),
     };
 
     send_and_respond(upstream_req, &target, is_streaming, start).await
@@ -418,57 +307,58 @@ async fn proxy_with_body_routing(
 
 /// Parses the request payload for querier routing.
 async fn parse_querier_payload(
-    req: &HttpRequest,
-    payload: web::Payload,
+    req: Request,
     query_path: &str,
-) -> actix_web::Result<Option<(String, QuerierPayload)>, Error> {
+) -> Result<Option<(String, QuerierPayload)>, Response> {
     let result = match query_path {
         // PromQL endpoints
         s if s.ends_with("/prometheus/api/v1/query_range")
             || s.ends_with("/prometheus/api/v1/query_exemplars") =>
         {
-            parse_promql_payload(req, payload).await?
+            parse_promql_payload(req).await?
         }
 
         // Values stream endpoint
         s if s.ends_with("/_values_stream") => {
-            let body = read_payload_bytes(payload, "values stream").await?;
+            let body = read_payload_bytes(req, "values stream").await?;
             let query = json::from_slice::<ValuesRequest>(&body).map_err(|_| {
-                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                (
+                    StatusCode::BAD_REQUEST,
                     "Failed to parse values stream request",
-                )))
+                )
+                    .into_response()
             })?;
             Some((
                 query.sql.to_string(),
-                QuerierPayload::Values(Box::new(web::Json(query))),
+                QuerierPayload::Values(Box::new(query)),
             ))
         }
 
         // Search endpoints
         s if s.ends_with("/_search") || s.ends_with("/_search_stream") => {
-            let body = read_payload_bytes(payload, "search").await?;
+            let body = read_payload_bytes(req, "search").await?;
             let query = json::from_slice::<SearchRequest>(&body).map_err(|_| {
-                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    "Failed to parse search request",
-                )))
+                (StatusCode::BAD_REQUEST, "Failed to parse search request").into_response()
             })?;
             Some((
                 query.query.sql.to_string(),
-                QuerierPayload::Search(Box::new(web::Json(query))),
+                QuerierPayload::Search(Box::new(query)),
             ))
         }
 
         // Search partition endpoint
         s if s.ends_with("/_search_partition") => {
-            let body = read_payload_bytes(payload, "search partition").await?;
+            let body = read_payload_bytes(req, "search partition").await?;
             let query = json::from_slice::<SearchPartitionRequest>(&body).map_err(|_| {
-                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+                (
+                    StatusCode::BAD_REQUEST,
                     "Failed to parse search partition request",
-                )))
+                )
+                    .into_response()
             })?;
             Some((
                 query.sql.to_string(),
-                QuerierPayload::SearchPartition(Box::new(web::Json(query))),
+                QuerierPayload::SearchPartition(Box::new(query)),
             ))
         }
 
@@ -480,33 +370,29 @@ async fn parse_querier_payload(
 }
 
 /// Parses PromQL request payload.
-async fn parse_promql_payload(
-    req: &HttpRequest,
-    payload: web::Payload,
-) -> actix_web::Result<Option<(String, QuerierPayload)>, Error> {
-    if req.method() == Method::GET {
-        let query =
-            web::Query::<RequestRangeQuery>::from_query(req.query_string()).map_err(|_| {
-                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    "Failed to parse query string",
-                )))
-            })?;
-        Ok(Some((
-            query.query.clone().unwrap_or_default(),
-            QuerierPayload::Empty,
-        )))
+async fn parse_promql_payload(req: Request) -> Result<Option<(String, QuerierPayload)>, Response> {
+    let method = req.method().clone();
+    if method == Method::GET {
+        let query_string = req.uri().query().unwrap_or("");
+        let params: StdHashMap<String, String> =
+            url::form_urlencoded::parse(query_string.as_bytes())
+                .into_owned()
+                .collect();
+
+        let query = params.get("query").cloned().unwrap_or_default();
+        Ok(Some((query, QuerierPayload::Empty)))
     } else {
-        let form = web::Form::<RequestRangeQuery>::from_request(req, &mut payload.into_inner())
-            .await
-            .map_err(|_| {
-                Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-                    "Failed to parse form data",
-                )))
-            })?;
-        Ok(Some((
-            form.query.clone().unwrap_or_default(),
-            QuerierPayload::PromQL(form),
-        )))
+        let body = read_payload_bytes(req, "promql").await?;
+        let form_str = String::from_utf8(body.to_vec())
+            .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid UTF-8 in form data").into_response())?;
+
+        // Parse form data
+        let form: HashMap<String, String> = url::form_urlencoded::parse(form_str.as_bytes())
+            .into_owned()
+            .collect();
+
+        let query = form.get("query").cloned().unwrap_or_default();
+        Ok(Some((query, QuerierPayload::PromQL(form))))
     }
 }
 
@@ -516,37 +402,90 @@ async fn send_and_respond(
     target: &ProxyTarget,
     is_streaming: bool,
     start: std::time::Instant,
-) -> actix_web::Result<HttpResponse, Error> {
-    let resp = upstream_req.send().await.map_err(|e| {
-        log::error!(
-            "proxy request failed: {} -> {}, error: {:?}, took: {} ms",
-            target.path,
-            target.node_addr,
-            e,
-            start.elapsed().as_millis()
-        );
-        into_payload_error(e.to_string())
-    })?;
-
-    let mut builder = build_response_headers(&resp, is_streaming);
-
-    if is_streaming {
-        let stream = resp
-            .bytes_stream()
-            .map(|chunk| chunk.map_err(|e| std::io::Error::other(e.to_string())));
-        Ok(builder.streaming(stream))
-    } else {
-        let body = resp.bytes().await.map_err(|e| {
+) -> Response {
+    let resp = match upstream_req.send().await {
+        Ok(r) => r,
+        Err(e) => {
             log::error!(
-                "proxy response failed: {} -> {}, error: {:?}, took: {} ms",
+                "proxy request failed: {} -> {}, error: {:?}, took: {} ms",
                 target.path,
                 target.node_addr,
                 e,
                 start.elapsed().as_millis()
             );
-            into_payload_error(e.to_string())
-        })?;
-        Ok(builder.body(body))
+            return (
+                StatusCode::BAD_GATEWAY,
+                format!("Proxy request failed: {e}"),
+            )
+                .into_response();
+        }
+    };
+
+    let status =
+        StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let mut builder = Response::builder().status(status);
+
+    // Copy headers
+    let skip_headers = if is_streaming {
+        SKIP_RESPONSE_HEADERS_STREAMING
+    } else {
+        SKIP_RESPONSE_HEADERS_NORMAL
+    };
+
+    for (key, value) in resp.headers() {
+        if skip_headers.contains(&key.as_str()) {
+            continue;
+        }
+        builder = builder.header(key, value);
+    }
+
+    // Add streaming-specific headers
+    if is_streaming {
+        builder = builder
+            .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+            .header(header::PRAGMA, "no-cache")
+            .header(header::CONNECTION, "keep-alive")
+            .header("X-Accel-Buffering", "no");
+    }
+
+    if is_streaming {
+        let stream = resp
+            .bytes_stream()
+            .map(|chunk| chunk.map_err(|e| std::io::Error::other(e.to_string())));
+        match builder.body(Body::from_stream(stream)) {
+            Ok(r) => r,
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build streaming response: {e}"),
+            )
+                .into_response(),
+        }
+    } else {
+        let body = match resp.bytes().await {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!(
+                    "proxy response failed: {} -> {}, error: {:?}, took: {} ms",
+                    target.path,
+                    target.node_addr,
+                    e,
+                    start.elapsed().as_millis()
+                );
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    format!("Failed to read response: {e}"),
+                )
+                    .into_response();
+            }
+        };
+        match builder.body(Body::from(body)) {
+            Ok(r) => r,
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build response: {e}"),
+            )
+                .into_response(),
+        }
     }
 }
 
@@ -574,10 +513,10 @@ const SKIP_RESPONSE_HEADERS_NORMAL: &[&str] =
     &["content-encoding", "transfer-encoding", "content-length"];
 
 /// Builds request headers for the upstream request.
-fn build_request_headers(req: &HttpRequest, is_streaming: bool) -> reqwest::header::HeaderMap {
-    let mut headers = reqwest::header::HeaderMap::new();
+fn build_request_headers(headers: &HeaderMap, is_streaming: bool) -> reqwest::header::HeaderMap {
+    let mut req_headers = reqwest::header::HeaderMap::new();
 
-    for (key, value) in req.headers() {
+    for (key, value) in headers {
         let key_str = key.as_str();
 
         // Skip hop-by-hop headers
@@ -594,58 +533,19 @@ fn build_request_headers(req: &HttpRequest, is_streaming: bool) -> reqwest::head
             reqwest::header::HeaderName::from_bytes(key.as_ref()),
             reqwest::header::HeaderValue::from_bytes(value.as_bytes()),
         ) {
-            headers.insert(name, val);
+            req_headers.insert(name, val);
         }
     }
 
     // For streaming endpoints, request uncompressed response
     if is_streaming {
-        headers.insert(
+        req_headers.insert(
             reqwest::header::ACCEPT_ENCODING,
             reqwest::header::HeaderValue::from_static("identity"),
         );
     }
 
-    headers
-}
-
-/// Builds response headers from the upstream response.
-fn build_response_headers(
-    resp: &reqwest::Response,
-    is_streaming: bool,
-) -> actix_web::HttpResponseBuilder {
-    let status = actix_web::http::StatusCode::from_u16(resp.status().as_u16())
-        .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR);
-    let mut builder = HttpResponse::build(status);
-
-    let skip_headers = if is_streaming {
-        SKIP_RESPONSE_HEADERS_STREAMING
-    } else {
-        SKIP_RESPONSE_HEADERS_NORMAL
-    };
-
-    for (key, value) in resp.headers() {
-        if skip_headers.contains(&key.as_str()) {
-            continue;
-        }
-
-        if let (Ok(name), Ok(val)) = (
-            actix_web::http::header::HeaderName::from_bytes(key.as_ref()),
-            actix_web::http::header::HeaderValue::from_bytes(value.as_bytes()),
-        ) {
-            builder.insert_header((name, val));
-        }
-    }
-
-    // Add streaming-specific headers
-    if is_streaming {
-        builder.insert_header((header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"));
-        builder.insert_header((header::PRAGMA, "no-cache"));
-        builder.insert_header((header::CONNECTION, "keep-alive"));
-        builder.insert_header(("X-Accel-Buffering", "no"));
-    }
-
-    builder
+    req_headers
 }
 
 /// Streaming endpoint patterns.
@@ -668,21 +568,32 @@ fn extract_path_without_query(path: &str) -> &str {
 }
 
 /// Reads payload bytes with error handling.
-async fn read_payload_bytes(
-    payload: web::Payload,
-    request_type: &str,
-) -> actix_web::Result<web::Bytes, Error> {
-    payload.to_bytes().await.map_err(|e| {
-        log::error!("Failed to read {request_type} request body: {e}");
-        into_payload_error(format!("Failed to read {request_type} request body"))
-    })
+async fn read_payload_bytes(req: Request, request_type: &str) -> Result<Bytes, Response> {
+    match req.into_body().collect().await {
+        Ok(collected) => Ok(collected.to_bytes()),
+        Err(e) => {
+            log::error!("Failed to read {request_type} request body: {e}");
+            Err((
+                StatusCode::BAD_REQUEST,
+                format!("Failed to read {request_type} request body"),
+            )
+                .into_response())
+        }
+    }
 }
 
-/// Converts a message into a payload error.
-fn into_payload_error(msg: impl Into<String>) -> Error {
-    Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
-        msg.into(),
-    )))
+/// Creates router-specific routes that proxy requests to backend nodes.
+/// This is used when the node is running in router mode.
+pub fn create_router_routes() -> axum::Router {
+    use axum::routing::any;
+
+    axum::Router::new()
+        .route("/config", any(dispatch))
+        .route("/config/{*path}", any(dispatch))
+        .route("/api/{*path}", any(dispatch))
+        .route("/aws/{*path}", any(dispatch))
+        .route("/gcp/{*path}", any(dispatch))
+        .route("/rum/{*path}", any(dispatch))
 }
 
 #[cfg(test)]

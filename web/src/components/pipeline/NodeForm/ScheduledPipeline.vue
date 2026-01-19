@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <FieldList
                     :fields="streamFields"
                     :stream-name="selectedStreamName"
+                    :stream-type="selectedStreamType"
                     @event-emitted="handleSidebarEvent"
                     :time-stamp="{
                       startTime: dateTime.startTime,

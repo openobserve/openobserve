@@ -107,7 +107,8 @@
     "manageTheme": "管理主题",
     "url": "网址",
     "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
-    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。"
+    "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
+    "id": "身份证"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -333,7 +334,8 @@
     "report": "报表",
     "pipeline": "流水线",
     "language": "语言",
-    "actions": "操作"
+    "actions": "操作",
+    "incidents": "事件"
   },
   "rum": {
     "title": "用户体验监控",
@@ -412,7 +414,53 @@
     "community_lbl": "社区",
     "loading_license_info": "正在加载许可证信息...",
     "installation_id_lbl": "安装 ID",
-    "expired_lbl": "已过期"
+    "expired_lbl": "已过期",
+    "feature_comparision_subtitle": "比较开源、企业和云产品的功能",
+    "feature_column_name": "特征",
+    "edition_opensource": "开源（自托管）",
+    "edition_enterprise": "企业版（自托管）",
+    "edition_cloud": "云",
+    "feature_logs": "日志",
+    "feature_metrics": "指标",
+    "feature_traces": "痕迹",
+    "feature_rum": "朗姆酒",
+    "feature_alerts": "警报",
+    "feature_dashboards": "仪表板",
+    "feature_reports": "报告",
+    "feature_vrl_functions": "VRL 函数",
+    "feature_pipelines": "管道",
+    "feature_high_availability": "高可用性",
+    "feature_multitenancy": "多租户（组织）",
+    "feature_dynamic_schema": "动态架构和架构演变",
+    "feature_multilingual_gui": "高级多语言 GUI",
+    "feature_sso": "单点登录",
+    "feature_rbac": "基于角色的访问控制 (RBAC)",
+    "feature_federated_search": "联合搜索/超级集群",
+    "feature_query_management": "查询管理",
+    "feature_workload_management": "工作负载管理 (QoS)",
+    "feature_audit_trail": "审计跟踪",
+    "feature_action_scripts": "操作脚本",
+    "feature_sensitive_data_redaction": "敏感数据编辑",
+    "feature_influence_roadmap": "影响路线图的能力",
+    "feature_license": "执照",
+    "feature_support": "支持",
+    "feature_cost": "成本",
+    "feature_pipelines_external": "管道-外部目的地",
+    "feature_extreme_performance": "极致性能（许多查询提高了 100 倍）",
+    "feature_query_optimizer": "查询优化器",
+    "value_sso_requires_ha": "✅ 需要 HA 模式",
+    "value_rbac_requires_ha": "✅ 需要 HA 模式",
+    "value_roadmap_enterprise_plan": "✅ 在企业计划上",
+    "value_license_agpl": "AGPL",
+    "value_license_enterprise": "企业",
+    "value_license_cloud": "云",
+    "value_support_community": "社区",
+    "value_support_enterprise": "企业",
+    "value_support_cloud": "云",
+    "value_cost_free": "免费",
+    "value_cost_enterprise": "如果是自托管，则每天最多可免费摄取 200 GB 的数据。之后付款",
+    "value_cost_cloud": "14 天免费试用。之后付款",
+    "feature_comparison_lbl": "功能对比"
   },
   "login": {
     "userid": "账号",
@@ -1556,7 +1604,8 @@
       "alertSettings": "设置警报规则并选择您希望以何种方式收到通知。",
       "deduplication": "通过将相似的警报分组在一起，避免多次发送相同的警报。",
       "advanced": "上下文变量、描述和行模板"
-    }
+    },
+    "template": "模板"
   },
   "alert_templates": {
     "header": "模板",
@@ -1993,7 +2042,13 @@
     "backToLogs": "返回日志",
     "RedMetrics": "RED 指标",
     "loadingStream": "正在加载数据流...",
-    "viewRelated": "查看相关"
+    "viewRelated": "查看相关",
+    "noTracesFound": "未找到结果。",
+    "configureFullTextSearch": "为直播配置全文搜索字段。",
+    "collapseFields": "折叠字段",
+    "openFields": "打开字段",
+    "timeRangeUpdated": "所选时间范围不包括此跟踪。时间范围已更新，以匹配跟踪的时间戳。",
+    "fetchingMoreTraces": "正在获取更多痕迹..."
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -2308,7 +2363,23 @@
     "noTracesFound": "未找到相关的痕迹",
     "noTracesDescription": "在所选时间范围内未找到服务 {service} 的跟踪",
     "openTraceInNewWindow": "在新窗口中打开 trace",
-    "filters": "过滤器"
+    "filters": "过滤器",
+    "semanticFieldGroupsTitle": "字段映射",
+    "semanticFieldGroupsCaption": "为关联和重复数据删除定义字段名称映射（例如，主机、主机名、节点 → “主机” 组）",
+    "groupsLabel": "组",
+    "importFromJson": "从 JSON 导入",
+    "addCustomGroup": "添加自定义群组",
+    "actionNormalize": "用于匹配的小写和修剪值",
+    "removeSemanticGroup": "移除语义组",
+    "fieldNamePlaceholder": "字段名称（以逗号分隔）",
+    "category": "类别",
+    "categoryHint": "按类别筛选群组",
+    "noSemanticGroupMessage": "该类别中没有语义组。选择其他类别或添加自定义群组。",
+    "showingGroups": "显示 {localGroupLength} 组总数中的 {filterGroupLength}",
+    "deduplicateFields": "重复数据删除字段",
+    "deduplicateFieldTooltip": "选择使用哪些字段映射进行重复数据删除指纹识别",
+    "alertDeduplicationMessage": "将对这些字段具有相同值的警报进行重复数据消除（例如，相同的指纹 = 相同的字段值）",
+    "atLeastOneDeduplicationField": "重复数据删除至少需要一个字段映射"
   },
   "sreChat": {
     "emptyMessage": "向我询问有关您的告警和事件的任何信息",

@@ -16,16 +16,21 @@
 import http from "./http";
 
 const destination = {
-  create: ({ org_identifier, destination_name, data }: any) => {
-    return http().post(`/api/${org_identifier}/alerts/destinations`, data);
+  create: ({ org_identifier, destination_name, data, module }: any) => {
+    let url = `/api/${org_identifier}/alerts/destinations`;
+    if (module) {
+      url += `?module=${module}`;
+    }
+    return http().post(url, data);
   },
-  update: ({ org_identifier, destination_name, data }: any) => {
-    return http().put(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        destination_name
-      )}`,
-      data
-    );
+  update: ({ org_identifier, destination_name, data, module }: any) => {
+    let url = `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
+      destination_name
+    )}`;
+    if (module) {
+      url += `?module=${module}`;
+    }
+    return http().put(url, data);
   },
   list: ({
     org_identifier,

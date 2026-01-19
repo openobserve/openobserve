@@ -6,7 +6,7 @@ test.describe("Pre-Test Cleanup", () => {
   /**
    * This cleanup test runs before all UI integration tests
    * It removes all test data from previous runs using API calls
-   * This ensures a clean state for all subsequent tests 
+   * This ensures a clean state for all subsequent tests  
    */
   test('Clean up all test data via API', {
     tag: ['@cleanup', '@all']
@@ -30,7 +30,9 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_user_update_dest_',
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
-        'incident_e2e_dest_'
+        'incident_e2e_dest_',
+        'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
+        /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
       [
@@ -47,7 +49,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_user_delete_tmpl_',
         'rbac_viewer_delete_tmpl_',
         'rbac_viewer_update_tmpl_',
-        'incident_e2e_template_'
+        'incident_e2e_template_',
+        'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_']
@@ -114,25 +117,69 @@ test.describe("Pre-Test Cleanup", () => {
         /^or-root-test-\d+$/,
         /^manual-debug-pipeline-/,
         /^manual-verify-pipeline-/,
-        /^scheurl\d+$/,       // scheurl556, scheurl149, scheurl56, etc.
-        /^schefile\d+$/,      // schefile399, schefile971, schefile123, etc.
-        /^realurl\d+$/        // realurl822, etc.
+        /^scheurl\d+$/,       // scheurl556, scheurl149, etc. (pipelineImport.spec.js)
+        /^schefile\d+$/,      // schefile399, schefile971, etc. (pipelineImport.spec.js)
+        /^realurl\d+$/,       // realurl822, etc. (pipelineImport.spec.js)
+        /^realfile\d+$/       // realfile123, etc. (pipelineImport.spec.js) - was missing!
       ]
     );
 
     // Clean up pipeline destinations matching test patterns
     await pm.apiCleanup.cleanupPipelineDestinations([
-      /^destination\d{2,3}$/  // destination12, destination123, etc.
+      /^destination\d{1,3}$/  // destination4, destination44, destination444, etc.
     ]);
 
     // Clean up functions matching test patterns
-    await pm.apiCleanup.cleanupFunctions([
+    // Patterns from sanity/pipeline tests (default org only)
+    const sanityFunctionPatterns = [
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
       /^sanitytest_/,                // sanitytest_a3f2, etc.
       /^e2eautomatefunctions_/       // e2eautomatefunctions_x9y2, etc.
-    ]);
+    ];
+
+    // Patterns from Functions folder tests (js-transform-type.spec.js)
+    const jsFunctionPatterns = [
+      /^test_js_fn_/,                // JS function creation tests
+      /^test_js_validate_/,          // JS validation tests
+      /^test_js_exec_/,              // JS execution tests
+      /^test_js_error_/,             // JS error handling tests
+      /^test_js_syntax_err_/,        // JS syntax error tests
+      /^test_js_empty_/,             // JS empty function tests
+      /^meta_js_fn_/,                // Meta org JS function tests
+      /^default_vrl_fn_/             // Default org VRL function tests
+    ];
+
+    // Patterns from Functions folder tests (row-expansion.spec.js)
+    const rowExpansionPatterns = [
+      /^vrl_row_expand_/,            // VRL row expansion tests
+      /^js_row_expand_/,             // JS row expansion tests
+      /^vrl_empty_expand_/,          // VRL empty expansion tests
+      /^js_empty_expand_/,           // JS empty expansion tests
+      /^vrl_single_expand_/,         // VRL single element tests
+      /^js_single_expand_/,          // JS single element tests
+      /^js_complex_expand_/,         // JS complex transformation tests
+      /^vrl_compare_/,               // VRL comparison tests
+      /^js_compare_/,                // JS comparison tests
+      /^pipeline_expand_fn_/,        // Pipeline integration tests
+      /^invalid_expand_/             // Invalid expansion tests
+    ];
+
+    // Clean up functions in default org (sanity tests + VRL functions from Functions folder)
+    const defaultOrgPatterns = [
+      ...sanityFunctionPatterns,
+      ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
+      ...rowExpansionPatterns        // vrl_* patterns created in default org
+    ];
+    await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
+
+    // Clean up functions in _meta org (JS functions only work there)
+    const metaOrgFunctionPatterns = [
+      ...jsFunctionPatterns,         // test_js_*, meta_js_fn_* created in _meta org
+      ...rowExpansionPatterns        // js_* patterns created in _meta org
+    ];
+    await pm.apiCleanup.cleanupFunctionsInOrg('_meta', metaOrgFunctionPatterns);
 
     // Clean up enrichment tables matching test patterns
     await pm.apiCleanup.cleanupEnrichmentTables([
@@ -141,7 +188,17 @@ test.describe("Pre-Test Cleanup", () => {
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
       /^search_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // search_test_<uuid>_csv (search filter test)
       /^edit_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // edit_test_<uuid>_csv (edit workflow test)
-      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/      // delete_test_<uuid>_csv (delete confirmation test)
+      /^delete_test_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,     // delete_test_<uuid>_csv (delete confirmation test)
+      // URL-based enrichment table tests (enrichment-table-url.spec.js) - uses UUID first segment (8 hex chars)
+      /^url_lifecycle_[a-f0-9]{8}$/,                                                         // url_lifecycle_<uuid> (full lifecycle test)
+      /^invalid_url_[a-f0-9]{8}$/,                                                           // invalid_url_<uuid> (URL format validation test)
+      /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
+      /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
+      /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
+      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
+      /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
+      /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
+      /^url_404_[a-f0-9]{8}$/                                                                // url_404_<uuid> (invalid URL 404 test)
     ]);
 
     // Clean up streams matching test patterns
@@ -186,6 +243,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^alert_validation_stream$/,                   // Alert validation stream
         /^auto_playwright_stream$/,                    // Auto playwright stream
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
+        /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
         /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
       ],
@@ -216,6 +274,21 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up saved views matching test patterns
     await pm.apiCleanup.cleanupSavedViews();
 
+    // Clean up metrics streams matching test patterns
+    // Metrics tests use OTLP ingestion which may create test-specific streams
+    await pm.apiCleanup.cleanupMetricsStreams(
+      [
+        /^test_.*_metrics$/,              // test_*_metrics streams (general test streams)
+        /^e2e_metrics_/,                  // e2e_metrics_* (E2E test streams)
+        /^otlp_test_/,                    // otlp_test_* (OTLP ingestion test streams)
+        /^metrics_test_/,                 // metrics_test_* (Metrics-specific test streams)
+        /^prom_test_/,                    // prom_test_* (Prometheus test streams)
+        /^temp_metrics_/                  // temp_metrics_* (Temporary test streams)
+      ],
+      // Protected metrics streams - never delete
+      ['default']  // 'default' is the primary metrics stream used by tests
+    );
+
     // Note: Stream deletion waiting is no longer needed here because:
     // 1. Pipeline conditions tests now use worker-specific stream names (e.g., e2e_conditions_basic_<runId>_w0)
     // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
@@ -223,37 +296,6 @@ test.describe("Pre-Test Cleanup", () => {
     // The cleanup patterns above will clean up old test streams via regex matching
 
     testLogger.info('Pre-test cleanup completed successfully');
-  });
-
-  test('Clean up JavaScript function test data', {
-    tag: ['@cleanup', '@functions', '@jsFunctions']
-  }, async ({ page }) => {
-    testLogger.info('Starting JavaScript functions cleanup');
-
-    const pm = new PageManager(page);
-
-    // Navigate to functions page
-    await pm.functionsPage.navigate();
-
-    // Cleanup patterns for JS function tests
-    const testPatterns = [
-      'test_js_fn_',
-      'test_js_validate_',
-      'test_js_exec_',
-      'test_js_error_',
-      'pipeline_js_fn_',
-      'test_js_array_',
-      'test_js_syntax_err_',
-      'test_js_empty_'
-    ];
-
-    // Delete all test functions matching each pattern
-    for (const pattern of testPatterns) {
-      testLogger.info(`Cleaning up functions matching pattern: ${pattern}`);
-      await pm.functionsPage.deleteAllFunctionsMatching(pattern);
-    }
-
-    testLogger.info('JavaScript functions cleanup completed successfully');
   });
 });
 

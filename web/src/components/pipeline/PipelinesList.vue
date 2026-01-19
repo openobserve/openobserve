@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :label="t(`pipeline.history`)"
                     @click="goToPipelineHistory"
-                    icon="history"
                 />
                 <q-btn
                     data-test="pipeline-list-backfill-btn"
@@ -72,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :label="t('pipeline.backfill')"
                     @click="goToBackfillJobs"
-                    icon="refresh"
                 />
                 <q-btn
                   data-test="pipeline-list-import-pipeline-btn"
@@ -145,103 +143,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-else>
                     <!-- Actions Buttons -->
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-                      dense
-                      unelevated
-                      size="sm"
-                      :color="props.row.enabled ? 'negative' : 'positive'"
-                      :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                      round
-                      flat
-                      :title="
-                        props.row.enabled ? t('alerts.pause') : t('alerts.start')
-                      "
-                      @click.stop="togglePipeline(props.row)"
-                    >
-                    </q-btn>
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="edit"
-                      :title="t('pipeline.edit')"
-                      @click.stop="editPipeline(props.row)"
-                    >
-                  </q-btn>
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="download"
-                      :title="t('pipeline.export')"
-                      @click.stop="exportPipeline(props.row)"
-                    >
-                  </q-btn>
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDelete"
-                      :title="t('pipeline.delete')"
-                      @click.stop="openDeleteDialog(props.row)"
-                    >
-                  </q-btn>
-                    <q-btn
-                      :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedVisibility"
-                      :title="t('pipeline.view')"
-                    >
-                      <q-tooltip position="bottom">
-                        <PipelineView :pipeline="props.row" />
-                      </q-tooltip>
-                    </q-btn>
-                    <!-- Backfill Button - Only for scheduled pipelines -->
-                    <q-btn
-                      v-if="props.row.source.source_type === 'scheduled'"
-                      :data-test="`pipeline-list-${props.row.name}-create-backfill`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="refresh"
-                      title="Create Backfill Job"
-                      @click.stop="openBackfillDialog(props.row)"
-                    >
-                    </q-btn>
-                    <!-- Error Indicator - Always render to maintain alignment -->
-                    <div class="pipeline-error-slot">
+                    <div class="tw:flex tw:items-center actions-container">
                       <q-btn
-                        v-if="props.row.last_error"
-                        :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                        class="pipeline-error-indicator"
+                        :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
+                        dense
+                        unelevated
+                        size="sm"
+                        :color="props.row.enabled ? 'negative' : 'positive'"
+                        :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+                        round
+                        flat
+                        :title="
+                          props.row.enabled ? t('alerts.pause') : t('alerts.start')
+                        "
+                        @click.stop="togglePipeline(props.row)"
+                      >
+                      </q-btn>
+                      <q-btn
+                        :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
                         padding="sm"
                         unelevated
                         size="sm"
                         round
                         flat
-                        color="negative"
-                         icon="error"
-                        @click.stop="showErrorDialog(props.row)"
+                        icon="edit"
+                        :title="t('pipeline.edit')"
+                        @click.stop="editPipeline(props.row)"
                       >
-                        <q-tooltip>
-                          Last error: {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                      </q-btn>
+                      <q-btn
+                        :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
+                        padding="sm"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        :icon="outlinedVisibility"
+                        :title="t('pipeline.view')"
+                      >
+                        <q-tooltip position="bottom">
+                          <PipelineView :pipeline="props.row" />
                         </q-tooltip>
+                      </q-btn>
+                      <q-btn
+                        :icon="outlinedMoreVert"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        @click.stop
+                        :data-test="`pipeline-list-${props.row.name}-more-options`"
+                      >
+                        <q-menu>
+                          <q-list style="min-width: 100px">
+                            <q-item
+                              class="flex items-center"
+                              clickable
+                              v-close-popup
+                              @click="exportPipeline(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" name="download" />
+                              </q-item-section>
+                              <q-item-section>{{ t('pipeline.export') }}</q-item-section>
+                            </q-item>
+                            <q-separator v-if="props.row.source.source_type === 'scheduled'" />
+                            <q-item
+                              v-if="props.row.source.source_type === 'scheduled'"
+                              class="flex items-center"
+                              clickable
+                              v-close-popup
+                              @click="openBackfillDialog(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" name="refresh" />
+                              </q-item-section>
+                              <q-item-section>Create Backfill</q-item-section>
+                            </q-item>
+                            <q-separator />
+                            <q-item
+                              class="flex items-center"
+                              clickable
+                              v-close-popup
+                              @click="openDeleteDialog(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" :name="outlinedDelete" />
+                              </q-item-section>
+                              <q-item-section>{{ t('pipeline.delete') }}</q-item-section>
+                            </q-item>
+                            <q-separator v-if="props.row.last_error" />
+                            <q-item
+                              v-if="props.row.last_error"
+                              class="flex items-center"
+                              clickable
+                              v-close-popup
+                              @click="showErrorDialog(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" name="error" color="negative" />
+                              </q-item-section>
+                              <q-item-section>
+                                <div>View Error</div>
+                                <div class="text-caption text-grey">
+                                  {{ new Date(props.row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                                </div>
+                              </q-item-section>
+                            </q-item>
+                          </q-list>
+                        </q-menu>
                       </q-btn>
                     </div>
                   </template>
@@ -528,6 +538,7 @@ import {
   outlinedPause,
   outlinedPlayArrow,
   outlinedVisibility,
+  outlinedMoreVert,
 } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -1370,20 +1381,6 @@ const onBackfillSuccess = (jobId: string) => {
   align-items: center;
 }
 
-.pipeline-error-slot {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  vertical-align: middle;
-}
-
-.pipeline-error-indicator {
-  cursor: pointer !important;
-
-  &:hover {
-    background-color: rgba(239, 68, 68, 0.1) !important;
-  }
-}
 
 // Glassmorphic Error Dialog
 .pipeline-error-dialog {

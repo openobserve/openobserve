@@ -529,12 +529,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
-    <q-tab-panels
+    <q-card
       v-model="activeTab"
       animated
       class="correlation-content tw:flex-1 tw:overflow-auto"
     >
-      <q-tab-panel name="logs" class="tw:p-0">
+      <div v-if="activeTab == 'logs'" class="tw:p-0">
         <!-- Refresh Button -->
         <div v-if="logsDashboardData" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
           <q-btn
@@ -549,6 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+
         <RenderDashboardCharts
           v-if="logsDashboardData"
           :key="logsDashboardRenderKey"
@@ -558,46 +559,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :allowAlertCreation="false"
           searchType="dashboards"
         />
-      </q-tab-panel>
+      </div>
+     
+     
+      <div v-if="activeTab == 'metrics'" class="tw:h-full">
+          <div class=" tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2">
+            <q-btn
+              v-if="dashboardData"
+              flat
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('common.refresh')"
+              @click="loadDashboard"
+              :loading="loading"
+              size="sm"
+            />
+            <q-btn
+              outline
+              dense
+              no-caps
+              color="primary"
+              icon="show_chart"
+              :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
+              @click="showMetricSelector = true"
+            >
+              <q-tooltip>{{ t('correlation.metricsTooltip') }}</q-tooltip>
+            </q-btn>
+          </div>
+            <div class="tw:p-0 tw:flex-1 tw:overflow-auto" style="height: calc(100vh - 272px);">
+            <RenderDashboardCharts
+              v-if="dashboardData"
+              :key="dashboardRenderKey"
+              :dashboardData="dashboardData"
+              :currentTimeObj="currentTimeObj"
+              :viewOnly="true"
+              :allowAlertCreation="false"
+              searchType="dashboards"
+            />
+      </div>
+    </div>
 
-      <q-tab-panel name="metrics" class="tw:p-0">
-        <div class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2">
-          <q-btn
-            v-if="dashboardData"
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
-          <q-btn
-            outline
-            dense
-            no-caps
-            color="primary"
-            icon="show_chart"
-            :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
-            @click="showMetricSelector = true"
-          >
-            <q-tooltip>{{ t('correlation.metricsTooltip') }}</q-tooltip>
-          </q-btn>
-        </div>
-
-        <RenderDashboardCharts
-          v-if="dashboardData"
-          :key="dashboardRenderKey"
-          :dashboardData="dashboardData"
-          :currentTimeObj="currentTimeObj"
-          :viewOnly="true"
-          :allowAlertCreation="false"
-          searchType="dashboards"
-        />
-      </q-tab-panel>
-
-      <q-tab-panel name="traces" class="tw:p-0">
+      <div v-if="activeTab == 'traces'" class="tw:h-full">
           <!-- Refresh Button -->
           <div v-if="traceCorrelationMode !== null" class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end">
             <q-btn
@@ -615,7 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
           >
             <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
             <div class="tw:text-base">{{ t('correlation.loadingTraces') }}</div>
@@ -728,7 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Traces Table -->
-            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100% - 4rem)">
+            <div class="tw:p-3 tw:overflow-auto" style="max-height: calc(100vh - 332px)">
               <q-table
                 :rows="tracesForDimensions"
                 :columns="traceListColumns"
@@ -816,8 +819,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('correlation.correlatedTracesFor', { service: serviceName }) }}
             </div>
           </div>
-      </q-tab-panel>
-    </q-tab-panels>
+        </div>
+    </q-card>
   </div>
 
   <!-- Metric Stream Selector Dialog -->
@@ -896,6 +899,7 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
@@ -1013,23 +1017,20 @@ const activeTab = computed({
 const internalActiveTab = ref("logs");
 
 // Active dimensions that can be modified
-// - matchedDimensions (stable): use actual values
-// - additionalDimensions (unstable): default to SELECT_ALL_VALUE (wildcard)
+// - matchedDimensions (stable): use actual values from current row
+// - additionalDimensions (unstable): use actual values from current row (user can change to "All" if desired)
 // Applied dimensions - these are used to generate queries
 const activeDimensions = ref<Record<string, string>>({
   ...props.matchedDimensions,
-  // Add additional dimensions with SELECT_ALL_VALUE as default (user can switch to actual value)
-  ...Object.fromEntries(
-    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
-  )
+  // Use actual values from additionalDimensions (showing current row values)
+  ...(props.additionalDimensions || {})
 });
 
 // Pending dimensions - these are edited by the user but not yet applied
 const pendingDimensions = ref<Record<string, string>>({
   ...props.matchedDimensions,
-  ...Object.fromEntries(
-    Object.keys(props.additionalDimensions || {}).map(key => [key, SELECT_ALL_VALUE])
-  )
+  // Use actual values from additionalDimensions (showing current row values)
+  ...(props.additionalDimensions || {})
 });
 
 // Track if there are pending changes that haven't been applied
@@ -2029,6 +2030,7 @@ watch(
   async (newVal) => {
     if (newVal) {
       // Load semantic groups first (required for applyUnstableDimensionDefaults)
+      // Note: pendingDimensions and activeDimensions are now managed by the props watcher below
       await loadSemanticGroups();
 
       // Re-apply defaults now that semantic groups are loaded
@@ -2097,6 +2099,12 @@ watch(
       return;
     }
     if (newAdditionalDims && Object.keys(newAdditionalDims).length > 0 && semanticGroups.value.length > 0) {
+      // Update pendingDimensions with new unstable dimension values from current row
+      pendingDimensions.value = {
+        ...props.matchedDimensions,
+        ...newAdditionalDims
+      };
+
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
@@ -2115,6 +2123,13 @@ watch(
     if (!oldMatchedDims || !initialLoadCompleted.value) {
       return;
     }
+
+    // Update pendingDimensions with new matched dimension values from current row
+    pendingDimensions.value = {
+      ...newMatchedDims,
+      ...(props.additionalDimensions || {})
+    };
+
     const hasUnstableInMatched = Object.values(newMatchedDims || {}).some(v => v === SELECT_ALL_VALUE);
     if (hasUnstableInMatched && semanticGroups.value.length > 0) {
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
@@ -2123,6 +2138,41 @@ watch(
       }
     }
   }
+);
+
+// Watch all dimension props together to detect any changes
+// This ensures filter dropdowns are always in sync with current row data
+// Triggers when: component mounts, user switches rows, or props update
+watch(
+  () => ({
+    matched: props.matchedDimensions,
+    additional: props.additionalDimensions,
+    service: props.serviceName
+  }),
+  (newProps, oldProps) => {
+    // Always update dimensions when props change (including initial mount)
+    // This handles: first open, reopen with different row, and navigation between rows
+    const newDimensions = {
+      ...(newProps.matched || {}),
+      ...(newProps.additional || {})
+    };
+
+    // Only update if dimensions actually changed
+    const dimensionsChanged =
+      !oldProps ||
+      JSON.stringify(newDimensions) !== JSON.stringify({
+        ...(oldProps.matched || {}),
+        ...(oldProps.additional || {})
+      });
+
+    if (dimensionsChanged) {
+      pendingDimensions.value = { ...newDimensions };
+      activeDimensions.value = { ...newDimensions };
+
+      console.log('[TelemetryCorrelationDashboard] Updated dimensions from props:', newDimensions);
+    }
+  },
+  { immediate: true, deep: true }
 );
 </script>
 
