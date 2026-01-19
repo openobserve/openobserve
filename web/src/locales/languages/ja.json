@@ -107,7 +107,8 @@
     "manageTheme": "テーマを管理",
     "url": "URL",
     "chunkLoadError": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
-    "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。"
+    "chunkLoadErrorMsg": "アプリケーションの新しいバージョンが利用可能です。ページを更新して続行してください。",
+    "id": "ID"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1617,7 +1618,8 @@
       "alertSettings": "アラートルールを設定し、通知方法を選択します。",
       "deduplication": "類似のアラートをグループ化して、同じアラートを複数回送信しないようにします。",
       "advanced": "コンテキスト変数、説明、行テンプレート"
-    }
+    },
+    "template": "テンプレートオーバーライド"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2358,7 +2360,29 @@
     "noTracesFound": "相関トレースは見つかりませんでした",
     "noTracesDescription": "選択した時間範囲のサービス {service} のトレースが見つかりません",
     "openTraceInNewWindow": "トレースを新しいウィンドウで開く",
-    "filters": "フィルター"
+    "filters": "フィルター",
+    "semanticFieldGroupsTitle": "フィールドマッピング",
+    "semanticFieldGroupsCaption": "相関と重複排除のためのフィールド名マッピングを定義します (例:ホスト、ホスト名、ノード →「ホスト」グループ)",
+    "groupsLabel": "グループ",
+    "importFromJson": "JSON からインポート",
+    "addCustomGroup": "カスタムグループを追加",
+    "actionNormalize": "マッチング用の小文字とトリム値",
+    "removeSemanticGroup": "セマンティックグループを削除",
+    "fieldNamePlaceholder": "フィールド名 (カンマ区切り)",
+    "category": "カテゴリー",
+    "categoryHint": "グループをカテゴリで絞り込む",
+    "noSemanticGroupMessage": "このカテゴリにはセマンティックグループはありません。別のカテゴリを選択するか、カスタムグループを追加してください。",
+    "showingGroups": "{localGroupLength} 個の合計グループの {フィルターグループの長さ} を表示中",
+    "deduplicateFields": "重複排除フィールド",
+    "deduplicateFieldTooltip": "重複排除フィンガープリントに使用するフィールドマッピングを選択する",
+    "alertDeduplicationMessage": "これらのフィールドの値が同じアラートは重複排除されます (例:同じフィンガープリント = 同じフィールド値)",
+    "atLeastOneDeduplicationField": "重複排除には少なくとも 1 つのフィールドマッピングが必要です",
+    "scope": "スコープ",
+    "scopeTooltip": "スコープディメンションは環境境界 (クラスタ、リージョン、ホスト) を定義し、連結されてFQNのスコープ部分を形成します:{scope}/{workload}",
+    "stable": "安定した",
+    "stableTooltip": "安定ディメンションはカーディナリティが低く、相関キーの計算に使用されます。",
+    "normalize": "ノーマライズ",
+    "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",

@@ -107,7 +107,8 @@
     "manageTheme": "Gerenciar tema",
     "url": "URL",
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
-    "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar."
+    "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
+    "id": "CARTEIRA DE IDENTIDADE"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1607,7 +1608,8 @@
       "alertSettings": "Defina suas regras de alerta e escolha como você gostaria de ser notificado.",
       "deduplication": "Evite enviar o mesmo alerta várias vezes agrupando alertas semelhantes.",
       "advanced": "Variáveis de contexto, descrição e modelo de linha"
-    }
+    },
+    "template": "Substituição de modelo"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2365,7 +2367,29 @@
     "noTracesFound": "Nenhum traço correlacionado encontrado",
     "noTracesDescription": "Nenhum rastreamento encontrado para o serviço {service} no intervalo de tempo selecionado",
     "openTraceInNewWindow": "Abrir rastreamento em uma nova janela",
-    "filters": "Filtros"
+    "filters": "Filtros",
+    "semanticFieldGroupsTitle": "Mapeamentos de campo",
+    "semanticFieldGroupsCaption": "Defina mapeamentos de nomes de campos para correlação e desduplicação (por exemplo, host, hostname, node → grupo 'host')",
+    "groupsLabel": "grupos",
+    "importFromJson": "Importar do JSON",
+    "addCustomGroup": "Adicionar grupo personalizado",
+    "actionNormalize": "Valores minúsculos e de corte para correspondência",
+    "removeSemanticGroup": "Remover grupo semântico",
+    "fieldNamePlaceholder": "Nomes de campo (separados por vírgula)",
+    "category": "Categoria",
+    "categoryHint": "Filtrar grupos por categoria",
+    "noSemanticGroupMessage": "Não há grupos semânticos nesta categoria. Selecione uma categoria diferente ou adicione um grupo personalizado.",
+    "showingGroups": "Mostrando {filterGroupLength} do total de {localGroupLength} grupos",
+    "deduplicateFields": "Campos de desduplicação",
+    "deduplicateFieldTooltip": "Selecione quais mapeamentos de campo usar para desduplicação de impressões digitais",
+    "alertDeduplicationMessage": "Alertas com os mesmos valores para esses campos serão desduplicados (por exemplo, mesma impressão digital = mesmos valores de campo)",
+    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação",
+    "scope": "Escopo",
+    "scopeTooltip": "As dimensões do escopo definem os limites ambientais (cluster, região, host) e são concatenadas para formar parte do escopo do FQN: {scope}/{workload}",
+    "stable": "Estável",
+    "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
+    "normalize": "Normalizar",
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
