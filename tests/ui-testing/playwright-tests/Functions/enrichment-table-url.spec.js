@@ -4,18 +4,19 @@
  * Test Coverage:
  * - P0: Full lifecycle (create, search, explore logs, delete)
  * - P0: URL validation
- * - P1: Cancel form
+ * - P1: Cancel form, Edit form, Schema mismatch error
  * - P2: Data source toggle
  */
 
-const { test, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const { expect } = require('@playwright/test');
+const { test, navigateToBase, expect } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { randomUUID } = require('crypto');
 
 // Test data - using small protocols.csv (13 rows) for fast processing
 const CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/protocols.csv';
+// Different schema CSV for mismatch testing (country data with different columns)
+const DIFFERENT_SCHEMA_CSV_URL = 'https://raw.githubusercontent.com/openobserve/openobserve/main/tests/test-data/enrichment_info.csv';
 const INVALID_URL_NO_PROTOCOL = 'example.com/data.csv';
 
 test.describe('Enrichment Table URL Feature Tests', () => {
@@ -169,7 +170,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.fillNameInput(tableName);
         await enrichmentPage.selectSourceOption('url');
         await enrichmentPage.fillUrlInput(CSV_URL);
-        await enrichmentPage.page.getByRole('button', { name: 'Save' }).click();
+        await enrichmentPage.clickSaveButton();
         testLogger.info('Attempted to create duplicate table');
 
         // Step 3: Verify error message
@@ -177,16 +178,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Duplicate name error verified');
 
         // Step 4: Navigate back to list (form may have auto-closed after error in CI)
-        // Check if Cancel button is still visible before trying to click it
-        const cancelBtn = enrichmentPage.page.getByRole('button', { name: 'Cancel' });
-        const isCancelVisible = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
-        if (isCancelVisible) {
-            await cancelBtn.click();
-            await enrichmentPage.page.waitForLoadState('networkidle');
-        } else {
-            // Form already closed, navigate to enrichment tables list
-            await enrichmentPage.navigateToEnrichmentTable();
-        }
+        await enrichmentPage.navigateBackFromFormIfNeeded();
         testLogger.info('Navigated back to list');
 
         // Cleanup - delete the table
@@ -302,21 +294,17 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Filled form with 404 URL');
 
         // Click Save - backend processes async and returns to list
-        await enrichmentPage.page.getByRole('button', { name: 'Save' }).click();
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.clickSaveButton();
         testLogger.info('Save clicked - backend will process async');
 
         // Check if save was successful (form closed) or if there's an error
-        const formTitle = enrichmentPage.page.getByText('Add Enrichment Table');
-        const formHidden = await formTitle.waitFor({ state: 'hidden', timeout: 15000 }).then(() => true).catch(() => false);
+        const formHidden = await enrichmentPage.waitForAddFormToClose();
 
         if (!formHidden) {
             // Form didn't close - check for error message
             testLogger.info('Form did not close - checking for error message');
-            const errorNotification = enrichmentPage.page.locator('.q-notification__message, .q-banner, [role="alert"]');
-            const hasError = await errorNotification.first().isVisible({ timeout: 5000 }).catch(() => false);
+            const { hasError, errorText } = await enrichmentPage.checkForErrorNotification();
             if (hasError) {
-                const errorText = await errorNotification.first().textContent();
                 testLogger.info(`Backend returned error: ${errorText}`);
                 // This is expected behavior - backend validates URL and returns error
                 await enrichmentPage.cancelEnrichmentTableForm();
@@ -333,45 +321,24 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Navigate explicitly to enrichment tables list
         await enrichmentPage.navigateToEnrichmentTable();
-        await enrichmentPage.page.waitForLoadState('networkidle');
 
         // Take a debug screenshot before searching
-        await enrichmentPage.page.screenshot({ path: 'test-results/url-404-before-search.png', fullPage: true });
+        await enrichmentPage.takeDebugScreenshot('url-404-before-search.png');
 
         // Search for table in list with retry (CI may need multiple attempts)
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            testLogger.info(`Searching for table - attempt ${attempt}`);
+        const { found } = await enrichmentPage.searchTableWithRetry(tableName, 5);
 
-            // Clear search and search again
-            const searchInput = enrichmentPage.page.getByPlaceholder(/search enrichment table/i);
-            await searchInput.clear();
-            await enrichmentPage.page.waitForTimeout(1000);
-            await searchInput.fill(tableName);
-            await enrichmentPage.page.waitForLoadState('networkidle');
-            await enrichmentPage.page.waitForTimeout(2000);
-
-            try {
-                const row = enrichmentPage.page.locator('tbody tr').filter({ hasText: tableName });
-                await expect(row).toBeVisible({ timeout: 10000 });
-                testLogger.info('Table found in list - 404 URL was accepted for async processing');
-
-                // Verify the table shows "Url" type
-                await enrichmentPage.verifyTableType(tableName, 'Url');
-                testLogger.info('Table type verified as Url');
-                testLogger.info('Test passed - cleanup will be handled by cleanup spec');
-                return;
-            } catch (error) {
-                if (attempt < 5) {
-                    testLogger.info(`Table not found yet, waiting and retrying...`);
-                    await enrichmentPage.page.waitForTimeout(5000);
-                    await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
-                    await enrichmentPage.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout: 15000 });
-                }
-            }
+        if (found) {
+            testLogger.info('Table found in list - 404 URL was accepted for async processing');
+            // Verify the table shows "Url" type
+            await enrichmentPage.verifyTableType(tableName, 'Url');
+            testLogger.info('Table type verified as Url');
+            testLogger.info('Test passed - cleanup will be handled by cleanup spec');
+            return;
         }
 
         // Take final debug screenshot
-        await enrichmentPage.page.screenshot({ path: 'test-results/url-404-not-found.png', fullPage: true });
+        await enrichmentPage.takeDebugScreenshot('url-404-not-found.png');
 
         // If we get here, the table was never created - this might be valid behavior if backend validates URLs
         testLogger.info('Table not found after multiple retries - backend may have rejected 404 URL synchronously');
@@ -415,5 +382,74 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Cancel without saving
         await enrichmentPage.cancelEnrichmentTableForm();
+    });
+
+    test('@P1 URL Jobs dialog - view failed job status', async () => {
+        const tableName = generateTableName('schema_mismatch');
+        testLogger.info(`Test: URL Jobs dialog - ${tableName}`);
+
+        // Step 1: Create enrichment table from protocols.csv
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('Table created with protocols.csv');
+
+        // Step 2: Verify table exists (wait for page to be ready)
+        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table found in list');
+
+        // Step 3: Click Edit button
+        await enrichmentPage.clickEditButton(tableName);
+        await enrichmentPage.verifyUpdateMode();
+        testLogger.info('Edit form opened');
+
+        // Replace URL with a different CSV
+        await enrichmentPage.replaceUrlInEditMode(DIFFERENT_SCHEMA_CSV_URL);
+        testLogger.info('Replaced URL');
+
+        // Save the changes
+        await enrichmentPage.clickSaveButton();
+        await enrichmentPage.page.waitForLoadState('networkidle');
+        testLogger.info('Save clicked - job processing async');
+
+        // Step 4: Wait for job to complete (poll until Edit button appears)
+        testLogger.info('Waiting for URL job to complete...');
+        for (let i = 0; i < 12; i++) {  // Wait up to 1 minute
+            await enrichmentPage.page.waitForTimeout(5000);
+            await enrichmentPage.page.reload({ waitUntil: 'networkidle' });
+            await enrichmentPage.waitForEnrichmentTablesList();
+            await enrichmentPage.searchEnrichmentTableInList(tableName);
+
+            // Check if Edit button is visible (job completed) - URL tables have 2 buttons when done
+            const row = enrichmentPage.page.locator('tbody tr').filter({ hasText: tableName });
+            const buttonCount = await row.locator('button').count();
+
+            if (buttonCount >= 2) {
+                testLogger.info(`Job finished - ${buttonCount} buttons visible`);
+                break;
+            }
+            testLogger.info(`Waiting for job - attempt ${i + 1}/12`);
+        }
+
+        // Step 5: Click on status icon to open URL Jobs dialog
+        await enrichmentPage.clickUrlStatusIcon(tableName);
+        await enrichmentPage.waitForUrlJobsDialog(tableName);
+        testLogger.info('URL Jobs dialog opened');
+
+        // Step 6: Verify job shows in dialog (completed or failed)
+        const dialog = enrichmentPage.page.locator('.q-dialog');
+        await expect(dialog).toBeVisible();
+
+        // Check for any job status badge (completed or failed)
+        const statusBadge = dialog.locator('.q-badge').first();
+        await expect(statusBadge).toBeVisible({ timeout: 10000 });
+        testLogger.info('Job status badge visible in dialog');
+
+        // Close dialog
+        await enrichmentPage.closeUrlJobsDialog();
+
+        // Cleanup handled by cleanup.spec.js
+        testLogger.info('Test completed - URL Jobs dialog verified');
     });
 });

@@ -198,7 +198,8 @@ test.describe("Pre-Test Cleanup", () => {
       /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
-      /^url_404_[a-f0-9]{8}$/                                                                // url_404_<uuid> (invalid URL 404 test)
+      /^url_404_[a-f0-9]{8}$/,                                                               // url_404_<uuid> (invalid URL 404 test)
+      /^schema_mismatch_[a-f0-9]{8}$/                                                        // schema_mismatch_<uuid> (schema mismatch test)
     ]);
 
     // Clean up streams matching test patterns
