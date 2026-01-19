@@ -334,7 +334,8 @@
     "report": "보고서",
     "pipeline": "파이프라인",
     "language": "언어",
-    "actions": "액션"
+    "actions": "액션",
+    "incidents": "인시던트"
   },
   "rum": {
     "title": "실제 사용자 모니터링",

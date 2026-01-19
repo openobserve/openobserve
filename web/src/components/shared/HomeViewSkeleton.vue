@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem]" style="display: flex; flex-direction: column;">
+  <div class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" style="display: flex; flex-direction: column; height: calc(100vh - 52px);">
 
     <!-- 1st section - Streams container -->
       <div class="feature-card"

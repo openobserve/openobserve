@@ -21,33 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="q-pa-none flex flex-col"
   >
-    <div class="tw:w-full tw:h-[68px] tw:px-[0.625rem] tw:mb-[0.375rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
+    <div class="tw:w-full  tw:px-[0.625rem] q-pt-xs" v-if="!showAddAlertDialog && !showImportAlertDialog">
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
+          class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
-            <!-- View Mode Tabs (Alerts / Incidents) -->
-            <div class="flex justify-start">
-              <q-tabs v-model="viewMode" inline-label dense @update:model-value="onViewModeChange" data-test="alert-incident-view-tabs">
-                <q-tab
-                  name="alerts"
-                  :label="t('alerts.header')"
-                  no-caps
-                  data-test="alert-view-tab"
-                />
-                <q-tab
-                  name="incidents"
-                  :label="t('alerts.incidents.title')"
-                  no-caps
-                  data-test="incident-view-tab"
-                />
-              </q-tabs>
+            <div class="q-table__title tw:font-[600]" data-test="alert-list-title">
+              {{ t("alerts.header") }}
             </div>
           </div>
           <div class="flex q-ml-auto tw:ps-2 items-center">
-            <!-- Tabs only visible in Alerts view -->
-            <div v-if="viewMode === 'alerts'" class="app-tabs-container tw:h-[36px] q-mr-sm">
+            <!-- Alert Tabs -->
+            <div class="app-tabs-container tw:h-[36px] q-mr-sm">
               <app-tabs
               class="tabs-selection-container"
               :tabs="alertTabs"
@@ -55,9 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:active-tab="filterAlertsByTab"
             />
             </div>
-            <!-- Search for Alerts view -->
+            <!-- Search for Alerts -->
             <q-input
-              v-if="viewMode === 'alerts'"
               v-model="dynamicQueryModel"
               dense
               borderless
@@ -75,23 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <!-- Search for Incidents view -->
-            <q-input
-              v-if="viewMode === 'incidents'"
-              v-model="incidentSearchQuery"
-              dense
-              borderless
-              placeholder="Search incidents..."
-              data-test="incident-search-input"
-              clearable
-              class="o2-search-input"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-            <!-- All Folders toggle (only for alerts view) -->
-            <div v-if="viewMode === 'alerts'" class="tw:ml-2">
+            <!-- All Folders toggle -->
+            <div class="tw:ml-2">
                 <q-toggle
                   data-test="alert-list-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
@@ -119,9 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-insights-btn"
             icon="insights"
           />
-          <!-- Import button (only for alerts view) -->
+          <!-- Import button -->
           <q-btn
-            v-if="viewMode === 'alerts'"
             class="q-ml-sm o2-secondary-button tw:h-[36px]"
             no-caps
             flat
@@ -129,9 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="importAlert"
             data-test="alert-import"
           />
-          <!-- Add Alert button (only for alerts view) -->
+          <!-- Add Alert button -->
           <q-btn
-            v-if="viewMode === 'alerts'"
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             no-caps
@@ -147,20 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
-      style="height: calc(100vh - 110px)"
+      style="height: calc(100vh - 118px)"
     >
-      <!-- Incidents View (no folders) -->
-      <div v-if="viewMode === 'incidents'" class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <IncidentList :searchQuery="incidentSearchQuery" />
-      </div>
-
       <!-- Alerts View (with folders) -->
       <q-splitter
-        v-else
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
-        style="height: calc(100vh - 110px)"
+        style="height: calc(100vh - 118px)"
         data-test="alert-list-splitter"
       >
         <template #before>
@@ -912,7 +874,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
-import IncidentList from "@/components/alerts/IncidentList.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 // import alertList from "./alerts";
@@ -933,7 +894,6 @@ export default defineComponent({
     AppTabs,
     SelectFolderDropDown,
     AlertHistoryDrawer,
-    IncidentList,
     O2AIContextAddBtn,
   },
   emits: [
@@ -1143,32 +1103,12 @@ export default defineComponent({
 
     const activeFolderToMove = ref("default");
 
-    // Initialize viewMode from URL query parameter
-    const viewMode = ref(
-      (router.currentRoute.value.query.view as string) === "incidents" ? "incidents" : "alerts"
-    );
-
     // Initialize activeTab from URL query parameter, default to "all"
     const activeTab = ref(
       (router.currentRoute.value.query.tab as string) || "all"
     );
 
-    // Incident search query
-    const incidentSearchQuery = ref("");
-
-    // View mode tabs (Alerts / Incidents)
-    const viewTabs = computed(() => [
-      {
-        label: t('alerts.header'),
-        value: 'alerts',
-      },
-      {
-        label: t('alerts.incidents.title'),
-        value: 'incidents',
-      }
-    ]);
-
-    // Tabs for alerts view only (removed incidents tab)
+    // Tabs for alerts view
     const alertTabs = reactive([
       {
         label: t("alerts.all"),
@@ -1198,31 +1138,7 @@ export default defineComponent({
         label: t("alerts.realTime"),
         value: "realTime",
       },
-      {
-        label: t("alerts.incidents.title"),
-        value: "incidents",
-      },
     ]);
-
-    const onViewModeChange = (newMode: string) => {
-      // Update viewMode immediately
-      viewMode.value = newMode;
-
-      // Update URL query parameter
-      router.push({
-        query: {
-          ...router.currentRoute.value.query,
-          view: newMode,
-          // Reset tab to 'all' when switching to alerts view
-          tab: newMode === "alerts" ? "all" : undefined,
-        },
-      });
-
-      // Reset active tab when switching to alerts view
-      if (newMode === "alerts") {
-        activeTab.value = "all";
-      }
-    };
 
     const columns = computed(() => {
       const baseColumns: any = [
@@ -2781,10 +2697,6 @@ export default defineComponent({
       computedOwner,
       tabs,
       alertTabs,
-      viewMode,
-      viewTabs,
-      onViewModeChange,
-      incidentSearchQuery,
       filterAlertsByTab,
       showHistoryDrawer,
       selectedHistoryAlertId,
