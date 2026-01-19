@@ -122,9 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Incident Details -->
       <div class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'tw:border-r tw:border-gray-700' : 'tw:border-r tw:border-gray-200'"  style="order: 1;">
 
-        <!-- Top Section (52% height) - Table of Contents -->
+        <!-- Top Section (45% height) - Table of Contents -->
         <div
-          style="height: 52%"
+          style="height: 45%"
           class="tw:border-b tw:p-4 tw:flex tw:flex-col"
           :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
         >
@@ -270,8 +270,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Bottom Section (48% height) - Timeline, Dimensions, Topology -->
-        <div style="height: 48%" class="tw:overflow-auto tw:p-4">
+        <!-- Bottom Section (55% height) - Timeline, Dimensions, Topology -->
+        <div style="height: 55%; overflow-y: auto;" class="tw:p-4">
         <!-- Timeline with UTC timestamps -->
         <div
           id="timeline"
@@ -281,6 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'tw:border-gray-700'
               : 'tw:border-gray-200'
           ]"
+          style="max-height: 150px;"
         >
           <!-- Header -->
           <div
@@ -355,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:border-gray-700'
                 : 'tw:border-gray-200'
             ]"
+            style="max-height: 130px;"
           >
             <!-- Header -->
             <div
@@ -371,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3 tw:overflow-x-auto">
+            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3 tw:overflow-x-auto" style="max-height: 200px; overflow-y: auto;">
               <div
                 v-for="(value, key) in incidentDetails.stable_dimensions"
                 :key="key"
@@ -399,6 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:border-gray-700'
                 : 'tw:border-gray-200'
             ]"
+            style="max-height: 200px;"
           >
             <!-- Header -->
             <div
@@ -415,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3">
+            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3" style="max-height: 150px; overflow-y: auto;">
               <div class="tw:text-xs tw:mb-2">
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Service:</span>
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
