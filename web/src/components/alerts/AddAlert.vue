@@ -1138,8 +1138,9 @@ export default defineComponent({
           };
         }
       } else if (newType === 'custom') {
-        // Start with local SQL, backend SQL will update it when ready
-        previewQuery.value = generateSqlQueryLocal();
+        // Clear preview query to avoid triggering search stream with old query
+        // The backend SQL generation will update it shortly
+        previewQuery.value = '';
         isUsingBackendSql.value = false;
         // Trigger backend SQL generation for preview
         debouncedGenerateSql();

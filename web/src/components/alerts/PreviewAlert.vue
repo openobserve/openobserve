@@ -688,15 +688,28 @@ const evaluateAndSetStatus = (resultCount: number) => {
 
   const threshold = props.formData.trigger_condition?.threshold || 0;
   const operator = props.formData.trigger_condition?.operator || ">=";
+  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
 
   console.log("[PreviewAlert] Result count:", resultCount);
   console.log("[PreviewAlert] Threshold:", threshold);
   console.log("[PreviewAlert] Operator:", operator);
+  console.log("[PreviewAlert] Is real-time:", isRealTime);
 
   let wouldTrigger = false;
   let comparisonText = "";
 
-  // Evaluate based on operator
+  // For real-time alerts, show neutral message (preview shows historical data, not real-time)
+  if (isRealTime) {
+    // Always show as "would trigger" with informational message for real-time alerts
+    evaluationStatus.value = {
+      wouldTrigger: true,
+      reason: 'When conditions match',
+    };
+    console.log("[PreviewAlert] Real-time evaluation complete:", evaluationStatus.value);
+    return;
+  }
+
+  // For scheduled alerts, evaluate based on operator and threshold
   switch (operator) {
     case ">=":
       wouldTrigger = resultCount >= threshold;
