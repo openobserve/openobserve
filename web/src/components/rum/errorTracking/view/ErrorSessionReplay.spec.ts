@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
+import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -63,6 +64,7 @@ describe("ErrorSessionReplay Component", () => {
         error: mockError,
       },
       global: {
+        plugins: [i18n],
         stubs: {
           "q-icon": {
             template: '<i data-test="q-icon" :class="name"></i>',
