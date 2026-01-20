@@ -514,13 +514,24 @@ const viewResourceDetails = (resource: any) => {
 const navigateToTrace = () => {
   if (!firstTraceId.value) return;
 
-  // Navigate to APM trace viewer with the trace_id
+  // Find the first resource with trace_id to get timing information
+  const resource = relatedResources.value.find((r: any) => r._oo_trace_id);
+
+  // Use resource timing if available, otherwise use event timing
+  const startTime = resource?.date
+    ? resource.date * 1000 - 10000000 // 10 seconds before
+    : props.rawEvent?.date * 1000 - 10000000;
+  const endTime = resource?.date
+    ? resource.date * 1000 + 10000000 // 10 seconds after
+    : props.rawEvent?.date * 1000 + 10000000;
+
   router.push({
     name: "traceDetails",
-    params: {
-      traceId: firstTraceId.value,
-    },
     query: {
+      stream: "default", // RUM traces stream
+      trace_id: firstTraceId.value,
+      from: startTime,
+      to: endTime,
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
@@ -529,19 +540,38 @@ const navigateToTrace = () => {
 /**
  * Navigate to trace details page with a specific trace_id
  * Used when clicking on individual trace icons
+ * Opens in a new tab
  */
 const navigateToSpecificTrace = (traceId: string) => {
   if (!traceId) return;
 
-  router.push({
+  // Find the resource with this trace_id to get timing information
+  const resource = relatedResources.value.find(
+    (r: any) => r._oo_trace_id === traceId,
+  );
+
+  // Use resource timing if available, otherwise use event timing
+  const startTime = resource?.date
+    ? resource.date * 1000 - 10000000 // 10 seconds before
+    : props.rawEvent?.date * 1000 - 10000000;
+  const endTime = resource?.date
+    ? resource.date * 1000 + 10000000 // 10 seconds after
+    : props.rawEvent?.date * 1000 + 10000000;
+
+  // Build the route object
+  const route = router.resolve({
     name: "traceDetails",
-    params: {
-      traceId: traceId,
-    },
     query: {
+      stream: "default", // RUM traces stream
+      trace_id: traceId,
+      from: startTime,
+      to: endTime,
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
+
+  // Open in new tab
+  window.open(route.href, "_blank");
 };
 
 defineExpose({
