@@ -255,7 +255,7 @@ describe("SearchBar", () => {
       const tabToggle = wrapper.find(".button-group.logs-visualize-toggle");
       expect(tabToggle.exists()).toBe(true);
       expect(wrapper.find('[data-test="traces-search-toggle"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="traces-service-maps-toggle"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-service-graph-toggle"]').exists()).toBe(true);
     });
 
     it("should not render tab toggle buttons when service graph is disabled", async () => {
@@ -621,11 +621,11 @@ describe("SearchBar", () => {
     });
 
     it("should emit update:activeTab when service-maps tab is clicked", async () => {
-      const serviceMapsBtn = wrapper.find('[data-test="traces-service-maps-toggle"]');
+      const serviceMapsBtn = wrapper.find('[data-test="traces-service-graph-toggle"]');
       await serviceMapsBtn.trigger("click");
 
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
-      expect(wrapper.emitted("update:activeTab")[0]).toEqual(["service-maps"]);
+      expect(wrapper.emitted("update:activeTab")[0]).toEqual(["service-graph"]);
     });
 
     it("should show search controls only when activeTab is search", async () => {

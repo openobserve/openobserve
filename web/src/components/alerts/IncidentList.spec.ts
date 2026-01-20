@@ -449,26 +449,35 @@ describe("IncidentList.vue", () => {
 
     it("should set selected incident and navigate when viewing incident", async () => {
       const incident = wrapper.vm.incidents[0];
+      const pushSpy = vi.spyOn(router, 'push');
 
-      // viewIncident sets selectedIncident and navigates via router
+      // viewIncident navigates via router to incident detail page
       wrapper.vm.viewIncident(incident);
 
-      // selectedIncident is set synchronously
-      expect(wrapper.vm.selectedIncident).toBe(incident);
-
-      // showDetailDrawer is set after router navigation completes
-      // In tests, we just verify the navigation intent by checking selectedIncident
+      // Verify router.push was called with correct route
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentDetail",
+        params: {
+          id: incident.id,
+        },
+      });
     });
 
     it("should set correct incident when viewing", async () => {
       const incident = createIncident({ id: "test-123", title: "Test Incident" });
       wrapper.vm.incidents.push(incident);
+      const pushSpy = vi.spyOn(router, 'push');
 
       await wrapper.vm.viewIncident(incident);
       await flushPromises();
 
-      expect(wrapper.vm.selectedIncident.id).toBe("test-123");
-      expect(wrapper.vm.selectedIncident.title).toBe("Test Incident");
+      // Verify router.push was called with correct incident ID
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentDetail",
+        params: {
+          id: "test-123",
+        },
+      });
     });
   });
 
@@ -558,20 +567,6 @@ describe("IncidentList.vue", () => {
         "custom-id",
         "acknowledged"
       );
-    });
-  });
-
-  describe("Status Updated Event Handler", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      vi.clearAllMocks();
-    });
-
-    it("should reload incidents when status is updated from drawer", async () => {
-      await wrapper.vm.onStatusUpdated();
-
-      expect(incidentsService.list).toHaveBeenCalled();
     });
   });
 

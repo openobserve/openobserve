@@ -213,6 +213,7 @@ import {
   outlinedDescription,
   outlinedCode,
   outlinedDevices,
+  outlinedNotificationsActive,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -555,18 +556,39 @@ export default defineComponent({
       }
     });
 
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
+    const updateIncidentsMenu = () => {
+      if (config.isCloud == "true" || config.isEnterprise == "true") {
         const alertIndex = linksList.value.findIndex(
           (link) => link.name === "alertList",
+        );
+
+        const incidentExists = linksList.value.some(
+          (link) => link.name === "incidentList",
+        );
+
+        if (alertIndex !== -1 && !incidentExists) {
+          linksList.value.splice(alertIndex + 1, 0, {
+            title: t("menu.incidents"),
+            icon: outlinedNotificationsActive,
+            link: "/incidents",
+            name: "incidentList",
+          });
+        }
+      }
+    };
+
+    const updateActionsMenu = () => {
+      if (isActionsEnabled.value) {
+        const incidentIndex = linksList.value.findIndex(
+          (link) => link.name === "incidentList",
         );
 
         const actionExists = linksList.value.some(
           (link) => link.name === "actionScripts",
         );
 
-        if (alertIndex !== -1 && !actionExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
+        if (incidentIndex !== -1 && !actionExists) {
+          linksList.value.splice(incidentIndex + 1, 0, {
             title: t("menu.actions"),
             icon: outlinedCode,
             link: "/actions",
@@ -580,6 +602,7 @@ export default defineComponent({
       langList.find((l) => l.code == getLocale()) || langList[0];
 
     const filterMenus = () => {
+      updateIncidentsMenu();
       updateActionsMenu();
 
       const disableMenus = new Set(
