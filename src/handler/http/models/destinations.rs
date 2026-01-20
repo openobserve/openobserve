@@ -217,7 +217,8 @@ impl Template {
 /// Alert destination configuration for sending notifications when alerts trigger.
 ///
 /// IMPORTANT: The `template` field is REQUIRED to create an alert destination.
-/// Without a template, the destination becomes a pipeline destination and cannot be used with alerts.
+/// Without a template, the destination becomes a pipeline destination and cannot be used with
+/// alerts.
 ///
 /// # Example - Creating an HTTP alert destination
 /// ```json

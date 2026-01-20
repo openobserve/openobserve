@@ -15,9 +15,9 @@
 
 #[cfg(feature = "enterprise")]
 use axum::body::Body;
-use axum::{Json, extract::Path, http::StatusCode, response::Response};
 #[cfg(feature = "enterprise")]
 use axum::http::HeaderMap;
+use axum::{Json, extract::Path, http::StatusCode, response::Response};
 // Re-export enterprise types for OpenAPI and route handlers
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::alerts::rca_agent::{

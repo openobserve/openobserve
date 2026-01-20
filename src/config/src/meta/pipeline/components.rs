@@ -34,7 +34,8 @@ pub enum PipelineSource {
     /// Example: { "source_type": "realtime" }
     Realtime(StreamParams),
     /// Scheduled pipeline: runs periodically based on trigger_condition.
-    /// Example: { "source_type": "scheduled", "org_id": "default", "stream_type": "logs", "query_condition": {...}, "trigger_condition": {...} }
+    /// Example: { "source_type": "scheduled", "org_id": "default", "stream_type": "logs",
+    /// "query_condition": {...}, "trigger_condition": {...} }
     Scheduled(DerivedStream),
 }
 
@@ -91,11 +92,14 @@ pub struct Node {
     /// Unique identifier for the node (use UUID format)
     pub id: String,
     /// Node configuration. Structure depends on node_type:
-    /// - stream: { "node_type": "stream", "org_id": "org", "stream_name": "name", "stream_type": "logs"|"metrics"|"traces" }
+    /// - stream: { "node_type": "stream", "org_id": "org", "stream_name": "name", "stream_type":
+    ///   "logs"|"metrics"|"traces" }
     /// - function: { "node_type": "function", "name": "func_name", "after_flatten": bool }
     /// - condition: { "node_type": "condition", "conditions": {...} }
-    /// - query: { "node_type": "query", "org_id": "org", "stream_type": "logs", "query_condition": {...}, "trigger_condition": {...} }
-    /// - remote_stream: { "node_type": "remote_stream", "org_id": "org", "destination_name": "dest" }
+    /// - query: { "node_type": "query", "org_id": "org", "stream_type": "logs", "query_condition":
+    ///   {...}, "trigger_condition": {...} }
+    /// - remote_stream: { "node_type": "remote_stream", "org_id": "org", "destination_name":
+    ///   "dest" }
     #[schema(value_type = Object)]
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
