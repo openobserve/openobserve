@@ -258,6 +258,7 @@ pub async fn search(
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
         .fst_fields(fst_fields.clone())
+        .timestamp_filter(query.time_range)
         .build(
             session,
             files,

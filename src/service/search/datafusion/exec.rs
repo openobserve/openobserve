@@ -622,27 +622,19 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn register_table(
+pub async fn register_metrics_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
     files: Vec<FileKey>,
-    sort_key: &[(String, bool)],
 ) -> Result<SessionContext> {
-    // only sort by timestamp desc
-    let sorted_by_time =
-        sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
-
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
-        .sorted_by_time(sorted_by_time)
         .build(session.target_partitions)
         .await?;
 
     let table = TableBuilder::new()
-        .sorted_by_time(sorted_by_time)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .build(session.clone(), files, schema)
         .await?;
@@ -694,6 +686,7 @@ impl TableBuilder {
         self
     }
 
+    /// apply timestamp filter to the table
     pub fn timestamp_filter(mut self, timestamp_filter: (i64, i64)) -> Self {
         self.timestamp_filter = Some(timestamp_filter);
         self
@@ -788,6 +781,7 @@ impl TableBuilder {
             session.id.clone(),
             self.index_condition,
             self.fst_fields,
+            self.timestamp_filter,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache);
@@ -1271,9 +1265,8 @@ mod tests {
                 id: 1,
                 segment_ids: None,
             }];
-            let sort_key = vec![(TIMESTAMP_COL_NAME.to_string(), true)];
 
-            let result = register_table(&session, schema, "test_table", files, &sort_key).await;
+            let result = register_metrics_table(&session, schema, "test_table", files).await;
 
             // Should create context successfully
             assert!(result.is_ok());

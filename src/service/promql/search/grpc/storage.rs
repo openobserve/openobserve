@@ -43,7 +43,7 @@ use crate::service::{
     db, file_list,
     promql::search::grpc::Context,
     search::{
-        datafusion::exec::register_table,
+        datafusion::exec::register_metrics_table,
         grpc::{
             QueryParams,
             storage::{cache_files, tantivy_search},
@@ -248,7 +248,7 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    let ctx = register_table(&session, schema.clone(), stream_name, files, &[]).await?;
+    let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
 
     Ok(Some((
         ctx,

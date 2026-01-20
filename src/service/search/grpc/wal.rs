@@ -216,6 +216,7 @@ pub async fn search_parquet(
         .file_stat_cache(file_stat_cache.clone())
         .index_condition(index_condition.clone())
         .fst_fields(fst_fields.clone())
+        .timestamp_filter(query.time_range)
         .build(
             session,
             files,
@@ -449,13 +450,13 @@ pub async fn search_memtable(
             sorted_by_time,
             index_condition.clone(),
             fst_fields.clone(),
+            query.time_range,
         ) {
             Ok(table) => Arc::new(table),
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] wal->mem->search: create memtable error: {}",
+                    "[trace_id {}] wal->mem->search: create memtable error: {e}",
                     query.trace_id,
-                    e
                 );
                 return Err(e.into());
             }
