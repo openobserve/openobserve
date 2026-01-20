@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
-    "id": "KİMLİK"
+    "id": "KİMLİK",
+    "getStarted": "Başlayın"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -373,7 +374,22 @@
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
     "location": "Yer",
-    "frustrationCount": "Hayal kırıklıkları"
+    "frustrationCount": "Hayal kırıklıkları",
+    "loadingMsg": "Sıkı durun, RUM verilerini yüklüyoruz.",
+    "breadcrumbs": "Ekmek kırıntıları",
+    "tags": "Etiketler",
+    "searchEvents": "Etkinlikleri Ara",
+    "loadingSessions": "Sıkı durun, seansları getiriyoruz.",
+    "errorStack": "Hata Yığını",
+    "sessionReplay": "Oturum Tekrar Oynatma",
+    "viewSessionReplay": "Oturum Tekrarını Görüntüle",
+    "playSessionReplay": "Oturum Oynatma Oynatma",
+    "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
+    "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
+    "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
+    "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
+    "eventID": "Olay Kimliği",
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
   },
   "about": {
     "name": "Açık Gözlem",
@@ -460,7 +476,190 @@
     "value_cost_free": "Bedava",
     "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 200 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
     "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir",
-    "feature_comparison_lbl": "Özellik Karşılaştırması"
+    "feature_comparison_lbl": "Özellik Karşılaştırması",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "Kurumsal Özellikler",
+        "offer_text": "OpenObservere'i kendi kendinize barındırırken tüm kurumsal özellikleri tamamen ücretsiz edinin",
+        "badge_text": "200GB/güne kadar ücretsiz",
+        "features_title": "OpenObserve Bulut Özellikleri",
+        "features_subtitle": "Bulut aboneliğinize dahil olan tüm özellikler",
+        "primary_button_text": "Şimdi İndirin"
+      },
+      "enterprise_without_license": {
+        "hero_title": "Kurumsal Özellikler",
+        "offer_text": "OpenObserve dağıtımınızı en üst düzeye çıkarmak için ücretsiz bir lisans isteyin",
+        "badge_text": "{kota} GB/güne kadar ücretsiz",
+        "features_title": "Kullanılabilir Kurumsal Özellikler",
+        "features_subtitle": "Sınırsız yeteneklerin kilidini açmak için ücretsiz bir lisans alın",
+        "primary_button_text": "Ücretsiz Lisans Alın",
+        "license_note": "Lisanssız 100GB/gün • Lisanslı 200GB/gün"
+      },
+      "enterprise_with_license": {
+        "hero_title": "Kurumsal Sürümünüz",
+        "offer_text": "Tüm özellikler etkinken OpenObserve Enterprise'ı çalıştırıyorsunuz",
+        "badge_text_unlimited": "Yutma Sınırı: Sınırsız",
+        "badge_text_limited": "Yutma Sınırı: {limit} GB/gün",
+        "features_title": "Aktif Kurumsal Özellikler",
+        "features_subtitle": "Tüm özellikler kilidi açıldı ve kullanıma hazır",
+        "primary_button_text": "Lisansı Yönet"
+      },
+      "open_source": {
+        "hero_title": "Enterprise Edition'ı edinin",
+        "offer_text": "Tüm kurumsal özellikleri tamamen ücretsiz indirin ve kilidini açın",
+        "badge_text": "200GB/güne kadar ücretsiz",
+        "features_title": "Tüm Kurumsal Özelliklerin Kilidini Açın",
+        "features_subtitle": "Üretime hazır gözlemlenebilirlik için ihtiyacınız olan her şey",
+        "primary_button_text": "Şimdi İndirin"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "Günlükler, Metrikler, İzler",
+          "note": "Tam gözlemlenebilirlik veri alımı ve analizi"
+        },
+        "rum": {
+          "name": "ROM",
+          "note": "Ön uç performansı için Gerçek Kullanıcı İzleme"
+        },
+        "alerts": {
+          "name": "Uyarılar",
+          "note": "Gerçek zamanlı uyarı ve bildirimler"
+        },
+        "dashboards": {
+          "name": "Gösterge panoları",
+          "note": "Özelleştirilebilir görselleştirme panoları"
+        },
+        "reports": {
+          "name": "Raporlar",
+          "note": "Zamanlanmış ve isteğe bağlı raporlama"
+        },
+        "vrl_functions": {
+          "name": "VRL Fonksiyonları",
+          "note": "Veri dönüşümü için Vektör Yeniden Eşleme Dili"
+        },
+        "pipelines": {
+          "name": "Boru hatları",
+          "note": "Veri işleme ve dönüştürme boru hatları"
+        },
+        "high_availability": {
+          "name": "Yüksek Kullanılabilirlik",
+          "note": "Güvenilirlik için dağıtılmış mimari"
+        },
+        "multitenancy": {
+          "name": "Çoklu kiracılık",
+          "note": "Kuruluş tabanlı veri yalıtımı"
+        },
+        "dynamic_schema": {
+          "name": "Dinamik Şema",
+          "note": "Otomatik şema algılama ve evrimi"
+        },
+        "multilingual_gui": {
+          "name": "Çok dilli GUI",
+          "note": "Gelişmiş uluslararasılaşma desteği"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "Tek Oturum Açma",
+          "note": "SSO sağlayıcılarıyla sorunsuz kimlik doğrulama"
+        },
+        "rbac": {
+          "name": "Rol Tabanlı Erişim Kontrolü",
+          "note": "Ayrıntılı izinler ve kullanıcı yönetimi"
+        },
+        "federated_search": {
+          "name": "Federasyonlu Arama/Süper Küme",
+          "note": "Sorguları birden çok küme arasında dağıtın"
+        },
+        "query_management": {
+          "name": "Sorgu Yönetimi",
+          "note": "Gelişmiş sorgu izleme ve optimizasyon"
+        },
+        "workload_management": {
+          "name": "İş Yükü Yönetimi",
+          "note": "Önceliğe dayalı kaynak tahsisi ve QoS"
+        },
+        "audit_trail": {
+          "name": "Denetim İzleri",
+          "note": "Uyumluluk için eksiksiz etkinlik günlüğü"
+        },
+        "action_scripts": {
+          "name": "Eylem Komut Dosyaları",
+          "note": "Olaylara ve uyarılara verilen yanıtları otomatikleştirin"
+        },
+        "sensitive_data_redaction": {
+          "name": "Hassas Veri Düzenleme",
+          "note": "PII ve hassas bilgileri koruyun"
+        },
+        "pipeline_remote_destinations": {
+          "name": "Boru Hattı Uzak Hedefleri",
+          "note": "Uzak hedeflere veri gönderin"
+        },
+        "query_optimizer": {
+          "name": "Sorgu İyileştirici/Toplama Önbelleği",
+          "note": "TopK toplama ve sorgu optimizasyonu"
+        },
+        "incident_management": {
+          "name": "Olay Yönetimi",
+          "note": "Olayları verimli bir şekilde izleyin ve yönetin"
+        },
+        "sre_agent": {
+          "name": "SRE Temsilcisi",
+          "note": "Otomatik SRE işlemleri ve içgörüleri"
+        },
+        "ai_assistant": {
+          "name": "Yapay Zeka Asistanı",
+          "note": "Akıllı sorgu ve analiz yardımı"
+        },
+        "anomaly_detection": {
+          "name": "Anomali Algılama",
+          "note": "Verilerdeki anormallikleri otomatik olarak tespit edin"
+        },
+        "metrics_auto_downsampling": {
+          "name": "Metrikler Otomatik Alt Örnekleme",
+          "note": "Zaman içinde otomatik metrik toplama"
+        },
+        "log_patterns": {
+          "name": "Günlük Desenleri",
+          "note": "Günlük verilerindeki kalıpları keşfedin"
+        },
+        "mcp_server": {
+          "name": "MCP Sunucusu",
+          "note": "Model Bağlam Protokolü sunucu entegrasyonu"
+        },
+        "rate_limiting": {
+          "name": "Hız Sınırlama",
+          "note": "Sorgu ve alım oranlarını kontrol edin"
+        },
+        "broadcast_join": {
+          "name": "Yayın Katılımı",
+          "note": "Optimize edilmiş dağıtılmış birleştirme işlemleri"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "Günlükler, Metrikler ve İzler Korelasyonu",
+          "note": "Otomatik algılama ve korelasyon"
+        },
+        "service_maps": {
+          "name": "Servis Haritaları",
+          "note": "Hizmet bağımlılıklarını görselleştirin"
+        }
+      },
+      "buttons": {
+        "contact_sales": "Satış İletişim",
+        "learn_more": "Daha Fazla Bilgi"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "Yalnızca Yüksek Kullanılabilirlik modu"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "Lisansı yönetme yetkisiniz yok."
+      }
+    },
+    "header_button": {
+      "cloud_features": "OpenObserve Özellikleri",
+      "enterprise_edition": "Baskı: Kurumsal",
+      "get_enterprise_free": "OpenObserve Enterprise'ı edinin (Ücretsiz)"
+    }
   },
   "login": {
     "userid": "Kullanıcı Kimliği",
@@ -2383,7 +2582,13 @@
     "deduplicateFields": "Tekilleştirme Alanları",
     "deduplicateFieldTooltip": "Tekilleştirme parmak izi almak için hangi alan eşlemelerinin kullanılacağını seçin",
     "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
-    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir"
+    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir",
+    "scope": "Kapsam",
+    "scopeTooltip": "Kapsam boyutları çevresel sınırları (küme, bölge, ana bilgisayar) tanımlar ve FQN'nin kapsam bölümünü oluşturmak üzere birleştirilir: {scope}/{workspace}",
+    "stable": "Kararlı",
+    "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
+    "normalize": "Normalleştir",
+    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
