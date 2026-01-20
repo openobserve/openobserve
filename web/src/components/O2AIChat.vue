@@ -10,7 +10,7 @@
               <img :src="o2AiTitleLogo" />
             </q-avatar>
             <div class="tw:flex tw:items-center">
-              <span class="tw:mr-[5.5px]">O2 AI
+              <span class="tw:mr-[5.5px]">O2 Assistant
               </span>
               <span class="o2-ai-beta-text"
               >Beta</span>
