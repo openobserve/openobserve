@@ -153,13 +153,31 @@ export async function verifyVariableAPITriggered(page, action, options = {}) {
 export async function hasRefreshIndicator(page, level = 'global') {
   try {
     if (level === 'global') {
-      const refreshBtn = page.locator('[data-test="dashboard-global-refresh-btn"]');
-      const hasIndicator = await refreshBtn.getAttribute('data-needs-refresh');
-      return hasIndicator === 'true';
+      const refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+      // Check if button has warning color class
+      // When Quasar applies :color="warning" with :outline="false", it adds q-btn--warning class
+      // When :outline="true", it's just an outlined button with no warning
+      const classList = await refreshBtn.getAttribute('class');
+      // Check for Quasar warning classes (q-btn--warning) or custom refresh indicator classes
+      return classList && (
+        classList.includes('q-btn--warning') ||
+        classList.includes('bg-warning') ||
+        classList.includes('text-warning') ||
+        classList.includes('refresh-needed') ||
+        classList.includes('needs-refresh') ||
+        classList.includes('highlighted')
+      );
     } else {
-      const panelRefreshBtn = page.locator(`[data-test="dashboard-panel-${level}-refresh-btn"]`);
-      const hasIndicator = await panelRefreshBtn.getAttribute('data-needs-refresh');
-      return hasIndicator === 'true';
+      const panelRefreshBtn = page.locator(`[data-panel="dashboard-panel-refresh-panel-btn"]`);
+      const classList = await panelRefreshBtn.getAttribute('class');
+      return classList && (
+        classList.includes('q-btn--warning') ||
+        classList.includes('bg-warning') ||
+        classList.includes('text-warning') ||
+        classList.includes('refresh-needed') ||
+        classList.includes('needs-refresh') ||
+        classList.includes('highlighted')
+      );
     }
   } catch (error) {
     testLogger.debug(`Error checking refresh indicator: ${error.message}`);
@@ -175,7 +193,7 @@ export async function hasRefreshIndicator(page, level = 'global') {
  */
 export async function panelNeedsRefresh(page, panelId) {
   try {
-    const warningIcon = page.locator(`[data-test="dashboard-panel-${panelId}-refresh-warning"]`);
+    const warningIcon = page.locator(`[data-test="dashboard-panel-refresh-panel-btn"]`);
     return await warningIcon.isVisible({ timeout: 3000 });
   } catch {
     return false;

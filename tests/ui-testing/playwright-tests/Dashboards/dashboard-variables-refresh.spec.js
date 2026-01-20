@@ -10,12 +10,40 @@ import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-varia
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import {
   hasRefreshIndicator,
-  panelNeedsRefresh,
+  monitorVariableAPICalls,
   trackPanelReload,
   waitForAllPanelsToLoad
 } from "../utils/variable-helpers.js";
 
 test.describe.configure({ mode: "parallel" });
+
+/**
+ * Helper function to change a variable value to a different option
+ * Selects the second option to ensure the value actually changes
+ */
+async function changeVariableValue(page, variableName) {
+  const apiMonitor = monitorVariableAPICalls(page, {expectedCount: 1, timeout: 15000});
+  // Wait for variable dropdown to be visible and ready
+  const varDropdown = page.getByLabel(variableName, { exact: true });
+  await varDropdown.waitFor({ state: "visible", timeout: 5000 });
+
+  // Ensure network is idle before clicking
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+  await varDropdown.click();
+
+  // Wait for dropdown menu to open
+  await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
+  await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 10000 });
+
+  // Click second option (index 1) to change value - first option is already selected
+  await page.locator('[role="option"]').nth(1).click();
+
+  // Wait for dropdown to close
+  await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  const apiResult = await apiMonitor;
+  return apiResult;
+}
 
 test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
   test.beforeEach(async ({ page }) => {
@@ -61,22 +89,21 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    // Change variable value
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    // Change variable value - select a DIFFERENT value than current
+    await changeVariableValue(page, variableName);
+
+    // Wait for any loading to complete before checking refresh indicator
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Check global refresh button shows indicator
-    const globalRefreshBtn = page.locator('[data-test="dashboard-global-refresh-btn"]');
-    await expect(globalRefreshBtn).toHaveClass(/refresh-needed|needs-refresh|highlighted/);
+    const globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    await globalRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Or check for visual indicator (icon, color change, badge, etc.)
+    // Wait for the refresh indicator to appear (button should change from outline to filled warning color)
+    // The button should have bg-warning class when variables change
+    await expect(globalRefreshBtn).toHaveClass(/bg-warning/, { timeout: 10000 });
+
+    // Check for visual indicator using helper function
     const hasIndicator = await hasRefreshIndicator(page, "global");
     expect(hasIndicator).toBe(true);
 
@@ -102,16 +129,49 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Add variables
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(varA, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
-    await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global", dependsOn: varA });
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add panel using variable B
+    // Reopen settings to add second variable
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    // Wait for variable to be saved and visible in settings
+    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", {
+      scope: "global",
+      dependsOn: varA,
+      dependsOnField: "kubernetes_namespace_name"
+    });
+
+    // Wait for variable to be saved
+    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    await pm.dashboardSetting.closeSettingWindow();
+
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Wait for variable to appear on dashboard
+    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+
+    // Add panel using variable B with filter
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "filter");
+    // Add filter using varB
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_container_name",
+      "",
+      "=",
+      `$${varB}`
+    );
+
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
@@ -119,26 +179,28 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    // Wait for panel to fully render and both variables to be visible and ready
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Change variable A (which affects B)
-    const varADropdown = page.getByLabel(varA, { exact: true });
-    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Wait for both variable selectors to be fully visible and stable
+    await page.locator(`[data-test="variable-selector-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varADropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-    // Panel should show refresh needed indicator
-    const needsRefresh = await panelNeedsRefresh(page, panelId);
-    expect(needsRefresh).toBe(true);
+    // Change variable A (which affects B) - select a DIFFERENT value than current
+    await changeVariableValue(page, varA);
 
-    // Or check for warning icon
-    const warningIcon = page.locator(`[data-test="dashboard-panel-${panelId}-refresh-warning"]`);
-    await expect(warningIcon).toBeVisible({ timeout: 5000 });
+    // Wait for any loading to complete before checking refresh indicator
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Check the panel refresh button for warning indicator
+    // When a variable changes that affects a panel, the panel's refresh button should show warning color
+    const panelRefreshBtn = page.locator('[data-test="dashboard-panel-refresh-panel-btn"]');
+    await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+
+    // Wait for the panel refresh button to get warning color
+    // Quasar applies text-warning class for flat buttons with :color="warning"
+    await expect(panelRefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -194,22 +256,14 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await changeVariableValue(page, variableName);
 
     // Click global refresh and track reloads
     const reloadTracker = trackPanelReload(
       page,
       null,
       async () => {
-        await page.locator('[data-test="dashboard-global-refresh-btn"]').click();
+        await page.locator('[data-test="dashboard-refresh-btn"]').click();
       },
       15000
     );
@@ -251,20 +305,36 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add two panels
+    // Add Panel1 with filter using the variable - only this panel will be affected by variable changes
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+    // Add filter using the variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_namespace_name",
+      "",
+      "=",
+      `$${variableName}`
+    );
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
+    // Wait for panel to be added to dashboard and get panel container with data-test-panel-id
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId1 = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    // Wait a bit for the panel ID to be set in the DOM
+    await page.waitForTimeout(1000);
 
+    // Get the panel container that has data-test-panel-id attribute
+    const panelContainer1 = page.locator('[data-test="dashboard-panel-container"]').first();
+    await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
+    const panelId1 = await panelContainer1.getAttribute("data-test-panel-id");
+
+    // Add Panel2 WITHOUT using the variable - this panel should not be affected
     await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -275,23 +345,28 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Wait for second panel to be added to dashboard
     await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
-    // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    // Wait for panels to fully render
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Change variable - this should only affect Panel1
+    await changeVariableValue(page, variableName);
+
+    // Wait for any loading to complete
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Check Panel1's refresh button for warning indicator - scope to specific panel using data-test-panel-id
+    const panel1RefreshBtn = page.locator(`[data-test-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+
+    // Panel1's refresh button should have warning color since it uses the variable
+    await expect(panel1RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Click refresh on Panel1 only
     const reloadTracker = trackPanelReload(
       page,
       panelId1,
       async () => {
-        await page.locator(`[data-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-btn"]`).click();
+        await panel1RefreshBtn.click();
       },
       10000
     );
@@ -346,16 +421,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    const selectedOption = page.locator('[role="option"]').first();
-    await selectedOption.waitFor({ state: "visible", timeout: 5000 });
-    await selectedOption.click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await changeVariableValue(page, variableName);
 
     // Change time range
     await page.locator('[data-test="date-time-btn"]').click();
@@ -363,7 +429,7 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Click global refresh
-    await page.locator('[data-test="dashboard-global-refresh-btn"]').click();
+    await page.locator('[data-test="dashboard-refresh-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Verify panel reloaded with new data
@@ -418,22 +484,21 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
     // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await changeVariableValue(page, variableName);
+
+    // Wait for any loading to complete before checking refresh indicator
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Wait for the refresh indicator to appear
+    const globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
+    await expect(globalRefreshBtn).toHaveClass(/bg-warning/, { timeout: 10000 });
 
     // Verify indicator shows
     let hasIndicator = await hasRefreshIndicator(page, "global");
     expect(hasIndicator).toBe(true);
 
     // Click global refresh
-    await page.locator('[data-test="dashboard-global-refresh-btn"]').click();
+    await page.locator('[data-test="dashboard-refresh-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Wait for panels to finish loading
@@ -474,42 +539,49 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add panel
+    // Add panel with filter using the variable
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+    // Add filter using the variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_namespace_name",
+      "",
+      "=",
+      `$${variableName}`
+    );
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
+    // Wait for panel to be added to dashboard and get panel ID
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    await page.waitForTimeout(1000);
+    const panelContainer = page.locator('[data-test="dashboard-panel-container"]').first();
+    await panelContainer.waitFor({ state: "attached", timeout: 5000 });
+    const panelId = await panelContainer.getAttribute("data-test-panel-id");
 
     // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await changeVariableValue(page, variableName);
 
-    // Verify panel indicator shows
-    let needsRefresh = await panelNeedsRefresh(page, panelId);
-    expect(needsRefresh).toBe(true);
-
-    // Click panel refresh
-    await page.locator(`[data-panel-id="${panelId}"] [data-test="dashboard-panel-refresh-btn"]`).click();
+    // Wait for any loading to complete before checking refresh indicator
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Verify indicator cleared
-    needsRefresh = await panelNeedsRefresh(page, panelId);
-    expect(needsRefresh).toBe(false);
+    // Wait for panel refresh button to show warning color
+    const panelRefreshBtn = page.locator(`[data-test-panel-id="${panelId}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    await panelRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+    await expect(panelRefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+
+    // Click panel refresh
+    await panelRefreshBtn.click();
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Verify indicator cleared - button should no longer have warning class
+    await expect(panelRefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -542,61 +614,80 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add Panel1
+    // Add Panel1 with filter using the variable
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+    // Add filter using the variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_namespace_name",
+      "",
+      "=",
+      `$${variableName}`
+    );
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for panel to be added to dashboard
+    // Wait for panel to be added to dashboard and get panel ID
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
-    const panelId1 = await page.locator('[data-test*="dashboard-panel-"]').first().getAttribute("data-panel-id");
+    await page.waitForTimeout(1000);
+    const panelContainer1 = page.locator('[data-test="dashboard-panel-container"]').first();
+    await panelContainer1.waitFor({ state: "attached", timeout: 5000 });
+    const panelId1 = await panelContainer1.getAttribute("data-test-panel-id");
 
-    // Add Panel2
+    // Add Panel2 also with filter using the variable
     await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+    // Add filter using the variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_namespace_name",
+      "",
+      "=",
+      `$${variableName}`
+    );
     await pm.dashboardPanelActions.addPanelName("Panel2");
     await pm.dashboardPanelActions.savePanel();
 
-    // Wait for second panel to be added to dashboard
+    // Wait for second panel to be added to dashboard and get panel ID
     await page.locator('[data-test*="dashboard-panel-"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
 
-    const panelId2 = await page.locator('[data-test*="dashboard-panel-"]').nth(1).getAttribute("data-panel-id");
+    await page.waitForTimeout(1000);
+    const panelContainer2 = page.locator('[data-test="dashboard-panel-container"]').nth(1);
+    await panelContainer2.waitFor({ state: "attached", timeout: 5000 });
+    const panelId2 = await panelContainer2.getAttribute("data-test-panel-id");
 
-    // Change variable
-    const varDropdown = page.getByLabel(variableName, { exact: true });
-    await varDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varDropdown.click();
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    // Change variable - both panels should be affected
+    await changeVariableValue(page, variableName);
 
-    // Both panels should show refresh needed
-    let panel1NeedsRefresh = await panelNeedsRefresh(page, panelId1);
-    let panel2NeedsRefresh = await panelNeedsRefresh(page, panelId2);
+    // Wait for any loading to complete before checking refresh indicator
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    expect(panel1NeedsRefresh).toBe(true);
-    expect(panel2NeedsRefresh).toBe(true);
+    // Wait for both panel refresh buttons to show warning color
+    const panel1RefreshBtn = page.locator(`[data-test-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+    const panel2RefreshBtn = page.locator(`[data-test-panel-id="${panelId2}"] [data-test="dashboard-panel-refresh-panel-btn"]`);
+
+    await panel1RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+    await panel2RefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+
+    await expect(panel1RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
+    await expect(panel2RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Click refresh only on Panel1
-    await page.locator(`[data-panel-id="${panelId1}"] [data-test="dashboard-panel-refresh-btn"]`).click();
+    await panel1RefreshBtn.click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Panel1 indicator should clear, Panel2 should remain
-    panel1NeedsRefresh = await panelNeedsRefresh(page, panelId1);
-    panel2NeedsRefresh = await panelNeedsRefresh(page, panelId2);
-
-    expect(panel1NeedsRefresh).toBe(false);
-    expect(panel2NeedsRefresh).toBe(true);
+    await expect(panel1RefreshBtn).not.toHaveClass(/text-warning/, { timeout: 10000 });
+    await expect(panel2RefreshBtn).toHaveClass(/text-warning/, { timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
