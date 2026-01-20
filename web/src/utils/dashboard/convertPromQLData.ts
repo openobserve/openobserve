@@ -187,7 +187,9 @@ export const convertPromQLData = async (
   // Check if series limiting info is available from data loader (PromQL streaming)
   if (metadata?.seriesLimiting) {
     const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
-    if (totalMetricsReceived > metricsStored) {
+    // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
+    // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
+    if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
       extras.limitNumberOfSeriesWarningMessage =
         "Limiting the displayed series to ensure optimal performance";
     }

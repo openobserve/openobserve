@@ -304,10 +304,13 @@ export default defineComponent({
                 store.dispatch("setCurrentUser", userInfo);
 
                 if(store.state.zoConfig?.rum?.enabled) {
+                  // Set user information first
                   openobserveRum.setUser({
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
                   });
+                  // Now start session replay recording after user is identified
+                  openobserveRum.startSessionReplayRecording({ force: true });
                 }
 
                 //check for redirect URI and redirect user to that page

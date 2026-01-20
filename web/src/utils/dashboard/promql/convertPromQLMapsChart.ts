@@ -127,7 +127,6 @@ export class MapsConverter implements PromQLChartConverter {
       ],
       tooltip: {
         trigger: "item",
-        confine: true,
         showDelay: 0,
         transitionDuration: 0.2,
         backgroundColor: "rgba(255,255,255,0.8)",

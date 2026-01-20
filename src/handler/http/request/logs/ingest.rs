@@ -244,6 +244,9 @@ pub async fn multi(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200,"status": [{"name": "olympics","successful": 3,"failed": 0}]})),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Ingest logs via JSON array", "category": "logs"}))
+    )
 )]
 pub async fn json(
     Path((org_id, stream_name)): Path<(String, String)>,

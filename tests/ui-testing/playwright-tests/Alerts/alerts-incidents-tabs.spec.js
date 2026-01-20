@@ -1,20 +1,20 @@
 /**
- * Alerts & Incidents Tabs - E2E Tests
+ * Alerts & Incidents Pages - E2E Tests
  *
- * ENTERPRISE FEATURE: This entire test suite validates the Alerts/Incidents
- * tab separation feature which is only available in OpenObserve Enterprise.
- * The Incidents view and all incident-related functionality require enterprise license.
+ * ENTERPRISE FEATURE: This entire test suite validates the Alerts and Incidents
+ * pages which are available in OpenObserve Enterprise.
+ * The Incidents page and all incident-related functionality require enterprise license.
  *
- * Test Suite: Validates the Alerts/Incidents tab separation feature
- * Module: Alerts
+ * Test Suite: Validates Alerts and Incidents as separate pages
+ * Module: Alerts / Incidents
  * Priority: High (Core UX Enhancement)
  *
- * Feature: Users can switch between Alerts (configuration) and Incidents (events)
- * using distinct tabs with proper conditional rendering of view-specific UI elements.
+ * Architecture: Alerts (/web/alerts) and Incidents (/web/incidents) are separate pages.
+ * Users navigate between them via the sidebar menu.
  *
  * Consolidated Test Coverage:
- * - Test 1: View mode UI validation (tabs, elements, switching) [ENTERPRISE]
- * - Test 2: Search functionality in both views [ENTERPRISE]
+ * - Test 1: UI validation for Alerts and Incidents pages [ENTERPRISE]
+ * - Test 2: Search functionality in both pages [ENTERPRISE]
  * - Test 3: Edge cases (empty states, page refresh) [ENTERPRISE]
  * - Test 4: Incident lifecycle actions (acknowledge, resolve, reopen) [ENTERPRISE - SKIPPED]
  * - Test 5: Incident detail drawer validation [ENTERPRISE - SKIPPED]
@@ -28,7 +28,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
 
-test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
+test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
@@ -37,111 +37,76 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        // Navigate directly to alerts page
-        await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        testLogger.info('Navigated to alerts page');
-
-        // Wait for any loading overlays to disappear
-        await pm.alertsPage.waitForLoadingOverlayToDisappear();
-
-        // Wait for alert list page to be ready
-        await pm.alertsPage.waitForAlertListPageReady();
-
-        // Wait for view mode buttons to be visible
-        await pm.alertsPage.waitForViewTabsReady();
-        testLogger.info('Alert page with view buttons loaded successfully');
+        // Navigate to alerts page using POM method
+        await pm.alertsPage.navigateToAlertsPage(logData.alertUrl);
     });
 
     /**
-     * Test 1: View Mode UI Validation
+     * Test 1: Page UI Validation
      * Consolidates: TC-01 through TC-06, TC-09, TC-10
      *
      * Validates:
-     * - Tabs visible on page load
-     * - Default view is Alerts with correct elements
-     * - Incidents elements hidden in Alerts view
-     * - Switch to Incidents shows correct elements
-     * - Alerts elements hidden in Incidents view
-     * - Bidirectional tab switching works
-     * - Toggle and buttons visibility across view switches
+     * - Alerts page shows correct elements
+     * - Incidents page shows correct elements (navigate via URL)
+     * - Navigation between pages works
      */
-    test("View mode UI validation - tabs, elements, and switching", {
+    test("Page navigation UI validation - elements and switching between Alerts/Incidents pages", {
         tag: ['@alertsIncidentsTabs', '@smoke', '@P0', '@all']
     }, async ({ page }) => {
-        testLogger.info('=== PHASE 1: Verify Alerts view on load ===');
+        testLogger.info('=== PHASE 1: Verify Alerts page on load ===');
 
-        // 1.1 Verify tabs are visible
-        await pm.alertsPage.expectViewModeTabsVisible();
-        testLogger.info('✓ Both view tabs visible');
-
-        // 1.2 Verify all Alerts view elements
+        // 1.1 Verify all Alerts page elements
         await pm.alertsPage.expectAlertListTableVisible();
         await pm.alertsPage.expectSearchAcrossFoldersToggleVisible();
         await pm.alertsPage.expectImportButtonVisible();
         await pm.alertsPage.expectAddAlertButtonVisible();
         await pm.alertsPage.expectAlertListSplitterVisible();
-        testLogger.info('✓ All Alerts view elements visible');
+        testLogger.info('✓ All Alerts page elements visible');
 
-        // 1.3 Verify Incidents-only elements are hidden
-        await pm.alertsPage.expectIncidentsOnlyElementsHidden();
-        testLogger.info('✓ Incidents elements hidden in Alerts view');
+        testLogger.info('=== PHASE 2: Navigate to Incidents page ===');
 
-        testLogger.info('=== PHASE 2: Switch to Incidents view ===');
-
-        // 2.1 Click Incidents tab
+        // 2.1 Navigate to Incidents page
         await pm.alertsPage.clickIncidentsTab();
 
-        // 2.2 Verify Incidents view elements
+        // 2.2 Verify Incidents page elements
         await pm.alertsPage.expectIncidentsViewElementsVisible();
-        testLogger.info('✓ Incidents view elements visible');
+        testLogger.info('✓ Incidents page elements visible');
 
-        // 2.3 Verify Alerts-only elements are hidden
-        await pm.alertsPage.expectAlertListTableHidden();
-        await pm.alertsPage.expectSearchAcrossFoldersToggleHidden();
-        await pm.alertsPage.expectImportButtonHidden();
-        await pm.alertsPage.expectAddAlertButtonHidden();
-        testLogger.info('✓ Alerts elements hidden in Incidents view');
+        testLogger.info('=== PHASE 3: Navigate back to Alerts page ===');
 
-        testLogger.info('=== PHASE 3: Switch back to Alerts view ===');
-
-        // 3.1 Click Alerts tab
+        // 3.1 Navigate to Alerts page
         await pm.alertsPage.clickAlertsTab();
 
-        // 3.2 Verify Alerts view elements restored
+        // 3.2 Verify Alerts page elements restored
         await pm.alertsPage.expectAlertsViewElementsVisible();
-        testLogger.info('✓ Alerts view elements restored');
+        testLogger.info('✓ Alerts page elements restored');
 
-        // 3.3 Verify toggle visible again
+        // 3.3 Verify toggle visible
         await pm.alertsPage.expectSearchAcrossFoldersToggleVisible();
-        testLogger.info('✓ Toggle visible in Alerts view');
+        testLogger.info('✓ Toggle visible in Alerts page');
 
-        // 3.4 Verify buttons visible again
+        // 3.4 Verify buttons visible
         await pm.alertsPage.expectImportButtonVisible();
         await pm.alertsPage.expectAddAlertButtonVisible();
-        testLogger.info('✓ Import and Add buttons visible in Alerts view');
+        testLogger.info('✓ Import and Add buttons visible in Alerts page');
 
-        // 3.5 Verify Incidents elements hidden again
-        await pm.alertsPage.expectIncidentsOnlyElementsHidden();
-        testLogger.info('✓ Incidents elements hidden again');
-
-        testLogger.info('=== View mode UI validation COMPLETE ===');
+        testLogger.info('=== Page UI validation COMPLETE ===');
     });
 
     /**
-     * Test 2: Search Functionality in Both Views
+     * Test 2: Search Functionality in Both Pages
      * Consolidates: TC-07, TC-08
      *
      * Validates:
-     * - Search input works in Alerts view
-     * - Search input works in Incidents view
+     * - Search input works in Alerts page
+     * - Search input works in Incidents page
      */
     test("Search functionality works in both views", {
         tag: ['@alertsIncidentsTabs', '@functional', '@P1', '@all', '@search']
     }, async ({ page }) => {
         const searchQuery = 'test';
 
-        testLogger.info('=== PHASE 1: Search in Alerts view ===');
+        testLogger.info('=== PHASE 1: Search in Alerts page ===');
 
         // 1.1 Type in alert search input
         await pm.alertsPage.typeInAlertSearchInput(searchQuery);
@@ -149,11 +114,11 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         // 1.2 Verify search works
         await pm.alertsPage.expectAlertSearchInputFocused();
         await pm.alertsPage.expectAlertListTableVisible();
-        testLogger.info('✓ Search in Alerts view works');
+        testLogger.info('✓ Search in Alerts page works');
 
-        testLogger.info('=== PHASE 2: Search in Incidents view ===');
+        testLogger.info('=== PHASE 2: Search in Incidents page ===');
 
-        // 2.1 Switch to Incidents view
+        // 2.1 Navigate to Incidents page
         await pm.alertsPage.clickIncidentsTab();
 
         // 2.2 Type in incident search input
@@ -162,7 +127,7 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         // 2.3 Verify search input has value and table visible
         await pm.alertsPage.expectIncidentSearchInputValue(searchQuery);
         await pm.alertsPage.expectIncidentListTableVisible();
-        testLogger.info('✓ Search in Incidents view works');
+        testLogger.info('✓ Search in Incidents page works');
 
         testLogger.info('=== Search functionality COMPLETE ===');
     });
@@ -174,7 +139,7 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
      * Validates:
      * - Empty alerts list shows table container and add button
      * - Empty incidents list shows table container
-     * - Page refresh preserves current view (URL state)
+     * - Page refresh preserves current page (URL state)
      */
     test("Edge cases - empty states and page refresh", {
         tag: ['@alertsIncidentsTabs', '@edgeCase', '@P2', '@all']
@@ -184,25 +149,22 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         // 1.1 Verify table container present (even if empty)
         await pm.alertsPage.expectAlertListTableVisible();
 
-        // 1.2 Verify tabs functional
-        await pm.alertsPage.expectViewModeTabsVisible();
-
-        // 1.3 Verify Add Alert button visible (key action for empty state)
+        // 1.2 Verify Add Alert button visible (key action for empty state)
         await pm.alertsPage.expectAddAlertButtonVisible();
         testLogger.info('✓ Empty alerts state handled correctly');
 
         testLogger.info('=== PHASE 2: Empty Incidents state ===');
 
-        // 2.1 Switch to Incidents view
+        // 2.1 Navigate to Incidents page
         await pm.alertsPage.clickIncidentsTab();
 
         // 2.2 Verify incident table container present
         await pm.alertsPage.expectIncidentListTableVisible();
         testLogger.info('✓ Empty incidents state handled correctly');
 
-        testLogger.info('=== PHASE 3: Page refresh preserves view ===');
+        testLogger.info('=== PHASE 3: Page refresh preserves page ===');
 
-        // 3.1 Verify we're in Incidents view
+        // 3.1 Verify we're on Incidents page
         await pm.alertsPage.expectIncidentsViewElementsVisible();
         const incidentsUrl = page.url();
         testLogger.info(`Incidents URL: ${incidentsUrl}`);
@@ -215,16 +177,14 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         await pm.alertsPage.waitForLoadingOverlayToDisappear();
         await page.waitForTimeout(3000);
 
-        // 3.4 Verify still in Incidents view (URL state preserved)
-        await pm.alertsPage.expectViewModeTabsVisible();
+        // 3.4 Verify still on Incidents page (URL state preserved)
         await pm.alertsPage.expectIncidentsViewElementsVisible();
-        await pm.alertsPage.expectAlertsOnlyElementsHidden();
-        testLogger.info('✓ Incidents view preserved after refresh');
+        testLogger.info('✓ Incidents page preserved after refresh');
 
-        // 3.5 Verify can switch back to Alerts
+        // 3.5 Verify can navigate back to Alerts
         await pm.alertsPage.clickAlertsTab();
         await pm.alertsPage.expectAlertsViewElementsVisible();
-        testLogger.info('✓ Can switch back to Alerts after refresh');
+        testLogger.info('✓ Can navigate back to Alerts after refresh');
 
         testLogger.info('=== Edge cases COMPLETE ===');
     });
@@ -262,12 +222,12 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
         test("Incident lifecycle actions - acknowledge, resolve, reopen", {
             tag: ['@alertsIncidentsTabs', '@incidentActions', '@P0', '@all', '@requiresIncidents']
         }, async ({ page }) => {
-            testLogger.info('=== PHASE 1: Setup - Navigate to Incidents view ===');
+            testLogger.info('=== PHASE 1: Setup - Navigate to Incidents page ===');
 
-            // Switch to Incidents view
+            // Navigate to Incidents page
             await pm.alertsPage.clickIncidentsTab();
             await pm.alertsPage.waitForIncidentsToLoad();
-            testLogger.info('Switched to Incidents view');
+            testLogger.info('Navigated to Incidents page');
 
             // Check if incidents exist on this environment
             const hasIncidents = await pm.alertsPage.hasIncidents();
@@ -355,7 +315,7 @@ test.describe("Alerts & Incidents Tabs", { tag: '@enterprise' }, () => {
             // Switch to Incidents view
             await pm.alertsPage.clickIncidentsTab();
             await pm.alertsPage.waitForIncidentsToLoad();
-            testLogger.info('Switched to Incidents view');
+            testLogger.info('Navigated to Incidents page');
 
             // Check if incidents exist on this environment
             const hasIncidents = await pm.alertsPage.hasIncidents();
