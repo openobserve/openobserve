@@ -698,17 +698,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-<<<<<<< HEAD
-        .route("/{org_id}/mcp", post(mcp::handle_mcp_post))
-        .route("/{org_id}/mcp/{*mcp_path}", get(mcp::handle_mcp_get));
-=======
         .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post))
 
         // Deduplication
         .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
         .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
->>>>>>> b07fe7b82 (remove old infra, improve ux, handle tool calls)
 
     #[cfg(feature = "enterprise")]
     {
