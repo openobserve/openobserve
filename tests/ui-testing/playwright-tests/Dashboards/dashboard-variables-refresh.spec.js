@@ -405,20 +405,56 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
       { scope: "global" }
     );
     await pm.dashboardSetting.closeSettingWindow();
-    // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Add panel
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Wait for variable to appear on dashboard with increased timeout
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 15000 });
+
+    // Add panel with filter using the variable
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "filter");
+    // Add filter using the variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_namespace_name",
+      "",
+      "=",
+      `$${variableName}`
+    );
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
     await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator('[data-test="dashboard-setting-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Capture the initial query inspector content before making changes
+    // Hover over panel to make dropdown visible
+    await page.locator('[data-test="dashboard-panel-container"]').first().hover();
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Use page object method to open query inspector
+    await pm.dashboardPanelEdit.openQueryInspector("Panel1");
+
+    // Wait for Query Inspector dialog to open and load content
+    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Get all text from Query Inspector dialog (includes query, time, variables)
+    const dialogContent = page.locator('.q-dialog').first();
+    await dialogContent.waitFor({ state: "visible", timeout: 5000 });
+    const queryInspectorBeforeRefresh = await dialogContent.textContent();
+
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
     // Change variable
     await changeVariableValue(page, variableName);
@@ -431,6 +467,35 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
     // Click global refresh
     await page.locator('[data-test="dashboard-refresh-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Wait for panels to finish loading
+    await waitForAllPanelsToLoad(page, 1, 10000);
+
+    // Capture the query inspector content after refresh
+    // Hover over panel to make dropdown visible
+    await page.locator('[data-test="dashboard-panel-container"]').first().hover();
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Use page object method to open query inspector
+    await pm.dashboardPanelEdit.openQueryInspector("Panel1");
+
+    // Wait for Query Inspector dialog to open and load content
+    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Get all text from Query Inspector dialog (includes query, time, variables)
+    const queryInspectorAfterRefresh = await dialogContent.textContent();
+
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Verify query inspector content is different - both variable value and time range should have changed
+    expect(queryInspectorBeforeRefresh).not.toBe(queryInspectorAfterRefresh);
+
+    // Verify the query after refresh contains the variable filter
+    // The query should have the kubernetes_namespace_name filter
+    expect(queryInspectorAfterRefresh).toContain("kubernetes_namespace_name");
 
     // Verify panel reloaded with new data
     const panelElement = page.locator('[data-test*="dashboard-panel-"]').first();
