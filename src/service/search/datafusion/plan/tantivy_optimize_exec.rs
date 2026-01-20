@@ -564,6 +564,7 @@ mod tests {
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use config::meta::stream::{FileMeta, StreamType};
+    use datafusion::sql::TableReference;
 
     use super::*;
 
@@ -968,6 +969,7 @@ mod tests {
         let query = Arc::new(QueryParams {
             trace_id: "test".to_string(),
             org_id: "org".to_string(),
+            stream: TableReference::from("test"),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
             time_range: (0, 1000),
@@ -1008,8 +1010,9 @@ mod tests {
         let query = Arc::new(QueryParams {
             trace_id: "test".to_string(),
             org_id: "org".to_string(),
-            stream_type: StreamType::Logs,
+            stream: TableReference::from("test"),
             stream_name: "test".to_string(),
+            stream_type: StreamType::Logs,
             time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
@@ -1096,6 +1099,7 @@ mod tests {
         let query = Arc::new(QueryParams {
             trace_id: "test".to_string(),
             org_id: "org".to_string(),
+            stream: TableReference::from("test"),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
             time_range: (0, 1000),
@@ -1136,6 +1140,7 @@ mod tests {
         let query = Arc::new(QueryParams {
             trace_id: "test".to_string(),
             org_id: "org".to_string(),
+            stream: TableReference::from("test"),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
             time_range: (0, 1000),
@@ -1177,6 +1182,7 @@ mod tests {
         let query = Arc::new(QueryParams {
             trace_id: "test".to_string(),
             org_id: "org".to_string(),
+            stream: TableReference::from("test"),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
             time_range: (0, 1000),

@@ -27,6 +27,7 @@ use config::{
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
+    sql::TableReference,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -213,6 +214,7 @@ pub(crate) async fn create_context(
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.to_string(),
+        stream: TableReference::from(stream_name),
         stream_type: StreamType::Metrics,
         stream_name: stream_name.to_string(),
         time_range,

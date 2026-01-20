@@ -20,7 +20,10 @@ use config::meta::{
     search::ScanStats,
     stream::{FileKey, StreamType},
 };
-use datafusion::{datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache};
+use datafusion::{
+    datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache,
+    sql::TableReference,
+};
 use infra::errors::Result;
 
 use super::{datafusion::exec::TableBuilder, index::IndexCondition};
@@ -37,6 +40,7 @@ pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u
 pub struct QueryParams {
     pub trace_id: String,
     pub org_id: String,
+    pub stream: TableReference,
     pub stream_type: StreamType,
     pub stream_name: String,
     pub time_range: (i64, i64),
@@ -50,9 +54,9 @@ pub struct QueryParams {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn create_tables_from_files<F>(
     files: Vec<FileKey>,
-    time_range: (i64, i64),
     session: config::meta::search::Session,
-    schema: Arc<Schema>,
+    query: Arc<QueryParams>,
+    schema_ref: Arc<Schema>,
     sorted_by_time: bool,
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
@@ -62,18 +66,18 @@ pub(crate) async fn create_tables_from_files<F>(
 where
     F: Fn() + Clone,
 {
-    // Split files into two groups based on time range overlap
-    let (start_time, end_time) = time_range;
-    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
-        .into_iter()
-        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
     let mut tables = Vec::new();
-    let schema_arc = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+    let schema_ref = Arc::new(
+        schema_ref
+            .as_ref()
+            .clone()
+            .with_metadata(Default::default()),
+    );
 
     // Helper to create table with common configuration
     let create_table = |files: Vec<FileKey>, timestamp_filter: Option<(i64, i64)>| {
         let session = session.clone();
-        let schema_arc = schema_arc.clone();
+        let schema_ref = schema_ref.clone();
         let file_stat_cache = file_stat_cache.clone();
         let index_condition = index_condition.clone();
         let fst_fields = fst_fields.clone();
@@ -91,11 +95,27 @@ where
             }
 
             builder
-                .build(session, files, schema_arc)
+                .build(session, files, schema_ref)
                 .await
                 .inspect_err(|_| on_error())
         }
     };
+
+    // If the stream is enrichment tables, create a table for all files
+    // this is used for add enrich before the stream name(usually for join with the stream)
+    if let Some(schema) = query.stream.schema()
+        && (schema == "enrich" || schema == "enrichment_tables")
+    {
+        let table = create_table(files, None).await?;
+        tables.push(table);
+        return Ok(tables);
+    }
+
+    // Split files into two groups based on time range overlap
+    let (start_time, end_time) = query.time_range;
+    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
+        .into_iter()
+        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
 
     // Create table for files without timestamp filter
     if !files_without_filter.is_empty() {
@@ -105,7 +125,7 @@ where
 
     // Create table for files with timestamp filter
     if !files_with_filter.is_empty() {
-        let table = create_table(files_with_filter, Some(time_range)).await?;
+        let table = create_table(files_with_filter, Some(query.time_range)).await?;
         tables.push(table);
     }
 

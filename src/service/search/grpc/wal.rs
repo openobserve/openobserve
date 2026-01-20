@@ -212,8 +212,8 @@ pub async fn search_parquet(
     let start = std::time::Instant::now();
     let tables = super::create_tables_from_files(
         files,
-        query.time_range,
         session,
+        query.clone(),
         schema,
         sorted_by_time,
         file_stat_cache,

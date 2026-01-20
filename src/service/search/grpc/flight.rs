@@ -196,6 +196,7 @@ pub async fn search(
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
+        stream,
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: (req.search_info.start_time, req.search_info.end_time),
@@ -275,7 +276,7 @@ pub async fn search(
             o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files(
                 &mut file_list,
                 sampling_config,
-                query_params.time_range,
+                Some(query_params.time_range),
                 req.search_info.histogram_interval,
                 &trace_id,
             );
