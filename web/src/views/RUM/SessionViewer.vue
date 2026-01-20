@@ -51,8 +51,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon name="sentiment_very_dissatisfied" size="0.875rem" class="q-pr-xs" style="color: #fb923c;" data-test="frustration-summary-icon" />
-          <span class="tw:font-semibold" style="color: #fb923c;" data-test="frustration-summary-text">{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? 's' : '' }}</span>
+          <q-icon
+            name="sentiment_very_dissatisfied"
+            size="0.875rem"
+            class="q-pr-xs"
+            style="color: #fb923c"
+            data-test="frustration-summary-icon"
+          />
+          <span
+            class="tw:font-semibold"
+            style="color: #fb923c"
+            data-test="frustration-summary-text"
+            >{{ frustrationCount }} Frustration{{
+              frustrationCount > 1 ? "s" : ""
+            }}</span
+          >
         </div>
       </div>
     </div>
@@ -138,8 +151,9 @@ const sessionDetails = ref({
 });
 
 const frustrationCount = computed(() => {
-  return segmentEvents.value.filter((event: any) =>
-    event.frustration_types && event.frustration_types.length > 0
+  return segmentEvents.value.filter(
+    (event: any) =>
+      event.frustration_types && event.frustration_types.length > 0,
   ).length;
 });
 
@@ -412,7 +426,8 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name =
+    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {
@@ -459,7 +474,7 @@ const formatEvent = (event: any) => {
 
     return eventTypes[event.type](event);
   } catch (err) {
-    console.log(err);
+    console.error("Error while formatting event :", event.type, err);
     return null;
   }
 };
