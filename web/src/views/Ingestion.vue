@@ -55,6 +55,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`ingestion.resetTokenBtnLabel`)"
             @click="showUpdateDialogFn"
           />
+          <q-input
+            v-model="globalSearchQuery"
+            :placeholder="t('common.search')"
+            dense
+            borderless
+            clearable
+            class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
+            data-test="ingestion-global-search"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
           <span
             class="text-subtitle bg-warning float-right q-pa-sm text-bold"
             v-if="
@@ -215,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onMounted, onUpdated } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -226,6 +239,7 @@ import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -242,6 +256,7 @@ export default defineComponent({
       store.state.selectedOrganization.identifier
     );
     const ingestTabType = ref("recommended");
+    const globalSearchQuery = ref("");
 
     const activeTab = ref("recommended");
     const metricRoutes = [
@@ -467,6 +482,91 @@ export default defineComponent({
       });
     };
 
+    // Global search functionality across all ingestion tabs
+    const allIngestionTabs = [
+      { name: 'recommended', label: t('ingestion.recommendedLabel') },
+      { name: 'custom', label: t('ingestion.customLabel') },
+      { name: 'servers', label: t('ingestion.serverLabel') },
+      { name: 'databases', label: t('ingestion.databaseLabel') },
+      { name: 'security', label: t('ingestion.securityLabel') },
+      { name: 'devops', label: t('ingestion.devopsLabel') },
+      { name: 'networking', label: t('ingestion.networkingLabel') },
+      { name: 'message-queues', label: t('ingestion.messageQueuesLabel') },
+      { name: 'languages', label: t('ingestion.languagesLabel') },
+      { name: 'others', label: t('ingestion.otherLabel') },
+    ];
+
+    // Recommended sub-tabs
+    const recommendedSubTabs = [
+      { name: 'ingestFromKubernetes', label: t('ingestion.kubernetes'), parentTab: 'recommended' },
+      { name: 'ingestFromWindows', label: t('ingestion.windows'), parentTab: 'recommended' },
+      { name: 'ingestFromLinux', label: t('ingestion.linux'), parentTab: 'recommended' },
+      { name: 'AWSConfig', label: t('ingestion.awsconfig'), parentTab: 'recommended' },
+      { name: 'GCPConfig', label: t('ingestion.gcpconfig'), parentTab: 'recommended' },
+      { name: 'AzureConfig', label: t('ingestion.azure'), parentTab: 'recommended' },
+      { name: 'ingestFromTraces', label: t('ingestion.tracesotlp'), parentTab: 'recommended' },
+      { name: 'frontendMonitoring', label: t('ingestion.rum'), parentTab: 'recommended' },
+    ];
+
+    // Watch for search changes and navigate
+    watch(globalSearchQuery, (newSearch) => {
+      if (!newSearch) {
+        return;
+      }
+
+      const searchQuery = newSearch.toLowerCase();
+
+      // First, check main tabs
+      const matchingMainTab = allIngestionTabs.find((tab) =>
+        tab.label.toLowerCase().includes(searchQuery)
+      );
+
+      if (matchingMainTab) {
+        router.replace({
+          name: matchingMainTab.name,
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier
+          }
+        });
+        return;
+      }
+
+      // Second, search within all ingestion items (servers, databases, etc.)
+      const searchResults = searchIngestionItems(newSearch);
+      if (searchResults.length > 0) {
+        // Navigate to the first matching item
+        const firstMatch = searchResults[0];
+        router.replace({
+          name: firstMatch.name,
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier
+          }
+        });
+        return;
+      }
+
+      // Third, check AWS services
+      import('@/utils/awsIntegrations').then((module) => {
+        const awsIntegrations = module.awsIntegrations;
+
+        const matchesAWSService = awsIntegrations.some((integration: any) =>
+          integration.displayName.toLowerCase().includes(searchQuery) ||
+          integration.name.toLowerCase().includes(searchQuery) ||
+          integration.description.toLowerCase().includes(searchQuery)
+        );
+
+        if (matchesAWSService) {
+          router.replace({
+            name: 'AWSConfig',
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              search: newSearch
+            }
+          });
+        }
+      });
+    });
+
     return {
       t,
       q,
@@ -494,6 +594,7 @@ export default defineComponent({
       traceRoutes,
       generateRUMToken,
       updateRUMToken,
+      globalSearchQuery,
     };
   },
 });
