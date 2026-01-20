@@ -159,44 +159,58 @@ jobs:
           cargo init --name sccache_test
 
           # Test compilation through sccache with cargo (matching actual build flags)
-          echo "Testing sccache with cargo build --release..."
+          echo "Testing sccache with cargo build --release (first run)..."
           RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
 
-          # Check sccache stats to verify it was used
+          # Show stats after first build
+          echo ""
+          echo "Stats after first build:"
+          STATS1=$($SCCACHE_PATH --show-stats)
+          echo "$STATS1"
+
+          # Clean and rebuild to test caching
+          echo ""
+          echo "Cleaning and rebuilding to test cache..."
+          cargo clean
+          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
+            echo "❌ ERROR: Test cargo rebuild failed"
+            exit 1
+          }
+
+          # Check sccache stats after second build to verify caching worked
+          echo ""
+          echo "Stats after second build:"
           STATS=$($SCCACHE_PATH --show-stats)
           echo "$STATS"
 
           COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
-          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
+          CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
           CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
+          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
 
-          if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
-            echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
-            echo ""
-
-            if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
-              echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
-            fi
-
-            CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
-            if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
-              echo "✅ Cache hits: $CACHE_HITS (cache is working!)"
-            fi
-
-            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
-              echo "⚠️  Non-cacheable: $NON_CACHEABLE (build scripts, proc macros, linking)"
-              echo "   This is expected for some compilation steps"
-            fi
-          else
-            echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
+          if [ "$COMPILE_REQUESTS" -lt 2 ] 2>/dev/null; then
+            echo "❌ ERROR: sccache did not intercept compilations (requests: $COMPILE_REQUESTS)"
             echo "This means RUSTC_WRAPPER is not working correctly with cargo"
-            echo ""
-            echo "Full stats:"
-            echo "$STATS"
             exit 1
+          fi
+
+          echo ""
+          echo "✓ SUCCESS: sccache intercepted $COMPILE_REQUESTS compilation(s)."
+          echo ""
+
+          if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
+            echo "✅ Cache is WORKING! Got $CACHE_HITS cache hits on rebuild."
+            echo "   This means caching will work for the full build."
+          else
+            echo "⚠️  WARNING: No cache hits after rebuild."
+            echo "   Cache misses: $CACHE_MISSES"
+            echo "   Non-cacheable: $NON_CACHEABLE"
+            echo ""
+            echo "   This suggests caching may not work effectively for the full build."
+            echo "   The build will still run, but may not see speedups on subsequent runs."
           fi
 
           # Clean up
@@ -358,44 +372,58 @@ jobs:
           cargo init --name sccache_test
 
           # Test compilation through sccache with cargo (matching actual build flags)
-          echo "Testing sccache with cargo build --release..."
+          echo "Testing sccache with cargo build --release (first run)..."
           RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
 
-          # Check sccache stats to verify it was used
+          # Show stats after first build
+          echo ""
+          echo "Stats after first build:"
+          STATS1=$($SCCACHE_PATH --show-stats)
+          echo "$STATS1"
+
+          # Clean and rebuild to test caching
+          echo ""
+          echo "Cleaning and rebuilding to test cache..."
+          cargo clean
+          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
+            echo "❌ ERROR: Test cargo rebuild failed"
+            exit 1
+          }
+
+          # Check sccache stats after second build to verify caching worked
+          echo ""
+          echo "Stats after second build:"
           STATS=$($SCCACHE_PATH --show-stats)
           echo "$STATS"
 
           COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
-          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
+          CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
           CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
+          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
 
-          if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
-            echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
-            echo ""
-
-            if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
-              echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
-            fi
-
-            CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
-            if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
-              echo "✅ Cache hits: $CACHE_HITS (cache is working!)"
-            fi
-
-            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
-              echo "⚠️  Non-cacheable: $NON_CACHEABLE (build scripts, proc macros, linking)"
-              echo "   This is expected for some compilation steps"
-            fi
-          else
-            echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
+          if [ "$COMPILE_REQUESTS" -lt 2 ] 2>/dev/null; then
+            echo "❌ ERROR: sccache did not intercept compilations (requests: $COMPILE_REQUESTS)"
             echo "This means RUSTC_WRAPPER is not working correctly with cargo"
-            echo ""
-            echo "Full stats:"
-            echo "$STATS"
             exit 1
+          fi
+
+          echo ""
+          echo "✓ SUCCESS: sccache intercepted $COMPILE_REQUESTS compilation(s)."
+          echo ""
+
+          if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
+            echo "✅ Cache is WORKING! Got $CACHE_HITS cache hits on rebuild."
+            echo "   This means caching will work for the full build."
+          else
+            echo "⚠️  WARNING: No cache hits after rebuild."
+            echo "   Cache misses: $CACHE_MISSES"
+            echo "   Non-cacheable: $NON_CACHEABLE"
+            echo ""
+            echo "   This suggests caching may not work effectively for the full build."
+            echo "   The build will still run, but may not see speedups on subsequent runs."
           fi
 
           # Clean up
