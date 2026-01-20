@@ -456,64 +456,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Alert Flow Graph -->
+          <!-- Alert Flow Summary -->
           <div
             v-if="incidentDetails.topology_context && incidentDetails.topology_context.nodes.length"
             :class="[
-              'tw:rounded-lg tw:border tw:overflow-hidden',
+              'tw:rounded-lg tw:border',
               store.state.theme === 'dark'
-                ? 'tw:border-gray-700'
-                : 'tw:border-gray-200'
+                ? 'tw:border-gray-700 tw:bg-gray-800/30'
+                : 'tw:border-gray-200 tw:bg-gray-50'
             ]"
             style="max-height: 200px;"
           >
-            <!-- Header -->
-            <div
-              :class="[
-                'tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b',
-                store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800 tw:border-gray-700'
-                  : 'tw:bg-gray-100 tw:border-gray-200'
-              ]"
-            >
-              <q-icon name="timeline" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
-                {{ t("alerts.incidents.alertFlow") }}
-              </span>
-            </div>
-            <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3">
-              <div class="tw:text-xs tw:space-y-2">
-                <div
+            <div class="tw:p-3">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                <q-icon name="timeline" size="14px" class="tw:opacity-70" />
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-medium">
+                  Alert Flow ({{ incidentDetails.topology_context.nodes.length }} unique)
+                </span>
+              </div>
+              <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                <q-badge
                   v-for="(node, index) in incidentDetails.topology_context.nodes"
                   :key="node.alert_id"
-                  :class="[
-                    'tw:p-2 tw:rounded tw:border',
-                    store.state.theme === 'dark'
-                      ? 'tw:bg-gray-700/50 tw:border-gray-600'
-                      : 'tw:bg-gray-50 tw:border-gray-200'
-                  ]"
+                  :color="index === 0 ? 'red-5' : 'blue-grey-5'"
+                  :label="`${node.alert_name} (${node.service_name})`"
+                  size="xs"
                 >
-                  <div class="tw:flex tw:items-start tw:justify-between">
-                    <div class="tw:flex-1">
-                      <div class="tw:font-medium tw:mb-1">
-                        <q-badge
-                          :color="index === 0 ? 'red-5' : 'blue-grey-5'"
-                          :label="node.alert_name"
-                          class="tw:mr-2"
-                        />
-                        <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs">
-                          {{ node.service_name }}
-                        </span>
-                      </div>
-                      <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:space-x-3">
-                        <span>Count: {{ node.alert_count }}</span>
-                        <span>First: {{ formatTimestamp(node.first_fired_at) }}</span>
-                        <span v-if="node.alert_count > 1">Last: {{ formatTimestamp(node.last_fired_at) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <q-tooltip v-if="node.alert_count > 1" class="text-xs">
+                    Fired {{ node.alert_count }} times
+                  </q-tooltip>
+                </q-badge>
               </div>
             </div>
           </div>
