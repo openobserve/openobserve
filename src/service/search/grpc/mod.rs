@@ -76,7 +76,9 @@ where
 
     // Helper to create table with common configuration
     let create_table = |files: Vec<FileKey>, timestamp_filter: Option<(i64, i64)>| {
-        let session = session.clone();
+        let mut session = session.clone();
+        // Note: avoid the files be replaced by the same session id in file_list::set
+        session.id = format!("{}-{}", session.id, timestamp_filter.is_some());
         let schema_ref = schema_ref.clone();
         let file_stat_cache = file_stat_cache.clone();
         let index_condition = index_condition.clone();
