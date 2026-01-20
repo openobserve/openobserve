@@ -1079,7 +1079,12 @@ export default defineComponent({
       correlationError.value = null;
 
       // Navigate back to incident list
-      router.push({ name: "incidentList" });
+      router.push({
+        name: "incidentList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
