@@ -257,6 +257,15 @@
         "enterprise": "about.value_cost_enterprise",
         "cloud": "about.value_cost_cloud"
       }
+    },
+    {
+      "id": "your-feature-id",
+      "category": "general|enterprise|performance|security",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
     }
   ]
 }
