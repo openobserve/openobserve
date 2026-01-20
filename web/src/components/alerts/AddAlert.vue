@@ -1064,7 +1064,7 @@ export default defineComponent({
 
       isFetchingStreams.value = true;
       return getStreams(formData.value.stream_type, false)
-        .then((res: any) => {
+        .then(async (res: any) => {
           streams.value[formData.value.stream_type] = res.list;
           schemaList.value = res.list;
           indexOptions.value = res.list.map((data: any) => {
@@ -1072,7 +1072,7 @@ export default defineComponent({
           });
 
           if (formData.value.stream_name)
-            updateStreamFields(formData.value.stream_name);
+            await updateStreamFields(formData.value.stream_name);
           return Promise.resolve();
         })
         .catch(() => Promise.reject())
@@ -1711,8 +1711,8 @@ export default defineComponent({
 
             if (query.fields?.stream) {
               formData.value.stream_name = query.fields.stream;
+              // updateStreams will automatically call updateStreamFields if stream_name is set
               await updateStreams(false);
-              await updateStreamFields(query.fields.stream);
             }
 
             // Set query type based on panel (SQL or PromQL)
