@@ -5,129 +5,167 @@ import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-varia
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { waitForVariableToLoad } from "../utils/variable-helpers.js";
 
+test.describe.configure({ mode: "parallel" });
+
 test.describe("Dashboard Variables - Null Handling", () => {
-    test.beforeEach(async ({ page }) => {
-        await navigateToBase(page);
-        await ingestion(page);
-    });
+  test.beforeEach(async ({ page }) => {
+    await navigateToBase(page);
+    await ingestion(page);
+  });
 
-    test("1-should set child variable to All when parent variable causes empty options", async ({ page }) => {
-        const pm = new PageManager(page);
-        const scopedVars = new DashboardVariablesScoped(page);
-        const dashboardName = `Dashboard_NullHandling_${Date.now()}`;
-        const parentVar = `parent_var_${Date.now()}`;
-        const childVar = `child_var_${Date.now()}`;
+  test("1-should set child variable to All when parent variable causes empty options", async ({ page }) => {
+    const pm = new PageManager(page);
+    const scopedVars = new DashboardVariablesScoped(page);
+    const dashboardName = `Dashboard_NullHandling_${Date.now()}`;
+    const parentVar = `parent_var_${Date.now()}`;
+    const childVar = `child_var_${Date.now()}`;
 
-        await pm.dashboardList.menuItem("dashboards-item");
-        await waitForDashboardPage(page);
-        await pm.dashboardCreate.waitForDashboardUIStable();
-        await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.waitForDashboardUIStable();
+    await pm.dashboardCreate.createDashboard(dashboardName);
 
-        await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
 
-        // Add a panel for context
-        await pm.dashboardCreate.addPanel();
-        await pm.chartTypeSelector.selectChartType("line");
-        await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
-        await pm.dashboardPanelActions.addPanelName("Panel1");
-        await pm.dashboardPanelActions.savePanel();
+    // Add Parent Variable - use a field that has values
+    await pm.dashboardSetting.openSetting();
+    await scopedVars.addScopedVariable(
+      parentVar,
+      "logs",
+      "e2e_automate",
+      "kubernetes_namespace_name",
+      { scope: "global" }
+    );
+    await pm.dashboardSetting.closeSettingWindow();
 
-        // 1. Add Parent Variable
-        // Use a field that has values
-        await pm.dashboardSetting.openSetting();
-        await scopedVars.addScopedVariable(
-            parentVar,
-            "logs",
-            "e2e_automate",
-            "kubernetes_namespace_name", // Assuming this has values
-            { scope: "global" }
-        );
-        await page.locator(`[data-test="dashboard-edit-variable-${parentVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Reopen settings to add child variable
+    await pm.dashboardSetting.openSetting();
+    await pm.dashboardSetting.openVariables();
+    // Wait for variable to be saved and visible in settings
+    await page.locator(`[data-test="dashboard-edit-variable-${parentVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-        // 2. Add Child Variable
-        // Use a field that we can filter to be empty
-        // We'll filter based on parent value
-        // Since we don't know the exact data, we test the mechanism:
-        // If we select a parent value, child loads.
-        // If the child Query returns nothing (e.g. we use a stream that doesn't match the parent), it should be All.
+    // Add Child Variable with an impossible filter to force empty results
+    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-name"]').fill(childVar);
+    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs", exact: true }).click();
 
-        // Let's rely on a custom query or just standard dependency.
-        // If we can't guarantee "no data", we can mock the behavior by checking what happens when we *clear* the parent?
-        // But the user issue is "parent changed -> child no data".
+    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
+    await streamSelect.click();
+    await streamSelect.fill("e2e_automate");
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
 
-        // Strategy: Create a child variable on a field that definitely exists ("kubernetes_pod_name")
-        // dependent on parent ("kubernetes_namespace_name").
-        // We just need to verify that IF it ends up empty (which we might not force easily without knowing data mapping),
-        // it defaults to All.
+    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
+    await fieldSelect.click();
+    await fieldSelect.fill("kubernetes_pod_name");
+    await page.locator('[role="option"]').first().click();
 
-        // To FORCE empty data, we can define the child variable on a stream/field that doesn't exist or is empty?
-        // Or add a filter to the child variable that is impossible to satisfy, e.g. "some_field = 'impossible_value'".
+    // Add an IMPOSSIBLE filter to force empty results
+    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
 
-        // Close and reopen to refresh
-        await pm.dashboardSetting.closeSettingWindow();
-        await pm.dashboardSetting.openSetting();
-        await pm.dashboardSetting.openVariables();
+    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
+    await filterNameSelector.waitFor({ state: "visible", timeout: 5000 });
+    await filterNameSelector.click();
+    await filterNameSelector.fill("kubernetes_pod_name");
+    await page.getByRole("option", { name: "kubernetes_pod_name" }).first().click();
 
-        await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-        await page.locator('[data-test="dashboard-variable-name"]').fill(childVar);
-        await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
-        await page.getByRole("option", { name: "logs", exact: true }).click();
+    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
+    await operatorSelector.click();
+    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
 
-        const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
-        await streamSelect.click();
-        await streamSelect.fill("e2e_automate");
-        await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+    // Use parent variable in the filter - this will cause child to have no matching data
+    const valueInput = page.locator('[data-test="common-auto-complete"]').last();
+    await valueInput.waitFor({ state: "visible", timeout: 5000 });
+    await valueInput.fill(`$${parentVar}`);
 
-        const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
-        await fieldSelect.click();
-        await fieldSelect.fill("kubernetes_pod_name"); // Valid field
-        await page.locator('[role="option"]').first().click();
+    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.locator(`[data-test="dashboard-edit-variable-${childVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-        // Add an IMPOSSIBLE filter to force empty results
-        await page.locator('[data-test="dashboard-add-filter-btn"]').click();
-        const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
-        await filterNameSelector.click();
-        await filterNameSelector.fill("kubernetes_pod_name");
-        await page.getByRole("option", { name: "kubernetes_pod_name" }).first().click();
+    await pm.dashboardSetting.closeSettingWindow();
 
-        const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
-        await operatorSelector.click();
-        await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    // Wait for settings dialog to be fully closed
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
-        const valueInput = page.locator('[data-test="dashboard-query-values-filter-value-input"]').last();
-        await valueInput.fill("IMPOSSIBLE_VALUE_XYZ_123");
+    // Verify child variable appears on dashboard
+    const childDropdown = page.locator(`[data-test="variable-selector-${childVar}"]`);
+    await childDropdown.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-        await page.locator(`[data-test="dashboard-edit-variable-${childVar}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // Wait for network to be idle before interacting with variable
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-        await pm.dashboardSetting.closeSettingWindow();
+    // Click the variable dropdown to see options
+    await childDropdown.click();
 
-        // Verify Initial State
-        // Child variable should have run, found 0 results, and defaulted to "All" (_o2_all_)
+    // Wait for dropdown menu to appear
+    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
 
-        // Add console log listener
-        page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+    // When a variable query returns no results, it should show "No Data Found"
+    const noDataText = page.getByText("No Data Found", { exact: true });
+    await expect(noDataText).toBeVisible({ timeout: 5000 });
 
-        // Wait for variable selector
-        const childDropdown = page.locator(`[data-test="variable-selector-${childVar}"]`);
-        await childDropdown.waitFor({ state: "visible", timeout: 10000 });
+    // Close the dropdown
+    await page.keyboard.press('Escape');
+    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-        const textContent = await childDropdown.textContent();
-        console.log(`[DEBUG] Child Dropdown Content: "${textContent}"`);
+    // Create a panel and use the child variable in a filter
+    // The variable should be replaced with _o2_all_ in the panel
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "filter");
 
-        const fs = require('fs');
-        fs.writeFileSync('playwright-debug-content.txt', `Content: "${textContent}"`, 'utf8');
+    // Add filter using the child variable
+    await pm.dashboardFilter.addFilterCondition(
+      0,
+      "kubernetes_pod_name",
+      "",
+      "=",
+      `$${childVar}`
+    );
 
-        // Check the value displayed in the dropdown (or the selected value text)
-        // The component usually displays "All" if value is _o2_all_
-        await expect(childDropdown).toContainText("All");
+    await pm.dashboardPanelActions.addPanelName("Panel1");
+    await pm.dashboardPanelActions.savePanel();
 
-        // Also verify that the variable state is NOT null in the background if possible?
-        // We can check by adding a panel that uses this variable and see if it loads data (not error).
+    // Wait for panel to be added
+    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
 
-        // Clean up
-        await pm.dashboardCreate.backToDashboardList();
-        await deleteDashboard(page, dashboardName);
-    });
+    // Verify panel renders without errors (despite the variable having no data)
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Open Query Inspector to verify child variable was replaced with _o2_all_
+    // Hover over panel to make dropdown visible
+    await page.locator('[data-test="dashboard-panel-container"]').first().hover();
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+    // Use page object method to open query inspector
+    await pm.dashboardPanelEdit.openQueryInspector("Panel1");
+
+    // Wait for Query Inspector dialog to open and load content
+    await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    // Get all text from Query Inspector dialog
+    // The Query Inspector shows variable substitution in multiple places:
+    // 1. The "Query" row shows the executed query with _o2_all_ instead of the variable
+    // 2. The "Variable(s)" row explicitly shows: child_var_xxx: _o2_all_
+    const dialogContent = page.locator('.q-dialog').first();
+    await dialogContent.waitFor({ state: "visible", timeout: 5000 });
+    const fullText = await dialogContent.textContent();
+
+    // Verify that the child variable was replaced with _o2_all_
+    // When a variable has no data (null value), it should be replaced with _o2_all_ in the actual query
+    expect(fullText).toContain("_o2_all_");
+
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+    // Clean up
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
 });
