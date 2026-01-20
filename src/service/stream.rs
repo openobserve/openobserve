@@ -1259,7 +1259,9 @@ pub async fn stream_delete_inner(
 
     // Delete WAL data (memtable, immutable, and parquet files) on ALL ingester nodes (fixes #9866)
     // This prevents stale data from appearing if the stream is recreated with the same name.
-    log::info!("Deleting WAL data for stream on all ingesters: {org_id}/{stream_type}/{stream_name}");
+    log::info!(
+        "Deleting WAL data for stream on all ingesters: {org_id}/{stream_type}/{stream_name}"
+    );
     if !delete_stream_data_from_ingesters(org_id, &stream_type.to_string(), stream_name).await {
         log::warn!(
             "Failed to delete WAL data for stream on some ingesters: {org_id}/{stream_type}/{stream_name}"
