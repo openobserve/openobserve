@@ -18,6 +18,7 @@ pub mod ai;
 pub mod alerts;
 pub mod bitvec;
 pub mod cluster;
+pub mod correlation;
 pub mod dashboards;
 pub mod destinations;
 pub mod enrichment_table;

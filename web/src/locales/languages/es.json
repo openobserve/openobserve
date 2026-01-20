@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Campos de deduplicación",
     "deduplicateFieldTooltip": "Seleccione qué asignaciones de campos usar para la toma de huellas digitales de deduplicación",
     "alertDeduplicationMessage": "Las alertas con los mismos valores para estos campos se deduplicarán (p. ej., misma huella digital = mismos valores de campo)",
-    "atLeastOneDeduplicationField": "Se requiere al menos una asignación de campos para la deduplicación"
+    "atLeastOneDeduplicationField": "Se requiere al menos una asignación de campos para la deduplicación",
+    "scope": "Alcance",
+    "scopeTooltip": "Las dimensiones del alcance definen los límites ambientales (clúster, región, anfitrión) y se concatenan para formar la parte del alcance del FQN: {scope}/{load}",
+    "stable": "Estable",
+    "stableTooltip": "Las dimensiones estables tienen una cardinalidad baja y se utilizan para el cálculo de la clave de correlación",
+    "normalize": "Normalizar",
+    "noSemanticGroupsInCategory": "No hay grupos semánticos en la categoría: {category}"
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",

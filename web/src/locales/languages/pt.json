@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Campos de desduplicação",
     "deduplicateFieldTooltip": "Selecione quais mapeamentos de campo usar para desduplicação de impressões digitais",
     "alertDeduplicationMessage": "Alertas com os mesmos valores para esses campos serão desduplicados (por exemplo, mesma impressão digital = mesmos valores de campo)",
-    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação"
+    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação",
+    "scope": "Escopo",
+    "scopeTooltip": "As dimensões do escopo definem os limites ambientais (cluster, região, host) e são concatenadas para formar parte do escopo do FQN: {scope}/{workload}",
+    "stable": "Estável",
+    "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
+    "normalize": "Normalizar",
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

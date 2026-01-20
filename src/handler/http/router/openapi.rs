@@ -403,7 +403,7 @@ use crate::{common::meta, handler::http::request};
             config::meta::service_streams::StreamInfo,
             // Alert Deduplication (enterprise)
             config::meta::alerts::deduplication::GlobalDeduplicationConfig,
-            config::meta::alerts::deduplication::SemanticFieldGroup,
+            config::meta::correlation::SemanticFieldGroup,
             config::meta::alerts::deduplication::DeduplicationConfig,
             config::meta::alerts::deduplication::GroupingConfig,
             config::meta::alerts::deduplication::SendStrategy,

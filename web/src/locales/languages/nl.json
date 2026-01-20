@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Deduplicatievelden",
     "deduplicateFieldTooltip": "Selecteer welke veldtoewijzingen u wilt gebruiken voor deduplicatie van vingerafdrukken",
     "alertDeduplicationMessage": "Waarschuwingen met dezelfde waarden voor deze velden worden ontdubbeld (bijvoorbeeld dezelfde vingerafdruk = dezelfde veldwaarden)",
-    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist"
+    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist",
+    "scope": "Toepassingsgebied",
+    "scopeTooltip": "Scope-dimensies definiëren de omgevingsgrenzen (cluster, regio, host) en worden samengevoegd om het scopedeel van de FQN te vormen: {scope}/{workload}",
+    "stable": "Stabiel",
+    "stableTooltip": "Stabiele dimensies hebben een lage kardinaliteit en worden gebruikt voor de berekening van de correlatiesleutel",
+    "normalize": "Normaliseer",
+    "noSemanticGroupsInCategory": "Geen semantische groepen in de categorie: {category}"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

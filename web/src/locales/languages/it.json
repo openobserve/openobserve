@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Campi di deduplicazione",
     "deduplicateFieldTooltip": "Seleziona le mappature dei campi da utilizzare per la deduplicazione delle impronte digitali",
     "alertDeduplicationMessage": "Gli avvisi con gli stessi valori per questi campi verranno deduplicati (ad esempio, stessa impronta digitale = stessi valori di campo)",
-    "atLeastOneDeduplicationField": "È richiesta almeno una mappatura dei campi per la deduplicazione"
+    "atLeastOneDeduplicationField": "È richiesta almeno una mappatura dei campi per la deduplicazione",
+    "scope": "Ambito",
+    "scopeTooltip": "Le dimensioni dell'ambito definiscono i confini ambientali (cluster, regione, host) e sono concatenate per formare la parte dell'ambito del FQN: {scope}/{workload}",
+    "stable": "Stabile",
+    "stableTooltip": "Le dimensioni stabili hanno una bassa cardinalità e vengono utilizzate per il calcolo delle chiavi di correlazione",
+    "normalize": "Normalizza",
+    "noSemanticGroupsInCategory": "Nessun gruppo semantico nella categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

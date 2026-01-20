@@ -2383,7 +2383,13 @@
     "deduplicateFields": "Champs de déduplication",
     "deduplicateFieldTooltip": "Sélectionnez les mappages de champs à utiliser pour la prise d'empreintes digitales de déduplication",
     "alertDeduplicationMessage": "Les alertes avec les mêmes valeurs pour ces champs seront dédupliquées (par exemple, même empreinte digitale = mêmes valeurs de champs)",
-    "atLeastOneDeduplicationField": "Au moins un mappage de champs est requis pour la déduplication"
+    "atLeastOneDeduplicationField": "Au moins un mappage de champs est requis pour la déduplication",
+    "scope": "Portée",
+    "scopeTooltip": "Les dimensions de la portée définissent les limites environnementales (cluster, région, hôte) et sont concaténées pour former la partie de portée du FQN : {scope}/{workload}",
+    "stable": "Stable",
+    "stableTooltip": "Les dimensions stables ont une faible cardinalité et sont utilisées pour le calcul des clés de corrélation",
+    "normalize": "Normaliser",
+    "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",

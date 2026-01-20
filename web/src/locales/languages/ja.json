@@ -2376,7 +2376,13 @@
     "deduplicateFields": "重複排除フィールド",
     "deduplicateFieldTooltip": "重複排除フィンガープリントに使用するフィールドマッピングを選択する",
     "alertDeduplicationMessage": "これらのフィールドの値が同じアラートは重複排除されます (例:同じフィンガープリント = 同じフィールド値)",
-    "atLeastOneDeduplicationField": "重複排除には少なくとも 1 つのフィールドマッピングが必要です"
+    "atLeastOneDeduplicationField": "重複排除には少なくとも 1 つのフィールドマッピングが必要です",
+    "scope": "スコープ",
+    "scopeTooltip": "スコープディメンションは環境境界 (クラスタ、リージョン、ホスト) を定義し、連結されてFQNのスコープ部分を形成します:{scope}/{workload}",
+    "stable": "安定した",
+    "stableTooltip": "安定ディメンションはカーディナリティが低く、相関キーの計算に使用されます。",
+    "normalize": "ノーマライズ",
+    "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
