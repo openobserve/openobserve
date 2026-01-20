@@ -131,15 +131,15 @@ jobs:
           echo "✓ sccache binary found and executable"
           $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
 
-          # Create a test Rust file and compile it
+          # Create a test Rust project and compile it with cargo
           mkdir -p /tmp/sccache-test
           cd /tmp/sccache-test
-          echo 'fn main() { println!("test"); }' > test.rs
+          cargo init --name sccache_test
 
-          # Test RUSTC_WRAPPER with a simple compilation
-          echo "Testing RUSTC_WRAPPER functionality..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true rustc test.rs -o test || {
-            echo "❌ ERROR: RUSTC_WRAPPER test compilation failed"
+          # Test compilation through sccache with cargo (the way it will actually be used)
+          echo "Testing sccache with cargo build..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build || {
+            echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
 
@@ -147,11 +147,15 @@ jobs:
           STATS=$($SCCACHE_PATH --show-stats)
           echo "$STATS"
 
-          if echo "$STATS" | grep -q "Compile requests.*[1-9]"; then
-            echo "✓ SUCCESS: sccache is working! It intercepted the test compilation."
+          COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
+          if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
+            echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
           else
-            echo "❌ ERROR: sccache did not intercept the test compilation"
-            echo "This means RUSTC_WRAPPER is not working correctly"
+            echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
+            echo "This means RUSTC_WRAPPER is not working correctly with cargo"
+            echo ""
+            echo "Full stats:"
+            echo "$STATS"
             exit 1
           fi
 
@@ -279,15 +283,15 @@ jobs:
           echo "✓ sccache binary found and executable"
           $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
 
-          # Create a test Rust file and compile it
+          # Create a test Rust project and compile it with cargo
           mkdir -p /tmp/sccache-test
           cd /tmp/sccache-test
-          echo 'fn main() { println!("test"); }' > test.rs
+          cargo init --name sccache_test
 
-          # Test RUSTC_WRAPPER with a simple compilation
-          echo "Testing RUSTC_WRAPPER functionality..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true rustc test.rs -o test || {
-            echo "❌ ERROR: RUSTC_WRAPPER test compilation failed"
+          # Test compilation through sccache with cargo (the way it will actually be used)
+          echo "Testing sccache with cargo build..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build || {
+            echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
 
@@ -295,11 +299,15 @@ jobs:
           STATS=$($SCCACHE_PATH --show-stats)
           echo "$STATS"
 
-          if echo "$STATS" | grep -q "Compile requests.*[1-9]"; then
-            echo "✓ SUCCESS: sccache is working! It intercepted the test compilation."
+          COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
+          if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
+            echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
           else
-            echo "❌ ERROR: sccache did not intercept the test compilation"
-            echo "This means RUSTC_WRAPPER is not working correctly"
+            echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
+            echo "This means RUSTC_WRAPPER is not working correctly with cargo"
+            echo ""
+            echo "Full stats:"
+            echo "$STATS"
             exit 1
           fi
 
