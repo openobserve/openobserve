@@ -166,7 +166,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      expect(chartData.options.series[0].layout).toBe("force");
+      // Layout is 'none' because we use D3-force to pre-compute positions
+      expect(chartData.options.series[0].layout).toBe("none");
     });
   });
 
@@ -360,8 +361,10 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      expect(chartData.options.series[0].layout).toBe("force");
-      expect(chartData.options.series[0].force).toBeDefined();
+      // Layout is 'none' because we use D3-force to pre-compute positions
+      expect(chartData.options.series[0].layout).toBe("none");
+      // Nodes should have fixed positions
+      expect(chartData.options.series[0].data[0].fixed).toBe(true);
     });
 
     it("should allow clicking empty state refresh button", async () => {
@@ -409,11 +412,12 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      expect(chartData.options.series[0].layout).toBe("force");
-      expect(chartData.options.series[0].force).toBeDefined();
-      expect(chartData.options.series[0].force.repulsion).toBe(300);
-      expect(chartData.options.series[0].force.gravity).toBe(0.1);
-      expect(chartData.options.series[0].force.edgeLength).toBe(150);
+      // Layout is 'none' because we use D3-force to pre-compute positions
+      expect(chartData.options.series[0].layout).toBe("none");
+      // Nodes should have pre-computed x, y positions
+      expect(chartData.options.series[0].data[0].x).toBeDefined();
+      expect(chartData.options.series[0].data[0].y).toBeDefined();
+      expect(chartData.options.series[0].data[0].fixed).toBe(true);
     });
   });
 
@@ -544,15 +548,22 @@ describe("IncidentServiceGraph.vue", () => {
     it("should cap node size at 100", async () => {
       // Create data with very high alert count
       const largeAlertData = {
-        ...mockGraphData,
         nodes: [
           {
+            alert_id: "alert_huge",
+            alert_name: "Huge Alert",
             service_name: "service-huge",
             alert_count: 100,
-            is_root_cause: false,
-            is_primary: false,
+            first_fired_at: 1000000,
+            last_fired_at: 2000000,
           },
         ],
+        edges: [],
+        stats: {
+          total_services: 1,
+          total_alerts: 100,
+          services_with_alerts: 1,
+        },
       };
 
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
@@ -1020,15 +1031,22 @@ describe("IncidentServiceGraph.vue", () => {
 
     it("should handle very large alert counts", async () => {
       const dataWithLargeAlerts = {
-        ...mockGraphData,
         nodes: [
           {
+            alert_id: "alert_huge",
+            alert_name: "Huge Alert",
             service_name: "service-huge",
             alert_count: 1000,
-            is_root_cause: false,
-            is_primary: false,
+            first_fired_at: 1000000,
+            last_fired_at: 2000000,
           },
         ],
+        edges: [],
+        stats: {
+          total_services: 1,
+          total_alerts: 1000,
+          services_with_alerts: 1,
+        },
       };
 
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
@@ -1068,7 +1086,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      expect(chartData.options.animationDuration).toBe(1500);
+      // Animation is disabled for better performance with pre-computed positions
+      expect(chartData.options.animation).toBe(false);
     });
 
     it("should set animation easing", async () => {
@@ -1080,7 +1099,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      expect(chartData.options.animationEasingUpdate).toBe("quinticInOut");
+      // Animation is disabled, so no easing setting
+      expect(chartData.options.animation).toBe(false);
     });
   });
 
@@ -1139,10 +1159,12 @@ describe("IncidentServiceGraph.vue", () => {
 
       const initialKey = wrapper.vm.chartKey;
 
+      // chartKey is no longer incremented on loadGraph to preserve node positions
       await wrapper.vm.loadGraph();
       await flushPromises();
 
-      expect(wrapper.vm.chartKey).toBeGreaterThan(initialKey);
+      // chartKey stays the same to preserve cached positions
+      expect(wrapper.vm.chartKey).toBe(initialKey);
     });
   });
 });
