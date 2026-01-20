@@ -1888,11 +1888,7 @@
     "destination_type": "Hedef Türü",
     "readonly": "Salt okunur",
     "additional_settings": "Ek Ayarlar",
-    "custom_headers": "Özel Başlıklar (İsteğe Bağlı)",
-    "preview": "Önizleme",
-    "test": "Testi",
-    "saved": "Hedef başarıyla kaydedildi",
-    "saveError": "Hedef kaydedilemedi"
+    "custom_headers": "Özel Başlıklar (İsteğe Bağlı)"
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

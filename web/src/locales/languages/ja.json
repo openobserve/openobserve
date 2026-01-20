@@ -1898,11 +1898,7 @@
     "destination_type": "デスティネーションタイプ",
     "readonly": "読み取り専用",
     "additional_settings": "その他の設定",
-    "custom_headers": "カスタムヘッダー (オプション)",
-    "preview": "プレビュー",
-    "test": "テスト",
-    "saved": "目的地は正常に保存されました",
-    "saveError": "送信先を保存できませんでした"
+    "custom_headers": "カスタムヘッダー (オプション)"
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

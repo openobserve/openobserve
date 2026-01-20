@@ -1888,11 +1888,7 @@
     "destination_type": "Tipo di destinazione",
     "readonly": "Sola lettura",
     "additional_settings": "Impostazioni aggiuntive",
-    "custom_headers": "Intestazioni personalizzate (opzionali)",
-    "preview": "Anteprima",
-    "test": "Test",
-    "saved": "Destinazione salvata con successo",
-    "saveError": "Impossibile salvare la destinazione"
+    "custom_headers": "Intestazioni personalizzate (opzionali)"
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",

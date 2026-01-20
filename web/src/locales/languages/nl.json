@@ -1888,11 +1888,7 @@
     "destination_type": "Soort bestemming",
     "readonly": "Alleen lezen",
     "additional_settings": "Aanvullende instellingen",
-    "custom_headers": "Aangepaste kopteksten (optioneel)",
-    "preview": "voorsmaak",
-    "test": "Test",
-    "saved": "Bestemming succesvol opgeslagen",
-    "saveError": "Het opslaan van de bestemming is mislukt"
+    "custom_headers": "Aangepaste kopteksten (optioneel)"
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
