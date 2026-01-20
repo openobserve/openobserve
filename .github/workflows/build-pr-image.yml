@@ -104,8 +104,22 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Run sccache-cache
+      - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache local cache
+        run: |
+          mkdir -p $HOME/.cache/sccache
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
+
+      - name: Restore sccache cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Add sccache to PATH
         run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
@@ -138,7 +152,7 @@ jobs:
 
           # Test compilation through sccache with cargo (matching actual build flags)
           echo "Testing sccache with cargo build --release..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build --release || {
+          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
@@ -194,7 +208,7 @@ jobs:
         run: |
           echo "Using sccache wrapper at: $SCCACHE_PATH"
           echo "RUSTC_WRAPPER=$SCCACHE_PATH"
-          echo "SCCACHE_GHA_ENABLED=true"
+          echo "SCCACHE_DIR=$SCCACHE_DIR"
 
           # Show initial sccache stats
           echo "=== Initial sccache stats ==="
@@ -206,8 +220,6 @@ jobs:
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
           RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
-          SCCACHE_GHA_ENABLED: "true"
-          SCCACHE_LOG: debug
 
       - name: Show sccache stats
         run: |
@@ -277,8 +289,22 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Run sccache-cache
+      - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache local cache
+        run: |
+          mkdir -p $HOME/.cache/sccache
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
+
+      - name: Restore sccache cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Add sccache to PATH
         run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
@@ -311,7 +337,7 @@ jobs:
 
           # Test compilation through sccache with cargo (matching actual build flags)
           echo "Testing sccache with cargo build --release..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build --release || {
+          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
@@ -367,7 +393,7 @@ jobs:
         run: |
           echo "Using sccache wrapper at: $SCCACHE_PATH"
           echo "RUSTC_WRAPPER=$SCCACHE_PATH"
-          echo "SCCACHE_GHA_ENABLED=true"
+          echo "SCCACHE_DIR=$SCCACHE_DIR"
 
           # Show initial sccache stats
           echo "=== Initial sccache stats ==="
@@ -379,8 +405,6 @@ jobs:
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
           RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
-          SCCACHE_GHA_ENABLED: "true"
-          SCCACHE_LOG: debug
 
       - name: Show sccache stats
         run: |
