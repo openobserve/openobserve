@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="incident-service-graph tw-flex tw-flex-col tw-h-full">
     <!-- Graph Container -->
+    <div class="tw-flex-1 tw-relative tw-overflow-hidden">
       <!-- Loading State -->
       <div
         v-if="loading"
