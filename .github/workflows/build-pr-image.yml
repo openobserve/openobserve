@@ -110,6 +110,57 @@ jobs:
       - name: Add sccache to PATH
         run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
 
+      - name: Validate sccache setup
+        run: |
+          echo "=== Validating sccache setup ==="
+          echo "SCCACHE_PATH: $SCCACHE_PATH"
+
+          # Check if sccache binary exists
+          if [ ! -f "$SCCACHE_PATH" ]; then
+            echo "❌ ERROR: sccache binary not found at $SCCACHE_PATH"
+            exit 1
+          fi
+
+          # Check if sccache is executable
+          if [ ! -x "$SCCACHE_PATH" ]; then
+            echo "❌ ERROR: sccache is not executable"
+            exit 1
+          fi
+
+          # Test sccache version
+          echo "✓ sccache binary found and executable"
+          $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
+
+          # Create a test Rust file and compile it
+          mkdir -p /tmp/sccache-test
+          cd /tmp/sccache-test
+          echo 'fn main() { println!("test"); }' > test.rs
+
+          # Test RUSTC_WRAPPER with a simple compilation
+          echo "Testing RUSTC_WRAPPER functionality..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true rustc test.rs -o test || {
+            echo "❌ ERROR: RUSTC_WRAPPER test compilation failed"
+            exit 1
+          }
+
+          # Check sccache stats to verify it was used
+          STATS=$($SCCACHE_PATH --show-stats)
+          echo "$STATS"
+
+          if echo "$STATS" | grep -q "Compile requests.*[1-9]"; then
+            echo "✓ SUCCESS: sccache is working! It intercepted the test compilation."
+          else
+            echo "❌ ERROR: sccache did not intercept the test compilation"
+            echo "This means RUSTC_WRAPPER is not working correctly"
+            exit 1
+          fi
+
+          # Clean up
+          cd -
+          rm -rf /tmp/sccache-test
+
+          echo "=== sccache validation complete ==="
+
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -125,11 +176,12 @@ jobs:
 
       - name: Build and run binary
         run: |
+          echo "Using sccache wrapper at: $SCCACHE_PATH"
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
-          RUSTC_WRAPPER: sccache
+          RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
           SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
@@ -206,6 +258,57 @@ jobs:
       - name: Add sccache to PATH
         run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
 
+      - name: Validate sccache setup
+        run: |
+          echo "=== Validating sccache setup ==="
+          echo "SCCACHE_PATH: $SCCACHE_PATH"
+
+          # Check if sccache binary exists
+          if [ ! -f "$SCCACHE_PATH" ]; then
+            echo "❌ ERROR: sccache binary not found at $SCCACHE_PATH"
+            exit 1
+          fi
+
+          # Check if sccache is executable
+          if [ ! -x "$SCCACHE_PATH" ]; then
+            echo "❌ ERROR: sccache is not executable"
+            exit 1
+          fi
+
+          # Test sccache version
+          echo "✓ sccache binary found and executable"
+          $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
+
+          # Create a test Rust file and compile it
+          mkdir -p /tmp/sccache-test
+          cd /tmp/sccache-test
+          echo 'fn main() { println!("test"); }' > test.rs
+
+          # Test RUSTC_WRAPPER with a simple compilation
+          echo "Testing RUSTC_WRAPPER functionality..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true rustc test.rs -o test || {
+            echo "❌ ERROR: RUSTC_WRAPPER test compilation failed"
+            exit 1
+          }
+
+          # Check sccache stats to verify it was used
+          STATS=$($SCCACHE_PATH --show-stats)
+          echo "$STATS"
+
+          if echo "$STATS" | grep -q "Compile requests.*[1-9]"; then
+            echo "✓ SUCCESS: sccache is working! It intercepted the test compilation."
+          else
+            echo "❌ ERROR: sccache did not intercept the test compilation"
+            echo "This means RUSTC_WRAPPER is not working correctly"
+            exit 1
+          fi
+
+          # Clean up
+          cd -
+          rm -rf /tmp/sccache-test
+
+          echo "=== sccache validation complete ==="
+
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -221,11 +324,12 @@ jobs:
 
       - name: Build and run binary
         run: |
+          echo "Using sccache wrapper at: $SCCACHE_PATH"
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
-          RUSTC_WRAPPER: sccache
+          RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
           SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
