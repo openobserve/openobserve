@@ -974,6 +974,20 @@ watch(
       return;
     }
 
+    // Check if aggregation is enabled but required fields are missing
+    if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
+      const hasColumn = props.formData.query_condition.aggregation.having?.column &&
+                        props.formData.query_condition.aggregation.having.column.trim() !== '';
+      const hasValue = props.formData.query_condition.aggregation.having?.value !== undefined &&
+                       props.formData.query_condition.aggregation.having.value !== null &&
+                       props.formData.query_condition.aggregation.having.value !== '';
+
+      if (!hasColumn || !hasValue) {
+        console.log("[PreviewAlert] Skipping refresh - aggregation enabled but required fields missing (column or value)");
+        return;
+      }
+    }
+
     // Refresh if we have a valid query
     if (props.query) {
       console.log("[PreviewAlert] Watch calling refreshDataOnce");
