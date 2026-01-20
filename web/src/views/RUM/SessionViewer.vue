@@ -76,12 +76,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <!-- Event Detail Drawer -->
+    <EventDetailDrawer
+      v-model="showEventDetailDrawer"
+      :event="selectedEvent"
+      :raw-event="selectedRawEvent"
+      :session-id="sessionId"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
+import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
 import { computed, onActivated, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -142,6 +151,12 @@ const frustrationCount = computed(() => {
     event.frustration_types && event.frustration_types.length > 0
   ).length;
 });
+
+// Event detail drawer state
+const showEventDetailDrawer = ref(false);
+const selectedEvent = ref<any>({});
+const selectedRawEvent = ref<any>({});
+const rawEventsMap = ref<Map<string, any>>(new Map());
 
 onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
@@ -331,6 +346,11 @@ const getSessionEvents = () => {
         );
       });
       segmentEvents.value = segmentEvents.value.map((hit: any) => {
+        // Store raw event data for detail view
+        const eventId = hit[`${hit.type}_id`];
+        if (eventId) {
+          rawEventsMap.value.set(eventId, hit);
+        }
         return formatEvent(hit);
       });
       getSessionErrorLogs();
@@ -378,6 +398,8 @@ const getSessionErrorLogs = () => {
         hit.type = "error";
         hit.error_id = getUUID();
         hit.error_message = hit.message;
+        // Store raw event data
+        rawEventsMap.value.set(hit.error_id, hit);
         segmentEvents.value.push(formatEvent(hit));
       });
 
@@ -495,6 +517,14 @@ const getFormattedDate = (timestamp: number) =>
   date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
 const handleSidebarEvent = (event: string, payload: any) => {
+  if (event === "event-click") {
+    // Open event detail drawer
+    selectedEvent.value = payload;
+    selectedRawEvent.value = rawEventsMap.value.get(payload.event_id) || {};
+    showEventDetailDrawer.value = true;
+  }
+
+  // Always seek to the event time in the video player
   videoPlayerRef.value.goto(
     payload.relativeTime,
     !!videoPlayerRef.value.playerState?.isPlaying,
