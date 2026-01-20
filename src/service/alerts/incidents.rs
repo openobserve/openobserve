@@ -717,7 +717,7 @@ pub async fn enrich_with_topology(
         log::debug!(
             "[incidents] Service graph has no edges, will use temporal edges for cross-service correlation"
         );
-        (vec![], vec![], std::collections::HashMap::new())
+        (vec![], vec![], vec![])
     };
 
     // Create service-to-node mapping for quick lookup
@@ -762,7 +762,13 @@ pub async fn enrich_with_topology(
                         let edge_exists = topology.edges.iter().any(|e| {
                             e.from_node_index == from_idx
                                 && e.to_node_index == to_idx
-                                && e.edge_type == edge_type
+                                && match (&e.edge_type, &edge_type) {
+                                    (EdgeType::ServiceDependency, EdgeType::ServiceDependency) => {
+                                        true
+                                    }
+                                    (EdgeType::Temporal, EdgeType::Temporal) => true,
+                                    _ => false,
+                                }
                         });
 
                         if !edge_exists {
