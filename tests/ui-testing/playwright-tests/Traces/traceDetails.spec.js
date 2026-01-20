@@ -1,5 +1,6 @@
 // traceDetails.spec.js
 // Tests for OpenObserve Traces feature - Trace Details functionality
+// CONSOLIDATED: 5 → 4 tests
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -54,80 +55,92 @@ test.describe("Trace Details testcases", () => {
 
     // Open trace details
     await pm.tracesPage.clickFirstTraceResult();
-    await page.waitForTimeout(3000); // Extra wait for trace details to render
 
-    // Check if trace details are visible using multiple methods
-    const detailsTreeVisible = await pm.tracesPage.isTraceDetailsTreeVisible();
-    const anyDetailsVisible = await pm.tracesPage.isAnyTraceDetailVisible();
+    // Wait with retry for trace details to render (UI may be slow)
+    let detailsTreeVisible = false;
+    let anyDetailsVisible = false;
+    let clickSuccessful = false;
 
-    if (!detailsTreeVisible && !anyDetailsVisible) {
-      testLogger.info('Trace details not visible - UI may render differently');
-      // Verify we're still on a valid page
-      const currentUrl = pm.tracesPage.getPageUrl();
-      expect(currentUrl).toContain('traces');
-      return false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await page.waitForTimeout(2000);
+      detailsTreeVisible = await pm.tracesPage.isTraceDetailsTreeVisible();
+      anyDetailsVisible = await pm.tracesPage.isAnyTraceDetailVisible();
+      clickSuccessful = await pm.tracesPage.isTraceClickSuccessful();
+
+      if (detailsTreeVisible || anyDetailsVisible) {
+        testLogger.info(`Trace details visible on attempt ${attempt + 1} for ${testName}`);
+        return true;
+      }
+
+      // If click was successful (we're still on traces page with UI intact),
+      // the trace details may be displayed inline or in a non-standard way
+      if (clickSuccessful) {
+        testLogger.info(`Trace click successful on attempt ${attempt + 1} for ${testName} - UI may show details inline`);
+        return true;
+      }
+
+      testLogger.info(`Waiting for trace details, attempt ${attempt + 1} for ${testName}`);
     }
 
-    return true;
+    // Final fallback: check if we're at least on the traces page with working UI
+    if (await pm.tracesPage.isTraceClickSuccessful()) {
+      testLogger.info(`Trace clicked successfully for ${testName} - trace details may render differently in this UI`);
+      return true;
+    }
+
+    throw new Error(`Precondition failed: Trace details not visible for ${testName}. UI may render differently or trace data is missing.`);
   }
 
-  test("P1: Toggle timeline view in trace details", {
+  // CONSOLIDATED: Merged "Toggle timeline view in trace details" + "Copy trace ID functionality"
+  test("P1: Trace details panel features - timeline and copy ID", {
     tag: ['@traceDetails', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing timeline toggle in trace details');
+    testLogger.info('Testing trace details panel features: timeline and copy ID');
 
-    const detailsOpened = await openTraceDetailsIfAvailable(page, pm, 'timeline test');
+    await openTraceDetailsIfAvailable(page, pm, 'panel features test');
 
-    if (!detailsOpened) {
-      testLogger.info('Trace details not fully rendered - test passes with UI verification');
-      return;
-    }
+    // === Test 1: Toggle timeline view in trace details (Original test #1) ===
+    await test.step('Toggle timeline view in trace details', async () => {
+      testLogger.info('Testing timeline toggle in trace details');
 
-    // Toggle timeline
-    const timelineButtonVisible = await pm.tracesPage.isTimelineToggleVisible();
-    if (timelineButtonVisible) {
-      await pm.tracesPage.toggleTimelineView();
-      await page.waitForTimeout(1000); // Animation
+      // Toggle timeline
+      const timelineButtonVisible = await pm.tracesPage.isTimelineToggleVisible();
+      if (timelineButtonVisible) {
+        await pm.tracesPage.toggleTimelineView();
+        await page.waitForTimeout(1000); // Animation
 
-      // Check if timeline is visible
-      const timelineVisible = await pm.tracesPage.isTimelineChartVisible();
-      testLogger.info(`Timeline toggled: ${timelineVisible ? 'visible' : 'hidden'}`);
-      // Verify toggle functionality worked
-      expect(timelineButtonVisible).toBeTruthy();
-    } else {
-      testLogger.info('Timeline toggle not available');
-      // Verify we at least opened trace details
-      const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
-      expect(detailsVisible).toBeTruthy();
-    }
-  });
+        // Check if timeline is visible
+        const timelineVisible = await pm.tracesPage.isTimelineChartVisible();
+        testLogger.info(`Timeline toggled: ${timelineVisible ? 'visible' : 'hidden'}`);
+        // Verify toggle functionality worked
+        expect(timelineButtonVisible).toBeTruthy();
+      } else {
+        testLogger.info('Timeline toggle not available');
+        // Verify we at least opened trace details
+        const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
+        expect(detailsVisible).toBeTruthy();
+      }
+    });
 
-  test("P1: Copy trace ID functionality", {
-    tag: ['@traceDetails', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing copy trace ID');
+    // === Test 2: Copy trace ID functionality (Original test #2) ===
+    await test.step('Copy trace ID functionality', async () => {
+      testLogger.info('Testing copy trace ID');
 
-    const detailsOpened = await openTraceDetailsIfAvailable(page, pm, 'copy test');
+      // Copy trace ID
+      const copyButtonVisible = await pm.tracesPage.isCopyTraceIdButtonVisible();
+      if (copyButtonVisible) {
+        await pm.tracesPage.copyTraceId();
 
-    if (!detailsOpened) {
-      testLogger.info('Trace details not fully rendered - test passes with UI verification');
-      return;
-    }
-
-    // Copy trace ID
-    const copyButtonVisible = await pm.tracesPage.isCopyTraceIdButtonVisible();
-    if (copyButtonVisible) {
-      await pm.tracesPage.copyTraceId();
-
-      // Check for success notification or clipboard content
-      testLogger.info('Trace ID copy functionality tested');
-      expect(copyButtonVisible).toBeTruthy();
-    } else {
-      testLogger.info('Copy button not available');
-      // Verify we at least opened trace details
-      const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
-      expect(detailsVisible).toBeTruthy();
-    }
+        // Check for success notification or clipboard content
+        testLogger.info('Trace ID copy functionality tested');
+        expect(copyButtonVisible).toBeTruthy();
+      } else {
+        testLogger.info('Copy button not available');
+        // Verify we at least opened trace details
+        const detailsVisible = await pm.tracesPage.isTraceDetailsTreeVisible() || await pm.tracesPage.isAnyTraceDetailVisible();
+        expect(detailsVisible).toBeTruthy();
+      }
+    });
   });
 
   test("P1: View related logs from trace details", {
@@ -135,12 +148,7 @@ test.describe("Trace Details testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing view related logs');
 
-    const detailsOpened = await openTraceDetailsIfAvailable(page, pm, 'logs test');
-
-    if (!detailsOpened) {
-      testLogger.info('Trace details not fully rendered - test passes with UI verification');
-      return;
-    }
+    await openTraceDetailsIfAvailable(page, pm, 'logs test');
 
     // Check if view logs button is available
     const viewLogsButtonVisible = await pm.tracesPage.isViewLogsButtonVisible();
@@ -165,12 +173,7 @@ test.describe("Trace Details testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing search within trace');
 
-    const detailsOpened = await openTraceDetailsIfAvailable(page, pm, 'search test');
-
-    if (!detailsOpened) {
-      testLogger.info('Trace details not fully rendered - test passes with UI verification');
-      return;
-    }
+    await openTraceDetailsIfAvailable(page, pm, 'search test');
 
     // Try search within trace
     const searchInputVisible = await pm.tracesPage.isTraceDetailsSearchInputVisible();
@@ -194,12 +197,7 @@ test.describe("Trace Details testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing share trace link');
 
-    const detailsOpened = await openTraceDetailsIfAvailable(page, pm, 'share test');
-
-    if (!detailsOpened) {
-      testLogger.info('Trace details not fully rendered - test passes with UI verification');
-      return;
-    }
+    await openTraceDetailsIfAvailable(page, pm, 'share test');
 
     // Share trace link
     const shareButtonVisible = await pm.tracesPage.isShareLinkButtonVisible();
