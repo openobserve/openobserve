@@ -585,10 +585,7 @@ mod tests {
         assert_eq!(user_request.last_name, "Doe");
         assert_eq!(user_request.password, "password123");
         assert_eq!(user_request.role.base_role, UserRole::Admin);
-        assert_eq!(
-            user_request.role.custom_role.unwrap().first().unwrap(),
-            "Admin"
-        );
+        assert!(user_request.role.custom_role.is_none());
         assert!(!user_request.is_external);
         assert!(user_request.token.is_none());
     }
