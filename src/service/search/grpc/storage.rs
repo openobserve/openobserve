@@ -253,18 +253,49 @@ pub async fn search(
 
     log::debug!("search->storage: session target_partitions: {target_partitions}");
 
-    let table = TableBuilder::new()
-        .sorted_by_time(sorted_by_time)
-        .file_stat_cache(file_stat_cache.clone())
-        .index_condition(index_condition.clone())
-        .fst_fields(fst_fields.clone())
-        .timestamp_filter(query.time_range)
-        .build(
-            session,
-            files,
-            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
-        )
-        .await?;
+    // Split files into two groups:
+    // 1. Files completely within the query time range (no timestamp filter needed)
+    // 2. Files partially overlapping with the query time range (need timestamp filter)
+    let (start_time, end_time) = query.time_range;
+    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
+        .into_iter()
+        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
+
+    log::info!(
+        "[trace_id {trace_id}] search->storage: split files - without filter: {}, with filter: {}",
+        files_without_filter.len(),
+        files_with_filter.len()
+    );
+
+    let mut tables = Vec::new();
+    let schema_arc = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+
+    // Create table for files without timestamp filter
+    if !files_without_filter.is_empty() {
+        let builder = TableBuilder::new()
+            .sorted_by_time(sorted_by_time)
+            .file_stat_cache(file_stat_cache.clone())
+            .index_condition(index_condition.clone())
+            .fst_fields(fst_fields.clone());
+        // Don't call timestamp_filter() to keep it as None
+        let table = builder
+            .build(session.clone(), files_without_filter, schema_arc.clone())
+            .await?;
+        tables.push(table);
+    }
+
+    // Create table for files with timestamp filter
+    if !files_with_filter.is_empty() {
+        let table = TableBuilder::new()
+            .sorted_by_time(sorted_by_time)
+            .file_stat_cache(file_stat_cache.clone())
+            .index_condition(index_condition.clone())
+            .fst_fields(fst_fields.clone())
+            .timestamp_filter(query.time_range)
+            .build(session.clone(), files_with_filter, schema_arc.clone())
+            .await?;
+        tables.push(table);
+    }
 
     log::info!(
         "{}",
@@ -281,7 +312,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
