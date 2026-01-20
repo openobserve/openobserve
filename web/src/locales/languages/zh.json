@@ -476,7 +476,190 @@
     "value_cost_free": "免费",
     "value_cost_enterprise": "如果是自托管，则每天最多可免费摄取 200 GB 的数据。之后付款",
     "value_cost_cloud": "14 天免费试用。之后付款",
-    "feature_comparison_lbl": "功能对比"
+    "feature_comparison_lbl": "功能对比",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "企业功能",
+        "offer_text": "自托管 OpenObserve 即可完全免费获得所有企业功能",
+        "badge_text": "免费高达 200GB /天",
+        "features_title": "OpenObserve",
+        "features_subtitle": "您的云订阅中包含的所有功能",
+        "primary_button_text": "立即下载"
+      },
+      "enterprise_without_license": {
+        "hero_title": "企业功能",
+        "offer_text": "申请免费许可证以最大限度地部署 OpenObserve",
+        "badge_text": "免费高达 {配额} GB /天",
+        "features_title": "可用的企业功能",
+        "features_subtitle": "获取免费许可证以解锁无限功能",
+        "primary_button_text": "获取免费许可证",
+        "license_note": "没有许可证 100GB/天 • 有许可证则为每天 200GB"
+      },
+      "enterprise_with_license": {
+        "hero_title": "您的企业版",
+        "offer_text": "你正在运行启用所有功能的 OpenObserve 企业版",
+        "badge_text_unlimited": "摄取限制：无限制",
+        "badge_text_limited": "摄取限制：{限制} GB/天",
+        "features_title": "活跃的企业功能",
+        "features_subtitle": "所有功能均已解锁，可供使用",
+        "primary_button_text": "管理许可证"
+      },
+      "open_source": {
+        "hero_title": "获取企业版",
+        "offer_text": "完全免费下载和解锁所有企业功能",
+        "badge_text": "免费高达 200GB /天",
+        "features_title": "解锁所有企业版功能",
+        "features_subtitle": "生产就绪可观测性所需的一切",
+        "primary_button_text": "立即下载"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "日志、指标、跟踪",
+          "note": "全面的可观测性数据摄取和分析"
+        },
+        "rum": {
+          "name": "朗姆酒",
+          "note": "对前端性能进行真实用户监控"
+        },
+        "alerts": {
+          "name": "警报",
+          "note": "实时警报和通知"
+        },
+        "dashboards": {
+          "name": "仪表板",
+          "note": "自定义的可视化仪表板"
+        },
+        "reports": {
+          "name": "报告",
+          "note": "定期报告和按需报告"
+        },
+        "vrl_functions": {
+          "name": "VRL 函数",
+          "note": "用于数据转换的矢量重映射语言"
+        },
+        "pipelines": {
+          "name": "管道",
+          "note": "数据处理和转换管道"
+        },
+        "high_availability": {
+          "name": "高可用性",
+          "note": "分布式架构确保可靠性"
+        },
+        "multitenancy": {
+          "name": "多租户",
+          "note": "基于组织的数据隔离"
+        },
+        "dynamic_schema": {
+          "name": "动态架构",
+          "note": "自动架构检测和演变"
+        },
+        "multilingual_gui": {
+          "name": "多语言 GUI",
+          "note": "高级国际化支持"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "单点登录",
+          "note": "与 SSO 提供商进行无缝身份验证"
+        },
+        "rbac": {
+          "name": "基于角色的访问控制",
+          "note": "精细的权限和用户管理"
+        },
+        "federated_search": {
+          "name": "联合搜索/超级集群",
+          "note": "在多个集群之间分配查询"
+        },
+        "query_management": {
+          "name": "查询管理",
+          "note": "高级查询监控和优化"
+        },
+        "workload_management": {
+          "name": "工作负载管理",
+          "note": "基于优先级的资源分配和 QoS"
+        },
+        "audit_trail": {
+          "name": "审计追踪",
+          "note": "完成活动记录以确保合规性"
+        },
+        "action_scripts": {
+          "name": "操作脚本",
+          "note": "自动响应事件和警报"
+        },
+        "sensitive_data_redaction": {
+          "name": "敏感数据编辑",
+          "note": "保护 PII 和敏感信息"
+        },
+        "pipeline_remote_destinations": {
+          "name": "管道远程目的地",
+          "note": "将数据发送到远程目的地"
+        },
+        "query_optimizer": {
+          "name": "查询优化器/聚合缓存",
+          "note": "TopK 聚合和查询优化"
+        },
+        "incident_management": {
+          "name": "事故管理",
+          "note": "高效跟踪和管理事件"
+        },
+        "sre_agent": {
+          "name": "SRE 代理",
+          "note": "自动化 SRE 操作和见解"
+        },
+        "ai_assistant": {
+          "name": "人工智能助手",
+          "note": "智能查询和分析协助"
+        },
+        "anomaly_detection": {
+          "name": "异常检测",
+          "note": "自动检测数据中的异常"
+        },
+        "metrics_auto_downsampling": {
+          "name": "指标自动下采样",
+          "note": "随时间推移自动汇总指标"
+        },
+        "log_patterns": {
+          "name": "日志模式",
+          "note": "发现日志数据中的模式"
+        },
+        "mcp_server": {
+          "name": "MCP 服务器",
+          "note": "模型上下文协议服务器集成"
+        },
+        "rate_limiting": {
+          "name": "速率限制",
+          "note": "控制查询和摄取率"
+        },
+        "broadcast_join": {
+          "name": "广播加入",
+          "note": "优化的分布式联接操作"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "日志、指标和跟踪的关联",
+          "note": "自动检测和关联"
+        },
+        "service_maps": {
+          "name": "服务地图",
+          "note": "可视化服务依赖关系"
+        }
+      },
+      "buttons": {
+        "contact_sales": "联系销售人员",
+        "learn_more": "了解更多"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "仅限高可用性模式"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "您无权管理许可证。"
+      }
+    },
+    "header_button": {
+      "cloud_features": "开放观察功能",
+      "enterprise_edition": "版本：企业版",
+      "get_enterprise_free": "获取OpenObserve 企业版（免费）"
+    }
   },
   "login": {
     "userid": "账号",

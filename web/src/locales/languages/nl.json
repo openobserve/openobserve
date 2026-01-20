@@ -476,7 +476,190 @@
     "value_cost_free": "Gratis",
     "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 200 GB aan data die per dag wordt opgenomen. Daarna betaald",
     "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald",
-    "feature_comparison_lbl": "Vergelijking van functies"
+    "feature_comparison_lbl": "Vergelijking van functies",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "Enterprise-functies",
+        "offer_text": "Krijg alle zakelijke functies volledig gratis wanneer u OpenObserve zelf host",
+        "badge_text": "Gratis tot 200 GB per dag",
+        "features_title": "OpenObserve Cloud-functies",
+        "features_subtitle": "Alle functies inbegrepen in je cloud-abonnement",
+        "primary_button_text": "Nu downloaden"
+      },
+      "enterprise_without_license": {
+        "hero_title": "Enterprise-functies",
+        "offer_text": "Vraag een gratis licentie aan om uw OpenObsere-implementatie te maximaliseren",
+        "badge_text": "Gratis tot {quota} GB per dag",
+        "features_title": "Beschikbare functies voor bedrijven",
+        "features_subtitle": "Ontvang een gratis licentie om onbeperkte mogelijkheden te ontgrendelen",
+        "primary_button_text": "Ontvang een gratis licentie",
+        "license_note": "100 GB/dag zonder licentie • 200 GB/dag met licentie"
+      },
+      "enterprise_with_license": {
+        "hero_title": "Uw Enterprise-editie",
+        "offer_text": "U gebruikt OpenObserve Enterprise met alle functies ingeschakeld",
+        "badge_text_unlimited": "Inslimiet: onbeperkt",
+        "badge_text_limited": "Inslimiet: {limiet} GB/dag",
+        "features_title": "Active Enterprise-functies",
+        "features_subtitle": "Alle functies ontgrendeld en klaar voor gebruik",
+        "primary_button_text": "Licentie beheren"
+      },
+      "open_source": {
+        "hero_title": "Koop de Enterprise-editie",
+        "offer_text": "Download en ontgrendelt alle bedrijfsfuncties volledig gratis",
+        "badge_text": "Gratis tot 200 GB per dag",
+        "features_title": "Ontgrendelt alle bedrijfsfuncties",
+        "features_subtitle": "Alles wat u nodig hebt voor een productieklare observatie",
+        "primary_button_text": "Nu downloaden"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "Logboeken, statistieken, sporen",
+          "note": "Inname en analyse van volledige waarneembaarheidsgegevens"
+        },
+        "rum": {
+          "name": "RUM",
+          "note": "Real User Monitoring voor frontend-prestaties"
+        },
+        "alerts": {
+          "name": "Waarschuwingen",
+          "note": "Waarschuwingen en meldingen in realtime"
+        },
+        "dashboards": {
+          "name": "Dashboards",
+          "note": "Aanpasbare visualisatiedashboards"
+        },
+        "reports": {
+          "name": "Rapporten",
+          "note": "Geplande en on-demand rapportage"
+        },
+        "vrl_functions": {
+          "name": "VRL-functies",
+          "note": "Vector Remap Language voor gegevenstransformatie"
+        },
+        "pipelines": {
+          "name": "Pijpleidingen",
+          "note": "Pijplijnen voor gegevensverwerking en -transformatie"
+        },
+        "high_availability": {
+          "name": "Hoge beschikbaarheid",
+          "note": "Gedistribueerde architectuur voor betrouwbaarheid"
+        },
+        "multitenancy": {
+          "name": "Multitenancy",
+          "note": "Gegevensisolatie op basis van een organisatie"
+        },
+        "dynamic_schema": {
+          "name": "Dynamisch schema",
+          "note": "Automatische schemadetectie en -evolutie"
+        },
+        "multilingual_gui": {
+          "name": "Meertalige GUI",
+          "note": "Geavanceerde ondersteuning voor internationalisering"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "Eenmalige aanmelding",
+          "note": "Naadloze authenticatie met SSO-providers"
+        },
+        "rbac": {
+          "name": "Op rollen gebaseerde toegangscontrole",
+          "note": "Gedetailleerde machtigingen en gebruikersbeheer"
+        },
+        "federated_search": {
+          "name": "Gefedereerd zoeken/Supercluster",
+          "note": "Query's over meerdere clusters verdelen"
+        },
+        "query_management": {
+          "name": "Beheer van zoekopdrachten",
+          "note": "Geavanceerde querybewaking en -optimalisatie"
+        },
+        "workload_management": {
+          "name": "Beheer van de werklast",
+          "note": "Op prioriteit gebaseerde toewijzing van middelen en QoS"
+        },
+        "audit_trail": {
+          "name": "Audittrail",
+          "note": "Volledige activiteitsregistratie voor naleving"
+        },
+        "action_scripts": {
+          "name": "Actiescripts",
+          "note": "Automatiseer reacties op gebeurtenissen en waarschuwingen"
+        },
+        "sensitive_data_redaction": {
+          "name": "Redactie van gevoelige gegevens",
+          "note": "Bescherm PII en gevoelige informatie"
+        },
+        "pipeline_remote_destinations": {
+          "name": "Afgelegen bestemmingen via pijplijn",
+          "note": "Gegevens naar afgelegen bestemmingen verzenden"
+        },
+        "query_optimizer": {
+          "name": "Query Optimizer/Aggregatiecache",
+          "note": "TopK-aggregatie en query-optimalisatie"
+        },
+        "incident_management": {
+          "name": "Incidentbeheer",
+          "note": "Incidenten efficiënt volgen en beheren"
+        },
+        "sre_agent": {
+          "name": "SRE-agent",
+          "note": "Geautomatiseerde SRE-activiteiten en -inzichten"
+        },
+        "ai_assistant": {
+          "name": "AI-assistent",
+          "note": "Intelligente hulp bij het opvragen en analyseren"
+        },
+        "anomaly_detection": {
+          "name": "Detectie van afwijkingen",
+          "note": "Detecteer automatisch afwijkingen in gegevens"
+        },
+        "metrics_auto_downsampling": {
+          "name": "Automatische downsampling van statistieken",
+          "note": "Automatische aggregatie van statistieken in de loop van de tijd"
+        },
+        "log_patterns": {
+          "name": "Logpatronen",
+          "note": "Ontdek patronen in logboekgegevens"
+        },
+        "mcp_server": {
+          "name": "MCP-server",
+          "note": "Serverintegratie met Model Context Protocol"
+        },
+        "rate_limiting": {
+          "name": "Snelheidsbeperking",
+          "note": "Controleer de vraag- en opnamesnelheden"
+        },
+        "broadcast_join": {
+          "name": "Uitzenden Doe mee",
+          "note": "Geoptimaliseerde gedistribueerde join-activiteiten"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "Correlatie tussen logboeken, statistieken en sporen",
+          "note": "Geautomatiseerde detectie en correlatie"
+        },
+        "service_maps": {
+          "name": "Servicekaarten",
+          "note": "Visualiseer serviceafhankelijkheden"
+        }
+      },
+      "buttons": {
+        "contact_sales": "Neem contact op met Sales",
+        "learn_more": "Meer informatie"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "Alleen in de modus Hoge beschikbaarheid"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "Je bent niet bevoegd om de licentie te beheren."
+      }
+    },
+    "header_button": {
+      "cloud_features": "OpenObsere-functies",
+      "enterprise_edition": "Editie: Enterprise",
+      "get_enterprise_free": "Download OpenObserve Enterprise (gratis)"
+    }
   },
   "login": {
     "userid": "Gebruikers-ID",

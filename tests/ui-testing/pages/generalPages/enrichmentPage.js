@@ -747,8 +747,22 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug(`Clicking edit button for: ${tableName}`);
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
         await row.waitFor({ state: 'visible', timeout: 10000 });
-        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
-        const editBtn = row.locator('button').nth(2);
+
+        // Find edit button - it's the second-to-last button (before delete)
+        // For file tables: Explore (0), Schema (1), Edit (2), Delete (3)
+        // For URL tables: Edit (0), Delete (1)
+        const buttons = row.locator('button');
+        const buttonCount = await buttons.count();
+        testLogger.debug(`Found ${buttonCount} buttons in row`);
+
+        // Bounds check: need at least 2 buttons (edit + delete)
+        if (buttonCount < 2) {
+            throw new Error(`Expected at least 2 buttons in row for table "${tableName}", found ${buttonCount}. Job may still be processing.`);
+        }
+
+        // Edit button is always second-to-last (before delete)
+        const editBtnIndex = buttonCount - 2;
+        const editBtn = buttons.nth(editBtnIndex);
         await editBtn.waitFor({ state: 'visible', timeout: 10000 });
         await editBtn.click();
         await this.page.waitForLoadState('networkidle');
@@ -778,10 +792,28 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async clickDeleteButton(tableName) {
+        testLogger.debug(`Clicking delete button for: ${tableName}`);
         const row = this.page.locator('tbody tr').filter({ hasText: tableName });
-        // Buttons order: Explore (0), Schema (1), Edit (2), Delete (3)
-        await row.locator('button').nth(3).click();
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Delete button is always the last button in the row
+        // For file tables: Explore (0), Schema (1), Edit (2), Delete (3)
+        // For URL tables: Edit (0), Delete (1)
+        const buttons = row.locator('button');
+        const buttonCount = await buttons.count();
+        testLogger.debug(`Found ${buttonCount} buttons in row`);
+
+        // Bounds check: need at least 1 button (delete)
+        if (buttonCount < 1) {
+            throw new Error(`Expected at least 1 button in row for table "${tableName}", found ${buttonCount}. Job may still be processing.`);
+        }
+
+        // Delete is always the last button
+        const deleteBtn = buttons.nth(buttonCount - 1);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
         await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Delete button clicked');
     }
 
     async verifyDeleteConfirmationDialog() {
@@ -1063,7 +1095,37 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Wait for form to fully load - the update mode options may take time to render in CI
         await this.page.waitForLoadState('networkidle');
-        await this.page.waitForTimeout(5000); // Longer wait for CI form rendering
+
+        // First, ensure we're on the Update form (wait for title with longer timeout for CI)
+        const updateTitle = this.page.getByText('Update Enrichment Table');
+        await updateTitle.waitFor({ state: 'visible', timeout: 30000 });
+        testLogger.debug('Update form title visible');
+
+        // Wait for option group or radio elements to appear (CI renders slower)
+        const optionGroupIndicators = [
+            '.q-option-group',
+            '.q-radio',
+            '[role="radiogroup"]',
+            'text=/Update Mode/i'
+        ];
+
+        let formReady = false;
+        for (let waitAttempt = 1; waitAttempt <= 6 && !formReady; waitAttempt++) {
+            testLogger.debug(`Waiting for form elements - attempt ${waitAttempt}/6`);
+
+            for (const indicator of optionGroupIndicators) {
+                const locator = this.page.locator(indicator).first();
+                if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    formReady = true;
+                    testLogger.debug(`Form element found: ${indicator}`);
+                    break;
+                }
+            }
+
+            if (!formReady) {
+                await this.page.waitForTimeout(2000);
+            }
+        }
 
         // Scroll the dialog content to ensure all elements are visible
         const dialogContent = this.page.locator('.q-dialog .q-card, .q-dialog__inner');
@@ -1105,7 +1167,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Try each selector until one works - with multiple attempts
         let clicked = false;
-        for (let attempt = 1; attempt <= 3 && !clicked; attempt++) {
+        for (let attempt = 1; attempt <= 5 && !clicked; attempt++) {
             testLogger.debug(`Attempt ${attempt} to find update mode option for: ${mode}`);
 
             for (const selector of selectors) {
@@ -1126,9 +1188,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 }
             }
 
-            if (!clicked && attempt < 3) {
+            if (!clicked && attempt < 5) {
                 // Wait and retry
-                await this.page.waitForTimeout(2000);
+                await this.page.waitForTimeout(3000);
+                // Try scrolling to bottom to reveal options
+                await dialogContent.first().evaluate(el => {
+                    el.scrollTop = el.scrollHeight;
+                }).catch(() => {});
             }
         }
 
@@ -1589,6 +1655,529 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expect(existingUrlsText).toBeVisible({ timeout: 10000 });
 
         testLogger.debug(`Existing URLs count verified: ${expectedCount}`);
+    }
+
+    // ============================================================================
+    // POM COMPLIANCE METHODS - Extracted from spec file raw selectors
+    // ============================================================================
+
+    /**
+     * Click the Save button on enrichment table form
+     */
+    async clickSaveButton() {
+        testLogger.debug('Clicking Save button');
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        await this.page.waitForLoadState('networkidle');
+        testLogger.debug('Save button clicked');
+    }
+
+    /**
+     * Wait for the Add Enrichment Table form to close
+     * @param {number} timeout - Timeout in milliseconds (default 15000)
+     * @returns {Promise<boolean>} True if form closed, false if still visible
+     */
+    async waitForAddFormToClose(timeout = 15000) {
+        testLogger.debug('Waiting for Add Enrichment Table form to close');
+        const formTitle = this.page.getByText('Add Enrichment Table');
+        const formHidden = await formTitle.waitFor({ state: 'hidden', timeout }).then(() => true).catch(() => false);
+        testLogger.debug(`Form closed: ${formHidden}`);
+        return formHidden;
+    }
+
+    /**
+     * Check for error notification and return its text if visible
+     * @returns {Promise<{hasError: boolean, errorText: string|null}>}
+     */
+    async checkForErrorNotification() {
+        testLogger.debug('Checking for error notification');
+        const errorNotification = this.page.locator('.q-notification__message, .q-banner, [role="alert"]');
+        const hasError = await errorNotification.first().isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (hasError) {
+            const errorText = await errorNotification.first().textContent();
+            testLogger.debug(`Error notification found: ${errorText}`);
+            return { hasError: true, errorText };
+        }
+
+        testLogger.debug('No error notification found');
+        return { hasError: false, errorText: null };
+    }
+
+    /**
+     * Navigate back from form - handles Cancel button visibility check
+     * If Cancel button is visible, clicks it; otherwise navigates to enrichment table list
+     * Handles race condition where form may auto-close after error notification
+     */
+    async navigateBackFromFormIfNeeded() {
+        testLogger.debug('Navigating back from form');
+
+        // Wait briefly for any auto-close behavior to complete
+        await this.page.waitForTimeout(1000);
+
+        const cancelBtn = this.page.getByRole('button', { name: 'Cancel' });
+        const isCancelVisible = await cancelBtn.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (isCancelVisible) {
+            try {
+                // Use click with shorter timeout and handle detachment gracefully
+                await cancelBtn.click({ timeout: 5000 });
+                await this.page.waitForLoadState('networkidle');
+                testLogger.debug('Clicked Cancel button to navigate back');
+            } catch (clickError) {
+                // Element may have been detached (form auto-closed) - this is okay
+                if (clickError.message.includes('detached') || clickError.message.includes('Target closed')) {
+                    testLogger.debug('Cancel button detached (form auto-closed) - navigating to list');
+                    await this.navigateToEnrichmentTable();
+                } else {
+                    throw clickError;
+                }
+            }
+        } else {
+            await this.navigateToEnrichmentTable();
+            testLogger.debug('Form already closed, navigated to enrichment tables list');
+        }
+    }
+
+    /**
+     * Wait for Enrichment Tables list to be visible
+     * @param {number} timeout - Timeout in milliseconds (default 15000)
+     */
+    async waitForEnrichmentTablesList(timeout = 15000) {
+        testLogger.debug('Waiting for Enrichment Tables list');
+        await this.page.locator('.q-table__title').filter({ hasText: 'Enrichment Tables' }).waitFor({ state: 'visible', timeout });
+        testLogger.debug('Enrichment Tables list is visible');
+    }
+
+    /**
+     * Search for table with retry logic (for CI environments)
+     * @param {string} tableName - Name of table to search
+     * @param {number} maxAttempts - Maximum number of retry attempts (default 5)
+     * @returns {Promise<{found: boolean, row: any}>}
+     */
+    async searchTableWithRetry(tableName, maxAttempts = 5) {
+        testLogger.debug(`Searching for table with retry: ${tableName}`);
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            testLogger.info(`Searching for table - attempt ${attempt}/${maxAttempts}`);
+
+            // Clear search and search again
+            const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
+            await searchInput.clear();
+            await this.page.waitForTimeout(1000);
+            await searchInput.fill(tableName);
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(2000);
+
+            // Use isVisible with catch instead of expect to avoid race condition
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const isVisible = await row.isVisible({ timeout: 10000 }).catch(() => false);
+
+            if (isVisible) {
+                testLogger.info('Table found in list');
+                return { found: true, row };
+            }
+
+            if (attempt < maxAttempts) {
+                testLogger.info('Table not found yet, waiting and retrying...');
+                await this.page.waitForTimeout(5000);
+                await this.page.reload({ waitUntil: 'networkidle' });
+                await this.waitForEnrichmentTablesList();
+            }
+        }
+
+        testLogger.warn(`Table ${tableName} not found after ${maxAttempts} attempts`);
+        return { found: false, row: null };
+    }
+
+    /**
+     * Take debug screenshot
+     * @param {string} filename - Screenshot filename (without path)
+     */
+    async takeDebugScreenshot(filename) {
+        testLogger.debug(`Taking debug screenshot: ${filename}`);
+        await this.page.screenshot({ path: `test-results/${filename}`, fullPage: true });
+        testLogger.debug(`Screenshot saved to test-results/${filename}`);
+    }
+
+    // ============================================================================
+    // URL JOBS DIALOG METHODS
+    // ============================================================================
+
+    /**
+     * Click on the URL status icon in the table row to open URL Jobs dialog
+     * @param {string} tableName - Name of the table
+     */
+    async clickUrlStatusIcon(tableName) {
+        testLogger.debug(`Clicking URL status icon for: ${tableName}`);
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Find the Type cell that contains "Url" text and click the icon next to it
+        // The icon can be: clock (processing), warning (failed), check_circle (completed)
+        const typeCell = row.locator('td').filter({ hasText: 'Url' });
+        await typeCell.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Click on the icon within the Type cell
+        const statusIcon = typeCell.locator('i, .q-icon, svg').first();
+        if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await statusIcon.click();
+        } else {
+            // Fallback: click on the cell itself
+            testLogger.debug('No icon found, clicking on Type cell');
+            await typeCell.click();
+        }
+
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('URL status icon clicked');
+    }
+
+    /**
+     * Wait for URL Jobs dialog to open
+     * @param {string} tableName - Expected table name in dialog title
+     */
+    async waitForUrlJobsDialog(tableName) {
+        testLogger.debug(`Waiting for URL Jobs dialog for: ${tableName}`);
+
+        // Wait for dialog with title "URL Jobs for <tableName>"
+        const dialogTitle = this.page.getByText(`URL Jobs for ${tableName}`);
+        await dialogTitle.waitFor({ state: 'visible', timeout: 15000 });
+
+        testLogger.debug('URL Jobs dialog is visible');
+    }
+
+    /**
+     * Verify a job shows failed status in URL Jobs dialog
+     */
+    async verifyJobFailed() {
+        testLogger.debug('Verifying job failed');
+
+        // Look for the failed badge (use first() to avoid strict mode violation)
+        const failedBadge = this.page.locator('.q-dialog .q-badge').filter({ hasText: 'failed' }).first();
+        await expect(failedBadge).toBeVisible({ timeout: 10000 });
+
+        testLogger.debug('Job failed status verified');
+    }
+
+    /**
+     * Verify URL Jobs dialog shows a specific error message
+     * @param {RegExp|string} errorPattern - Error message pattern to look for
+     */
+    async verifyJobError(errorPattern) {
+        testLogger.debug(`Verifying job error matches: ${errorPattern}`);
+
+        const errorMessage = this.page.locator('.q-dialog').getByText(errorPattern);
+        await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
+
+        testLogger.debug('Job error verified');
+    }
+
+    /**
+     * Verify a job shows completed status
+     */
+    async verifyJobCompleted() {
+        testLogger.debug('Verifying job completed');
+
+        // Look for the completed badge
+        const completedBadge = this.page.locator('.q-dialog').getByText('completed');
+        await expect(completedBadge).toBeVisible({ timeout: 10000 });
+
+        testLogger.debug('Job completed status verified');
+    }
+
+    /**
+     * Close the URL Jobs dialog
+     */
+    async closeUrlJobsDialog() {
+        testLogger.debug('Closing URL Jobs dialog');
+
+        // Try clicking X button, fallback to pressing Escape
+        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog .q-btn--flat').first();
+        if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await closeBtn.click();
+        } else {
+            await this.page.keyboard.press('Escape');
+        }
+
+        await this.page.waitForTimeout(500);
+        testLogger.debug('URL Jobs dialog closed');
+    }
+
+    /**
+     * Wait for URL job to show failed status (with retry for async processing)
+     * @param {string} tableName - Name of the table
+     * @param {number} maxWaitTime - Maximum wait time in ms (default 60000 = 1 min)
+     * @returns {Promise<{found: boolean, elapsedTime: number}>} Object with found status and elapsed time
+     */
+    async waitForUrlJobFailed(tableName, maxWaitTime = 60000) {
+        testLogger.info(`Waiting for URL job to fail for: ${tableName} (max ${maxWaitTime / 1000}s)`);
+        const startTime = Date.now();
+        let attemptCount = 0;
+
+        while (Date.now() - startTime < maxWaitTime) {
+            attemptCount++;
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+            // Reload to get fresh status
+            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.waitForEnrichmentTablesList();
+            await this.searchEnrichmentTableInList(tableName);
+
+            // Check for red/warning icon in the row - look in the Type cell (contains "Url")
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const typeCell = row.locator('td').filter({ hasText: 'Url' });
+            const warningIcon = typeCell.locator('[class*="warning"], [style*="red"], .text-negative');
+
+            if (await warningIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+                testLogger.info(`Failed status icon found after ${elapsed}s (attempt ${attemptCount})`);
+                return { found: true, elapsedTime: elapsed };
+            }
+
+            testLogger.debug(`Job still processing - attempt ${attemptCount}, elapsed ${elapsed}s`);
+            await this.page.waitForTimeout(5000);
+        }
+
+        const totalElapsed = Math.round((Date.now() - startTime) / 1000);
+        testLogger.warn(`Timeout waiting for job to fail after ${totalElapsed}s (${attemptCount} attempts)`);
+        return { found: false, elapsedTime: totalElapsed };
+    }
+
+    /**
+     * Replace URL in existing enrichment table (in edit mode)
+     * @param {string} newUrl - URL to replace with
+     */
+    async replaceUrlInEditMode(newUrl) {
+        testLogger.debug(`Replacing URL in edit mode: ${newUrl}`);
+
+        // Select "Replace all URLs" mode
+        await this.selectUpdateMode('replace');
+
+        // Wait for URL input to appear
+        await this.page.waitForTimeout(1000);
+
+        // Fill the new URL input
+        await this.fillNewUrlInput(newUrl);
+
+        testLogger.debug('URL replaced in edit mode');
+    }
+
+    /**
+     * Add a URL in edit mode - simplified version that finds any visible URL input
+     * Use this when update mode radio buttons aren't available
+     * @param {string} newUrl - URL to add
+     */
+    async addUrlInEditMode(newUrl) {
+        testLogger.debug(`Adding URL in edit mode: ${newUrl}`);
+
+        // Wait for update form to be ready
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+
+        // Try multiple strategies to find and fill the URL input
+        const urlInputSelectors = [
+            'input[placeholder*="http"]',
+            'input[aria-label*="URL"]',
+            'input[aria-label*="url"]',
+            '.q-field__native[type="text"]'
+        ];
+
+        let inputFilled = false;
+        for (const selector of urlInputSelectors) {
+            const inputs = this.page.locator(selector);
+            const count = await inputs.count();
+            testLogger.debug(`Found ${count} inputs matching: ${selector}`);
+
+            for (let i = 0; i < count; i++) {
+                const input = inputs.nth(i);
+                if (await input.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    // Check if it's empty or a URL field
+                    const value = await input.inputValue().catch(() => '');
+                    const placeholder = await input.getAttribute('placeholder').catch(() => '');
+
+                    if (placeholder?.includes('http') || value === '' || value.startsWith('http')) {
+                        await input.clear();
+                        await input.fill(newUrl);
+                        inputFilled = true;
+                        testLogger.debug(`Filled URL in input: ${selector} (index ${i})`);
+                        break;
+                    }
+                }
+            }
+            if (inputFilled) break;
+        }
+
+        if (!inputFilled) {
+            // Fallback: try fillNewUrlInput
+            testLogger.debug('Fallback: trying fillNewUrlInput');
+            await this.fillNewUrlInput(newUrl);
+        }
+
+        testLogger.debug('URL added in edit mode');
+    }
+
+    // ============================================================================
+    // SCHEMA MISMATCH TEST POM METHODS
+    // ============================================================================
+
+    /**
+     * Get button count in table row (used to check if job is done processing)
+     * @param {string} tableName - Name of the table
+     * @returns {Promise<number>} Number of buttons in the row
+     */
+    async getTableRowButtonCount(tableName) {
+        testLogger.debug(`Getting button count for: ${tableName}`);
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        const buttonCount = await row.locator('button').count();
+        testLogger.debug(`Button count for ${tableName}: ${buttonCount}`);
+        return buttonCount;
+    }
+
+    /**
+     * Check if warning icon is visible in the Type cell for a table
+     * @param {string} tableName - Name of the table
+     * @returns {Promise<boolean>} True if warning icon is visible
+     */
+    async isWarningIconVisibleInRow(tableName) {
+        testLogger.debug(`Checking warning icon for: ${tableName}`);
+        const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+        const warningIcon = row.locator('td').filter({ hasText: 'Url' }).locator('[class*="warning"], .text-negative, .text-red');
+        const isVisible = await warningIcon.isVisible({ timeout: 2000 }).catch(() => false);
+        testLogger.debug(`Warning icon visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Wait for URL job to complete (either success with buttons or failure with warning icon)
+     * @param {string} tableName - Name of the table
+     * @param {number} maxAttempts - Maximum number of polling attempts (default 12)
+     * @param {number} pollInterval - Time between polls in ms (default 5000)
+     * @returns {Promise<{completed: boolean, hasFailed: boolean, buttonCount: number}>}
+     */
+    async waitForUrlJobToFinish(tableName, maxAttempts = 12, pollInterval = 5000) {
+        testLogger.info(`Waiting for URL job to finish: ${tableName} (max ${maxAttempts} attempts)`);
+
+        for (let i = 0; i < maxAttempts; i++) {
+            await this.page.waitForTimeout(pollInterval);
+            await this.page.reload({ waitUntil: 'networkidle' });
+            await this.waitForEnrichmentTablesList();
+            await this.searchEnrichmentTableInList(tableName);
+
+            // Check for warning icon (failed job)
+            const hasWarningIcon = await this.isWarningIconVisibleInRow(tableName);
+            if (hasWarningIcon) {
+                testLogger.info(`Job failed (warning icon visible) - attempt ${i + 1}`);
+                return { completed: true, hasFailed: true, buttonCount: 0 };
+            }
+
+            // Check button count as indicator job is done
+            const buttonCount = await this.getTableRowButtonCount(tableName);
+            if (buttonCount >= 2) {
+                testLogger.info(`Job finished - ${buttonCount} buttons visible`);
+                return { completed: true, hasFailed: false, buttonCount };
+            }
+
+            testLogger.info(`Waiting for job - attempt ${i + 1}/${maxAttempts} (${buttonCount} buttons visible)`);
+        }
+
+        testLogger.warn(`Job did not complete within ${maxAttempts} attempts`);
+        return { completed: false, hasFailed: false, buttonCount: 0 };
+    }
+
+    /**
+     * Check if job status dialog is visible
+     * @returns {Promise<boolean>} True if dialog is visible
+     */
+    async isJobsDialogVisible() {
+        const dialog = this.page.locator('.q-dialog');
+        return await dialog.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    /**
+     * Get job status from the URL Jobs dialog
+     * @returns {Promise<{status: 'failed'|'completed'|'unknown', hasFailed: boolean, hasCompleted: boolean}>}
+     */
+    async getJobStatusFromDialog() {
+        testLogger.debug('Getting job status from dialog');
+        const dialog = this.page.locator('.q-dialog');
+
+        const failedBadge = dialog.locator('.q-badge').filter({ hasText: /failed/i }).first();
+        const completedBadge = dialog.locator('.q-badge').filter({ hasText: /completed/i }).first();
+
+        const hasFailed = await failedBadge.isVisible({ timeout: 5000 }).catch(() => false);
+        const hasCompleted = await completedBadge.isVisible({ timeout: 2000 }).catch(() => false);
+
+        let status = 'unknown';
+        if (hasFailed) status = 'failed';
+        else if (hasCompleted) status = 'completed';
+
+        testLogger.debug(`Job status: ${status} (failed: ${hasFailed}, completed: ${hasCompleted})`);
+        return { status, hasFailed, hasCompleted };
+    }
+
+    /**
+     * Check if schema-related error message is visible in dialog
+     * @returns {Promise<boolean>} True if schema error message is visible
+     */
+    async isSchemaErrorVisibleInDialog() {
+        testLogger.debug('Checking for schema error in dialog');
+        const dialog = this.page.locator('.q-dialog');
+        const errorText = dialog.locator('text=/schema|column|mismatch/i');
+        const isVisible = await errorText.first().isVisible({ timeout: 3000 }).catch(() => false);
+        testLogger.debug(`Schema error visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Verify any job status badge is visible in dialog
+     */
+    async verifyAnyJobStatusBadgeVisible() {
+        testLogger.debug('Verifying any job status badge is visible');
+        const dialog = this.page.locator('.q-dialog');
+        const anyBadge = dialog.locator('.q-badge').first();
+        await expect(anyBadge).toBeVisible({ timeout: 10000 });
+        testLogger.debug('Job status badge verified visible');
+    }
+
+    /**
+     * Delete an enrichment table if it exists (for test cleanup)
+     * @param {string} tableName - Name of the table to delete
+     * @returns {Promise<{deleted: boolean, reason: 'deleted'|'not_found'|'deletion_failed', error?: string}>}
+     */
+    async deleteTableIfExists(tableName) {
+        testLogger.debug(`Attempting to delete table if exists: ${tableName}`);
+
+        try {
+            // Navigate to enrichment tables list
+            await this.navigateToEnrichmentTable();
+            await this.waitForEnrichmentTablesList();
+
+            // Search for the table
+            const searchInput = this.page.getByPlaceholder(/search enrichment table/i);
+            await searchInput.clear();
+            await searchInput.fill(tableName);
+            await this.page.waitForLoadState('networkidle');
+            await this.page.waitForTimeout(1000);
+
+            // Check if table exists
+            const row = this.page.locator('tbody tr').filter({ hasText: tableName });
+            const isVisible = await row.isVisible({ timeout: 3000 }).catch(() => false);
+
+            if (!isVisible) {
+                testLogger.debug(`Table ${tableName} not found - nothing to delete`);
+                return { deleted: false, reason: 'not_found' };
+            }
+
+            // Delete the table
+            await this.clickDeleteButton(tableName);
+            await this.verifyDeleteConfirmationDialog();
+            await this.clickDeleteOK();
+            await this.verifyTableRowHidden(tableName);
+
+            testLogger.info(`Table ${tableName} deleted successfully`);
+            return { deleted: true, reason: 'deleted' };
+        } catch (error) {
+            testLogger.error(`Failed to delete table ${tableName}: ${error.message}`);
+            return { deleted: false, reason: 'deletion_failed', error: error.message };
+        }
     }
 }
 

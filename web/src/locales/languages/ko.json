@@ -476,7 +476,190 @@
     "value_cost_free": "무료",
     "value_cost_enterprise": "셀프 호스팅의 경우 하루 최대 200GB의 데이터를 무료로 수집할 수 있습니다.이후 유료",
     "value_cost_cloud": "14일 무료 평가판.이후 유료",
-    "feature_comparison_lbl": "기능 비교"
+    "feature_comparison_lbl": "기능 비교",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "엔터프라이즈 기능",
+        "offer_text": "OpenObserve 자체 호스팅 시 모든 엔터프라이즈 기능을 완전히 무료로 이용할 수 있습니다.",
+        "badge_text": "하루 최대 200GB까지 무료",
+        "features_title": "오픈옵저브 클라우드 기능",
+        "features_subtitle": "클라우드 구독에 포함된 모든 기능",
+        "primary_button_text": "지금 다운로드"
+      },
+      "enterprise_without_license": {
+        "hero_title": "엔터프라이즈 기능",
+        "offer_text": "무료 라이선스를 요청하여 OpenObserve 배포를 극대화하세요.",
+        "badge_text": "하루 최대 {할당량} GB까지 무료",
+        "features_title": "사용 가능한 엔터프라이즈 기능",
+        "features_subtitle": "무제한 기능을 잠금 해제할 수 있는 무료 라이선스 받기",
+        "primary_button_text": "무료 라이선스 받기",
+        "license_note": "100GB/일 (라이선스 없음) • 200GB/일 (라이선스 포함)"
+      },
+      "enterprise_with_license": {
+        "hero_title": "나만의 엔터프라이즈 에디션",
+        "offer_text": "모든 기능을 활성화한 상태로 OpenObserve Enterprise를 실행하고 있습니다.",
+        "badge_text_unlimited": "섭취 제한: 무제한",
+        "badge_text_limited": "섭취 제한: {한도} GB/일",
+        "features_title": "액티브 엔터프라이즈 기능",
+        "features_subtitle": "모든 기능이 잠금 해제되어 바로 사용 가능",
+        "primary_button_text": "라이선스 관리"
+      },
+      "open_source": {
+        "hero_title": "엔터프라이즈 에디션 받기",
+        "offer_text": "모든 엔터프라이즈 기능을 완전 무료로 다운로드하고 잠금 해제하세요",
+        "badge_text": "하루 최대 200GB까지 무료",
+        "features_title": "모든 엔터프라이즈 기능 잠금 해제",
+        "features_subtitle": "프로덕션에 바로 사용할 수 있는 옵저버빌리티에 필요한 모든 것",
+        "primary_button_text": "지금 다운로드"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "로그, 지표, 트레이스",
+          "note": "완전한 옵저버빌리티 데이터 수집 및 분석"
+        },
+        "rum": {
+          "name": "럼",
+          "note": "프런트엔드 성능을 위한 실제 사용자 모니터링"
+        },
+        "alerts": {
+          "name": "알림",
+          "note": "실시간 경고 및 알림"
+        },
+        "dashboards": {
+          "name": "대시보드",
+          "note": "사용자 지정 가능한 시각화 대시보드"
+        },
+        "reports": {
+          "name": "보고서",
+          "note": "정기 및 온디맨드 보고"
+        },
+        "vrl_functions": {
+          "name": "VRL 함수",
+          "note": "데이터 변환을 위한 벡터 리맵 언어"
+        },
+        "pipelines": {
+          "name": "파이프라인",
+          "note": "데이터 처리 및 변환 파이프라인"
+        },
+        "high_availability": {
+          "name": "높은 가용성",
+          "note": "안정성을 위한 분산 아키텍처"
+        },
+        "multitenancy": {
+          "name": "멀티테넌시",
+          "note": "조직 기반 데이터 격리"
+        },
+        "dynamic_schema": {
+          "name": "동적 스키마",
+          "note": "자동 스키마 탐지 및 진화"
+        },
+        "multilingual_gui": {
+          "name": "다국어 GUI",
+          "note": "고급 인터내셔널리제이션 지원"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "싱글 사인온",
+          "note": "SSO 공급자를 통한 원활한 인증"
+        },
+        "rbac": {
+          "name": "역할 기반 액세스 제어",
+          "note": "세분화된 권한 및 사용자 관리"
+        },
+        "federated_search": {
+          "name": "페더레이션 검색/슈퍼클러스터",
+          "note": "여러 클러스터에 쿼리 배포"
+        },
+        "query_management": {
+          "name": "쿼리 관리",
+          "note": "고급 쿼리 모니터링 및 최적화"
+        },
+        "workload_management": {
+          "name": "워크로드 관리",
+          "note": "우선 순위 기반 리소스 할당 및 QoS"
+        },
+        "audit_trail": {
+          "name": "감사 추적",
+          "note": "규정 준수를 위한 완전한 활동 로깅"
+        },
+        "action_scripts": {
+          "name": "액션 스크립트",
+          "note": "이벤트 및 경고에 대한 대응 자동화"
+        },
+        "sensitive_data_redaction": {
+          "name": "민감한 데이터 수정",
+          "note": "PII 및 민감한 정보 보호"
+        },
+        "pipeline_remote_destinations": {
+          "name": "파이프라인 원격 목적지",
+          "note": "원격 목적지로 데이터 전송"
+        },
+        "query_optimizer": {
+          "name": "쿼리 최적화 프로그램/어그리게이션 캐시",
+          "note": "TopK 집계 및 쿼리 최적화"
+        },
+        "incident_management": {
+          "name": "인시던트 관리",
+          "note": "효율적인 사고 추적 및 관리"
+        },
+        "sre_agent": {
+          "name": "SRE 에이전트",
+          "note": "자동화된 SRE 운영 및 인사이트"
+        },
+        "ai_assistant": {
+          "name": "AI 어시스턴트",
+          "note": "지능형 쿼리 및 분석 지원"
+        },
+        "anomaly_detection": {
+          "name": "이상 징후 탐지",
+          "note": "데이터의 이상 징후를 자동으로 감지"
+        },
+        "metrics_auto_downsampling": {
+          "name": "지표 자동 다운샘플링",
+          "note": "시간 경과에 따른 자동 지표 집계"
+        },
+        "log_patterns": {
+          "name": "로그 패턴",
+          "note": "로그 데이터의 패턴 검색"
+        },
+        "mcp_server": {
+          "name": "MCP 서버",
+          "note": "모델 컨텍스트 프로토콜 서버 통합"
+        },
+        "rate_limiting": {
+          "name": "속도 제한",
+          "note": "쿼리 및 수집 속도 제어"
+        },
+        "broadcast_join": {
+          "name": "브로드캐스트 참여",
+          "note": "최적화된 분산 조인 작업"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "로그, 지표 및 트레이스 상관관계",
+          "note": "자동 탐지 및 상관관계 분석"
+        },
+        "service_maps": {
+          "name": "서비스 맵",
+          "note": "서비스 종속성 시각화"
+        }
+      },
+      "buttons": {
+        "contact_sales": "영업팀에 문의",
+        "learn_more": "자세히 알아보기"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "고가용성 모드 전용"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "라이선스를 관리할 권한이 없습니다."
+      }
+    },
+    "header_button": {
+      "cloud_features": "옵저브 기능 열기",
+      "enterprise_edition": "에디션: 엔터프라이즈",
+      "get_enterprise_free": "오픈옵저브 엔터프라이즈 받기 (무료)"
+    }
   },
   "login": {
     "userid": "사용자 ID",
