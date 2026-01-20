@@ -109,11 +109,6 @@ jobs:
         with:
           version: "v0.7.7"
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          prefix-key: amd64
-
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -129,15 +124,16 @@ jobs:
 
       - name: Build and run binary
         run: |
+          export RUSTC_WRAPPER=sccache
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
-        env:
-          CARGO_BUILD_RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
-        run: sccache --show-stats
+        run: |
+          echo "=== sccache statistics ==="
+          sccache --show-stats
+          echo "==========================="
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -206,11 +202,6 @@ jobs:
         with:
           version: "v0.7.7"
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          prefix-key: arm64
-
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -226,15 +217,16 @@ jobs:
 
       - name: Build and run binary
         run: |
+          export RUSTC_WRAPPER=sccache
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
-        env:
-          CARGO_BUILD_RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
 
       - name: Show sccache stats
-        run: sccache --show-stats
+        run: |
+          echo "=== sccache statistics ==="
+          sccache --show-stats
+          echo "==========================="
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
