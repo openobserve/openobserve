@@ -406,6 +406,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
 import hljs from 'highlight.js';
+import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/github-dark.css';
 import { marked } from 'marked';
 import { MarkedOptions } from 'marked';
@@ -2050,6 +2051,45 @@ export default defineComponent({
         }
       }
 
+      // Heading styles - appropriately sized for chat interface
+      // Only applies within message-blocks, not globally
+      :deep(h1) {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        margin: 16px 0 8px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h2) {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        margin: 14px 0 7px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h3) {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        margin: 12px 0 6px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h4) {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        margin: 10px 0 5px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h5) {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h6) {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
+      }
+
       // Table styling to prevent horizontal overflow
       :deep(table) {
         max-width: 100%;
@@ -2728,6 +2768,176 @@ export default defineComponent({
       background: rgba(255, 255, 255, 0.08);
       color: #888;
     }
+  }
+}
+
+
+// Theme-based syntax highlighting - both CSS files are loaded, we scope them by theme
+// Hide dark theme in light mode
+.light-mode {
+  // Force light theme colors to take precedence
+  :deep(.hljs) {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #24292e;
+    background: #ffffff;
+  }
+  :deep(.hljs-doctag),
+  :deep(.hljs-keyword),
+  :deep(.hljs-meta .hljs-keyword),
+  :deep(.hljs-template-tag),
+  :deep(.hljs-template-variable),
+  :deep(.hljs-type),
+  :deep(.hljs-variable.language_) {
+    color: #d73a49;
+  }
+  :deep(.hljs-title),
+  :deep(.hljs-title.class_),
+  :deep(.hljs-title.class_.inherited__),
+  :deep(.hljs-title.function_) {
+    color: #6f42c1;
+  }
+  :deep(.hljs-attr),
+  :deep(.hljs-attribute),
+  :deep(.hljs-literal),
+  :deep(.hljs-meta),
+  :deep(.hljs-number),
+  :deep(.hljs-operator),
+  :deep(.hljs-variable),
+  :deep(.hljs-selector-attr),
+  :deep(.hljs-selector-class),
+  :deep(.hljs-selector-id) {
+    color: #005cc5;
+  }
+  :deep(.hljs-regexp),
+  :deep(.hljs-string),
+  :deep(.hljs-meta .hljs-string) {
+    color: #032f62;
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: #e36209;
+  }
+  :deep(.hljs-comment),
+  :deep(.hljs-code),
+  :deep(.hljs-formula) {
+    color: #6a737d;
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag),
+  :deep(.hljs-selector-pseudo) {
+    color: #22863a;
+  }
+  :deep(.hljs-subst) {
+    color: #24292e;
+  }
+  :deep(.hljs-section) {
+    color: #005cc5;
+    font-weight: bold;
+  }
+  :deep(.hljs-bullet) {
+    color: #735c0f;
+  }
+  :deep(.hljs-emphasis) {
+    color: #24292e;
+    font-style: italic;
+  }
+  :deep(.hljs-strong) {
+    color: #24292e;
+    font-weight: bold;
+  }
+  :deep(.hljs-addition) {
+    color: #22863a;
+    background-color: #f0fff4;
+  }
+  :deep(.hljs-deletion) {
+    color: #b31d28;
+    background-color: #ffeef0;
+  }
+}
+// Force dark theme colors in dark mode
+.dark-mode {
+  :deep(.hljs) {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #c9d1d9;
+    background: #0d1117;
+  }
+  :deep(.hljs-doctag),
+  :deep(.hljs-keyword),
+  :deep(.hljs-meta .hljs-keyword),
+  :deep(.hljs-template-tag),
+  :deep(.hljs-template-variable),
+  :deep(.hljs-type),
+  :deep(.hljs-variable.language_) {
+    color: #ff7b72;
+  }
+  :deep(.hljs-title),
+  :deep(.hljs-title.class_),
+  :deep(.hljs-title.class_.inherited__),
+  :deep(.hljs-title.function_) {
+    color: #d2a8ff;
+  }
+  :deep(.hljs-attr),
+  :deep(.hljs-attribute),
+  :deep(.hljs-literal),
+  :deep(.hljs-meta),
+  :deep(.hljs-number),
+  :deep(.hljs-operator),
+  :deep(.hljs-variable),
+  :deep(.hljs-selector-attr),
+  :deep(.hljs-selector-class),
+  :deep(.hljs-selector-id) {
+    color: #79c0ff;
+  }
+  :deep(.hljs-regexp),
+  :deep(.hljs-string),
+  :deep(.hljs-meta .hljs-string) {
+    color: #a5d6ff;
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: #ffa657;
+  }
+  :deep(.hljs-comment),
+  :deep(.hljs-code),
+  :deep(.hljs-formula) {
+    color: #8b949e;
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag),
+  :deep(.hljs-selector-pseudo) {
+    color: #7ee787;
+  }
+  :deep(.hljs-subst) {
+    color: #c9d1d9;
+  }
+  :deep(.hljs-section) {
+    color: #1f6feb;
+    font-weight: bold;
+  }
+  :deep(.hljs-bullet) {
+    color: #f2cc60;
+  }
+  :deep(.hljs-emphasis) {
+    color: #c9d1d9;
+    font-style: italic;
+  }
+  :deep(.hljs-strong) {
+    color: #c9d1d9;
+    font-weight: bold;
+  }
+  :deep(.hljs-addition) {
+    color: #aff5b4;
+    background-color: #033a16;
+  }
+  :deep(.hljs-deletion) {
+    color: #ffdcd7;
+    background-color: #67060c;
   }
 }
 </style> 
