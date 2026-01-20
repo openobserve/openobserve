@@ -60,6 +60,9 @@ export default class DashboardSetting {
       timeout: 15000,
     });
     await this.setting.click();
+    // Wait for settings dialog to open - use more specific selector
+    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
   }
   //General Setting//
   //Change Dashboard Name//
@@ -152,6 +155,13 @@ export default class DashboardSetting {
   //Open Variables tab
 
   async openVariables() {
+    // Wait for settings dialog to be fully open before clicking variables tab
+    // Use specific selector instead of generic .q-dialog to avoid matching multiple dialogs
+    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+    await this.page
+      .locator('[data-test="dashboard-settings-variable-tab"]')
+      .waitFor({ state: "visible", timeout: 10000 });
     await this.page
       .locator('[data-test="dashboard-settings-variable-tab"]')
       .click();

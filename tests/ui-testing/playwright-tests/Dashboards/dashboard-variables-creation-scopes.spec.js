@@ -388,6 +388,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
     // Wait for tab content to load
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible", timeout: 5000 });
+    // Ensure no dialogs are open before adding panel
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
@@ -852,6 +855,9 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     await page.locator('span[data-test*="dashboard-tab-"][title="Tab1"]').click();
     // Wait for tab content to load
     await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible", timeout: 5000 });
+    // Ensure no dialogs are open before adding panel
+    await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     // Go to add panel
     await pm.dashboardCreate.addPanel();
