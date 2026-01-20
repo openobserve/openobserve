@@ -109,47 +109,6 @@ jobs:
         with:
           shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          workspaces: "."
-
-      - name: Validate cache setup
-        run: |
-          echo "=== Testing Rust cache with quick build ==="
-
-          # Create a simple test project
-          mkdir -p /tmp/cache-test
-          cd /tmp/cache-test
-          cargo init --name cache_test
-
-          # First build
-          echo "First build (populating cache)..."
-          time cargo build --release
-
-          # Clean and rebuild
-          echo ""
-          echo "Cleaning and rebuilding (testing cache)..."
-          cargo clean
-
-          START_TIME=$(date +%s)
-          cargo build --release
-          END_TIME=$(date +%s)
-          DURATION=$((END_TIME - START_TIME))
-
-          echo ""
-          echo "Second build took: ${DURATION}s"
-
-          if [ $DURATION -lt 5 ]; then
-            echo "✅ Cache is working! Second build was very fast (${DURATION}s)"
-            echo "   Full build caching should work well."
-          elif [ $DURATION -lt 15 ]; then
-            echo "✅ Cache appears to be working. Second build: ${DURATION}s"
-          else
-            echo "⚠️  Second build took ${DURATION}s (expected <5s with caching)"
-            echo "   Cache may not be fully effective, but build will continue."
-          fi
-
-          cd -
-          rm -rf /tmp/cache-test
-          echo "=== Cache validation complete ==="
 
       - name: Install Protoc
         run: |
@@ -238,47 +197,6 @@ jobs:
         with:
           shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          workspaces: "."
-
-      - name: Validate cache setup
-        run: |
-          echo "=== Testing Rust cache with quick build ==="
-
-          # Create a simple test project
-          mkdir -p /tmp/cache-test
-          cd /tmp/cache-test
-          cargo init --name cache_test
-
-          # First build
-          echo "First build (populating cache)..."
-          time cargo build --release
-
-          # Clean and rebuild
-          echo ""
-          echo "Cleaning and rebuilding (testing cache)..."
-          cargo clean
-
-          START_TIME=$(date +%s)
-          cargo build --release
-          END_TIME=$(date +%s)
-          DURATION=$((END_TIME - START_TIME))
-
-          echo ""
-          echo "Second build took: ${DURATION}s"
-
-          if [ $DURATION -lt 5 ]; then
-            echo "✅ Cache is working! Second build was very fast (${DURATION}s)"
-            echo "   Full build caching should work well."
-          elif [ $DURATION -lt 15 ]; then
-            echo "✅ Cache appears to be working. Second build: ${DURATION}s"
-          else
-            echo "⚠️  Second build took ${DURATION}s (expected <5s with caching)"
-            echo "   Cache may not be fully effective, but build will continue."
-          fi
-
-          cd -
-          rm -rf /tmp/cache-test
-          echo "=== Cache validation complete ==="
 
       - name: Install Protoc
         run: |
@@ -346,9 +264,7 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          sparse-checkout: .
-          fetch-depth: 1
-          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set GIT_TAG env
         run: |
