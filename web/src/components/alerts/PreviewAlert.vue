@@ -794,9 +794,21 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  let new_relative_time = 2;
-  if (relativeTime < 2) {
+
+  // Priority order for time range:
+  // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
+  // 2. Fall back to alert period
+  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
+  let new_relative_time;
+
+  if (previewTimerangeMinutes > 0) {
+    // Use the configured preview timerange from env variable
+    new_relative_time = previewTimerangeMinutes;
+    console.log(`[PreviewAlert] Using configured preview timerange: ${previewTimerangeMinutes} minutes`);
+  } else {
+    // Fall back to using the alert period
     new_relative_time = relativeTime;
+    console.log(`[PreviewAlert] Using alert period: ${relativeTime} minutes`);
   }
 
   const startTime = endTime - new_relative_time * 60 * 1000000;
