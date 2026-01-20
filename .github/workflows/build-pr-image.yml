@@ -107,6 +107,9 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
+      - name: Add sccache to PATH
+        run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
+
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
@@ -199,6 +202,9 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Add sccache to PATH
+        run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
 
       - name: Install Protoc
         run: |
