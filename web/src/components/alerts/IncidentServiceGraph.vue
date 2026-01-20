@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Graph Canvas using ECharts -->
       <div
         v-if="!loading && graphData && graphData.nodes.length > 0"
-        class="tw-absolute tw-inset-0"
+        style="width: 100%; height: calc(100vh - 150px)"
       >
         <ChartRenderer
           ref="chartRendererRef"
