@@ -108,11 +108,14 @@ export const servicenowConfig: PrebuiltConfig = {
   ]
 };
 
+import servicenowLogo from '@/assets/images/alerts/destinations/servicenow.png';
+
 export const servicenowDestinationType = {
   id: 'servicenow',
   name: 'ServiceNow',
   description: 'Create incidents in ServiceNow',
-  icon: 'servicenow-icon',
-  popular: false,
+  icon: 'servicenow',
+  image: servicenowLogo,
+  popular: true,
   category: 'incident'
 };

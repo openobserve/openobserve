@@ -13,60 +13,48 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="destination-test-result" class="test-result-container">
+  <div data-test="destination-test-result" class="o2-test-result">
     <!-- Success State -->
-    <q-banner
+    <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="test-success"
-      dense
-      rounded
+      class="o2-test-success"
     >
-      <template #avatar>
-        <q-icon name="check_circle" color="positive" />
-      </template>
-
-      <div class="test-result-content">
-        <div data-test="test-success-message" class="test-message">
+      <div class="result-icon">
+        <q-icon name="check_circle" size="20px" />
+      </div>
+      <div class="result-content">
+        <div data-test="test-success-message" class="result-title">
           {{ t('alerts.testSuccessMessage') }}
         </div>
-        <div data-test="test-success-timestamp" class="test-timestamp">
+        <div data-test="test-success-timestamp" class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
-        </div>
-
-        <!-- Success Details (Optional) -->
-        <div v-if="result.statusCode" class="test-details">
-          <span class="status-code success">{{ result.statusCode }}</span>
+          <span v-if="result.statusCode" class="status-badge success-badge">
+            {{ result.statusCode }}
+          </span>
           <span v-if="result.responseTime" class="response-time">
             {{ result.responseTime }}ms
           </span>
         </div>
       </div>
-    </q-banner>
+    </div>
 
     <!-- Failure State -->
-    <q-banner
+    <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="test-failure"
-      dense
-      rounded
+      class="o2-test-failure"
     >
-      <template #avatar>
-        <q-icon name="error" color="negative" />
-      </template>
-
-      <div class="test-result-content">
-        <div data-test="test-failure-message" class="test-message">
+      <div class="result-icon">
+        <q-icon name="error" size="20px" />
+      </div>
+      <div class="result-content">
+        <div data-test="test-failure-message" class="result-title">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="test-timestamp">
+        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="result-meta">
           {{ formatTimestamp(result.timestamp) }}
-        </div>
-
-        <!-- Failure Details -->
-        <div class="test-details">
-          <span v-if="result.statusCode" class="status-code failure">
+          <span v-if="result.statusCode" class="status-badge error-badge">
             {{ result.statusCode }}
           </span>
           <span v-if="result.responseTime" class="response-time">
@@ -74,84 +62,88 @@ limitations under the License. -->
           </span>
         </div>
 
-        <!-- Expandable Error Details -->
+        <!-- Suggested Fix -->
+        <div v-if="getSuggestedFix(result)" class="result-suggestion">
+          <q-icon name="lightbulb" size="16px" />
+          <span>{{ getSuggestedFix(result) }}</span>
+        </div>
+
+        <!-- Error Details Expansion -->
         <q-expansion-item
           v-if="result.error || result.responseBody"
           data-test="test-failure-details-expansion"
-          :label="t('alerts.viewDetails')"
-          class="error-details-expansion"
+          class="error-expansion"
           dense
+          expand-icon-class="text-grey-7"
         >
-          <div data-test="test-failure-details" class="error-details">
-            <div v-if="result.error" data-test="test-error-message" class="error-field">
-              <strong>{{ t('alerts.error') }}:</strong>
-              <code class="error-text">{{ result.error }}</code>
+          <template #header>
+            <div class="expansion-header">
+              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
+            </div>
+          </template>
+
+          <div data-test="test-failure-details" class="error-details-content">
+            <div v-if="result.error" data-test="test-error-message" class="error-item">
+              <div class="error-label">{{ t('alerts.error') }}</div>
+              <div class="error-value">{{ result.error }}</div>
             </div>
 
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-field">
-              <strong>{{ t('alerts.httpStatus') }}:</strong>
-              <span class="status-code">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</span>
+            <div v-if="result.statusCode" data-test="test-http-status" class="error-item">
+              <div class="error-label">{{ t('alerts.httpStatus') }}</div>
+              <div class="error-value">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-field">
-              <strong>{{ t('alerts.responseBody') }}:</strong>
-              <pre class="response-body">{{ formatResponseBody(result.responseBody) }}</pre>
-            </div>
-
-            <div v-if="result.headers" data-test="test-response-headers" class="error-field">
-              <strong>{{ t('alerts.responseHeaders') }}:</strong>
-              <pre class="response-headers">{{ JSON.stringify(result.headers, null, 2) }}</pre>
+            <div v-if="result.responseBody" data-test="test-response-body" class="error-item">
+              <div class="error-label">{{ t('alerts.responseBody') }}</div>
+              <pre class="error-code">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </q-expansion-item>
 
-        <!-- Suggested Fixes -->
-        <div v-if="getSuggestedFix(result)" class="suggested-fixes">
-          <q-icon name="lightbulb" color="warning" size="sm" />
-          <span class="suggestion-text">{{ getSuggestedFix(result) }}</span>
+        <!-- Retry Button -->
+        <div class="result-actions">
+          <q-btn
+            data-test="test-retry-button"
+            flat
+            no-caps
+            dense
+            size="sm"
+            color="primary"
+            :label="t('alerts.retry')"
+            icon="refresh"
+            @click="$emit('retry')"
+          />
         </div>
       </div>
-
-      <template #action>
-        <q-btn
-          data-test="test-retry-button"
-          flat
-          color="primary"
-          :label="t('alerts.retry')"
-          @click="$emit('retry')"
-        />
-      </template>
-    </q-banner>
+    </div>
 
     <!-- Loading State -->
-    <q-banner
+    <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="test-loading"
-      dense
-      rounded
+      class="o2-test-loading"
     >
-      <template #avatar>
-        <q-spinner color="primary" size="sm" />
-      </template>
-
-      <div class="test-result-content">
-        <div class="test-message">
+      <div class="result-icon">
+        <q-spinner color="primary" size="20px" />
+      </div>
+      <div class="result-content">
+        <div class="result-title">
           {{ t('alerts.testInProgress') }}
         </div>
-        <div class="test-subtext">
+        <div class="result-meta">
           {{ t('alerts.sendingNotification') }}
         </div>
       </div>
-    </q-banner>
+    </div>
 
     <!-- Idle State -->
     <div
       v-else
       data-test="test-result-idle"
-      class="test-idle"
+      class="o2-test-idle"
     >
-      <q-icon name="play_circle_outline" color="grey-6" size="sm" />
+      <q-icon name="info" size="16px" />
       <span class="idle-text">
         {{ t('alerts.testIdleMessage') }}
       </span>
@@ -294,173 +286,238 @@ function getSuggestedFix(result: TestResult): string | null {
 </script>
 
 <style scoped lang="scss">
-.test-result-container {
-  margin-top: 1rem;
+.o2-test-result {
+  margin-top: 12px;
 
-  .test-success {
-    background-color: rgba(76, 175, 80, 0.1);
-    border-left: 4px solid #4caf50;
+  .o2-test-success,
+  .o2-test-failure,
+  .o2-test-loading {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border-left: 3px solid;
+    background-color: var(--q-field-bg);
   }
 
-  .test-failure {
-    background-color: rgba(244, 67, 54, 0.1);
-    border-left: 4px solid #f44336;
+  .o2-test-success {
+    border-left-color: var(--q-positive);
+    background-color: rgba(76, 175, 80, 0.08);
+
+    .result-icon {
+      color: var(--q-positive);
+    }
   }
 
-  .test-loading {
-    background-color: rgba(33, 150, 243, 0.1);
-    border-left: 4px solid #2196f3;
+  .o2-test-failure {
+    border-left-color: var(--q-negative);
+    background-color: rgba(244, 67, 54, 0.08);
+
+    .result-icon {
+      color: var(--q-negative);
+    }
   }
 
-  .test-result-content {
-    .test-message {
+  .o2-test-loading {
+    border-left-color: var(--q-primary);
+    background-color: rgba(33, 150, 243, 0.08);
+
+    .result-icon {
+      color: var(--q-primary);
+    }
+  }
+
+  .result-icon {
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .result-content {
+    flex: 1;
+    min-width: 0;
+
+    .result-title {
+      font-size: 13px;
       font-weight: 500;
-      margin-bottom: 0.25rem;
+      line-height: 1.4;
+      margin-bottom: 4px;
     }
 
-    .test-timestamp {
-      font-size: 0.8rem;
-      opacity: 0.7;
-      margin-bottom: 0.5rem;
-    }
-
-    .test-subtext {
-      font-size: 0.85rem;
-      opacity: 0.8;
-    }
-
-    .test-details {
+    .result-meta {
+      font-size: 11px;
+      color: var(--q-text-secondary);
       display: flex;
-      gap: 1rem;
-      margin-top: 0.5rem;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
 
-      .status-code {
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.8rem;
+      .status-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
         font-weight: 600;
-        font-family: 'Monaco', 'Consolas', monospace;
+        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+        letter-spacing: 0.3px;
 
-        &.success {
-          background-color: #4caf50;
+        &.success-badge {
+          background-color: var(--q-positive);
           color: white;
         }
 
-        &.failure {
-          background-color: #f44336;
+        &.error-badge {
+          background-color: var(--q-negative);
           color: white;
         }
       }
 
       .response-time {
-        font-size: 0.8rem;
+        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
         color: var(--q-text-secondary);
-        font-family: 'Monaco', 'Consolas', monospace;
       }
     }
 
-    .error-details {
-      margin-top: 0.5rem;
-
-      .error-field {
-        margin-bottom: 0.75rem;
-
-        strong {
-          display: block;
-          margin-bottom: 0.25rem;
-          font-size: 0.85rem;
-        }
-      }
-
-      .error-text {
-        background-color: rgba(244, 67, 54, 0.1);
-        padding: 0.5rem;
-        border-radius: 4px;
-        display: block;
-        font-family: 'Monaco', 'Consolas', monospace;
-        font-size: 0.8rem;
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-
-      .response-body,
-      .response-headers {
-        background-color: var(--q-field-bg);
-        padding: 0.5rem;
-        border-radius: 4px;
-        font-family: 'Monaco', 'Consolas', monospace;
-        font-size: 0.75rem;
-        max-height: 200px;
-        overflow-y: auto;
-        margin: 0;
-        white-space: pre;
-      }
-    }
-
-    .suggested-fixes {
-      margin-top: 0.75rem;
-      padding: 0.5rem;
-      background-color: rgba(255, 193, 7, 0.1);
-      border-radius: 4px;
-      border-left: 3px solid #ffc107;
+    .result-suggestion {
       display: flex;
       align-items: flex-start;
-      gap: 0.5rem;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 8px;
+      background-color: rgba(255, 193, 7, 0.1);
+      border-radius: 3px;
+      font-size: 11px;
+      color: var(--q-text);
+      line-height: 1.4;
 
-      .suggestion-text {
-        font-size: 0.85rem;
-        line-height: 1.4;
+      .q-icon {
+        color: var(--q-warning);
+        flex-shrink: 0;
+        margin-top: 1px;
       }
+    }
+
+    .error-expansion {
+      margin-top: 8px;
+      background-color: transparent;
+
+      .expansion-header {
+        display: flex;
+        align-items: center;
+        color: var(--q-text-secondary);
+        font-size: 11px;
+      }
+    }
+
+    .error-details-content {
+      padding: 8px 0 0 0;
+
+      .error-item {
+        margin-bottom: 12px;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+
+        .error-label {
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--q-text-secondary);
+          margin-bottom: 4px;
+        }
+
+        .error-value {
+          font-size: 11px;
+          color: var(--q-text);
+          line-height: 1.5;
+          word-break: break-word;
+        }
+
+        .error-code {
+          background-color: rgba(0, 0, 0, 0.05);
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          border-radius: 3px;
+          padding: 8px;
+          font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+          font-size: 10px;
+          line-height: 1.5;
+          max-height: 150px;
+          overflow-y: auto;
+          margin: 0;
+          white-space: pre;
+          color: var(--q-text);
+        }
+      }
+    }
+
+    .result-actions {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
     }
   }
 
-  .test-idle {
+  .o2-test-idle {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    color: var(--q-text-secondary);
-    font-size: 0.9rem;
-    border: 1px dashed var(--q-border-color);
+    gap: 8px;
+    padding: 10px 12px;
     border-radius: 4px;
-    text-align: center;
-    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+
+    .q-icon {
+      color: var(--q-text-secondary);
+      opacity: 0.7;
+    }
+
+    .idle-text {
+      font-size: 11px;
+      color: var(--q-text-secondary);
+      line-height: 1.4;
+    }
   }
 }
 
-.error-details-expansion {
-  margin-top: 0.5rem;
-
-  :deep(.q-expansion-item__header) {
-    padding: 0.5rem 0;
-    font-size: 0.85rem;
-  }
-
-  :deep(.q-expansion-item__content) {
-    padding: 0.5rem 0 0 0;
-  }
-}
-
-// Dark mode adjustments
+// Dark theme adjustments
 body.body--dark {
-  .test-success {
-    background-color: rgba(76, 175, 80, 0.2);
-  }
+  .o2-test-result {
+    .o2-test-success,
+    .o2-test-failure,
+    .o2-test-loading {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
 
-  .test-failure {
-    background-color: rgba(244, 67, 54, 0.2);
-  }
+    .o2-test-success {
+      background-color: rgba(76, 175, 80, 0.12);
+    }
 
-  .test-loading {
-    background-color: rgba(33, 150, 243, 0.2);
-  }
+    .o2-test-failure {
+      background-color: rgba(244, 67, 54, 0.12);
+    }
 
-  .suggested-fixes {
-    background-color: rgba(255, 193, 7, 0.2);
-  }
+    .o2-test-loading {
+      background-color: rgba(33, 150, 243, 0.12);
+    }
 
-  .error-text {
-    background-color: rgba(244, 67, 54, 0.2);
+    .result-suggestion {
+      background-color: rgba(255, 193, 7, 0.15);
+    }
+
+    .error-code {
+      background-color: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .o2-test-idle {
+      background-color: rgba(255, 255, 255, 0.02);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .result-actions {
+      border-top-color: rgba(255, 255, 255, 0.08);
+    }
   }
 }
 </style>

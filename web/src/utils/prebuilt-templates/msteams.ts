@@ -112,11 +112,14 @@ export const msteamsConfig: PrebuiltConfig = {
   ]
 };
 
+import msteamsLogo from '@/assets/images/alerts/destinations/msteams.png';
+
 export const msteamsDestinationType = {
   id: 'msteams',
   name: 'Microsoft Teams',
   description: 'Send notifications to Teams channels',
-  icon: 'msteams-icon',
+  icon: 'msteams',
+  image: msteamsLogo,
   popular: true,
   category: 'messaging'
 };

@@ -79,55 +79,13 @@ export function usePrebuiltDestinations() {
 
   /**
    * Ensure system templates exist in DEFAULT_ORG
-   * Creates templates lazily when first prebuilt destination is created
+   * NOTE: System templates are now managed by the backend via prebuilt destinations config
+   * This function is kept for backward compatibility but does nothing
    */
   async function ensureSystemTemplates(): Promise<void> {
-    const DEFAULT_ORG = 'default';
-
-    try {
-      isLoading.value = true;
-
-      for (const type of PREBUILT_DESTINATION_TYPES) {
-        const config = getPrebuiltConfig(type.id);
-        if (!config) continue;
-
-        const templateName = config.templateName;
-
-        try {
-          // Check if template already exists
-          await alertTemplateService.get_by_name({
-            org_identifier: DEFAULT_ORG,
-            template_name: templateName
-          });
-          // Template exists, continue to next
-          continue;
-        } catch (error) {
-          // Template doesn't exist, create it
-          console.log(`Creating system template: ${templateName}`);
-
-          await alertTemplateService.create({
-            org_identifier: DEFAULT_ORG,
-            template_name: templateName,
-            data: {
-              name: templateName,
-              body: config.templateBody,
-              type: type.category === 'email' ? 'email' : 'http',
-              isDefault: true
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to ensure system templates:', error);
-      $q.notify({
-        type: 'negative',
-        message: t('alerts.prebuilt.templateInitError'),
-        caption: error.message
-      });
-      throw error;
-    } finally {
-      isLoading.value = false;
-    }
+    // System templates are now automatically provided by the backend
+    // No need to create them from the frontend
+    return Promise.resolve();
   }
 
   /**
@@ -291,7 +249,9 @@ export function usePrebuiltDestinations() {
   async function createDestination(
     type: PrebuiltTypeId,
     name: string,
-    credentials: Record<string, any>
+    credentials: Record<string, any>,
+    headers: Record<string, string> = {},
+    skipTlsVerify: boolean = false
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -315,35 +275,72 @@ export function usePrebuiltDestinations() {
       const destinationHeaders = generateDestinationHeaders(type, credentials);
 
       // Create destination payload
-      const destinationData: DestinationWithPrebuilt = {
-        name,
-        type: type === 'email' ? 'email' : 'http',
-        url: destinationUrl,
-        method: config.method,
-        skip_tls_verify: false,
-        template: config.templateName,
-        headers: destinationHeaders,
-        emails: type === 'email' ? credentials.recipients : '',
-        action_id: '',
-        output_format: 'json',
-        metadata: {
-          prebuilt_type: type,
-          credentials: {
-            // Store non-sensitive credential metadata
+      // Email destinations use different payload structure than HTTP destinations
+      let destinationData: any;
+
+      if (type === 'email') {
+        // Email destination - no URL or HTTP-specific fields
+        destinationData = {
+          name,
+          type: 'email',
+          template: config.templateName, // Include template for email
+          skip_tls_verify: skipTlsVerify,
+          output_format: 'json',
+          destination_type_name: type,
+          emails: Array.isArray(credentials.recipients)
+            ? credentials.recipients
+            : (credentials.recipients || '').split(',').map((e: string) => e.trim()).filter(Boolean),
+          metadata: {
+            prebuilt_type: type,
+            // Flatten credentials into metadata (only non-sensitive fields)
             ...Object.fromEntries(
               Object.entries(credentials).filter(([key]) =>
                 !key.toLowerCase().includes('password') &&
                 !key.toLowerCase().includes('key') &&
                 !key.toLowerCase().includes('token')
-              )
+              ).map(([k, v]) => [`credential_${k}`, String(v)])
             )
           }
+        };
+      } else {
+        // HTTP-based destinations (Slack, Teams, PagerDuty, Opsgenie, ServiceNow, Discord)
+        destinationData = {
+          name,
+          type: 'http',
+          url: destinationUrl,
+          method: config.method,
+          template: config.templateName, // Include template for all destinations
+          skip_tls_verify: skipTlsVerify,
+          headers: { ...destinationHeaders, ...headers },
+          output_format: 'json',
+          destination_type_name: type,
+          metadata: {
+            prebuilt_type: type,
+            // Flatten credentials into metadata (only non-sensitive fields)
+            ...Object.fromEntries(
+              Object.entries(credentials).filter(([key]) =>
+                !key.toLowerCase().includes('password') &&
+                !key.toLowerCase().includes('key') &&
+                !key.toLowerCase().includes('token')
+              ).map(([k, v]) => [`credential_${k}`, String(v)])
+            )
+          }
+        };
+
+        // Special handling for ServiceNow - encode Basic Auth in Authorization header
+        if (type === 'servicenow') {
+          const authString = btoa(`${credentials.username}:${credentials.password}`);
+          destinationData.headers = {
+            ...destinationData.headers,
+            'Authorization': `Basic ${authString}`
+          };
         }
-      };
+      }
 
       // Create the destination
       await alertDestinationService.create({
         org_identifier: organizationIdentifier.value,
+        destination_name: name,
         data: destinationData
       });
 
@@ -355,6 +352,118 @@ export function usePrebuiltDestinations() {
 
     } catch (error: any) {
       console.error('Failed to create prebuilt destination:', error);
+      $q.notify({
+        type: 'negative',
+        message: t('alerts.destinations.saveError'),
+        caption: error.message
+      });
+      throw error;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /**
+   * Update an existing prebuilt destination
+   */
+  async function updateDestination(
+    type: PrebuiltTypeId,
+    originalName: string,
+    name: string,
+    credentials: Record<string, any>,
+    headers: Record<string, string> = {},
+    skipTlsVerify: boolean = false
+  ): Promise<void> {
+    try {
+      isLoading.value = true;
+
+      // Ensure system templates exist
+      await ensureSystemTemplates();
+
+      // Skip credential validation in update mode - credentials are optional
+      // User might not be changing credentials, and sensitive fields are cleared for security
+
+      const config = getPrebuiltConfig(type);
+      if (!config) {
+        throw new Error('Invalid destination type');
+      }
+
+      // Generate destination data
+      const destinationUrl = generateDestinationUrl(type, credentials);
+      const destinationHeaders = generateDestinationHeaders(type, credentials);
+
+      // Build update payload (same structure as create)
+      let destinationData: any;
+
+      if (type === 'email') {
+        destinationData = {
+          name,
+          type: 'email',
+          template: config.templateName,
+          skip_tls_verify: skipTlsVerify,
+          output_format: 'json',
+          destination_type_name: type,
+          emails: Array.isArray(credentials.recipients)
+            ? credentials.recipients
+            : (credentials.recipients || '').split(',').map((e: string) => e.trim()).filter(Boolean),
+          metadata: {
+            prebuilt_type: type,
+            ...Object.fromEntries(
+              Object.entries(credentials).filter(([key]) =>
+                !key.toLowerCase().includes('password') &&
+                !key.toLowerCase().includes('key') &&
+                !key.toLowerCase().includes('token')
+              ).map(([k, v]) => [`credential_${k}`, String(v)])
+            )
+          }
+        };
+      } else {
+        destinationData = {
+          name,
+          type: 'http',
+          url: destinationUrl,
+          method: config.method,
+          template: config.templateName,
+          skip_tls_verify: skipTlsVerify,
+          headers: { ...destinationHeaders, ...headers },
+          output_format: 'json',
+          destination_type_name: type,
+          metadata: {
+            prebuilt_type: type,
+            ...Object.fromEntries(
+              Object.entries(credentials).filter(([key]) =>
+                !key.toLowerCase().includes('password') &&
+                !key.toLowerCase().includes('key') &&
+                !key.toLowerCase().includes('token')
+              ).map(([k, v]) => [`credential_${k}`, String(v)])
+            )
+          }
+        };
+
+        if (type === 'servicenow') {
+          const authString = btoa(`${credentials.username}:${credentials.password}`);
+          destinationData.headers = {
+            ...destinationData.headers,
+            'Authorization': `Basic ${authString}`
+          };
+        }
+      }
+
+      // Update the destination
+      await alertDestinationService.update({
+        org_identifier: organizationIdentifier.value,
+        destination_name: originalName, // Use original name for lookup
+        data: destinationData
+      });
+
+      $q.notify({
+        type: 'positive',
+        message: t('alerts.destinations.saved'),
+        timeout: 2000
+      });
+
+    } catch (error: any) {
+      console.error('Failed to update prebuilt destination:', error);
       $q.notify({
         type: 'negative',
         message: t('alerts.destinations.saveError'),
@@ -465,6 +574,7 @@ export function usePrebuiltDestinations() {
     generatePreview,
     testDestination,
     createDestination,
+    updateDestination,
     detectPrebuiltType,
     convertToPrebuilt,
 

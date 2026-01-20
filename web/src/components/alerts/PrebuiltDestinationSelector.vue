@@ -14,22 +14,6 @@ limitations under the License. -->
 
 <template>
   <div data-test="prebuilt-destination-selector" class="destination-selector">
-    <!-- Search Bar -->
-    <div class="search-container q-mb-md">
-      <q-input
-        v-model="searchQuery"
-        data-test="destination-search-input"
-        :placeholder="t('alerts.searchDestinationType')"
-        dense
-        outlined
-        clearable
-      >
-        <template #prepend>
-          <q-icon name="search" />
-        </template>
-      </q-input>
-    </div>
-
     <!-- Destination Type Grid -->
     <div class="selector-grid">
       <div
@@ -41,21 +25,21 @@ limitations under the License. -->
         :class="{ selected: selectedType === type.id }"
         @click="selectType(type.id)"
       >
-        <!-- Popular Badge -->
-        <q-badge
-          v-if="type.popular"
-          data-test="destination-popular-badge"
-          color="primary"
-          class="popular-badge"
-        >
-          {{ t('alerts.popular') }}
-        </q-badge>
-
         <!-- Card Content -->
         <div class="card-content">
-          <!-- Icon -->
+          <!-- Icon/Image -->
           <div class="card-icon">
-            <q-icon :name="getIconName(type.icon)" size="32px" />
+            <img
+              v-if="type.image"
+              :src="type.image"
+              :alt="type.name"
+              class="destination-logo"
+            />
+            <q-icon
+              v-else
+              :name="getIconName(type.icon)"
+              size="32px"
+            />
           </div>
 
           <!-- Name -->
@@ -69,13 +53,12 @@ limitations under the License. -->
           </p>
 
           <!-- Selection Indicator -->
-          <q-icon
+          <div
             v-if="selectedType === type.id"
-            name="check_circle"
-            color="primary"
-            size="20px"
-            class="selection-indicator"
-          />
+            class="check-icon"
+          >
+            <q-icon name="check_circle" size="20px" color="positive" />
+          </div>
         </div>
       </div>
 
@@ -97,39 +80,20 @@ limitations under the License. -->
           <p data-test="destination-type-description" class="card-description">
             {{ t('alerts.customDestinationDescription') }}
           </p>
-          <q-icon
+          <div
             v-if="selectedType === 'custom'"
-            name="check_circle"
-            color="primary"
-            size="20px"
-            class="selection-indicator"
-          />
+            class="check-icon"
+          >
+            <q-icon name="check_circle" size="20px" color="positive" />
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Empty State -->
-    <div
-      v-if="filteredDestinationTypes.length === 0"
-      data-test="destination-search-empty"
-      class="empty-state"
-    >
-      <q-icon name="search_off" size="48px" color="grey-5" />
-      <p class="empty-text">
-        {{ t('alerts.noDestinationTypesFound') }}
-      </p>
-      <q-btn
-        flat
-        color="primary"
-        :label="t('alerts.clearSearch')"
-        @click="searchQuery = ''"
-      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { PREBUILT_DESTINATION_TYPES } from '@/utils/prebuilt-templates';
 import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
@@ -137,18 +101,15 @@ import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
 // Define component props
 interface Props {
   modelValue?: PrebuiltTypeId | 'custom' | null;
-  searchQuery?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  modelValue: null,
-  searchQuery: ''
+  modelValue: null
 });
 
 // Define component emits
 interface Emits {
   (e: 'update:modelValue', value: PrebuiltTypeId | 'custom' | null): void;
-  (e: 'update:searchQuery', value: string): void;
   (e: 'select', value: PrebuiltTypeId | 'custom'): void;
 }
 
@@ -158,25 +119,13 @@ const emit = defineEmits<Emits>();
 const { t } = useI18n();
 
 // Reactive state
-const searchQuery = ref(props.searchQuery);
 const selectedType = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 });
 
 // Computed properties
-const filteredDestinationTypes = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return PREBUILT_DESTINATION_TYPES;
-  }
-
-  const query = searchQuery.value.toLowerCase().trim();
-  return PREBUILT_DESTINATION_TYPES.filter(type =>
-    type.name.toLowerCase().includes(query) ||
-    type.description.toLowerCase().includes(query) ||
-    type.category.toLowerCase().includes(query)
-  );
-});
+const filteredDestinationTypes = computed(() => PREBUILT_DESTINATION_TYPES);
 
 // Methods
 function selectType(typeId: PrebuiltTypeId | 'custom') {
@@ -188,6 +137,7 @@ function getIconName(icon: string): string {
   // Map destination type icons to Quasar icon names
   const iconMap: Record<string, string> = {
     slack: 'chat',
+    discord: 'forum',
     msteams: 'groups',
     email: 'email',
     pagerduty: 'warning',
@@ -198,64 +148,47 @@ function getIconName(icon: string): string {
 
   return iconMap[icon] || icon;
 }
-
-// Watch search query changes
-watch(() => searchQuery.value, (newValue) => {
-  emit('update:searchQuery', newValue);
-});
 </script>
 
 <style scoped lang="scss">
 .destination-selector {
-  .search-container {
-    max-width: 400px;
-  }
-
   .selector-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-
-    @media (max-width: 768px) {
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.75rem;
-    }
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
   }
 
   .destination-card {
     position: relative;
-    padding: 1.5rem 1rem;
-    border: 2px solid var(--q-border-color);
-    border-radius: 8px;
-    background: var(--q-card-bg);
+    padding: 20px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: #ffffff;
     cursor: pointer;
-    transition: all 0.2s ease;
-    min-height: 140px;
+    transition: all 0.3s ease;
+    min-height: 120px;
     display: flex;
     flex-direction: column;
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      border-color: var(--q-primary);
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+      border-color: #1976d2;
     }
 
     &.selected {
-      border-color: var(--q-primary);
-      background: linear-gradient(135deg, var(--q-primary-light) 0%, transparent 100%);
-      box-shadow: 0 2px 8px rgba(var(--q-primary-rgb), 0.2);
+      border-color: #1976d2;
+      background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+      box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
+
+      .card-icon {
+        color: #1976d2;
+      }
     }
 
     &.custom-card {
       border-style: dashed;
-    }
-
-    .popular-badge {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      font-size: 0.7rem;
     }
 
     .card-content {
@@ -268,45 +201,43 @@ watch(() => searchQuery.value, (newValue) => {
     }
 
     .card-icon {
-      margin-bottom: 0.75rem;
-      color: var(--q-primary);
+      margin-bottom: 8px;
+      color: #666;
+
+      .destination-logo {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+      }
     }
 
     .card-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin: 0 0 0.5rem 0;
+      font-size: 13px;
+      font-weight: 500;
+      margin: 4px 0 0 0;
       color: var(--q-text-primary);
-      line-height: 1.2;
+      line-height: 1.3;
+      text-align: center;
     }
 
     .card-description {
-      font-size: 0.75rem;
+      font-size: 11px;
       color: var(--q-text-secondary);
-      margin: 0;
-      line-height: 1.3;
+      margin: 4px 0 0 0;
+      line-height: 1.2;
       flex-grow: 1;
+      text-align: center;
+      display: none; // Hide description to save space
+
+      @media (min-width: 1200px) {
+        display: block; // Show on larger screens
+      }
     }
 
-    .selection-indicator {
+    .check-icon {
       position: absolute;
-      top: -8px;
-      right: -8px;
-      background: white;
-      border-radius: 50%;
-      padding: 2px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 2rem;
-    color: var(--q-text-secondary);
-
-    .empty-text {
-      margin: 1rem 0;
-      font-size: 0.9rem;
+      bottom: 8px;
+      right: 8px;
     }
   }
 }
@@ -314,16 +245,18 @@ watch(() => searchQuery.value, (newValue) => {
 // Dark mode adjustments
 body.body--dark {
   .destination-card {
+    background: #1e1e1e;
+    border-color: #424242;
+
     &:hover {
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+      border-color: #1976d2;
     }
 
     &.selected {
-      box-shadow: 0 2px 8px rgba(var(--q-primary-rgb), 0.3);
-    }
-
-    .selection-indicator {
-      background: var(--q-dark);
+      border-color: #1976d2;
+      background: linear-gradient(135deg, rgba(25, 118, 210, 0.2) 0%, #1e1e1e 100%);
+      box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
     }
   }
 }

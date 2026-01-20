@@ -85,11 +85,14 @@ export const pagerdutyConfig: PrebuiltConfig = {
   ]
 };
 
+import pagerdutyLogo from '@/assets/images/alerts/destinations/pagerduty.png';
+
 export const pagerdutyDestinationType = {
   id: 'pagerduty',
   name: 'PagerDuty',
   description: 'Create incidents in PagerDuty',
-  icon: 'pagerduty-icon',
+  icon: 'pagerduty',
+  image: pagerdutyLogo,
   popular: true,
   category: 'incident'
 };

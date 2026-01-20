@@ -61,6 +61,52 @@ limitations under the License.
       </div>
     </template>
 
+    <!-- Discord Fields -->
+    <template v-if="destinationType === 'discord'">
+      <div class="col-6 q-py-xs">
+        <q-input
+          v-model="credentials.webhookUrl"
+          data-test="discord-webhook-url-input"
+          label="Discord Webhook URL *"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          hide-bottom-space
+          :rules="[
+            (val: any) => !!val || 'Webhook URL is required',
+            (val: any) => val.includes('discord.com/api/webhooks/') || 'Invalid Discord webhook URL'
+          ]"
+          tabindex="0"
+        >
+          <template v-slot:hint>
+            <span class="text-caption text-grey-7">
+              Get your webhook URL from Discord channel settings
+            </span>
+          </template>
+        </q-input>
+      </div>
+      <div class="col-6 q-py-xs">
+        <q-input
+          v-model="credentials.username"
+          data-test="discord-username-input"
+          label="Bot Username (optional)"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          hide-bottom-space
+          tabindex="0"
+        >
+          <template v-slot:hint>
+            <span class="text-caption text-grey-7">
+              Custom username for the webhook bot
+            </span>
+          </template>
+        </q-input>
+      </div>
+    </template>
+
     <!-- MS Teams Fields -->
     <template v-if="destinationType === 'msteams'">
       <div class="col-12 q-py-xs">
@@ -341,7 +387,7 @@ limitations under the License.
     </template>
 
     <!-- Test and Preview Actions -->
-    <div class="col-12 q-py-md">
+    <div v-if="!hideActions" class="col-12 q-py-md">
       <div class="flex items-center q-gutter-sm">
         <q-btn
           data-test="destination-preview-button"
@@ -362,70 +408,12 @@ limitations under the License.
         />
       </div>
     </div>
-
-    <!-- Test Result Display -->
-    <div v-if="testResult" class="col-12 q-py-xs">
-      <q-banner
-        v-if="testResult.success"
-        data-test="test-result-success"
-        class="bg-positive text-white rounded-borders"
-      >
-        <template #avatar>
-          <q-icon name="check_circle" />
-        </template>
-        <div data-test="test-success-message">
-          Test notification sent successfully!
-        </div>
-        <div class="text-caption" data-test="test-success-timestamp">
-          {{ new Date(testResult.timestamp).toLocaleString() }}
-        </div>
-      </q-banner>
-
-      <q-banner
-        v-else
-        data-test="test-result-failure"
-        class="bg-negative text-white rounded-borders"
-      >
-        <template #avatar>
-          <q-icon name="error" />
-        </template>
-        <div data-test="test-failure-message">
-          {{ testResult.error }}
-        </div>
-        <q-expansion-item
-          v-if="testResult.statusCode || testResult.responseBody"
-          data-test="test-failure-details-expansion"
-          label="View Details"
-          icon="info"
-          dark
-        >
-          <div data-test="test-failure-details" class="q-pa-sm">
-            <div v-if="testResult.statusCode" data-test="test-http-status">
-              <strong>Status:</strong> {{ testResult.statusCode }}
-            </div>
-            <div v-if="testResult.responseBody" data-test="test-response-body" class="q-mt-sm">
-              <strong>Response:</strong><br>
-              <pre>{{ testResult.responseBody }}</pre>
-            </div>
-          </div>
-        </q-expansion-item>
-        <template #action>
-          <q-btn
-            data-test="test-retry-button"
-            label="Retry"
-            flat
-            @click="$emit('test')"
-          />
-        </template>
-      </q-banner>
-    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { PropType } from 'vue';
-import type { TestResult } from '@/utils/prebuilt-templates/types';
 
 const props = defineProps({
   destinationType: {
@@ -440,9 +428,9 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  testResult: {
-    type: Object as PropType<TestResult | null>,
-    default: null
+  hideActions: {
+    type: Boolean,
+    default: false
   }
 });
 

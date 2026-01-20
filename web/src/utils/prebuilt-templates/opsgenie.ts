@@ -87,11 +87,14 @@ export const opsgenieConfig: PrebuiltConfig = {
   ]
 };
 
+import opsgenieLogo from '@/assets/images/alerts/destinations/opsgenie.png';
+
 export const opsgenieDestinationType = {
   id: 'opsgenie',
   name: 'Opsgenie',
   description: 'Create alerts in Opsgenie',
-  icon: 'opsgenie-icon',
-  popular: false,
+  icon: 'opsgenie',
+  image: opsgenieLogo,
+  popular: true,
   category: 'incident'
 };

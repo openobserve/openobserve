@@ -22,6 +22,7 @@ export * from './types';
 
 // Template configurations
 export { slackTemplate, slackConfig, slackDestinationType } from './slack';
+export { discordTemplate, discordConfig, discordDestinationType } from './discord';
 export { msteamsTemplate, msteamsConfig, msteamsDestinationType } from './msteams';
 export { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from './pagerduty';
 export { servicenowTemplate, servicenowConfig, servicenowDestinationType } from './servicenow';
@@ -29,6 +30,7 @@ export { emailTemplate, emailConfig, emailDestinationType } from './email';
 export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from './opsgenie';
 
 import { slackConfig, slackDestinationType } from './slack';
+import { discordConfig, discordDestinationType } from './discord';
 import { msteamsConfig, msteamsDestinationType } from './msteams';
 import { pagerdutyConfig, pagerdutyDestinationType } from './pagerduty';
 import { servicenowConfig, servicenowDestinationType } from './servicenow';
@@ -41,6 +43,7 @@ import { PrebuiltConfig, PrebuiltType } from './types';
  */
 export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   slackDestinationType as PrebuiltType,
+  discordDestinationType as PrebuiltType,
   msteamsDestinationType as PrebuiltType,
   emailDestinationType as PrebuiltType,
   pagerdutyDestinationType as PrebuiltType,
@@ -53,6 +56,7 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
  */
 export const PREBUILT_CONFIGS: Record<string, PrebuiltConfig> = {
   slack: slackConfig,
+  discord: discordConfig,
   msteams: msteamsConfig,
   pagerduty: pagerdutyConfig,
   servicenow: servicenowConfig,
@@ -110,11 +114,18 @@ export function detectPrebuiltTypeFromUrl(url: string): string | null {
  * Generate URL for prebuilt destination based on credentials
  */
 export function generateDestinationUrl(type: string, credentials: Record<string, any>): string {
+  if (!credentials) {
+    console.error('generateDestinationUrl: credentials is null or undefined');
+    return '';
+  }
+
   switch (type) {
     case 'slack':
+    case 'discord':
     case 'msteams':
+      return credentials.webhookUrl || '';
     case 'servicenow':
-      return credentials.webhookUrl || credentials.instanceUrl;
+      return credentials.instanceUrl || '';
     case 'pagerduty':
       return 'https://events.pagerduty.com/v2/enqueue';
     case 'opsgenie':
@@ -143,8 +154,9 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
       headers['Authorization'] = `GenieKey ${credentials.apiKey}`;
       break;
     case 'servicenow':
-      // Basic auth will be handled by the backend
-      headers['Authorization'] = `Basic ${btoa(`${credentials.username}:${credentials.password}`)}`;
+      // Note: Basic auth credentials are passed separately to backend for secure handling
+      // Backend will encode credentials and add Authorization header
+      // DO NOT encode credentials on frontend for security reasons
       break;
   }
 

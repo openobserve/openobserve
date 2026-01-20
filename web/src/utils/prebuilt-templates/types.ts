@@ -17,7 +17,7 @@ import { Component } from 'vue';
 /**
  * Prebuilt destination types
  */
-export type PrebuiltTypeId = 'slack' | 'msteams' | 'pagerduty' | 'servicenow' | 'email' | 'opsgenie';
+export type PrebuiltTypeId = 'slack' | 'discord' | 'msteams' | 'pagerduty' | 'servicenow' | 'email' | 'opsgenie';
 
 /**
  * Credential field configuration
@@ -52,6 +52,7 @@ export interface PrebuiltType {
   name: string;
   description: string;
   icon: string; // Icon name or component reference
+  image?: string; // Image URL for logo
   popular?: boolean;
   category: 'messaging' | 'incident' | 'email' | 'custom';
 }

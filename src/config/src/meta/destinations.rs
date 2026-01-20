@@ -249,141 +249,8 @@ impl Destination {
     /// This provides predefined configurations for popular notification services
     /// that users can customize with their own URLs and credentials.
     pub fn prebuilt_destinations() -> Vec<Self> {
-        vec![
-            // Slack webhook destination
-            Self {
-                id: None,
-                org_id: String::new(), // Will be set by caller
-                name: "Slack Webhook".to_string(),
-                module: Module::Alert {
-                    template: None, // Can be set at alert level
-                    destination_type: DestinationType::Http(Endpoint {
-                        url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK".to_string(),
-                        method: HTTPType::POST,
-                        skip_tls_verify: false,
-                        headers: Some(HashMap::from([
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                        ])),
-                        action_id: None,
-                        output_format: Some(HTTPOutputFormat::JSON),
-                        destination_type: Some("slack".to_string()),
-                        metadata: HashMap::from([
-                            ("service".to_string(), "slack".to_string()),
-                            ("description".to_string(), "Slack webhook for team notifications".to_string()),
-                        ]),
-                    }),
-                },
-            },
-            // Microsoft Teams webhook destination
-            Self {
-                id: None,
-                org_id: String::new(),
-                name: "Microsoft Teams Webhook".to_string(),
-                module: Module::Alert {
-                    template: None,
-                    destination_type: DestinationType::Http(Endpoint {
-                        url: "https://your-tenant.webhook.office.com/webhookb2/YOUR-TEAMS-WEBHOOK-URL".to_string(),
-                        method: HTTPType::POST,
-                        skip_tls_verify: false,
-                        headers: Some(HashMap::from([
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                        ])),
-                        action_id: None,
-                        output_format: Some(HTTPOutputFormat::JSON),
-                        destination_type: Some("teams".to_string()),
-                        metadata: HashMap::from([
-                            ("service".to_string(), "teams".to_string()),
-                            ("description".to_string(), "Microsoft Teams webhook for team notifications".to_string()),
-                        ]),
-                    }),
-                },
-            },
-            // PagerDuty Events API destination
-            Self {
-                id: None,
-                org_id: String::new(),
-                name: "PagerDuty Events API".to_string(),
-                module: Module::Alert {
-                    template: None,
-                    destination_type: DestinationType::Http(Endpoint {
-                        url: "https://events.pagerduty.com/v2/enqueue".to_string(),
-                        method: HTTPType::POST,
-                        skip_tls_verify: false,
-                        headers: Some(HashMap::from([
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                            ("Authorization".to_string(), "Token YOUR_INTEGRATION_KEY".to_string()),
-                        ])),
-                        action_id: None,
-                        output_format: Some(HTTPOutputFormat::JSON),
-                        destination_type: Some("pagerduty".to_string()),
-                        metadata: HashMap::from([
-                            ("service".to_string(), "pagerduty".to_string()),
-                            ("description".to_string(), "PagerDuty incident management".to_string()),
-                        ]),
-                    }),
-                },
-            },
-            // Discord webhook destination
-            Self {
-                id: None,
-                org_id: String::new(),
-                name: "Discord Webhook".to_string(),
-                module: Module::Alert {
-                    template: None,
-                    destination_type: DestinationType::Http(Endpoint {
-                        url: "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK".to_string(),
-                        method: HTTPType::POST,
-                        skip_tls_verify: false,
-                        headers: Some(HashMap::from([
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                        ])),
-                        action_id: None,
-                        output_format: Some(HTTPOutputFormat::JSON),
-                        destination_type: Some("discord".to_string()),
-                        metadata: HashMap::from([
-                            ("service".to_string(), "discord".to_string()),
-                            ("description".to_string(), "Discord webhook for community notifications".to_string()),
-                        ]),
-                    }),
-                },
-            },
-            // Generic webhook destination
-            Self {
-                id: None,
-                org_id: String::new(),
-                name: "Generic Webhook".to_string(),
-                module: Module::Alert {
-                    template: None,
-                    destination_type: DestinationType::Http(Endpoint {
-                        url: "https://your-service.com/webhook".to_string(),
-                        method: HTTPType::POST,
-                        skip_tls_verify: false,
-                        headers: Some(HashMap::from([
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                        ])),
-                        action_id: None,
-                        output_format: Some(HTTPOutputFormat::JSON),
-                        destination_type: Some("webhook".to_string()),
-                        metadata: HashMap::from([
-                            ("service".to_string(), "webhook".to_string()),
-                            ("description".to_string(), "Generic webhook destination".to_string()),
-                        ]),
-                    }),
-                },
-            },
-            // Email destination
-            Self {
-                id: None,
-                org_id: String::new(),
-                name: "Email Notification".to_string(),
-                module: Module::Alert {
-                    template: None,
-                    destination_type: DestinationType::Email(Email {
-                        recipients: vec!["admin@your-domain.com".to_string()],
-                    }),
-                },
-            },
-        ]
+        // Load from config file instead of embedded code
+        crate::prebuilt_loader::load_prebuilt_destinations()
     }
 }
 
@@ -645,12 +512,12 @@ mod tests {
     fn test_prebuilt_destinations() {
         let prebuilt = Destination::prebuilt_destinations();
 
-        // Should have 6 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
-        // Email
-        assert_eq!(prebuilt.len(), 6);
+        // Should have 8 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
+        // Opsgenie, ServiceNow, Email
+        assert_eq!(prebuilt.len(), 8);
 
         // Check that each destination has expected properties
-        let slack = prebuilt.iter().find(|d| d.name == "Slack Webhook").unwrap();
+        let slack = prebuilt.iter().find(|d| d.name == "Slack").unwrap();
         assert_eq!(slack.org_id, "");
         match &slack.module {
             Module::Alert {
@@ -673,7 +540,7 @@ mod tests {
         // Check Teams destination
         let teams = prebuilt
             .iter()
-            .find(|d| d.name == "Microsoft Teams Webhook")
+            .find(|d| d.name == "Microsoft Teams")
             .unwrap();
         match &teams.module {
             Module::Alert {
@@ -689,10 +556,7 @@ mod tests {
         }
 
         // Check Email destination
-        let email = prebuilt
-            .iter()
-            .find(|d| d.name == "Email Notification")
-            .unwrap();
+        let email = prebuilt.iter().find(|d| d.name == "Email").unwrap();
         match &email.module {
             Module::Alert {
                 destination_type, ..

@@ -26,7 +26,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::{auth::UserEmail, ssrf_guard::SsrfGuard},
+    },
     handler::http::{
         extractors::Headers,
         models::destinations::Destination,
@@ -105,6 +108,16 @@ pub async fn test_destination(
     let body = test_req.body.unwrap_or_default();
     let headers = test_req.headers.unwrap_or_default();
     let skip_tls_verify = test_req.skip_tls_verify.unwrap_or(false);
+
+    // SSRF protection: Validate URL before making request
+    if let Err(error_msg) = SsrfGuard::validate_url(url) {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(error_msg),
+        });
+    }
 
     // Build HTTP client
     let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));

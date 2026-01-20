@@ -132,11 +132,14 @@ export const emailConfig: PrebuiltConfig = {
   ]
 };
 
+import emailLogo from '@/assets/images/alerts/destinations/email.png';
+
 export const emailDestinationType = {
   id: 'email',
   name: 'Email',
   description: 'Send HTML formatted email notifications',
-  icon: 'email-icon',
+  icon: 'email',
+  image: emailLogo,
   popular: true,
   category: 'email'
 };

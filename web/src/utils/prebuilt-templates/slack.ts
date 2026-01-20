@@ -90,11 +90,14 @@ export const slackConfig: PrebuiltConfig = {
   ]
 };
 
+import slackLogo from '@/assets/images/alerts/destinations/slack.png';
+
 export const slackDestinationType = {
   id: 'slack',
   name: 'Slack',
   description: 'Send notifications to Slack channels',
-  icon: 'slack-icon', // Will be mapped to actual icon component
+  icon: 'slack',
+  image: slackLogo,
   popular: true,
   category: 'messaging'
 };
