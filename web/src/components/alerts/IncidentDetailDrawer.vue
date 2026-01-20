@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="text-h6">
-          {{ t("alerts.incidents.header") }}
+          Incident
         </div>
         <!-- Incident name with colored indicator -->
         <span
@@ -73,8 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Severity Badge -->
           <q-badge
-            :style="{ backgroundColor: getSeverityColorHex(incidentDetails.severity), color: '#fff' }"
+            :style="{ color: getSeverityColorHex(incidentDetails.severity) }"
             class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+            outline
           >
             <div class="tw:flex tw:items-center tw:gap-1.5">
               <q-icon name="warning" size="14px" />
@@ -101,6 +102,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-badge>
         </div>
       </div>
+
+      <!-- Action buttons at extreme right of header -->
+      <div v-if="incidentDetails" class="tw:flex tw:gap-2 tw:ml-auto tw:items-center">
+        <q-btn
+          v-if="incidentDetails.status === 'open'"
+          color="brown-5"
+          size="sm"
+          no-caps
+          unelevated
+          dense
+          @click="acknowledgeIncident"
+          :loading="updating"
+          class="incident-action-buttons"
+        >
+          <q-icon name="check_circle" size="16px" class="tw:mr-1" />
+          <span>{{ t("alerts.incidents.acknowledge") }}</span>
+          <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
+        </q-btn>
+        <q-btn
+          v-if="incidentDetails.status !== 'resolved'"
+          color="positive"
+          size="sm"
+          no-caps
+          unelevated
+          dense
+          @click="resolveIncident"
+          :loading="updating"
+          class="incident-action-buttons"
+        >
+          <q-icon name="task_alt" size="16px" class="tw:mr-1" />
+          <span>{{ t("alerts.incidents.resolve") }}</span>
+          <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
+        </q-btn>
+        <q-btn
+          v-if="incidentDetails.status === 'resolved'"
+          color="info"
+          size="sm"
+          no-caps
+          unelevated
+          dense
+          @click="reopenIncident"
+          :loading="updating"
+          class="incident-action-buttons"
+        >
+          <q-icon name="refresh" size="16px" class="tw:mr-1" />
+          <span>{{ t("alerts.incidents.reopen") }}</span>
+          <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
+        </q-btn>
+
+        <!-- AI Chat Button -->
+        <q-btn
+          size="sm"
+          flat
+          dense
+          @click="openSREChat"
+          class="tw:ml-2 ai-hover-btn"
+          :class="showAIChat ? 'ai-btn-active' : ''"
+          style="border-radius: 100%"
+        >
+          <img :src="getAIIconURL()" class="ai-icon tw:w-5 tw:h-5" />
+          <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
+        </q-btn>
+      </div>
     </div>
 
     <!-- Content -->
@@ -122,9 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Incident Details -->
       <div class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'tw:border-r tw:border-gray-700' : 'tw:border-r tw:border-gray-200'"  style="order: 1;">
 
-        <!-- Top Section (52% height) - Table of Contents -->
+        <!-- Top Section (45% height) - Table of Contents -->
         <div
-          style="height: 52%"
+          style="height: 45%"
           class="tw:border-b tw:p-4 tw:flex tw:flex-col"
           :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
         >
@@ -270,8 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Bottom Section (48% height) - Timeline, Dimensions, Topology -->
-        <div style="height: 48%" class="tw:overflow-auto tw:p-4">
+        <!-- Bottom Section (55% height) - Timeline, Dimensions, Topology -->
+        <div style="height: 55%; overflow-y: auto;" class="tw:p-4">
         <!-- Timeline with UTC timestamps -->
         <div
           id="timeline"
@@ -281,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'tw:border-gray-700'
               : 'tw:border-gray-200'
           ]"
+          style="max-height: 150px;"
         >
           <!-- Header -->
           <div
@@ -355,6 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:border-gray-700'
                 : 'tw:border-gray-200'
             ]"
+            style="max-height: 130px;"
           >
             <!-- Header -->
             <div
@@ -371,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3 tw:overflow-x-auto">
+            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3 tw:overflow-x-auto" style="max-height: 200px; overflow-y: auto;">
               <div
                 v-for="(value, key) in incidentDetails.stable_dimensions"
                 :key="key"
@@ -399,6 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:border-gray-700'
                 : 'tw:border-gray-200'
             ]"
+            style="max-height: 200px;"
           >
             <!-- Header -->
             <div
@@ -415,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3">
+            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3" style="max-height: 150px; overflow-y: auto;">
               <div class="tw:text-xs tw:mb-2">
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Service:</span>
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
@@ -456,162 +523,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right Column: Tabs and Content -->
       <div class="tabs-content-column tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden" style="order: 2;">
         <!-- Tabs -->
-        <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:pt-4 tw:pb-2 q-px-md tw:flex-shrink-0">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
-              <q-tab
-                name="incidentAnalysis"
-                icon="psychology"
-                label="Incident Analysis"
-              />
-              <q-tab
-                name="serviceGraph"
-                icon="hub"
-                label="Alert Graph"
-              />
-              <q-tab
-                name="alertTriggers"
-                icon="notifications_active"
-              >
-                <template #default>
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
-                    <span>Alert Triggers</span>
-                    <span class="tw:text-xs tw:opacity-70">({{ triggers.length }})</span>
-                  </div>
-                </template>
-              </q-tab>
+        <div class="tw:px-4 tw:pt-4 tw:pb-2 q-px-md tw:flex-shrink-0">
+          <q-tabs
+            v-model="activeTab"
+            inline-label
+            dense
+            no-caps
+            align="left"
+            class="tw:flex-1"
+            mobile-arrows
+            outside-arrows
+            :breakpoint="0"
+          >
+            <q-tab
+              name="incidentAnalysis"
+              label="Incident Analysis"
+            />
+            <q-tab
+              name="serviceGraph"
+              label="Alert Graph"
+            />
+            <q-tab
+              name="alertTriggers"
+            >
+              <template #default>
+                <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <span>Alert Triggers</span>
+                  <span class="tw:text-xs tw:opacity-70">({{ triggers.length }})</span>
+                </div>
+              </template>
+            </q-tab>
 
-              <!-- Show telemetry tabs inline when AI chat is closed -->
-              <q-tab
-                v-if="!showAIChat"
-                name="logs"
-                icon="description"
-                :label="t('common.logs')"
-              />
-              <q-tab
-                v-if="!showAIChat"
-                name="metrics"
-                icon="bar_chart"
-                :label="t('search.metrics')"
-              />
-              <q-tab
-                v-if="!showAIChat"
-                name="traces"
-                icon="timeline"
-                :label="t('menu.traces')"
-              />
-            </q-tabs>
-
-            <!-- Telemetry Dropdown Menu - Only show when AI chat is open -->
-            <q-btn
-              v-if="showAIChat"
-              flat
-              dense
-              icon="menu"
-              size="sm"
-              class="tw:ml-2"
-            >
-              <q-tooltip :delay="500">View Telemetry Data</q-tooltip>
-              <q-menu>
-                <q-list dense style="min-width: 150px;">
-                  <q-item
-                    clickable
-                    v-close-popup
-                    @click="activeTab = 'logs'"
-                    :class="activeTab === 'logs' ? 'bg-primary text-white' : ''"
-                  >
-                    <q-item-section avatar>
-                      <q-icon name="description" size="18px" />
-                    </q-item-section>
-                    <q-item-section>{{ t('common.logs') }}</q-item-section>
-                  </q-item>
-                  <q-item
-                    clickable
-                    v-close-popup
-                    @click="activeTab = 'metrics'"
-                    :class="activeTab === 'metrics' ? 'bg-primary text-white' : ''"
-                  >
-                    <q-item-section avatar>
-                      <q-icon name="bar_chart" size="18px" />
-                    </q-item-section>
-                    <q-item-section>{{ t('search.metrics') }}</q-item-section>
-                  </q-item>
-                  <q-item
-                    clickable
-                    v-close-popup
-                    @click="activeTab = 'traces'"
-                    :class="activeTab === 'traces' ? 'bg-primary text-white' : ''"
-                  >
-                    <q-item-section avatar>
-                      <q-icon name="timeline" size="18px" />
-                    </q-item-section>
-                    <q-item-section>{{ t('menu.traces') }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-btn>
-          </div>
-
-          <!-- Action buttons -->
-          <div class="tw:flex tw:gap-2 tw:ml-auto tw:items-center">
-            <q-btn
-              v-if="incidentDetails.status === 'open'"
-              color="warning"
-              size="sm"
-              no-caps
-              unelevated
-              dense
-              @click="acknowledgeIncident"
-              :loading="updating"
-              class="tw:px-2"
-            >
-              <q-icon name="check_circle" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
-              <span v-if="!showAIChat">{{ t("alerts.incidents.acknowledge") }}</span>
-              <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="incidentDetails.status !== 'resolved'"
-              color="positive"
-              size="sm"
-              no-caps
-              unelevated
-              dense
-              @click="resolveIncident"
-              :loading="updating"
-              class="tw:px-2"
-            >
-              <q-icon name="task_alt" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
-              <span v-if="!showAIChat">{{ t("alerts.incidents.resolve") }}</span>
-              <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="incidentDetails.status === 'resolved'"
-              color="info"
-              size="sm"
-              no-caps
-              unelevated
-              dense
-              @click="reopenIncident"
-              :loading="updating"
-              class="tw:px-2"
-            >
-              <q-icon name="refresh" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
-              <span v-if="!showAIChat">{{ t("alerts.incidents.reopen") }}</span>
-              <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
-            </q-btn>
-
-            <!-- AI Chat Button -->
-            <q-btn
-              size="sm"
-              flat
-              dense
-              @click="openSREChat"
-              class="tw:ml-2"
-            >
-              <img :src="getAIIconURL()" class="tw:w-5 tw:h-5" />
-              <q-tooltip :delay="500" style="width: 180px;">Chat with SRE Assistant</q-tooltip>
-            </q-btn>
-          </div>
+            <!-- Telemetry tabs always inline -->
+            <q-tab
+              name="logs"
+              :label="t('common.logs')"
+            />
+            <q-tab
+              name="metrics"
+              :label="t('search.metrics')"
+            />
+            <q-tab
+              name="traces"
+              :label="t('menu.traces')"
+            />
+          </q-tabs>
         </div>
 
         <!-- Tab Content Area -->
@@ -1886,6 +1842,33 @@ body.body--dark .tabs-content-column .tw:overflow-auto::-webkit-scrollbar-thumb 
 
 body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
   background: #475569;
+}
+
+/* AI Button Styles */
+.ai-btn-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.ai-hover-btn {
+  transition: background 0.3s ease;
+}
+
+.ai-hover-btn:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.ai-icon {
+  transition: transform 0.6s ease, filter 0.3s ease;
+}
+
+.ai-hover-btn:hover .ai-icon,
+.ai-btn-active .ai-icon {
+  transform: rotate(180deg);
+  filter: brightness(0) invert(1);
+}
+
+.incident-action-buttons{
+  padding: 4px 6px;
 }
 </style>
 
