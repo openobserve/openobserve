@@ -112,6 +112,7 @@ jobs:
           mkdir -p $HOME/.cache/sccache
           echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
           echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
+          echo "SCCACHE_DIRECT=true" >> $GITHUB_ENV
 
       - name: Restore sccache cache
         uses: actions/cache@v4
@@ -128,6 +129,8 @@ jobs:
         run: |
           echo "=== Validating sccache setup ==="
           echo "SCCACHE_PATH: $SCCACHE_PATH"
+          echo "SCCACHE_DIR: $SCCACHE_DIR"
+          echo "SCCACHE_DIRECT: $SCCACHE_DIRECT"
 
           # Check if sccache binary exists
           if [ ! -f "$SCCACHE_PATH" ]; then
@@ -144,6 +147,11 @@ jobs:
           # Test sccache version
           echo "✓ sccache binary found and executable"
           $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
+
+          # Show sccache configuration
+          echo ""
+          echo "Sccache configuration:"
+          $SCCACHE_PATH --show-stats | head -20
 
           # Create a test Rust project and compile it with cargo
           mkdir -p /tmp/sccache-test
@@ -167,14 +175,20 @@ jobs:
 
           if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
             echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
-
-            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
-              echo "⚠️  WARNING: $NON_CACHEABLE compilations were non-cacheable"
-              echo "   This might affect caching performance in the full build"
-            fi
+            echo ""
 
             if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
               echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
+            fi
+
+            CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
+            if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
+              echo "✅ Cache hits: $CACHE_HITS (cache is working!)"
+            fi
+
+            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
+              echo "⚠️  Non-cacheable: $NON_CACHEABLE (build scripts, proc macros, linking)"
+              echo "   This is expected for some compilation steps"
             fi
           else
             echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
@@ -297,6 +311,7 @@ jobs:
           mkdir -p $HOME/.cache/sccache
           echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
           echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
+          echo "SCCACHE_DIRECT=true" >> $GITHUB_ENV
 
       - name: Restore sccache cache
         uses: actions/cache@v4
@@ -313,6 +328,8 @@ jobs:
         run: |
           echo "=== Validating sccache setup ==="
           echo "SCCACHE_PATH: $SCCACHE_PATH"
+          echo "SCCACHE_DIR: $SCCACHE_DIR"
+          echo "SCCACHE_DIRECT: $SCCACHE_DIRECT"
 
           # Check if sccache binary exists
           if [ ! -f "$SCCACHE_PATH" ]; then
@@ -329,6 +346,11 @@ jobs:
           # Test sccache version
           echo "✓ sccache binary found and executable"
           $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
+
+          # Show sccache configuration
+          echo ""
+          echo "Sccache configuration:"
+          $SCCACHE_PATH --show-stats | head -20
 
           # Create a test Rust project and compile it with cargo
           mkdir -p /tmp/sccache-test
@@ -352,14 +374,20 @@ jobs:
 
           if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
             echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
-
-            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
-              echo "⚠️  WARNING: $NON_CACHEABLE compilations were non-cacheable"
-              echo "   This might affect caching performance in the full build"
-            fi
+            echo ""
 
             if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
               echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
+            fi
+
+            CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
+            if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
+              echo "✅ Cache hits: $CACHE_HITS (cache is working!)"
+            fi
+
+            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
+              echo "⚠️  Non-cacheable: $NON_CACHEABLE (build scripts, proc macros, linking)"
+              echo "   This is expected for some compilation steps"
             fi
           else
             echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
