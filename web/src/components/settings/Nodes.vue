@@ -387,6 +387,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
+        <div class="row full-width q-pt-sm flex items-center q-pl-md">
+          <div
+            class="col q-table__title items-start"
+            data-test="cipher-keys-list-title"
+          >
+            {{ t("nodes.header") }}
+          </div>
+          <div class="tw:flex tw:h-[36px] tw:mb-2">
+        <q-input
+              v-model="filterQuery"
+              dense
+              class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
+              borderless
+              style="width: 400px;"
+              :placeholder="t('nodes.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="o2-search-input-icon" />
+              </template>
+            </q-input>
+            <q-btn
+              :label="t('common.refresh')"
+              class="o2-secondary-button tw:h-[36px]"
+              no-caps
+              flat
+              @click="getData(true)">
+            </q-btn>
+          </div>
+           
+        </div>
         <q-table
           ref="qTable"
           :rows="tabledata"
@@ -398,52 +428,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           class="nodes-list-table tw:border-l tw:border-solid tw:border-gray-1200 tw:rounded-none"
           dense
-          style="width: 100%; height: calc(100vh - 50px); overflow-y: auto;"
+          style="width: 100%; height: calc(100vh - 104px); overflow-y: auto;"
+          hide-top
         >
           <template #no-data><NoData /></template>
-          <template #top="scope">
-            <div class="row full-width q-pt-sm flex items-center ">
-              <div
-                class="col q-table__title items-start"
-                data-test="cipher-keys-list-title"
-              >
-                {{ t("nodes.header") }}
-              </div>
-              <div class="col-auto flex q-mb-sm ">
-                <q-input
-                  v-model="filterQuery"
-                  dense
-                  class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
-                  borderless
-                  style="width: 400px;"
-                  :placeholder="t('nodes.search')"
-                >
-                  <template #prepend>
-                    <q-icon name="search" class="o2-search-input-icon" />
-                  </template>
-                </q-input>
-                <q-btn 
-                  :label="t('common.refresh')" 
-                  class="o2-secondary-button tw:h-[36px]"
-                  padding="sm"
-                  no-caps
-                  flat
-                  @click="getData(true)">
-                </q-btn>
-              </div>
-
-            </div>
-            <div class="col-auto flex q-ml-auto pagination-align q-pb-sm">
-                <QTablePagination
-                  v-if="resultTotal > 0"
-                  :scope="scope"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  position="top"
-                  @update:changeRecordPerPage="changePagination"
-                />
-              </div>
-          </template>
 
           <template v-slot:body-cell-id="props">
             <q-td :props="props"

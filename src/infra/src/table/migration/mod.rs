@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -89,6 +89,8 @@ mod m20251229_000001_create_backfill_jobs;
 mod m20251230_000001_add_allow_static_token_to_org_users;
 mod m20260107_000001_sync_distinct_stream_retention;
 mod m20260108_000001_recreate_enrichment_table_urls_with_ksuids;
+mod m20260113_000001_add_alert_template;
+mod m20260119_000001_add_stat_interval_to_ratelimit;
 
 pub struct Migrator;
 
@@ -167,6 +169,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20251230_000001_add_allow_static_token_to_org_users::Migration),
             Box::new(m20260107_000001_sync_distinct_stream_retention::Migration),
             Box::new(m20260108_000001_recreate_enrichment_table_urls_with_ksuids::Migration),
+            Box::new(m20260113_000001_add_alert_template::Migration),
+            Box::new(m20260119_000001_add_stat_interval_to_ratelimit::Migration),
         ]
     }
 }

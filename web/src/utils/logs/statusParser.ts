@@ -17,17 +17,20 @@
  * Status Parser for Log Entries
  * =============================
  * Extracts and parses log severity/status information from log entries.
- * 
+ *
  * Supported Input Formats:
- * - Syslog numeric levels (0-7): { "syslog.severity": 3 } → error
+ * - OTEL/Syslog numeric levels (0-7): { "severity": 0 } → info (OTEL UNSPECIFIED)
+ * - Syslog numeric levels (1-7): { "syslog.severity": 3 } → error
  * - String levels: { "level": "ERROR" } → error
  * - Custom status fields: { "status": "warning" } → warning
- * 
- * Priority System (0 = highest, 8 = lowest): --> this is one that we use severity in the logs
- * 0: emergency, 1: alert, 2: critical, 3: error, 4: warning, 
+ *
+ * Priority System (1 = highest, 8 = lowest):
+ * 0: UNSPECIFIED (mapped to info, priority 6)
+ * 1: alert, 2: critical, 3: error, 4: warning,
  * 5: notice, 6: info, 7: debug, 8: ok/success
- * 
+ *
  * Examples:
+ * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#84a8f6ff", priority: 6 }
  * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#dc2626", priority: 3 }
  * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#eab308", priority: 4 }
  * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#059669", priority: 8 }
@@ -131,18 +134,20 @@ function parseStatusValue(value: any): StatusInfo {
 }
 
 /**
- * Maps numeric syslog severity levels to status information
- * Follows RFC 5424 syslog severity levels (0-7)
- * 
+ * Maps numeric severity levels to status information
+ * Handles both OTEL and syslog severity levels:
+ * - 0: OTEL UNSPECIFIED (mapped to info)
+ * - 1-7: Syslog severity levels (alert, critical, error, warning, notice, info, debug)
+ *
  * @param value - Numeric severity level (0-7)
  * @returns StatusInfo object
  */
 function mapNumericStatus(value: number): StatusInfo {
   switch (value) {
-    // System is unusable - highest severity
-    // Example: mapNumericStatus(0) → { level: 'emergency', color: '#dc2626', priority: 0 }
+    // OTEL UNSPECIFIED level (0) - treat as info
+    // Example: mapNumericStatus(0) → { level: 'info', color: '#84a8f6ff', priority: 6 }
     case 0:
-      return { level: 'emergency', color: STATUS_COLORS.emergency, priority: 0 };
+      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
     
     // Action must be taken immediately
     // Example: mapNumericStatus(1) → { level: 'alert', color: '#ea580c', priority: 1 }

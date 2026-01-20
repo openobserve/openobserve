@@ -68,7 +68,7 @@ describe("useRateLimiter", () => {
 
       const result = await rateLimiterInstance.getApiLimitsByOrganization("test-org");
 
-      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith("test-org");
+      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith("test-org", "second");
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(3);
@@ -178,7 +178,7 @@ describe("useRateLimiter", () => {
       
       // Check first dispatch for API limits
       expect(mockStore.dispatch).toHaveBeenNthCalledWith(1, "setApiLimitsByOrgId", {
-        "test-org": expect.arrayContaining([
+        "test-org_second": expect.arrayContaining([
           expect.objectContaining({
             module_name: "test_module",
           }),
@@ -222,7 +222,7 @@ describe("useRateLimiter", () => {
 
       for (const org of organizations) {
         await rateLimiterInstance.getApiLimitsByOrganization(org);
-        expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(org);
+        expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(org, "second");
       }
     });
 
@@ -268,7 +268,7 @@ describe("useRateLimiter", () => {
 
       const result = await rateLimiterInstance.getRoleLimitsByOrganization("test-org", "admin");
 
-      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", "admin");
+      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", "admin", "second");
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
@@ -334,7 +334,7 @@ describe("useRateLimiter", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setRoleLimitsByOrgIdByRole", {
         "test-org": {
           "existing-role": [{ module_name: "existing" }],
-          "admin": expect.arrayContaining([
+          "admin_second": expect.arrayContaining([
             expect.objectContaining({
               module_name: "test_module",
             }),
@@ -351,7 +351,7 @@ describe("useRateLimiter", () => {
 
       for (const role of roles) {
         await rateLimiterInstance.getRoleLimitsByOrganization("test-org", role);
-        expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", role);
+        expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith("test-org", role, "second");
       }
     });
 
@@ -403,7 +403,7 @@ describe("useRateLimiter", () => {
         "test-org": {
           "role1": [{ module_name: "module1" }],
           "role2": [{ module_name: "module2" }],
-          "new-role": expect.any(Array),
+          "new-role_second": expect.any(Array),
         },
         "other-org": {
           "role3": [{ module_name: "module3" }],
@@ -542,8 +542,8 @@ describe("useRateLimiter", () => {
       expect(modules).toBeDefined();
 
       // Verify service calls
-      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(orgId);
-      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(orgId, "admin");
+      expect(rateLimiterService.getApiLimits).toHaveBeenCalledWith(orgId, "second");
+      expect(rateLimiterService.getRoleLimits).toHaveBeenCalledWith(orgId, "admin", "second");
       expect(rateLimiterService.getModules).toHaveBeenCalledWith(orgId);
 
       // Verify store dispatches

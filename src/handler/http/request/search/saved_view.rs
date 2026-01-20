@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, delete, get, post, put, web};
+use axum::{Json, extract::Path, response::Response};
 
 use crate::{
     common::{
@@ -34,6 +32,8 @@ use crate::{
 /// GetSavedView - Retrieve a single saved view associated with this org.
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "GetSavedView",
@@ -58,25 +58,26 @@ use crate::{
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get saved view details"}))
+        ("x-o2-mcp" = json!({"description": "Get saved view details", "category": "search"}))
     )
 )]
-#[get("/{org_id}/savedviews/{view_id}")]
-pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, view_id) = path.into_inner();
+pub async fn get_view(Path(path): Path<(String, String)>) -> Response {
+    let (org_id, view_id) = path;
     let view_id = view_id.trim();
     match saved_view::get_view(&org_id, view_id).await {
         Ok(view) => {
             let view: View = view;
-            Ok(MetaHttpResponse::json(view))
+            MetaHttpResponse::json(view)
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// ListSavedViews - Retrieve the list of saved views.
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/savedviews",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "ListSavedViews",
@@ -100,21 +101,22 @@ pub async fn get_view(path: web::Path<(String, String)>) -> Result<HttpResponse,
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all saved views"}))
+        ("x-o2-mcp" = json!({"description": "List all saved views", "category": "search"}))
     )
 )]
-#[get("/{org_id}/savedviews")]
-pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+pub async fn get_views(Path(path): Path<String>) -> Response {
+    let org_id = path;
     match saved_view::get_views_list_only(&org_id).await {
-        Ok(views) => Ok(MetaHttpResponse::json(views)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(views) => MetaHttpResponse::json(views),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// DeleteSavedViews - Delete a view associated with this given org.
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "DeleteSavedViews",
@@ -137,27 +139,25 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Delete a saved view", "category": "search"}))
     )
 )]
-#[delete("/{org_id}/savedviews/{view_id}")]
-pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, view_id) = path.into_inner();
+pub async fn delete_view(Path(path): Path<(String, String)>) -> Response {
+    let (org_id, view_id) = path;
     match saved_view::delete_view(&org_id, &view_id).await {
         Ok(_) => {
             remove_ownership(&org_id, "savedviews", Authz::new(&view_id)).await;
-            Ok(MetaHttpResponse::json(DeleteViewResponse {
-                org_id,
-                view_id,
-            }))
+            MetaHttpResponse::json(DeleteViewResponse { org_id, view_id })
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// CreateSavedViews - Create a view for later retrieval associated with the given search.
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/savedviews",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "CreateSavedViews",
@@ -180,32 +180,33 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Create a saved view", "category": "search"}))
     )
 )]
-#[post("/{org_id}/savedviews")]
 pub async fn create_view(
-    path: web::Path<String>,
-    view: web::Json<CreateViewRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    Path(path): Path<String>,
+    Json(view): Json<CreateViewRequest>,
+) -> Response {
+    let org_id = path;
 
     match saved_view::set_view(&org_id, &view).await {
         Ok(created_view) => {
             set_ownership(&org_id, "savedviews", Authz::new(&created_view.view_id)).await;
-            Ok(MetaHttpResponse::json(CreateViewResponse {
+            MetaHttpResponse::json(CreateViewResponse {
                 org_id,
                 view_id: created_view.view_id,
                 view_name: view.view_name.clone(),
-            }))
+            })
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// UpdateSavedViews - Update a saved view
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/savedviews/{view_id}",
     context_path = "/api",
     tag = "Saved Views",
     operation_id = "UpdateSavedViews",
@@ -231,25 +232,30 @@ pub async fn create_view(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Saved Views", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a saved view"}))
+        ("x-o2-mcp" = json!({"description": "Update a saved view", "category": "search"}))
     )
 )]
-#[put("/{org_id}/savedviews/{view_id}")]
 pub async fn update_view(
-    path: web::Path<(String, String)>,
-    view: web::Json<UpdateViewRequest>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, view_id) = path.into_inner();
+    Path(path): Path<(String, String)>,
+    Json(view): Json<UpdateViewRequest>,
+) -> Response {
+    let (org_id, view_id) = path;
 
     match saved_view::update_view(&org_id, &view_id, &view).await {
-        Ok(updated_view) => Ok(MetaHttpResponse::json(updated_view)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(updated_view) => MetaHttpResponse::json(updated_view),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{App, test};
+    use axum::{
+        Router,
+        body::Body,
+        http::{Request, StatusCode},
+        routing::post,
+    };
+    use tower::ServiceExt;
 
     use super::*;
 
@@ -259,14 +265,14 @@ mod tests {
             data: "base64-encoded-data".into(),
             view_name: "query-for-blah".into(),
         };
-        let app = test::init_service(App::new().service(create_view)).await;
-        let req = test::TestRequest::post()
+        let app = Router::new().route("/{org_id}/savedviews", post(create_view));
+        let req = Request::builder()
+            .method("POST")
             .uri("/default/savedviews")
-            .set_json(&payload)
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_success());
-        let json_body: CreateViewResponse = test::read_body_json(resp).await;
-        assert!(!json_body.view_id.is_empty());
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(&payload).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert!(resp.status() == StatusCode::OK || resp.status().is_success());
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,18 +12,23 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use std::io::Error;
 
 #[cfg(feature = "enterprise")]
-use actix_http::StatusCode;
-use actix_web::{HttpRequest, HttpResponse, get, web};
+use axum::http::StatusCode;
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::HeaderMap,
+    response::{IntoResponse, Response},
+};
 use config::{
     get_config,
     meta::{
-        search::{Query, SearchEventType},
+        search::{Query as SearchQuery, SearchEventType},
         stream::StreamType,
     },
 };
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use tracing::{Instrument, Span};
@@ -34,7 +39,7 @@ use crate::handler::http::request::search::utils::check_stream_permissions;
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
-        meta,
+        meta::{self},
         utils::{
             auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
@@ -51,6 +56,8 @@ use crate::{
 /// GetSearchProfile
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/search/profile",
     context_path = "/api",
     tag = "Search",
     operation_id = "GetSearchProfile",
@@ -95,16 +102,16 @@ use crate::{
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]
-#[get("/{org_id}/search/profile")]
 pub async fn get_search_profile(
-    path: web::Path<String>,
+    Path(path): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+    headers: HeaderMap,
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let (org_id, stream_name) = (path.into_inner(), "default".to_string());
+    let (org_id, stream_name) = (path, "default".to_string());
     let mut range_error = String::new();
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!(
@@ -115,18 +122,9 @@ pub async fn get_search_profile(
         Span::none()
     };
 
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = user_email.user_id;
 
-    let query =
-        match web::Query::<hashbrown::HashMap<String, String>>::from_query(in_req.query_string()) {
-            Ok(q) => q,
-            Err(_) => {
-                return Ok(meta::http::HttpResponse::bad_request(
-                    "Invalid query parameters",
-                ));
-            }
-        };
     let stream_type = StreamType::Traces;
 
     // Validate required parameters
@@ -137,29 +135,29 @@ pub async fn get_search_profile(
     ) {
         (Some(query_trace_id), Some(start_time), Some(end_time)) => {
             if query_trace_id.is_empty() || start_time.is_empty() || end_time.is_empty() {
-                return Ok(meta::http::HttpResponse::bad_request(
+                return meta::http::HttpResponse::bad_request(
                     "trace_id/start_time/end_time cannot be empty",
-                ));
+                );
             }
             let start_time = start_time.parse::<i64>().unwrap_or(0);
             let end_time = end_time.parse::<i64>().unwrap_or(0);
             if start_time == 0 || end_time == 0 {
-                return Ok(meta::http::HttpResponse::bad_request(
+                return meta::http::HttpResponse::bad_request(
                     "start_time/end_time must be valid i64",
-                ));
+                );
             }
             (query_trace_id, start_time, end_time)
         }
         _ => {
-            return Ok(meta::http::HttpResponse::bad_request(
+            return meta::http::HttpResponse::bad_request(
                 "trace_id/start_time/end_time is required",
-            ));
+            );
         }
     };
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = config::meta::search::Request {
-        query: Query {
+        query: SearchQuery {
             sql: format!(
                 "SELECT _timestamp, events FROM default WHERE trace_id = '{query_trace_id}' ORDER BY start_time"
             ),
@@ -174,7 +172,7 @@ pub async fn get_search_profile(
     };
 
     if let Err(e) = req.decode() {
-        return Ok(meta::http::HttpResponse::bad_request(e));
+        return meta::http::HttpResponse::bad_request(e);
     }
     req.use_cache = get_use_cache_from_request(&query);
 
@@ -196,7 +194,7 @@ pub async fn get_search_profile(
     #[cfg(feature = "enterprise")]
     if let Some(res) = check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
     {
-        return Ok(res);
+        return res;
     }
 
     #[cfg(feature = "enterprise")]
@@ -204,8 +202,11 @@ pub async fn get_search_profile(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::BadRequest()
-                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
+                )
+                    .into_response();
             }
         };
         if !keys_used.is_empty() {
@@ -231,7 +232,7 @@ pub async fn get_search_profile(
                             }) {
                             Some(user) => user,
                             None => {
-                                return Ok(meta::http::HttpResponse::forbidden("User not found"));
+                                return meta::http::HttpResponse::forbidden("User not found");
                             }
                         };
 
@@ -256,9 +257,9 @@ pub async fn get_search_profile(
                     )
                     .await
                     {
-                        return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                        return crate::common::meta::http::HttpResponse::forbidden(
                             "Unauthorized Access to key",
-                        ));
+                        );
                     }
                     // Check permissions on key ends
                 }
@@ -324,7 +325,7 @@ pub async fn get_search_profile(
 
             si.events = events;
 
-            Ok(HttpResponse::Ok().json(si))
+            Json(si).into_response()
         }
         Err(err) => {
             let search_type = req
@@ -341,10 +342,7 @@ pub async fn get_search_profile(
                 "",
             );
             log::error!("[trace_id {trace_id}] search error: {err}");
-            Ok(error_utils::map_error_to_http_response(
-                &err,
-                Some(trace_id),
-            ))
+            error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }

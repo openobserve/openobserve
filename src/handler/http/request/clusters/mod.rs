@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, get};
+use axum::response::Response;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
@@ -23,8 +21,12 @@ use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
 /// ListClusters
 #[utoipa::path(
+    get,
+    path = "/clusters",
     context_path = "/api",
     tag = "Clusters",
     operation_id = "ListClusters",
@@ -43,25 +45,30 @@ use {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/clusters")]
-pub async fn list_clusters() -> Result<HttpResponse, Error> {
+pub async fn list_clusters() -> Response {
     #[cfg(feature = "enterprise")]
     let clusters = if get_o2_config().super_cluster.enabled {
-        let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(
-            Some(RoleGroup::Interactive),
-        )
+        match o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(Some(
+            RoleGroup::Interactive,
+        ))
         .await
-        .map_err(Error::other)?;
-        let mut regions = HashMap::with_capacity(clusters.len());
-        for c in clusters {
-            let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);
-            region.push(c.name);
+        {
+            Ok(clusters) => {
+                let mut regions = HashMap::with_capacity(clusters.len());
+                for c in clusters {
+                    let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);
+                    region.push(c.name);
+                }
+                regions
+            }
+            Err(e) => {
+                return MetaHttpResponse::internal_error(e);
+            }
         }
-        regions
     } else {
         HashMap::new()
     };
     #[cfg(not(feature = "enterprise"))]
-    let clusters: HashMap<String, String> = HashMap::new();
-    Ok(HttpResponse::Ok().json(clusters))
+    let clusters: HashMap<String, Vec<String>> = HashMap::new();
+    MetaHttpResponse::json(clusters)
 }

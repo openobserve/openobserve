@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
-    "id": "CARTEIRA DE IDENTIDADE"
+    "id": "CARTEIRA DE IDENTIDADE",
+    "getStarted": "Comece"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -334,7 +335,8 @@
     "report": "Relatórios",
     "pipeline": "Oleodutos",
     "language": "Idioma",
-    "actions": "Ações"
+    "actions": "Ações",
+    "incidents": "Incidentes"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -372,7 +374,22 @@
     "viewURL": "Exibir URL",
     "events": "Eventos",
     "location": "Localização",
-    "frustrationCount": "Frustrações"
+    "frustrationCount": "Frustrações",
+    "loadingMsg": "Espere aí, estamos carregando dados do RUM.",
+    "breadcrumbs": "Pão ralado",
+    "tags": "Etiquetas",
+    "searchEvents": "Pesquisar eventos",
+    "loadingSessions": "Espere aí, estamos buscando sessões.",
+    "errorStack": "Pilha de erros",
+    "sessionReplay": "Repetição da sessão",
+    "viewSessionReplay": "Exibir repetição da sessão",
+    "playSessionReplay": "Reproduzir repetição da sessão",
+    "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
+    "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
+    "getStartedRUM": "Comece com o monitoramento real de usuários",
+    "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
+    "eventID": "ID do evento",
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
   },
   "about": {
     "name": "Abra o Observe",
@@ -1607,7 +1624,8 @@
       "alertSettings": "Defina suas regras de alerta e escolha como você gostaria de ser notificado.",
       "deduplication": "Evite enviar o mesmo alerta várias vezes agrupando alertas semelhantes.",
       "advanced": "Variáveis de contexto, descrição e modelo de linha"
-    }
+    },
+    "template": "Substituição de modelo"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "Campos de desduplicação",
     "deduplicateFieldTooltip": "Selecione quais mapeamentos de campo usar para desduplicação de impressões digitais",
     "alertDeduplicationMessage": "Alertas com os mesmos valores para esses campos serão desduplicados (por exemplo, mesma impressão digital = mesmos valores de campo)",
-    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação"
+    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação",
+    "scope": "Escopo",
+    "scopeTooltip": "As dimensões do escopo definem os limites ambientais (cluster, região, host) e são concatenadas para formar parte do escopo do FQN: {scope}/{workload}",
+    "stable": "Estável",
+    "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
+    "normalize": "Normalizar",
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

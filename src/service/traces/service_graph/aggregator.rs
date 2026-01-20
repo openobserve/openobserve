@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -78,7 +78,7 @@ pub async fn write_sql_aggregated_edges(
     if !bulk_body.is_empty() {
         use crate::common::meta::ingestion::{IngestUser, SystemJobType};
 
-        let data = actix_web::web::Bytes::from(bulk_body.into_bytes());
+        let data = bytes::Bytes::from(bulk_body.into_bytes());
 
         crate::service::logs::bulk::ingest(
             0,

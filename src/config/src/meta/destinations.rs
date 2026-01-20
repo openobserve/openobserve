@@ -40,7 +40,11 @@ impl Destination {
 #[serde(rename_all = "snake_case")]
 pub enum Module {
     Alert {
-        template: String,
+        /// Optional template name. When None, the alert must specify a template
+        /// at the alert level.
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        template: Option<String>,
         destination_type: DestinationType,
     },
     Pipeline {
@@ -51,7 +55,7 @@ pub enum Module {
 impl Default for Module {
     fn default() -> Self {
         Module::Alert {
-            template: "".to_string(),
+            template: None,
             destination_type: DestinationType::Http(Endpoint::default()),
         }
     }
@@ -252,7 +256,7 @@ mod tests {
             org_id: "test_org".to_string(),
             name: "alert_dest".to_string(),
             module: Module::Alert {
-                template: "template".to_string(),
+                template: Some("template".to_string()),
                 destination_type: DestinationType::Http(Endpoint::default()),
             },
         };
@@ -277,7 +281,7 @@ mod tests {
                 template,
                 destination_type,
             } => {
-                assert_eq!(template, "");
+                assert_eq!(template, None);
                 assert!(matches!(destination_type, DestinationType::Http(_)));
             }
             _ => panic!("Default should be Alert"),
@@ -287,7 +291,7 @@ mod tests {
     #[test]
     fn test_module_display() {
         let alert_module = Module::Alert {
-            template: "test".to_string(),
+            template: Some("test".to_string()),
             destination_type: DestinationType::Http(Endpoint::default()),
         };
         assert_eq!(alert_module.to_string(), "alert");
@@ -372,7 +376,7 @@ mod tests {
             org_id: "test_org".to_string(),
             name: "test_dest".to_string(),
             module: Module::Alert {
-                template: "alert_template".to_string(),
+                template: Some("alert_template".to_string()),
                 destination_type: DestinationType::Email(Email {
                     recipients: vec!["user@example.com".to_string()],
                 }),
@@ -431,7 +435,7 @@ mod tests {
     #[test]
     fn test_module_alert() {
         let module = Module::Alert {
-            template: "alert_template".to_string(),
+            template: Some("alert_template".to_string()),
             destination_type: DestinationType::Http(Endpoint::default()),
         };
 
@@ -440,7 +444,7 @@ mod tests {
                 template,
                 destination_type,
             } => {
-                assert_eq!(template, "alert_template");
+                assert_eq!(template, Some("alert_template".to_string()));
                 assert!(matches!(destination_type, DestinationType::Http(_)));
             }
             _ => panic!("Should be Alert module"),

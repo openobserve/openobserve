@@ -1,11 +1,11 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, get, web};
+use axum::{extract::Path, response::Response};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -39,6 +39,8 @@ pub struct DedupSummaryResponse {
 
 /// Get deduplication summary statistics for an organization
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/dedup/summary",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDedupSummary",
@@ -52,18 +54,13 @@ pub struct DedupSummaryResponse {
         (status = 200, description = "Success", body = DedupSummaryResponse),
     )
 )]
-#[get("/{org_id}/alerts/dedup/summary")]
-pub async fn get_dedup_summary(
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-
+pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
     // Get all alerts for the organization
     let alerts_data = match crate::service::db::alerts::alert::list(&org_id, None, None).await {
         Ok(data) => data,
         Err(e) => {
             log::error!("Failed to list alerts for org {org_id}: {e}");
-            return Ok(MetaHttpResponse::internal_error(e));
+            return MetaHttpResponse::internal_error(e);
         }
     };
 
@@ -106,7 +103,13 @@ pub async fn get_dedup_summary(
         timestamp: config::utils::time::now_micros(),
     };
 
-    Ok(HttpResponse::Ok().json(response))
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            serde_json::to_string(&response).unwrap(),
+        ))
+        .unwrap()
 }
 
 /// Get dedup counts from database

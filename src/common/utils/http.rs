@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_web::http::header::{HeaderMap, HeaderName};
+use axum::http::header::{HeaderMap, HeaderName};
 use config::meta::{
     dashboards::usage_report::DashboardInfo,
     search::{SearchEventContext, SearchEventType, default_use_cache},
@@ -253,7 +253,8 @@ pub(crate) fn get_dashboard_info_from_request(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{http::header::HeaderValue, web::Query};
+    use axum::extract::Query;
+    use http::HeaderValue;
 
     use super::*;
 

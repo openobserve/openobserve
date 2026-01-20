@@ -227,7 +227,7 @@ test.describe("dashboard Import testcases", () => {
       page.getByText("warning1 File(s) Failed to Import")
     ).toBeVisible();
     await expect(
-      page.getByText(" JSON 1 : Request failed with status code 400")
+      page.getByText(" JSON 1 : Request failed with status code 422")
     ).toBeVisible();
   });
 

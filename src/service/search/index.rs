@@ -704,7 +704,9 @@ impl Condition {
                     .iter()
                     .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(Arc::new(InListExpr::new(left, values, *negated, None)))
+                Ok(Arc::new(InListExpr::try_new(
+                    left, values, *negated, schema,
+                )?))
             }
             Condition::Regex(..) => {
                 unreachable!("Condition::Regex query only support for promql")

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             size="13px"
             icon="restart_alt"
-            class="tw:flex tw:justify-center tw:items-center tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:mr-[0.375rem] tw:rounded-[0.375rem] el-border"
+            class="tw:flex tw:justify-center tw:items-center tw:w-[2rem] tw:min-h-[2rem]! tw:h-[2rem]! tw:mr-[0.375rem] tw:rounded-[0.375rem] el-border q-mr-sm"
             @click="resetFilters"
           >
             <q-tooltip>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <q-btn
-          class="tw:mr-[0.375rem] float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border"
+          class="tw:mr-[0.375rem] float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border q-mr-sm"
           size="sm"
           :disable="!searchObj.data.queryResults?.hits?.length"
           icon="download"

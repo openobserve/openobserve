@@ -35,7 +35,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::meta::stream::SchemaRecords,
     service::{
-        db, ingestion,
+        db,
+        ingestion::{self, get_thread_id},
         metadata::{Metadata, MetadataItem},
         stream,
     },
@@ -114,8 +115,13 @@ impl Metadata for TraceListIndex {
             hour_buf.records_size += data_size;
         }
 
-        let writer =
-            ingester::get_writer(0, org_id, StreamType::Metadata.as_str(), STREAM_NAME).await;
+        let writer = ingester::get_writer(
+            get_thread_id(),
+            org_id,
+            StreamType::Metadata.as_str(),
+            STREAM_NAME,
+        )
+        .await;
         _ = ingestion::write_file(
             &writer,
             org_id,

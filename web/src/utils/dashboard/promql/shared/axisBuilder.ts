@@ -34,7 +34,6 @@ export function buildTooltip(
 
   return {
     trigger: triggerType,
-    confine: true,
     textStyle: {
       fontSize: 12,
     },

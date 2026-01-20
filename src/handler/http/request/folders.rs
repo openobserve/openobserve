@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
+use axum::{extract::Path, response::Response};
 use config::meta::folder::Folder;
 
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
 #[cfg(feature = "enterprise")]
 use crate::{common::utils::auth::UserEmail, handler::http::extractors::Headers};
 
-impl From<FolderError> for HttpResponse {
+impl From<FolderError> for Response {
     fn from(value: FolderError) -> Self {
         match value {
             FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
@@ -59,6 +59,8 @@ impl From<FolderError> for HttpResponse {
 
 /// CreateFolder
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/folders/{folder_type}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "CreateFolder",
@@ -86,20 +88,18 @@ impl From<FolderError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new folder"}))
+        ("x-o2-mcp" = json!({"description": "Create a new folder", "category": "folders"}))
     ),
 )]
-#[post("/v2/{org_id}/folders/{folder_type}")]
 pub async fn create_folder(
-    path: web::Path<(String, FolderType)>,
-    body: web::Json<CreateFolderRequestBody>,
-) -> impl Responder {
-    let (org_id, folder_type) = path.into_inner();
-    let folder = body.into_inner().into();
+    Path((org_id, folder_type)): Path<(String, FolderType)>,
+    axum::Json(body): axum::Json<CreateFolderRequestBody>,
+) -> Response {
+    let folder = body.into();
     match folders::save_folder(&org_id, folder, folder_type.into(), false).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
-            HttpResponse::Ok().json(body)
+            MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
     }
@@ -107,6 +107,8 @@ pub async fn create_folder(
 
 /// UpdateFolder
 #[utoipa::path(
+    put,
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "UpdateFolder",
@@ -134,24 +136,24 @@ pub async fn create_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update folder properties"}))
+        ("x-o2-mcp" = json!({"description": "Update folder properties", "category": "folders"}))
     ),
 )]
-#[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 pub async fn update_folder(
-    path: web::Path<(String, FolderType, String)>,
-    body: web::Json<UpdateFolderRequestBody>,
-) -> impl Responder {
-    let (org_id, folder_type, folder_id) = path.into_inner();
-    let folder = body.into_inner().into();
+    Path((org_id, folder_type, folder_id)): Path<(String, FolderType, String)>,
+    axum::Json(body): axum::Json<UpdateFolderRequestBody>,
+) -> Response {
+    let folder = body.into();
     match folders::update_folder(&org_id, &folder_id, folder_type.into(), folder).await {
-        Ok(_) => HttpResponse::Ok().body("Folder updated"),
+        Ok(_) => MetaHttpResponse::ok("Folder updated"),
         Err(err) => err.into(),
     }
 }
 
 /// ListFolders
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/folders/{folder_type}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "ListFolders",
@@ -169,17 +171,14 @@ pub async fn update_folder(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all folders"}))
+        ("x-o2-mcp" = json!({"description": "List all folders", "category": "folders"}))
     ),
 )]
-#[get("/v2/{org_id}/folders/{folder_type}")]
 #[allow(unused_variables)]
 pub async fn list_folders(
-    path: web::Path<(String, FolderType)>,
+    Path((org_id, folder_type)): Path<(String, FolderType)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> impl Responder {
-    let (org_id, folder_type) = path.into_inner();
-
+) -> Response {
     #[cfg(not(feature = "enterprise"))]
     let user_id = None;
 
@@ -189,7 +188,7 @@ pub async fn list_folders(
     match folders::list_folders(&org_id, user_id, folder_type.into()).await {
         Ok(folders) => {
             let body: ListFoldersResponseBody = folders.into();
-            HttpResponse::Ok().json(body)
+            MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
     }
@@ -197,6 +196,8 @@ pub async fn list_folders(
 
 /// GetFolder
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolder",
@@ -216,16 +217,16 @@ pub async fn list_folders(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder details by ID"}))
+        ("x-o2-mcp" = json!({"description": "Get folder details by ID", "category": "folders"}))
     ),
 )]
-#[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
-pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
-    let (org_id, folder_type, folder_id) = path.into_inner();
+pub async fn get_folder(
+    Path((org_id, folder_type, folder_id)): Path<(String, FolderType, String)>,
+) -> Response {
     match folders::get_folder(&org_id, &folder_id, folder_type.into()).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
-            HttpResponse::Ok().json(body)
+            MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
     }
@@ -233,6 +234,8 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
 
 /// GetFolderByName
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/folders/{folder_type}/name/{folder_name}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "GetFolderByName",
@@ -252,16 +255,16 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get folder by name"}))
+        ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
-#[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
-pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -> impl Responder {
-    let (org_id, folder_type, folder_name) = path.into_inner();
+pub async fn get_folder_by_name(
+    Path((org_id, folder_type, folder_name)): Path<(String, FolderType, String)>,
+) -> Response {
     match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
-            HttpResponse::Ok().json(body)
+            MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
     }
@@ -269,6 +272,8 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
 
 /// DeleteFolder
 #[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/folders/{folder_type}/{folder_id}",
     context_path = "/api",
     tag = "Folders",
     operation_id = "DeleteFolder",
@@ -289,14 +294,14 @@ pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Folders", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a folder by ID"}))
+        ("x-o2-mcp" = json!({"description": "Delete a folder by ID", "category": "folders"}))
     ),
 )]
-#[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
-async fn delete_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
-    let (org_id, folder_type, folder_id) = path.into_inner();
+pub async fn delete_folder(
+    Path((org_id, folder_type, folder_id)): Path<(String, FolderType, String)>,
+) -> Response {
     match folders::delete_folder(&org_id, &folder_id, folder_type.into()).await {
-        Ok(()) => HttpResponse::Ok().body("Folder deleted"),
+        Ok(()) => MetaHttpResponse::ok("Folder deleted"),
         Err(err) => err.into(),
     }
 }
@@ -308,6 +313,8 @@ pub mod deprecated {
     /// CreateFolder
     #[deprecated]
     #[utoipa::path(
+        post,
+        path = "/{org_id}/folders",
         context_path = "/api",
         tag = "Folders",
         operation_id = "CreateFolderDeprecated",
@@ -336,18 +343,16 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[post("/{org_id}/folders")]
     pub async fn create_folder(
-        path: web::Path<String>,
-        body: web::Json<CreateFolderRequestBody>,
-    ) -> impl Responder {
-        let org_id = path.into_inner();
-        let folder = body.into_inner().into();
+        Path(org_id): Path<String>,
+        axum::Json(body): axum::Json<CreateFolderRequestBody>,
+    ) -> Response {
+        let folder = body.into();
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::save_folder(&org_id, folder, folder_type, false).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
-                HttpResponse::Ok().json(body)
+                MetaHttpResponse::json(body)
             }
             Err(err) => err.into(),
         }
@@ -356,6 +361,8 @@ pub mod deprecated {
     /// UpdateFolder
     #[deprecated]
     #[utoipa::path(
+        put,
+        path = "/{org_id}/folders/{folder_id}",
         context_path = "/api",
         tag = "Folders",
         operation_id = "UpdateFolderDeprecated",
@@ -385,16 +392,14 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[put("/{org_id}/folders/{folder_id}")]
     pub async fn update_folder(
-        path: web::Path<(String, String)>,
-        body: web::Json<UpdateFolderRequestBody>,
-    ) -> impl Responder {
-        let (org_id, folder_id) = path.into_inner();
-        let folder = body.into_inner().into();
+        Path((org_id, folder_id)): Path<(String, String)>,
+        axum::Json(body): axum::Json<UpdateFolderRequestBody>,
+    ) -> Response {
+        let folder = body.into();
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
-            Ok(_) => HttpResponse::Ok().body("Folder updated"),
+            Ok(_) => MetaHttpResponse::ok("Folder updated"),
             Err(err) => err.into(),
         }
     }
@@ -402,6 +407,8 @@ pub mod deprecated {
     /// ListFolders
     #[deprecated]
     #[utoipa::path(
+        get,
+        path = "/{org_id}/folders",
         context_path = "/api",
         tag = "Folders",
         operation_id = "ListFoldersDeprecated",
@@ -421,14 +428,11 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[get("/{org_id}/folders")]
     #[allow(unused_variables)]
     pub async fn list_folders(
-        path: web::Path<String>,
+        Path(org_id): Path<String>,
         #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    ) -> impl Responder {
-        let org_id = path.into_inner();
-
+    ) -> Response {
         #[cfg(not(feature = "enterprise"))]
         let user_id = None;
 
@@ -439,7 +443,7 @@ pub mod deprecated {
         match folders::list_folders(&org_id, user_id, folder_type).await {
             Ok(folders) => {
                 let body: ListFoldersResponseBody = folders.into();
-                HttpResponse::Ok().json(body)
+                MetaHttpResponse::json(body)
             }
             Err(err) => err.into(),
         }
@@ -448,6 +452,8 @@ pub mod deprecated {
     /// GetFolder
     #[deprecated]
     #[utoipa::path(
+        get,
+        path = "/{org_id}/folders/{folder_id}",
         context_path = "/api",
         tag = "Folders",
         operation_id = "GetFolderDeprecated",
@@ -469,14 +475,12 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[get("/{org_id}/folders/{folder_id}")]
-    pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
-        let (org_id, folder_id) = path.into_inner();
+    pub async fn get_folder(Path((org_id, folder_id)): Path<(String, String)>) -> Response {
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::get_folder(&org_id, &folder_id, folder_type).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
-                HttpResponse::Ok().json(body)
+                MetaHttpResponse::json(body)
             }
             Err(err) => err.into(),
         }
@@ -485,6 +489,8 @@ pub mod deprecated {
     /// GetFolderByName
     #[deprecated]
     #[utoipa::path(
+        get,
+        path = "/{org_id}/folders/name/{folder_name}",
         context_path = "/api",
         tag = "Folders",
         operation_id = "GetFolderByNameDeprecated",
@@ -506,14 +512,14 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[get("/{org_id}/folders/name/{folder_name}")]
-    pub async fn get_folder_by_name(path: web::Path<(String, String)>) -> impl Responder {
-        let (org_id, folder_name) = path.into_inner();
+    pub async fn get_folder_by_name(
+        Path((org_id, folder_name)): Path<(String, String)>,
+    ) -> Response {
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::get_folder_by_name(&org_id, &folder_name, folder_type).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
-                HttpResponse::Ok().json(body)
+                MetaHttpResponse::json(body)
             }
             Err(err) => err.into(),
         }
@@ -522,6 +528,8 @@ pub mod deprecated {
     /// DeleteFolder
     #[deprecated]
     #[utoipa::path(
+        delete,
+        path = "/{org_id}/folders/{folder_id}",
         context_path = "/api",
         tag = "Folders",
         operation_id = "DeleteFolderDeprecated",
@@ -544,12 +552,10 @@ pub mod deprecated {
             ("x-o2-mcp" = json!({"enabled": false}))
         ),
     )]
-    #[delete("/{org_id}/folders/{folder_id}")]
-    async fn delete_folder(path: web::Path<(String, String)>) -> impl Responder {
-        let (org_id, folder_id) = path.into_inner();
+    pub async fn delete_folder(Path((org_id, folder_id)): Path<(String, String)>) -> Response {
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::delete_folder(&org_id, &folder_id, folder_type).await {
-            Ok(()) => HttpResponse::Ok().body("Folder deleted"),
+            Ok(()) => MetaHttpResponse::ok("Folder deleted"),
             Err(err) => err.into(),
         }
     }
@@ -561,7 +567,7 @@ mod tests {
 
     #[test]
     fn test_folder_error_conversion() {
-        // Test conversion from FolderError to HttpResponse
+        // Test conversion from FolderError to Response
         let test_cases = vec![
             (FolderError::MissingName, 400),
             (FolderError::UpdateDefaultFolder, 400),
@@ -578,7 +584,7 @@ mod tests {
         ];
 
         for (error, expected_status) in test_cases {
-            let response: HttpResponse = error.into();
+            let response: Response = error.into();
             assert_eq!(response.status().as_u16(), expected_status);
         }
     }

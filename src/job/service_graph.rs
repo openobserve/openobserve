@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::spawn_pausable_job;
+use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -23,6 +23,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::info!("[SERVICE_GRAPH::JOB] Service graph is disabled");
             return Ok(());
         }
+
+        // Service graph processor writes data via ingestion pipeline
+        // and must run on ingester nodes only
+        if !LOCAL_NODE.is_ingester() {
+            log::info!(
+                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-ingester node (role: {:?})",
+                LOCAL_NODE.role
+            );
+            return Ok(());
+        }
+
         log::info!("[SERVICE_GRAPH::JOB] Service graph processor is enabled");
 
         spawn_pausable_job!(

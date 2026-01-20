@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{
     io::{BufRead, Cursor, Read},
 };
 
-use actix_web::http;
+use axum::http;
 use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
@@ -87,6 +87,9 @@ pub async fn ingest(
     } else {
         format_stream_name(in_stream_name.to_string())
     };
+    if stream_name.is_empty() {
+        return Err(Error::IngestionError("Stream name is empty".to_string()));
+    }
 
     // check system resource
     check_ingestion_allowed(org_id, stream_type, Some(&stream_name)).await?;

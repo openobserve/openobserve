@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::http::StatusCode;
 use config::{
     meta::{otlp::OtlpRequestType, stream::StreamType},
     metrics,
     utils::json,
 };
+use http::StatusCode;
 use infra::errors::{Error, Result};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
@@ -77,6 +77,11 @@ impl Ingest for Ingester {
                 }
             }
             StreamType::Metrics => {
+                let stream_name =  if stream_name.is_empty(){
+                    None
+                } else {
+                    Some(stream_name.as_str())
+                };
                 let log_ingestion_type: IngestionType = req
                     .ingestion_type
                     .unwrap_or_default()
@@ -88,7 +93,7 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::metrics::json::ingest(&org_id, data, internal_user)
+                    crate::service::metrics::json::ingest(&org_id, stream_name, data, internal_user)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))

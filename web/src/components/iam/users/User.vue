@@ -628,7 +628,7 @@ export default defineComponent({
     // };
     const shouldAllowEdit = (user: any) => {
       // Allow editing for root users only if the current user is root
-      if (user.role === "root") {
+      if (user.role?.toLowerCase() === "root") {
         return store.state.userInfo.email === user.email;
       }
       // Allow editing for all other users
@@ -640,12 +640,12 @@ export default defineComponent({
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
-          user.role !== "root" &&
+          user.role?.toLowerCase() !== "root" &&
           (currentUserRole.value == "root" || currentUserRole.value == "admin")
         );
       } else {
         return (
-          ((currentUserRole.value == "admin" && user.role !== "root") ||
+          ((currentUserRole.value == "admin" && user.role?.toLowerCase() !== "root") ||
             currentUserRole.value == "root") &&
           !user.isLoggedinUser
         );
@@ -656,11 +656,11 @@ export default defineComponent({
 
       if (isEnterprise.value) {
       //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root 
+      //should allow delete for all users when it is root and also when the row user is not root
       //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
         if(config.isCloud == 'true'){
           return (
-            user.role !== "root" &&
+            user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
               store.state.userInfo.email !== user.email
@@ -670,7 +670,7 @@ export default defineComponent({
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
-          user.role !== "root" &&
+          user.role?.toLowerCase() !== "root" &&
           (currentUserRole.value == "root" ||
             currentUserRole.value == "admin") &&
           !user.isLoggedinUser
@@ -680,7 +680,7 @@ export default defineComponent({
           (currentUserRole.value == "admin" ||
             currentUserRole.value == "root") &&
           !user.isLoggedinUser &&
-          user.role !== "root"
+          user.role?.toLowerCase() !== "root"
         );
       }
     };

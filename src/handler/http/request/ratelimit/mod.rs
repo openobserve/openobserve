@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, get, put, web};
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -23,9 +24,7 @@ use {
         common::meta::http::HttpResponse as MetaHttpResponse,
         service::{ratelimit, ratelimit::rule::RatelimitError},
     },
-    actix_web::http,
-    config::meta::ratelimit::{RatelimitRule, RatelimitRuleUpdater},
-    futures_util::StreamExt,
+    config::meta::ratelimit::{Interval, RatelimitRule, RatelimitRuleUpdater},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
         default_rules::{
@@ -44,10 +43,11 @@ pub const QUOTA_PAGE_GLOBAL_RULES_ORG: &str = "global_rules";
 
 #[cfg(feature = "enterprise")]
 #[derive(Debug, Clone, Deserialize)]
-struct QueryParams {
-    org_id: String,
-    update_type: Option<String>,
-    user_role: Option<String>,
+pub struct QueryParams {
+    pub org_id: String,
+    pub update_type: Option<String>,
+    pub user_role: Option<String>,
+    pub interval: Option<String>, // second/minute/hour
 }
 #[cfg(feature = "enterprise")]
 impl QueryParams {
@@ -65,7 +65,7 @@ impl QueryParams {
 
 #[cfg(not(feature = "enterprise"))]
 #[derive(Debug, Clone, Deserialize)]
-struct QueryParams();
+pub struct QueryParams();
 
 #[cfg(feature = "enterprise")]
 async fn validate_ratelimit_updater(
@@ -148,7 +148,7 @@ async fn validate_ratelimit_updater(
 }
 
 #[cfg(feature = "enterprise")]
-impl From<RatelimitError> for HttpResponse {
+impl From<RatelimitError> for Response {
     fn from(value: RatelimitError) -> Self {
         match value {
             RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
@@ -160,6 +160,8 @@ impl From<RatelimitError> for HttpResponse {
 /// listApiModule
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/ratelimit/api_modules",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listApiModule",
@@ -180,15 +182,11 @@ impl From<RatelimitError> for HttpResponse {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/ratelimit/api_modules")]
-pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn api_modules(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {org_id} has no access",
-            )));
+            return MetaHttpResponse::bad_request(format!("org_id: {org_id} has no access",));
         }
 
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
@@ -199,19 +197,29 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
 
         let info = get_ratelimit_global_default_api_info().await;
         let all_group = info.get_all_groups();
-        Ok(HttpResponse::Ok().json(all_group))
+        MetaHttpResponse::json(all_group)
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
+        drop(org_id);
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap()
     }
 }
 
 /// listModuleRatelimitRule
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/ratelimit/module_list",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listModuleRatelimitRule",
@@ -223,6 +231,7 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
     params(
         ("org_id" = String, Path, description = "Organization Name"),
         ("org_id" = String, Query, description = "Organization Name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -233,21 +242,16 @@ pub async fn api_modules(path: web::Path<String>) -> Result<HttpResponse, Error>
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/ratelimit/module_list")]
 pub async fn list_module_ratelimit(
-    path: web::Path<String>,
-    query: web::Query<QueryParams>,
-) -> Result<HttpResponse, Error> {
+    Path(org_id): Path<String>,
+    Query(query): Query<QueryParams>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {org_id} has no access",
-            )));
+            return MetaHttpResponse::bad_request(format!("org_id: {org_id} has no access",));
         }
 
-        let query = query.into_inner();
         let org_id = query.get_org_id();
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
             let openapi_info = crate::handler::http::router::openapi::openapi_info().await;
@@ -255,33 +259,58 @@ pub async fn list_module_ratelimit(
                 .await;
         }
 
-        let global_default_rules = get_default_rules().await.map_err(std::io::Error::other)?;
+        let global_default_rules = match get_default_rules().await {
+            Ok(rules) => rules,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
         // module-level is org-level
-        let all_rules = infra::table::ratelimit::fetch_rules(
+        let all_rules = match infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
             Some(org_id.clone()),
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(std::io::Error::other)?;
+        {
+            Ok(rules) => rules,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
         let info = get_ratelimit_global_default_api_info().await;
-        let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
-
-        Ok(HttpResponse::Ok().json(api_group_info))
+        let interval = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None
+        };
+        let api_group_info = info
+            .api_groups(Some(org_id.as_str()), all_rules, interval)
+            .await;
+        MetaHttpResponse::json(api_group_info)
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
+        drop(org_id);
         let _ = query;
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap()
     }
 }
 
 /// listRoleRatelimitRule
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/ratelimit/role_list",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "listRoleRatelimitRule",
@@ -294,6 +323,7 @@ pub async fn list_module_ratelimit(
         ("org_id" = String, Path, description = "Organization Name"),
         ("org_id" = String, Query, description = "Organization Name"),
         ("user_role" = String, Query, description = "User Role Name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -304,27 +334,20 @@ pub async fn list_module_ratelimit(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/{org_id}/ratelimit/role_list")]
 pub async fn list_role_ratelimit(
-    path: web::Path<String>,
-    query: web::Query<QueryParams>,
-) -> Result<HttpResponse, Error> {
+    Path(org_id): Path<String>,
+    Query(query): Query<QueryParams>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {org_id} has no access",
-            )));
+            return MetaHttpResponse::bad_request(format!("org_id: {org_id} has no access",));
         }
 
-        let query = query.into_inner();
         let org_id = query.get_org_id();
         let user_role = query.user_role.unwrap_or_default();
         if user_role.is_empty() {
-            return Ok(MetaHttpResponse::bad_request(
-                "user_role param is required".to_string(),
-            ));
+            return MetaHttpResponse::bad_request("user_role param is required".to_string());
         }
 
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
@@ -333,44 +356,70 @@ pub async fn list_role_ratelimit(
                 .await;
         }
 
-        let global_default_rules = get_default_rules().await.unwrap();
+        let global_default_rules = match get_default_rules().await {
+            Ok(rules) => rules,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
         // module-level is org-level
-        let org_level_rules = infra::table::ratelimit::fetch_rules(
+        let org_level_rules = match infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
             Some(org_id.clone()),
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(std::io::Error::other)?;
+        {
+            Ok(rules) => rules,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
-        let role_level_rules = infra::table::ratelimit::fetch_rules(
+        let role_level_rules = match infra::table::ratelimit::fetch_rules(
             org_level_rules,
             Some(org_id.clone()),
             Some(user_role),
         )
         .await
-        .map_err(std::io::Error::other)?;
+        {
+            Ok(rules) => rules,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
         let info = get_ratelimit_global_default_api_info().await;
+        let interval = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None
+        };
         let api_group_info = info
-            .api_groups(Some(org_id.as_str()), role_level_rules)
+            .api_groups(Some(org_id.as_str()), role_level_rules, interval)
             .await;
-
-        Ok(HttpResponse::Ok().json(api_group_info))
+        MetaHttpResponse::json(api_group_info)
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
+        drop(org_id);
         let _ = query;
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap()
     }
 }
 
 /// UpdateRatelimitRule
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/ratelimit/update",
     context_path = "/api",
     tag = "Ratelimit",
     operation_id = "UpdateRatelimitRule",
@@ -384,6 +433,7 @@ pub async fn list_role_ratelimit(
         ("org_id" = String, Query, description = "Organization name"),
         ("update_type" = String, Query, description = "Update Type"),
         ("user_role" = Option<String>, Query, description = "UserRole name"),
+        ("interval" = Option<String>, Query, description = "Time interval: second/minute/hour (default: second)"),
     ),
     request_body(content = String, description = "json array", content_type = "application/json", example = json!({"Key Values": {"list": 0,"create": 0,"delete": 0,"get": 0},"Service Accounts": {"update": 0,"list": 0,"create": 0,"delete": 0,"get": 0}})),
     responses(
@@ -395,34 +445,24 @@ pub async fn list_role_ratelimit(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/ratelimit/update")]
 pub async fn update_ratelimit(
-    path: web::Path<String>,
-    query: web::Query<QueryParams>,
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut payload: web::Payload,
-) -> Result<HttpResponse, Error> {
+    Path(org_id): Path<String>,
+    Query(query): Query<QueryParams>,
+    body: axum::body::Bytes,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = path.into_inner();
         if org_id != QUOTA_PAGE_REQUIRED_ORG {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "org_id: {org_id} has no access",
-            )));
+            return MetaHttpResponse::bad_request(format!("org_id: {org_id} has no access",));
         }
 
-        let mut bytes = web::BytesMut::new();
-        while let Some(item) = payload.next().await {
-            bytes.extend_from_slice(&item.map_err(std::io::Error::other)?);
-        }
-
-        let updater = match parse_and_validate_ratelimit_payload(bytes).await {
+        let updater = match parse_and_validate_ratelimit_payload(body).await {
             Ok(updater) => updater,
             Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(e.to_string()));
+                return MetaHttpResponse::bad_request(e.to_string());
             }
         };
 
-        let query = query.into_inner();
         let org_id = query.get_org_id();
 
         if RATELIMIT_API_MAPPING.read().await.is_empty() {
@@ -434,53 +474,71 @@ pub async fn update_ratelimit(
         if let Err(e) =
             validate_ratelimit_updater(org_id.as_str(), &query.get_update_type(), &updater).await
         {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "validate ratelimit updater error: {e}"
-            )));
+            return MetaHttpResponse::bad_request(format!("validate ratelimit updater error: {e}"));
         }
 
         let user_role = match query.get_update_type().as_str() {
             "module" => DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string(),
             "role" => {
                 if query.user_role.is_none() || query.user_role.eq(&Some("".to_string())) {
-                    return Ok(MetaHttpResponse::bad_request(
+                    return MetaHttpResponse::bad_request(
                         "user_role param is required when update_type=role".to_string(),
-                    ));
+                    );
                 } else {
                     query.user_role.clone().unwrap()
                 }
             }
             _ => {
-                return Ok(MetaHttpResponse::bad_request(format!(
+                return MetaHttpResponse::bad_request(format!(
                     "update_type is incorrect: {}, only support module or role",
                     query.get_update_type()
-                )));
+                ));
             }
         };
 
-        let rules = RatelimitRule::from_updater(org_id.as_str(), user_role.as_str(), &updater);
+        // Determine stat_interval_ms based on interval query param
+        let stat_interval_ms = if let Some(interval_str) = query.interval.as_deref() {
+            match Interval::try_from(interval_str) {
+                Ok(interval) => Some(interval.get_interval_ms()),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            }
+        } else {
+            None // Use default (1000ms)
+        };
+
+        let rules = RatelimitRule::from_updater(
+            org_id.as_str(),
+            user_role.as_str(),
+            &updater,
+            stat_interval_ms,
+        );
         log::debug!("RatelimitRule::from_updater rules: {rules:?}");
         match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
-            Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK,
-                "Ratelimit rule updated successfully",
-            ))),
-            Err(e) => Ok(e.into()),
+            Ok(()) => MetaHttpResponse::ok("Ratelimit rule updated successfully"),
+            Err(e) => e.into(),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(path);
+        use axum::{
+            body::Body,
+            http::{StatusCode, header},
+        };
+        drop(org_id);
         let _ = query;
-        drop(payload);
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        drop(body);
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap()
     }
 }
 
 #[cfg(feature = "enterprise")]
 async fn parse_and_validate_ratelimit_payload(
-    bytes: web::BytesMut,
+    bytes: axum::body::Bytes,
 ) -> Result<RatelimitRuleUpdater, String> {
     let value: serde_json::Value =
         serde_json::from_slice(&bytes).map_err(|e| format!("Failed to parse JSON: {e}"))?;

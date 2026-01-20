@@ -1276,4 +1276,243 @@ export class AlertCreationWizard {
 
         return randomAlertName;
     }
+
+    /**
+     * Create a scheduled alert with PromQL query for metrics streams
+     * This tests the fix for bug #9967 - cannot save alert when selecting PromQL mode
+     *
+     * @param {string} metricsStreamName - Name of the metrics stream (e.g., 'e2e_test_cpu_usage')
+     * @param {string} promqlQuery - PromQL query string (e.g., 'e2e_test_cpu_usage')
+     * @param {string} destinationName - Name of the destination
+     * @param {string} randomValue - Random string for unique naming
+     * @param {Object} promqlCondition - PromQL condition config
+     * @param {string} [promqlCondition.operator='>='] - Operator for promql condition
+     * @param {number} [promqlCondition.value=1] - Value for promql condition
+     */
+    async createScheduledAlertWithPromQL(metricsStreamName, promqlQuery, destinationName, randomValue, promqlCondition = {}) {
+        const randomAlertName = 'auto_promql_alert_' + randomValue;
+        this.currentAlertName = randomAlertName;
+
+        // Default promql condition values
+        const operator = promqlCondition.operator || '>=';
+        const conditionValue = promqlCondition.value !== undefined ? promqlCondition.value : 1;
+
+        testLogger.info('Creating scheduled alert with PromQL query', {
+            metricsStreamName,
+            promqlQuery,
+            destinationName,
+            alertName: randomAlertName,
+            promqlCondition: { operator, value: conditionValue }
+        });
+
+        // ==================== STEP 1: ALERT SETUP ====================
+        // Wait for Add Alert button to be enabled (destinations need to load)
+        const addAlertBtn = this.page.locator(this.locators.addAlertButton);
+        await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
+
+        // If button is disabled, reload the page to fetch destinations
+        if (await addAlertBtn.isDisabled()) {
+            testLogger.info('Add Alert button disabled, reloading page to fetch destinations');
+            await this.page.reload();
+            await this.page.waitForLoadState('networkidle');
+            await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
+        }
+
+        await expect(addAlertBtn).toBeEnabled({ timeout: 15000 });
+        await addAlertBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Add alert dialog opened');
+
+        await this.page.locator(this.locators.alertNameInput).fill(randomAlertName);
+        testLogger.info('Filled alert name', { alertName: randomAlertName });
+
+        // Select stream type (metrics) - IMPORTANT: Must be metrics for PromQL tab to appear
+        await this.page.locator(this.locators.streamTypeDropdown).click();
+        await expect(this.page.getByRole('option', { name: 'metrics' })).toBeVisible({ timeout: 10000 });
+        await this.page.getByRole('option', { name: 'metrics' }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected stream type: metrics');
+
+        // Select metrics stream name
+        await expect(this.page.locator(this.locators.streamNameDropdown)).toBeVisible({ timeout: 10000 });
+        await this.page.locator(this.locators.streamNameDropdown).click();
+
+        try {
+            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        } catch (e) {
+            testLogger.warn('Stream dropdown options not visible after first click, retrying');
+            await this.page.locator(this.locators.streamNameDropdown).click();
+            await this.page.waitForTimeout(1000);
+            await expect(this.page.getByText(metricsStreamName, { exact: true })).toBeVisible({ timeout: 5000 });
+        }
+        await this.page.getByText(metricsStreamName, { exact: true }).click();
+        testLogger.info('Selected metrics stream name', { metricsStreamName });
+
+        // Select Scheduled alert type
+        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        testLogger.info('Selected scheduled alert type');
+
+        // ==================== STEP 2: CONDITIONS (PromQL) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 2: Conditions');
+
+        // Click PromQL tab (only visible for metrics streams)
+        const promqlTab = this.page.locator('[data-test="tab-promql"]');
+        await promqlTab.waitFor({ state: 'visible', timeout: 10000 });
+        await promqlTab.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Switched to PromQL tab');
+
+        // Open PromQL editor
+        const viewEditorBtn = this.page.locator(this.locators.viewEditorButton);
+        await viewEditorBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await viewEditorBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Opened PromQL Editor dialog');
+
+        // Enter PromQL query in the editor
+        const promqlEditor = this.page.locator(this.locators.promqlEditorDialog).locator('.inputarea');
+        await this.page.locator(this.locators.viewLineLocator).first().click();
+        await promqlEditor.fill(promqlQuery);
+        testLogger.info('Entered PromQL query', { promqlQuery });
+
+        // Run the query
+        await this.page.locator(this.locators.runQueryButton).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(2000);
+        testLogger.info('Ran PromQL query');
+
+        // Close PromQL editor dialog
+        try {
+            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
+            if (await closeButton.isVisible({ timeout: 3000 })) {
+                await closeButton.click();
+            } else {
+                await this.page.locator(this.locators.qDialogLocator).getByText('arrow_back_ios_new').click();
+            }
+        } catch (error) {
+            testLogger.warn('Close button click failed, trying keyboard escape', { error: error.message });
+            await this.page.keyboard.press('Escape');
+        }
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Closed PromQL Editor dialog');
+
+        // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
+
+        // ==================== STEP 4: ALERT SETTINGS ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Navigated to Step 4: Alert Settings');
+
+        // *** BUG FIX TEST: Fill PromQL condition (Trigger if the value is) ***
+        // This is the new field added by PR #9970 to fix bug #9967
+        const promqlConditionRow = this.page.locator('.alert-settings-row').filter({ hasText: 'Trigger if the value is' });
+        await promqlConditionRow.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('PromQL condition row is visible - bug fix verified');
+
+        // Select operator for promql_condition
+        const promqlOperatorSelect = promqlConditionRow.locator('.q-select').first();
+        await promqlOperatorSelect.click();
+        await this.page.waitForTimeout(500);
+        // Select from the visible dropdown menu (not just any text on page)
+        const visibleMenu = this.page.locator('.q-menu:visible');
+        await visibleMenu.locator(`.q-item`).filter({ hasText: operator }).first().click();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Set PromQL condition operator', { operator });
+
+        // Set value for promql_condition
+        // Note: The q-input has debounce="300", so we must wait after filling
+        const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
+        await promqlValueInput.clear();
+        await promqlValueInput.fill(String(conditionValue));
+        await this.page.waitForTimeout(500); // Wait for debounce to complete (300ms + buffer)
+        testLogger.info('Set PromQL condition value', { value: conditionValue });
+
+        // Set threshold (still required for PromQL alerts)
+        // IMPORTANT: For PromQL alerts, there are TWO sets of operator/value fields:
+        // 1. First: PromQL condition (promql_condition.operator, promql_condition.value)
+        // 2. Second: Threshold (trigger_condition.operator, trigger_condition.threshold)
+        // Use nth(1) to target the SECOND q-select on the step (the threshold operator)
+        const stepContainer = this.page.locator('.step-alert-conditions');
+        const thresholdOperator = stepContainer.locator('.q-select').nth(1); // Second q-select is threshold
+        await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdOperator.click();
+        await this.page.waitForTimeout(500);
+        const visibleThresholdMenu = this.page.locator('.q-menu:visible');
+        await visibleThresholdMenu.locator('.q-item').filter({ hasText: '>=' }).first().click();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Set threshold operator: >=');
+
+        // The threshold value input is the SECOND number input after promql value
+        // But it shares a row with a "events" label, so we need to find the right one
+        // Looking at the UI structure: promql value is first, threshold value is second
+        const thresholdInput = stepContainer.locator('input[type="number"]').nth(1);
+        await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
+        await thresholdInput.fill('1');
+        testLogger.info('Set threshold value: 1');
+
+        // Set period - period input is third number input on the step
+        const periodInput = stepContainer.locator('input[type="number"]').nth(2);
+        await this.page.waitForTimeout(500);
+        if (await periodInput.isVisible({ timeout: 3000 })) {
+            await periodInput.fill('1');
+            testLogger.info('Set period: 1 minute');
+        }
+
+        // Select destination
+        const destinationRow = this.page.locator(this.locators.alertSettingsRow).filter({ hasText: /Destination/ });
+        const destinationDropdown = destinationRow.locator('.q-select').first();
+        await destinationDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await destinationDropdown.click();
+        await this.page.waitForTimeout(1000);
+
+        const visibleDestMenu = this.page.locator('.q-menu:visible');
+        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
+        let destFound = false;
+        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOption.click();
+            destFound = true;
+            testLogger.info('Selected destination via visible menu', { destinationName });
+        }
+
+        if (!destFound) {
+            await visibleDestMenu.locator('.q-item').first().click();
+            testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
+        }
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected destination', { destinationName });
+
+        // ==================== STEP 5: DEDUPLICATION (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 5: Deduplication (skipping)');
+
+        // ==================== STEP 6: ADVANCED (Skip) ====================
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Navigated to Step 6: Advanced (skipping)');
+
+        // ==================== SUBMIT ALERT ====================
+        await this.page.locator(this.locators.alertSubmitButton).click();
+        await expect(this.page.getByText(this.locators.alertSuccessMessage)).toBeVisible({ timeout: 30000 });
+        testLogger.info('Successfully created scheduled alert with PromQL query', { alertName: randomAlertName });
+
+        return randomAlertName;
+    }
 }

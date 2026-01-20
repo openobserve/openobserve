@@ -39,7 +39,7 @@ impl Model {
             "alert" => {
                 let destination_type: destinations::DestinationType =
                     json::from_value(self.r#type)?;
-                let template = template.ok_or(DestinationError::AlertDestTemplateNotFound)?;
+                // Template is now optional at destination level - can be specified at alert level
                 destinations::Module::Alert {
                     template,
                     destination_type,
@@ -64,8 +64,13 @@ impl Model {
 pub async fn put(
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, Error> {
-    let template_id = if let destinations::Module::Alert { template, .. } = &destination.module {
-        super::templates::get(&destination.org_id, template)
+    // Template is now optional - only look it up if one is specified
+    let template_id = if let destinations::Module::Alert {
+        template: Some(template_name),
+        ..
+    } = &destination.module
+    {
+        super::templates::get(&destination.org_id, template_name)
             .await?
             .and_then(|temp| temp.id.map(|id| id.to_string()))
     } else {
@@ -87,12 +92,11 @@ pub async fn put(
                         template: new_template,
                         destination_type,
                     } => {
-                        let template_id =
-                            template_id.ok_or(DestinationError::AlertDestEmptyTemplateId)?;
-                        active.template_id = Set(Some(template_id));
+                        // Template is optional - only set template_id if a template is specified
+                        active.template_id = Set(template_id);
                         active.module = Set("alert".to_string());
                         active.r#type = Set(json::to_value(destination_type)?);
-                        Some(new_template)
+                        new_template
                     }
                     destinations::Module::Pipeline { endpoint } => {
                         active.template_id = Set(None);
@@ -118,12 +122,12 @@ pub async fn put(
                             template: new_template,
                             destination_type,
                         } => {
-                            let template_id =
-                                template_id.ok_or(DestinationError::AlertDestEmptyTemplateId)?;
+                            // Template is optional - only set template_id if a template is
+                            // specified
                             active.module = Set("alert".to_string());
-                            active.template_id = Set(Some(template_id));
+                            active.template_id = Set(template_id);
                             active.r#type = Set(json::to_value(destination_type)?);
-                            Some(new_template)
+                            new_template
                         }
                         destinations::Module::Pipeline { endpoint } => {
                             active.module = Set("pipeline".to_string());

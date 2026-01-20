@@ -106,18 +106,26 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationErr
     db::alerts::destinations::get(org_id, name).await
 }
 
+/// Gets a destination with its optional template.
+/// Returns the destination and optionally the template if one is configured.
 pub async fn get_with_template(
     org_id: &str,
     name: &str,
-) -> Result<(Destination, Template), DestinationError> {
+) -> Result<(Destination, Option<Template>), DestinationError> {
     let dest = get(org_id, name).await?;
     if let Module::Alert { template, .. } = &dest.module {
-        let template = db::alerts::templates::get(org_id, template)
-            .await
-            .map_err(|_| DestinationError::TemplateNotFound)?;
-        Ok((dest, template))
+        if let Some(template_name) = template {
+            let template = db::alerts::templates::get(org_id, template_name)
+                .await
+                .map_err(|_| DestinationError::TemplateNotFound)?;
+            Ok((dest, Some(template)))
+        } else {
+            // Template is optional at destination level
+            Ok((dest, None))
+        }
     } else {
-        Err(DestinationError::TemplateNotFound)
+        // Pipeline destinations don't have templates
+        Ok((dest, None))
     }
 }
 

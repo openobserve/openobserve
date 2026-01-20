@@ -98,16 +98,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-select
               data-test="add-destination-template-select"
               v-model="formData.template"
-              :label="t('alert_destinations.template') + ' *'"
+              :label="t('alert_destinations.template')"
               :options="getFormattedTemplates"
               class="showLabelOnTop no-case"
               stack-label
               borderless
               hide-bottom-space
               dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              clearable
               tabindex="0"
-            />
+            >
+              <template v-slot:hint>
+                <span class="text-caption text-grey-7">
+                  Optional - can be set at alert level instead
+                </span>
+              </template>
+            </q-select>
           </div>
         </div>
 

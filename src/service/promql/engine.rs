@@ -31,10 +31,11 @@ use datafusion::{
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
+    logical_expr::utils::disjunction,
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
     },
-    prelude::{DataFrame, SessionContext, col, lit},
+    prelude::{DataFrame, Expr, SessionContext, col, lit},
 };
 use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::{HashMap, HashSet};
@@ -59,6 +60,10 @@ use crate::service::promql::{
 type TokioResult = tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Sample>>, HashSet<i64>)>>;
 type TokioExemplarsResult =
     tokio::task::JoinHandle<Result<(HashMap<u64, Vec<Arc<Exemplar>>>, HashSet<i64>)>>;
+
+// Constants for optimization thresholds
+const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
+const OPTIMIZATION_MAX_STEPS: i64 = 30;
 
 pub struct Engine {
     trace_id: String,
@@ -473,7 +478,7 @@ impl Engine {
         };
 
         let start = std::time::Instant::now();
-        let values = values
+        let mut values = values
             .into_par_iter()
             .map(|rv| RangeValue {
                 labels: rv.labels,
@@ -489,40 +494,14 @@ impl Engine {
             start.elapsed()
         );
 
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
-
-        // TODO: optimize this part
+        // apply offset to samples
+        let offset_modifier = get_offset_modifier(selector.offset);
         if offset_modifier != 0 {
-            let adjusted_values = values
-                .into_iter()
-                .map(|rv| {
-                    let adjusted_samples = rv
-                        .samples
-                        .into_iter()
-                        .map(|s| Sample {
-                            timestamp: s.timestamp + offset_modifier,
-                            value: s.value,
-                        })
-                        .collect();
-                    RangeValue {
-                        labels: rv.labels,
-                        samples: adjusted_samples,
-                        exemplars: rv.exemplars,
-                        time_window: rv.time_window,
-                    }
-                })
-                .collect();
-            return Ok(adjusted_values);
+            values.par_iter_mut().for_each(|rv| {
+                rv.samples
+                    .iter_mut()
+                    .for_each(|s| s.timestamp += offset_modifier);
+            });
         }
 
         Ok(values)
@@ -585,21 +564,10 @@ impl Engine {
     ) -> Result<HashMap<u64, RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
-        let mut end = self.ctx.end; // 30 minutes + 5m = 35m
-
-        if let Some(offset) = selector.offset.clone() {
-            match offset {
-                Offset::Pos(offset) => {
-                    start -= micros(offset);
-                    end -= micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    start += micros(offset);
-                    end += micros(offset);
-                }
-            }
-        }
+        let offset_modifier = get_offset_modifier(selector.offset.clone());
+        let start =
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) + offset_modifier;
+        let end = self.ctx.end + offset_modifier; // 30 minutes + 5m = 35m
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -686,6 +654,12 @@ impl Engine {
         let mut label_selector = self.label_selector.clone();
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
+        // Calculate step and lookback for the optimization
+        let start = self.eval_ctx.start + offset_modifier;
+        let end = self.eval_ctx.end + offset_modifier;
+        let step = self.eval_ctx.step;
+        let lookback = range.map_or(self.ctx.lookback_delta, micros);
+
         let mut tasks = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats, keep_filters) in ctxs {
             let query_ctx = self.ctx.query_ctx.clone();
@@ -705,6 +679,8 @@ impl Engine {
                         label_selector,
                         start,
                         end,
+                        step,
+                        lookback,
                     )
                     .await
                 },
@@ -1206,6 +1182,7 @@ impl Engine {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
     query_ctx: Arc<QueryContext>,
     ctx: SessionContext,
@@ -1214,15 +1191,50 @@ async fn selector_load_data_from_datafusion(
     label_selector: HashSet<String>,
     start: i64,
     end: i64,
+    step: i64,
+    lookback: i64,
 ) -> Result<HashMap<u64, RangeValue>> {
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
+
     let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => v.filter(
-            col(TIMESTAMP_COL_NAME)
-                .gt(lit(start))
-                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
-        )?,
+        Ok(v) => {
+            // Optimization: When step > lookback, we don't need to load all data in
+            // [start-lookback, end] Instead, we only need to load data windows around
+            // each evaluation point
+            let use_optimization = start != end
+                && step > 0
+                && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+                && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+            if use_optimization {
+                let num_steps = ((end - start) / step) + 1;
+                let eval_timestamps: Vec<i64> =
+                    (0..num_steps).map(|i| start + (step * i)).collect();
+
+                let mut conditions: Vec<Expr> = Vec::new();
+                for &eval_ts in &eval_timestamps {
+                    let window_start = eval_ts - lookback;
+                    let window_end = eval_ts;
+
+                    conditions.push(
+                        col(TIMESTAMP_COL_NAME)
+                            .gt_eq(lit(window_start))
+                            .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+                    );
+                }
+
+                let filters = disjunction(conditions).unwrap();
+                v.filter(filters)?
+            } else {
+                // Need to include lookback window before start for the first evaluation point
+                let query_start = start - lookback;
+                v.filter(
+                    col(TIMESTAMP_COL_NAME)
+                        .gt_eq(lit(query_start))
+                        .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+                )?
+            }
+        }
         Err(_) => {
             return Ok(HashMap::default());
         }
@@ -1236,7 +1248,6 @@ async fn selector_load_data_from_datafusion(
     }
 
     // check if exemplars field is exists
-
     if query_ctx.query_exemplars {
         let schema = df_group.schema().as_arrow();
         if schema.field_with_name(EXEMPLARS_LABEL).is_err() {
@@ -1652,6 +1663,18 @@ async fn load_exemplars_from_datafusion(
 
     Ok((metrics, all_unique_timestamps))
 }
+
+fn get_offset_modifier(offset: Option<Offset>) -> i64 {
+    if let Some(offset) = offset {
+        match offset {
+            Offset::Pos(offset) => micros(offset),
+            Offset::Neg(offset) => -micros(offset),
+        }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

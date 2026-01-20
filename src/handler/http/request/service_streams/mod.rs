@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, get, web};
+use axum::{
+    Json,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
@@ -52,13 +55,10 @@ use crate::{
         ("Authorization" = [])
     )
 )]
-#[get("/{org_id}/service_streams/_analytics")]
 pub async fn get_dimension_analytics(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
-) -> Result<HttpResponse, Error> {
-    #[allow(unused_variables)]
-    let org_id = org_id.into_inner();
+) -> Response {
     // Note: No stream-specific permissions needed - this is org-level analytics
 
     #[cfg(feature = "enterprise")]
@@ -66,20 +66,17 @@ pub async fn get_dimension_analytics(
         match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::calculate_dimension_analytics(&org_id)
             .await
         {
-            Ok(analytics) => Ok(MetaHttpResponse::json(analytics)),
-            Err(e) => Ok(
-                MetaHttpResponse::internal_error(
-                    format!("Failed to calculate dimension analytics: {e}")
-                ),
+            Ok(analytics) => MetaHttpResponse::json(analytics),
+            Err(e) => MetaHttpResponse::internal_error(
+                format!("Failed to calculate dimension analytics: {e}")
             ),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(MetaHttpResponse::forbidden(
-            "Service Discovery is an enterprise-only feature",
-        ))
+        drop(org_id);
+        MetaHttpResponse::forbidden("Service Discovery is an enterprise-only feature")
     }
 }
 
@@ -132,14 +129,11 @@ pub async fn get_dimension_analytics(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[actix_web::post("/{org_id}/service_streams/_correlate")]
 pub async fn correlate_streams(
-    org_id: web::Path<String>,
-    #[allow(unused_variables)] req: web::Json<CorrelationRequest>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
-) -> Result<HttpResponse, Error> {
-    #[allow(unused_variables)]
-    let org_id = org_id.into_inner();
+    #[allow(unused_variables)] Json(req): Json<CorrelationRequest>,
+) -> Response {
     // Note: No stream-specific permissions needed - user already has access to source stream
 
     #[cfg(feature = "enterprise")]
@@ -163,24 +157,27 @@ pub async fn correlate_streams(
         )
         .await
         {
-            Ok(Some(response)) => Ok(MetaHttpResponse::json(response)),
+            Ok(Some(response)) => MetaHttpResponse::json(response),
             Ok(None) => {
                 // No service found - this is a successful API call with no results
                 // Return 200 with null to indicate "no match" (not an error)
-                Ok(HttpResponse::Ok().json(serde_json::json!(null)))
+                (StatusCode::OK, Json(serde_json::json!(null))).into_response()
             }
-            Err(e) => Ok(MetaHttpResponse::internal_error(format!(
-                "Failed to correlate streams: {e}"
-            ))),
+            Err(e) => MetaHttpResponse::internal_error(format!("Failed to correlate streams: {e}")),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            403u16,
-            "Service Discovery is an enterprise-only feature".to_string(),
-        )))
+        drop(org_id);
+        (
+            StatusCode::FORBIDDEN,
+            Json(MetaHttpResponse::error(
+                StatusCode::FORBIDDEN,
+                "Service Discovery is an enterprise-only feature",
+            )),
+        )
+            .into_response()
     }
 }
 
@@ -224,36 +221,35 @@ pub struct CorrelationRequest {
         ("Authorization" = [])
     )
 )]
-#[get("/{org_id}/service_streams/_grouped")]
 pub async fn get_services_grouped(
-    _org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>, // Require authentication
-) -> Result<HttpResponse, Error> {
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = _org_id.into_inner();
         // Get FQN priority from DB/cache (org-level setting or system default)
         let fqn_priority =
             crate::service::db::system_settings::get_fqn_priority_dimensions(&org_id).await;
 
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority)
+        // Get semantic groups to determine scope vs workload dimensions
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
+
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::list_grouped_by_fqn(&org_id, &fqn_priority, &semantic_groups)
             .await
         {
-            Ok(response) => Ok(MetaHttpResponse::json(response)),
-            Err(e) => Ok(
-                MetaHttpResponse::internal_error(
-                    format!("Failed to get grouped services: {e}")
-                ),
+            Ok(response) => MetaHttpResponse::json(response),
+            Err(e) => MetaHttpResponse::internal_error(
+                format!("Failed to get grouped services: {e}")
             ),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
         log::info!("Service Discovery is an enterprise-only feature");
-        Ok(MetaHttpResponse::forbidden(
-            "Service Discovery is an enterprise-only feature",
-        ))
+        MetaHttpResponse::forbidden("Service Discovery is an enterprise-only feature")
     }
 }
 

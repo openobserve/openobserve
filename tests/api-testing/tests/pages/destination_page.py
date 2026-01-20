@@ -58,12 +58,12 @@ class DestinationPage:
         payload = {
             "url": "https://jsonplaceholder.typicode.com/todos",
             "method": "get",
-            "template": "",  
+            "template": "",
             "headers": {},  # Ensure this is formatted correctly
             "name": destination_name,
             "skip_tls_verify": skip_tls_verify_value
         }
-        response = session.post(f"{base_url}api/{org_id}/alerts/destinations", json=payload, headers=headers)
+        response = session.post(f"{base_url}api/{org_id}/alerts/destinations?module=pipeline", json=payload, headers=headers)
         assert response.status_code == 200, f"Failed to create destination: {response.content}"
         return response
 
@@ -142,15 +142,15 @@ class DestinationPage:
     def retrieve_destinations_pipeline(self, session, base_url, user_email, user_password, org_id):
         """Retrieve destinations and extract the first destination name containing 'destination_pipeline' with title 'pipeline_title'."""
         session.auth = HTTPBasicAuth(user_email, user_password)
-        response = session.get(f"{base_url}api/{org_id}/alerts/destinations")
-        assert response.status_code == 200, f"Failed to validate destinations: {response.content}"  
+        response = session.get(f"{base_url}api/{org_id}/alerts/destinations?module=pipeline")
+        assert response.status_code == 200, f"Failed to validate destinations: {response.content}"
 
         destinations = response.json()
         assert len(destinations) > 0, "No destinations found"
 
-        pipeline_destinations = [destination for destination in destinations if "destination_pipeline" in destination["name"] 
-                           and destination["name"].startswith(f"destination_pipeline_{DestinationPage.Unique_value_destination}")]  
-        
+        pipeline_destinations = [destination for destination in destinations if "destination_pipeline" in destination["name"]
+                           and destination["name"].startswith(f"destination_pipeline_{DestinationPage.Unique_value_destination}")]
+
         assert len(pipeline_destinations) > 0, f"No destinations found containing 'destination_pipeline' with title 'destination_pipeline_{DestinationPage.Unique_value_destination}'"
 
         return {
@@ -249,7 +249,7 @@ class DestinationPage:
             "name": destination_name,
             "skip_tls_verify": skip_tls_verify_value
         }
-        response = session.put(f"{base_url}api/{org_id}/alerts/destinations/{destination_name}", json=payload, headers=headers)
+        response = session.put(f"{base_url}api/{org_id}/alerts/destinations/{destination_name}?module=pipeline", json=payload, headers=headers)
         assert response.status_code == 200, f"Failed to update destination: {response.content}"
         destination_pipeline = response.json()
         assert isinstance(destination_pipeline, dict), "Response is not a valid destination object" 
@@ -318,18 +318,18 @@ class DestinationPage:
         
     def validate_deleted_destination_pipeline(self, session, base_url, user_email, user_password, org_id, destination_name):
         """Running an E2E test for validating deleted destinations in SC."""
-        session.auth = HTTPBasicAuth(user_email, user_password)         
-        # Retrieve all destinations
-        response = session.get(f"{base_url}api/{org_id}/alerts/destinations")
-        assert response.status_code == 200, f"Failed to retrieve destinations: {response.content}"  
+        session.auth = HTTPBasicAuth(user_email, user_password)
+        # Retrieve all pipeline destinations
+        response = session.get(f"{base_url}api/{org_id}/alerts/destinations?module=pipeline")
+        assert response.status_code == 200, f"Failed to retrieve destinations: {response.content}"
 
         destinations = response.json()
 
         # Filter destinations that contain 'destination_pipeline' and match the expected name
-        pipeline_destinations = [destination for destination in destinations 
-                           if "destination_pipeline" in destination["name"] 
-                           and destination["name"].startswith(f"destination_pipeline_{DestinationPage.Unique_value_destination}")]      
-        
+        pipeline_destinations = [destination for destination in destinations
+                           if "destination_pipeline" in destination["name"]
+                           and destination["name"].startswith(f"destination_pipeline_{DestinationPage.Unique_value_destination}")]
+
         # Check if any templates of the specified type exist
         if len(pipeline_destinations) == 0:
             print(f"No destinations found of type '{destination_name}'")

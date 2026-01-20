@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::collections::HashMap;
 
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::StatusCode,
+    response::Response,
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -29,7 +34,7 @@ use crate::{
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
 
-impl From<DestinationError> for HttpResponse {
+impl From<DestinationError> for Response {
     fn from(value: DestinationError) -> Self {
         match &value {
             DestinationError::UsedByAlert(_) => MetaHttpResponse::conflict(value),
@@ -43,95 +48,110 @@ impl From<DestinationError> for HttpResponse {
 
 /// CreateDestination
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "CreateDestination",
-    summary = "Create alert destination",
-    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
-                   notifications are sent when alert conditions are met, including webhooks, email addresses, Slack \
-                   channels, PagerDuty integrations, and other notification services. The destination can be used by \
-                   multiple alerts within the organization.",
+    summary = "Create alert or pipeline destination",
+    description = "Creates a new destination configuration for an organization. Destinations define where notifications \
+                   are sent (for alerts) or where data is routed (for pipelines). For alert destinations, this includes \
+                   webhooks, email addresses, Slack channels, PagerDuty integrations, and other notification services. \
+                   For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
-    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Create alert/pipeline destination, alert destination must have a template", "category": "alerts"}))
     )
 )]
-#[post("/{org_id}/alerts/destinations")]
 pub async fn save_destination(
-    path: web::Path<String>,
-    dest: web::Json<Destination>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let dest = match dest.into_inner().into(org_id) {
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(dest): Json<Destination>,
+) -> Response {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
-        Err(e) => return Ok(e.into()),
+        Err(e) => return e.into(),
     };
-    log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
-        Ok(v) => Ok(MetaHttpResponse::json(
+        Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
                 .with_name(v.name),
-        )),
-        Err(e) => Ok(e.into()),
+        ),
+        Err(e) => e.into(),
     }
 }
 
 /// UpdateDestination
 #[utoipa::path(
+    put,
+    path = "/{org_id}/alerts/destinations/{destination_name}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "UpdateDestination",
-    summary = "Update alert destination",
-    description = "Updates an existing alert destination configuration. Allows modification of destination settings such as \
-                   webhook URLs, authentication credentials, notification channels, and other delivery parameters. The \
-                   updated configuration will apply to all future alert notifications using this destination.",
+    summary = "Update alert or pipeline destination",
+    description = "Updates an existing destination configuration. For alert destinations, allows modification of settings \
+                   such as webhook URLs, authentication credentials, notification channels, and other delivery parameters. \
+                   For pipeline destinations, allows updating external system endpoints, output formats, and metadata. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
+        ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
-    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),  
+    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Update alert destination", "category": "alerts"}))
     )
 )]
-#[put("/{org_id}/alerts/destinations/{destination_name}")]
 pub async fn update_destination(
-    path: web::Path<(String, String)>,
-    dest: web::Json<Destination>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    let dest = match dest.into_inner().into(org_id) {
+    Path((org_id, name)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(dest): Json<Destination>,
+) -> Response {
+    // Check the module query parameter to determine if this is an alert or pipeline destination
+    let module = query.get("module").map(|s| s.as_str());
+    let is_alert = module != Some("pipeline");
+
+    let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
-        Err(e) => return Ok(e.into()),
+        Err(e) => return e.into(),
     };
     match destinations::save(&name, dest, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Destination updated")),
-        Err(e) => Ok(e.into()),
+        Ok(_) => MetaHttpResponse::ok("Destination updated"),
+        Err(e) => e.into(),
     }
 }
 
 /// GetDestination
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/destinations/{destination_name}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDestination",
@@ -148,24 +168,24 @@ pub async fn update_destination(
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = inline(Destination)),
-        (status = 404, description = "NotFound", content_type = "application/json", body = ()), 
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get destination details"}))
+        ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
-#[get("/{org_id}/alerts/destinations/{destination_name}")]
-async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
     match destinations::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(Destination::from(data))),
-        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+        Ok(data) => MetaHttpResponse::json(Destination::from(data)),
+        Err(e) => MetaHttpResponse::not_found(e),
     }
 }
 
 /// ListDestinations
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/destinations",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ListDestinations",
@@ -187,17 +207,14 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert destinations"}))
+        ("x-o2-mcp" = json!({"description": "List all alert destinations", "category": "alerts"}))
     )
 )]
-#[get("/{org_id}/alerts/destinations")]
-async fn list_destinations(
-    path: web::Path<String>,
-    req: HttpRequest,
+pub async fn list_destinations(
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+) -> Response {
     let module = query.get("module").map(|s| s.as_str());
 
     let mut _permitted = None;
@@ -217,24 +234,24 @@ async fn list_destinations(
                 _permitted = list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
     }
 
     match destinations::list(&org_id, module, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(
-            data.into_iter().map(Destination::from).collect::<Vec<_>>(),
-        )),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(data) => {
+            MetaHttpResponse::json(data.into_iter().map(Destination::from).collect::<Vec<_>>())
+        }
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
 /// DeleteDestination
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/alerts/destinations/{destination_name}",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertDestination",
@@ -257,20 +274,20 @@ async fn list_destinations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert destination"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert destination", "category": "alerts"}))
     )
 )]
-#[delete("/{org_id}/alerts/destinations/{destination_name}")]
-async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
     match destinations::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination deleted")),
-        Err(e) => Ok(e.into()),
+        Ok(_) => MetaHttpResponse::ok("Alert destination deleted"),
+        Err(e) => e.into(),
     }
 }
 
 /// DeleteDestinationBulk
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/alerts/destinations/bulk",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "DeleteAlertDestinationBulk",
@@ -294,20 +311,17 @@ async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpRes
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/alerts/destinations/bulk")]
-async fn delete_destination_bulk(
-    path: web::Path<String>,
+pub async fn delete_destination_bulk(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if !check_permissions(name, &org_id, &_user_id, "destinations", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -327,9 +341,9 @@ async fn delete_destination_bulk(
             }
         }
     }
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }

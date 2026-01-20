@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:mx-auto tw:block"
         />
         <div class="text-center full-width">
-          Hold on tight, we're fetching session.
+          {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center">
           <q-toggle
-            class="q-mr-md"
+            class="o2-toggle-button-xs q-mr-md"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             size="xs"
@@ -156,7 +156,6 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
-import { getPath } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 
 const props = defineProps({

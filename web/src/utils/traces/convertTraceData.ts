@@ -675,15 +675,50 @@ export const convertServiceGraphToNetwork = (
       curveness = 0.3 + (edgeIndex % 4) * 0.1;
     }
 
+    // Format latency values
+    const formatLatency = (ns: number) => {
+      if (!ns || ns === 0) return 'N/A';
+      const ms = ns / 1000000;
+      return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
+    };
+
+    const p50 = formatLatency(edge.p50_latency_ns || 0);
+    const p95 = formatLatency(edge.p95_latency_ns || 0);
+    const p99 = formatLatency(edge.p99_latency_ns || 0);
+
+    // Determine color based on error rate AND latency (P95)
+    // Priority: errors first, then latency
+    const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
+    let edgeColor;
+    if (errorRate > 5) {
+      edgeColor = "#f5222d"; // Red for high errors
+    } else if (errorRate > 1) {
+      edgeColor = "#faad14"; // Orange for medium errors
+    } else if (p95Ms > 1000) {
+      edgeColor = "#ff7875"; // Light red for high latency (>1s)
+    } else if (p95Ms > 500) {
+      edgeColor = "#ffc069"; // Light orange for medium latency (>500ms)
+    } else {
+      edgeColor = "#52c41a"; // Green for healthy
+    }
+
     return {
       source: edge.from,
       target: edge.to,
       value: edge.total_requests || 0,
+      tooltip: {
+        formatter: edge.from + ' → ' + edge.to + '<br/>' +
+          'Requests: ' + (edge.total_requests || 0) + '<br/>' +
+          'Errors: ' + (edge.failed_requests || 0) + ' (' + errorRate.toFixed(2) + '%)<br/>' +
+          'P50: ' + p50 + '<br/>' +
+          'P95: ' + p95 + '<br/>' +
+          'P99: ' + p99
+      },
       symbol: ['none', 'arrow'], // Arrow at target end
       symbolSize: [0, 12], // Smaller arrows for cleaner look
       lineStyle: {
         width: Math.max(1, Math.min(4, 1 + (edge.total_requests || 0) / 150)),
-        color: errorRate > 5 ? "#f5222d" : errorRate > 1 ? "#faad14" : "#52c41a",
+        color: edgeColor,
         curveness: curveness,
         opacity: 0.5, // More transparent for less visual clutter
       },

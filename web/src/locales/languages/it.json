@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Inizia"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -334,7 +335,8 @@
     "report": "Rapporti",
     "pipeline": "Oleodotti",
     "language": "Lingua",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "incidents": "Incidenti"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",
@@ -372,7 +374,22 @@
     "viewURL": "Visualizza URL",
     "events": "Eventi",
     "location": "Posizione",
-    "frustrationCount": "Frustrazioni"
+    "frustrationCount": "Frustrazioni",
+    "loadingMsg": "Tieni duro, stiamo caricando i dati RUM.",
+    "breadcrumbs": "Pangrattato",
+    "tags": "Etichette",
+    "searchEvents": "Cerca eventi",
+    "loadingSessions": "Resisti, stiamo andando a prendere delle sedute.",
+    "errorStack": "Stack di errori",
+    "sessionReplay": "Replay della sessione",
+    "viewSessionReplay": "Visualizza il replay della sessione",
+    "playSessionReplay": "Riproduci sessione",
+    "discoverSessionTitle": "Scopri Session Replay per comprendere in dettaglio le interazioni degli utenti",
+    "discoverSessionMessage": "Session Replay acquisisce e riproduce le interazioni degli utenti sul tuo sito web o sulla tua applicazione. Ciò ti consente di esaminare visivamente il modo in cui gli utenti navigano, dove fanno clic, cosa digitano e come interagiscono con i tuoi contenuti",
+    "getStartedRUM": "Inizia con Real User Monitoring",
+    "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
+    "eventID": "ID evento",
+    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione."
   },
   "about": {
     "name": "Apri Observe",
@@ -1607,7 +1624,8 @@
       "alertSettings": "Imposta le regole per gli avvisi e scegli come ricevere le notifiche.",
       "deduplication": "Evita di inviare lo stesso avviso più volte raggruppando avvisi simili.",
       "advanced": "Variabili di contesto, descrizione e modello di riga"
-    }
+    },
+    "template": "Sostituisci modello"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "Campi di deduplicazione",
     "deduplicateFieldTooltip": "Seleziona le mappature dei campi da utilizzare per la deduplicazione delle impronte digitali",
     "alertDeduplicationMessage": "Gli avvisi con gli stessi valori per questi campi verranno deduplicati (ad esempio, stessa impronta digitale = stessi valori di campo)",
-    "atLeastOneDeduplicationField": "È richiesta almeno una mappatura dei campi per la deduplicazione"
+    "atLeastOneDeduplicationField": "È richiesta almeno una mappatura dei campi per la deduplicazione",
+    "scope": "Ambito",
+    "scopeTooltip": "Le dimensioni dell'ambito definiscono i confini ambientali (cluster, regione, host) e sono concatenate per formare la parte dell'ambito del FQN: {scope}/{workload}",
+    "stable": "Stabile",
+    "stableTooltip": "Le dimensioni stabili hanno una bassa cardinalità e vengono utilizzate per il calcolo delle chiavi di correlazione",
+    "normalize": "Normalizza",
+    "noSemanticGroupsInCategory": "Nessun gruppo semantico nella categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",

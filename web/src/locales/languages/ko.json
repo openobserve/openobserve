@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
     "chunkLoadErrorMsg": "새 버전의 응용 프로그램을 사용할 수 있습니다.계속하려면 페이지를 새로고침하세요.",
-    "id": "신분증"
+    "id": "신분증",
+    "getStarted": "시작하기"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -334,7 +335,8 @@
     "report": "보고서",
     "pipeline": "파이프라인",
     "language": "언어",
-    "actions": "액션"
+    "actions": "액션",
+    "incidents": "인시던트"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -372,7 +374,22 @@
     "viewURL": "URL 보기",
     "events": "이벤트",
     "location": "위치",
-    "frustrationCount": "좌절"
+    "frustrationCount": "좌절",
+    "loadingMsg": "잠시만요. RUM 데이터를 로드하고 있습니다.",
+    "breadcrumbs": "빵 부스러기",
+    "tags": "태그",
+    "searchEvents": "검색 이벤트",
+    "loadingSessions": "잠시만요. 세션을 가져오는 중이에요.",
+    "errorStack": "오류 스택",
+    "sessionReplay": "세션 리플레이",
+    "viewSessionReplay": "세션 리플레이 보기",
+    "playSessionReplay": "플레이 세션 리플레이",
+    "discoverSessionTitle": "세션 리플레이를 통해 사용자 상호작용에 대해 자세히 알아보세요",
+    "discoverSessionMessage": "Session Replay는 웹 사이트 또는 애플리케이션에서의 사용자 상호 작용을 캡처하고 재생합니다.이를 통해 사용자가 탐색하는 방식, 클릭한 위치, 입력하는 내용, 콘텐츠에 참여하는 방식을 시각적으로 검토할 수 있습니다.",
+    "getStartedRUM": "실제 사용자 모니터링 시작하기",
+    "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
+    "eventID": "이벤트 ID",
+    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다."
   },
   "about": {
     "name": "오픈 옵저브",
@@ -1607,7 +1624,8 @@
       "alertSettings": "알림 규칙을 설정하고 알림 수신 방법을 선택하세요.",
       "deduplication": "비슷한 알림을 그룹화하여 동일한 알림을 여러 번 전송하지 마십시오.",
       "advanced": "컨텍스트 변수, 설명 및 행 템플릿"
-    }
+    },
+    "template": "템플릿 오버라이드"
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "중복 제거 필드",
     "deduplicateFieldTooltip": "중복 제거 핑거프린팅에 사용할 필드 매핑 선택",
     "alertDeduplicationMessage": "이러한 필드에 동일한 값을 가진 알림은 중복 제거됩니다 (예: 동일한 핑거프린트 = 동일한 필드 값).",
-    "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다."
+    "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다.",
+    "scope": "범위",
+    "scopeTooltip": "범위 차원은 환경 경계 (클러스터, 지역, 호스트) 를 정의하고 연결되어 FQN의 범위 부분을 구성합니다. {scope}/{workload}",
+    "stable": "안정적",
+    "stableTooltip": "안정된 차원은 카디널리티가 낮으며 상관관계 키 계산에 사용됩니다.",
+    "normalize": "표준화",
+    "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}"
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",

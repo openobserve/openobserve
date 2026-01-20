@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import * as rudderanalytics from "rudder-sdk-js";
+import { RudderAnalytics } from "@rudderstack/analytics-js";
 import config from "../aws-exports";
 
 const writeKey = "ziox-cloud-browser";
 const dataPlaneUrl = "https://e1.zinclabs.dev";
+
+// Create a new instance of RudderAnalytics
+const rudderanalytics = new RudderAnalytics();
 
 if (config.enableAnalytics == "true") {
   try {

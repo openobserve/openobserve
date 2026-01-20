@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Fangen Sie an"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -334,7 +335,8 @@
     "report": "Berichte",
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
-    "actions": "Aktionen"
+    "actions": "Aktionen",
+    "incidents": "Vorfälle"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -372,7 +374,22 @@
     "viewURL": "URL anzeigen",
     "events": "Ereignisse",
     "location": "Standort",
-    "frustrationCount": "Frustrationen"
+    "frustrationCount": "Frustrationen",
+    "loadingMsg": "Halten Sie sich fest, wir laden RUM-Daten.",
+    "breadcrumbs": "Semmelbrösel",
+    "tags": "Schlagworte",
+    "searchEvents": "Veranstaltungen suchen",
+    "loadingSessions": "Halt dich fest, wir veranstalten Sessions.",
+    "errorStack": "Fehlerstapel",
+    "sessionReplay": "Sitzungswiederholung",
+    "viewSessionReplay": "Sitzungswiederholung anzeigen",
+    "playSessionReplay": "Sitzungswiederholung abspielen",
+    "discoverSessionTitle": "Entdecken Sie Session Replay, um Benutzerinteraktionen im Detail zu verstehen",
+    "discoverSessionMessage": "Session Replay erfasst Benutzerinteraktionen auf Ihrer Website oder Anwendung und spielt sie erneut ab. Auf diese Weise können Sie visuell überprüfen, wie Benutzer navigieren, wohin sie klicken, was sie eingeben und wie sie mit Ihren Inhalten interagieren",
+    "getStartedRUM": "Erste Schritte mit Real User Monitoring",
+    "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
+    "eventID": "ID des Ereignisses",
+    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab."
   },
   "about": {
     "name": "Observe öffnen",
@@ -1607,7 +1624,8 @@
       "alertSettings": "Lege deine Alarmregeln fest und wähle aus, wie du benachrichtigt werden möchtest.",
       "deduplication": "Vermeiden Sie es, dieselbe Warnung mehrmals zu senden, indem Sie ähnliche Warnungen zu Gruppen zusammenfassen.",
       "advanced": "Kontextvariablen, Beschreibung und Zeilenvorlage"
-    }
+    },
+    "template": "Vorlage überschreiben"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "Deduplizierungsfelder",
     "deduplicateFieldTooltip": "Wählen Sie aus, welche Feldzuordnungen für das Deduplizierungs-Fingerprinting verwendet werden sollen",
     "alertDeduplicationMessage": "Alarme mit den gleichen Werten für diese Felder werden dedupliziert (z. B. derselbe Fingerabdruck = gleiche Feldwerte)",
-    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich"
+    "atLeastOneDeduplicationField": "Für die Deduplizierung ist mindestens eine Feldzuordnung erforderlich",
+    "scope": "Geltungsbereich",
+    "scopeTooltip": "Scope-Dimensionen definieren Umgebungsgrenzen (Cluster, Region, Host) und werden verkettet, um den Geltungsbereich des FQN zu bilden: {scope}/{workload}",
+    "stable": "Stabil",
+    "stableTooltip": "Stabile Dimensionen haben eine niedrige Kardinalität und werden für die Berechnung von Korrelationsschlüsseln verwendet.",
+    "normalize": "Normalisieren",
+    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",

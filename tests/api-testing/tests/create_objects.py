@@ -63,9 +63,8 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
 
         destination_name_pipeline = f"destination_pipeline_{destination_page.Unique_value_destination}_{i}"
         destination_page.create_destination_pipeline(session, base_url, org_id, user_email, user_password, destination_name_pipeline)
-
         folder_name = f"folder_{folder_page.Unique_value_folder}_{i}"
-        folder_id = folder_page.create_folder(session, base_url, user_email, user_password, org_id, folder_name)
+        folder_id = folder_page.create_folder_dashboard_v2(session, base_url, user_email, user_password, org_id, folder_name)
 
         dashboard_name = f"dashboard_{dashboard_page.Unique_value_dashboard}_{i}"
         dashboard_id = dashboard_page.create_dashboard(session, base_url, user_email, user_password, org_id, stream_name, folder_id, dashboard_name)
@@ -159,7 +158,7 @@ def create_objects(session, base_url, user_email, user_password, org_id, stream_
         destination_page.create_destination_pipeline(session, base_url, org_id, email_address_admin, "12345678", destination_admin_pipeline)
 
         folder_admin = f"folder_{folder_page.Unique_value_folder}_{i}admin"
-        folder_id = folder_page.create_folder(session, base_url, email_address_admin, "12345678", org_id, folder_admin)
+        folder_id = folder_page.create_folder_dashboard_v2(session, base_url, email_address_admin, "12345678", org_id, folder_admin)
 
         dashboard_admin = f"dashboard_{dashboard_page.Unique_value_dashboard}_{i}admin"
         dashboard_id = dashboard_page.create_dashboard(session, base_url, email_address_admin, "12345678", org_id, stream_name, folder_id, dashboard_admin)

@@ -14,6 +14,7 @@ pub struct Model {
     pub stream_name: String,
     pub is_real_time: bool,
     pub destinations: Json,
+    pub template: Option<String>,
     pub context_attributes: Option<Json>,
     pub row_template: Option<String>,
     pub row_template_type: i16,

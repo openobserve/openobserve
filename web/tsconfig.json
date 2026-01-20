@@ -14,5 +14,6 @@
   "compilerOptions": {
     "strictPropertyInitialization": false,
     "skipLibCheck": true,
+    "resolveJsonModule": true
   }
 }

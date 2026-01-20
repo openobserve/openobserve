@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
-    "id": "KİMLİK"
+    "id": "KİMLİK",
+    "getStarted": "Başlayın"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -334,7 +335,8 @@
     "report": "Raporlar",
     "pipeline": "Boru hatları",
     "language": "Dil",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "incidents": "Olaylar"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -372,7 +374,22 @@
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
     "location": "Yer",
-    "frustrationCount": "Hayal kırıklıkları"
+    "frustrationCount": "Hayal kırıklıkları",
+    "loadingMsg": "Sıkı durun, RUM verilerini yüklüyoruz.",
+    "breadcrumbs": "Ekmek kırıntıları",
+    "tags": "Etiketler",
+    "searchEvents": "Etkinlikleri Ara",
+    "loadingSessions": "Sıkı durun, seansları getiriyoruz.",
+    "errorStack": "Hata Yığını",
+    "sessionReplay": "Oturum Tekrar Oynatma",
+    "viewSessionReplay": "Oturum Tekrarını Görüntüle",
+    "playSessionReplay": "Oturum Oynatma Oynatma",
+    "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
+    "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
+    "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
+    "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
+    "eventID": "Olay Kimliği",
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
   },
   "about": {
     "name": "Açık Gözlem",
@@ -1607,7 +1624,8 @@
       "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
       "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
       "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
-    }
+    },
+    "template": "Şablon Geçersiz Kılma"
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "Tekilleştirme Alanları",
     "deduplicateFieldTooltip": "Tekilleştirme parmak izi almak için hangi alan eşlemelerinin kullanılacağını seçin",
     "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
-    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir"
+    "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir",
+    "scope": "Kapsam",
+    "scopeTooltip": "Kapsam boyutları çevresel sınırları (küme, bölge, ana bilgisayar) tanımlar ve FQN'nin kapsam bölümünü oluşturmak üzere birleştirilir: {scope}/{workspace}",
+    "stable": "Kararlı",
+    "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
+    "normalize": "Normalleştir",
+    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}"
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",

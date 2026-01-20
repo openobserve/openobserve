@@ -195,7 +195,7 @@ const useHttpStreaming = () => {
 
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      const streamEndpoint = isMultiStream ? "_multi_search_stream" : "_search_stream";
+      const streamEndpoint = isMultiStream ? "_search_multi_stream" : "_search_stream";
       
       url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;

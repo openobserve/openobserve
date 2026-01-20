@@ -80,20 +80,20 @@ const dashboards = {
     );
   },
   list_Folders: (organization: string) => {
-    return http().get(`/api/${organization}/folders`);
+    return http().get(`/api/v2/${organization}/folders/dashboards`);
   },
   new_Folder: (organization: string, data: any) => {
-    return http().post(`/api/${organization}/folders`, data, {
+    return http().post(`/api/v2/${organization}/folders/dashboards`, data, {
       headers: { "Content-Type": "application/json; charset=UTF-8" },
     });
   },
   edit_Folder: (organization: string, folderId: any, data: any) => {
-    return http().put(`/api/${organization}/folders/${folderId}`, data, {
+    return http().put(`/api/v2/${organization}/folders/dashboards/${folderId}`, data, {
       headers: { "Content-Type": "application/json; charset=UTF-8" },
     });
   },
   delete_Folder: (organization: string, folderId: any) => {
-    return http().delete(`/api/${organization}/folders/${folderId}`);
+    return http().delete(`/api/v2/${organization}/folders/dashboards/${folderId}`);
   },
   move_Dashboard: (organization: string, dashboardIds: string[], from: string, dstFolderId: string) => {
     return http().patch(

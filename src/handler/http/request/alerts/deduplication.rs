@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,11 @@
 
 //! Alert deduplication API endpoints (Enterprise feature)
 
-use actix_web::{HttpResponse, delete, get, post, put, web};
+use axum::{Json, extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
-use config::meta::alerts::deduplication::{GlobalDeduplicationConfig, SemanticFieldGroup};
+use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
+#[cfg(feature = "enterprise")]
+use config::meta::correlation::SemanticFieldGroup;
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -25,6 +27,8 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 /// Get deduplication configuration for an organization
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDeduplicationConfig",
@@ -39,21 +43,20 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[get("/{org_id}/alerts/deduplication/config")]
-pub async fn get_config(org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-
+pub async fn get_config(Path(org_id): Path<String>) -> Response {
     match crate::service::alerts::org_config::get_deduplication_config(&org_id).await {
-        Ok(Some(config)) => Ok(HttpResponse::Ok().json(config)),
-        Ok(None) => Ok(MetaHttpResponse::json(
-            GlobalDeduplicationConfig::default_with_presets(),
-        )),
+        Ok(Some(config)) => axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::to_string(&config).unwrap(),
+            ))
+            .unwrap(),
+        Ok(None) => MetaHttpResponse::json(GlobalDeduplicationConfig::default_with_presets()),
         Err(e) => {
             log::error!("Error getting deduplication config for org {org_id}: {e}");
 
-            Ok(MetaHttpResponse::internal_error(format!(
-                "Failed to get deduplication config: {e}"
-            )))
+            MetaHttpResponse::internal_error(format!("Failed to get deduplication config: {e}"))
         }
     }
 }
@@ -61,6 +64,8 @@ pub async fn get_config(org_id: web::Path<String>) -> Result<HttpResponse, actix
 /// Get deduplication configuration for an organization (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetDeduplicationConfig",
@@ -72,14 +77,21 @@ pub async fn get_config(org_id: web::Path<String>) -> Result<HttpResponse, actix
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
 )]
-#[get("/{org_id}/alerts/deduplication/config")]
-pub async fn get_config(_org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+pub async fn get_config(_org_id: Path<String>) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }
 
 /// Set deduplication configuration for an organization
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SetDeduplicationConfig",
@@ -98,23 +110,15 @@ pub async fn get_config(_org_id: web::Path<String>) -> Result<HttpResponse, acti
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/alerts/deduplication/config")]
 pub async fn set_config(
-    org_id: web::Path<String>,
-    config: web::Json<GlobalDeduplicationConfig>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-    let config = config.into_inner();
-
+    Path(org_id): Path<String>,
+    Json(config): Json<GlobalDeduplicationConfig>,
+) -> Response {
     match crate::service::alerts::org_config::set_deduplication_config(&org_id, &config).await {
-        Ok(()) => Ok(MetaHttpResponse::ok(
-            "Deduplication config saved successfully",
-        )),
+        Ok(()) => MetaHttpResponse::ok("Deduplication config saved successfully"),
         Err(e) => {
             log::error!("Error setting deduplication config for org {org_id}: {e}");
-            Ok(MetaHttpResponse::internal_error(format!(
-                "Failed to set deduplication config: {e}"
-            )))
+            MetaHttpResponse::internal_error(format!("Failed to set deduplication config: {e}"))
         }
     }
 }
@@ -122,6 +126,8 @@ pub async fn set_config(
 /// Set deduplication configuration for an organization (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/deduplication/config",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SetDeduplicationConfig",
@@ -136,12 +142,14 @@ pub async fn set_config(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/alerts/deduplication/config")]
-pub async fn set_config(
-    _org_id: web::Path<String>,
-    _config: web::Json<serde_json::Value>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+pub async fn set_config(_org_id: Path<String>, _config: Json<serde_json::Value>) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }
 
 /// Delete deduplication configuration for an organization
@@ -162,19 +170,21 @@ pub async fn set_config(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[delete("/{org_id}/alerts/deduplication/config")]
-pub async fn delete_config(org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-
+pub async fn delete_config(Path(org_id): Path<String>) -> Response {
     match crate::service::alerts::org_config::delete_deduplication_config(&org_id).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(serde_json::json!({
-            "message": "Deduplication config deleted successfully"
-        }))),
+        Ok(()) => axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({
+                    "message": "Deduplication config deleted successfully"
+                })
+                .to_string(),
+            ))
+            .unwrap(),
         Err(e) => {
             log::error!("Error deleting deduplication config for org {org_id}: {e}");
-            Ok(MetaHttpResponse::internal_error(format!(
-                "Failed to delete deduplication config: {e}"
-            )))
+            MetaHttpResponse::internal_error(format!("Failed to delete deduplication config: {e}"))
         }
     }
 }
@@ -195,9 +205,14 @@ pub async fn delete_config(org_id: web::Path<String>) -> Result<HttpResponse, ac
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
 )]
-#[delete("/{org_id}/alerts/deduplication/config")]
-pub async fn delete_config(_org_id: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+pub async fn delete_config(_org_id: Path<String>) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }
 
 // ==================== SEMANTIC GROUPS MANAGEMENT ====================
@@ -225,6 +240,8 @@ pub struct SemanticGroupModification {
 /// Get semantic field groups for an organization
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetSemanticGroups",
@@ -237,20 +254,23 @@ pub struct SemanticGroupModification {
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[get("/{org_id}/alerts/deduplication/semantic-groups")]
-pub async fn get_semantic_groups(
-    org_id: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-
+pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     // Use system_settings which has proper caching and cluster watch
     let groups = crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
-    Ok(HttpResponse::Ok().json(groups))
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            serde_json::to_string(&groups).unwrap(),
+        ))
+        .unwrap()
 }
 
 /// Get semantic field groups (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "GetSemanticGroups",
@@ -262,11 +282,14 @@ pub async fn get_semantic_groups(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
 )]
-#[get("/{org_id}/alerts/deduplication/semantic-groups")]
-pub async fn get_semantic_groups(
-    _org_id: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }
 
 /// Preview diff between imported semantic groups and current DB state
@@ -276,6 +299,8 @@ pub async fn get_semantic_groups(
 /// The UI can use this to show users what will change before they commit.
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/deduplication/semantic-groups/preview-diff",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "PreviewSemanticGroupsDiff",
@@ -293,20 +318,22 @@ pub async fn get_semantic_groups(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/alerts/deduplication/semantic-groups/preview-diff")]
 pub async fn preview_semantic_groups_diff(
-    org_id: web::Path<String>,
-    proposed_groups: web::Json<Vec<SemanticFieldGroup>>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let org_id = org_id.into_inner();
-    let proposed = proposed_groups.into_inner();
-
+    Path(org_id): Path<String>,
+    Json(proposed_groups): Json<Vec<SemanticFieldGroup>>,
+) -> Response {
     // Validate all group IDs
-    for group in &proposed {
+    for group in &proposed_groups {
         if !SemanticFieldGroup::validate_id(&group.id) {
-            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
-                "error": format!("Invalid semantic group ID: '{}'. IDs must be lowercase, alphanumeric, dash-separated", group.id)
-            })));
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::BAD_REQUEST)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({
+                        "error": format!("Invalid semantic group ID: '{}'. IDs must be lowercase, alphanumeric, dash-separated", group.id)
+                    }).to_string(),
+                ))
+                .unwrap();
         }
     }
 
@@ -322,7 +349,7 @@ pub async fn preview_semantic_groups_diff(
     let mut modifications = Vec::new();
     let mut unchanged = Vec::new();
 
-    for proposed_group in &proposed {
+    for proposed_group in &proposed_groups {
         match current_map.get(&proposed_group.id) {
             Some(current_group) => {
                 if current_group != &proposed_group {
@@ -343,16 +370,25 @@ pub async fn preview_semantic_groups_diff(
         }
     }
 
-    Ok(HttpResponse::Ok().json(SemanticGroupDiff {
-        additions,
-        modifications,
-        unchanged,
-    }))
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            serde_json::to_string(&SemanticGroupDiff {
+                additions,
+                modifications,
+                unchanged,
+            })
+            .unwrap(),
+        ))
+        .unwrap()
 }
 
 /// Preview diff (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/deduplication/semantic-groups/preview-diff",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "PreviewSemanticGroupsDiff",
@@ -367,12 +403,17 @@ pub async fn preview_semantic_groups_diff(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/alerts/deduplication/semantic-groups/preview-diff")]
 pub async fn preview_semantic_groups_diff(
-    _org_id: web::Path<String>,
-    _proposed_groups: web::Json<serde_json::Value>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+    _org_id: Path<String>,
+    _proposed_groups: Json<serde_json::Value>,
+) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }
 
 /// Save semantic field groups for an organization
@@ -383,6 +424,8 @@ pub async fn preview_semantic_groups_diff(
 /// - Existing groups not in the request are preserved
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SaveSemanticGroups",
@@ -400,24 +443,28 @@ pub async fn preview_semantic_groups_diff(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/alerts/deduplication/semantic-groups")]
 pub async fn save_semantic_groups(
-    org_id: web::Path<String>,
-    groups: web::Json<Vec<SemanticFieldGroup>>,
-) -> Result<HttpResponse, actix_web::Error> {
+    Path(org_id): Path<String>,
+    Json(groups): Json<Vec<SemanticFieldGroup>>,
+) -> Response {
     use config::meta::system_settings::{
         SettingCategory, SystemSetting, keys::SEMANTIC_FIELD_GROUPS,
     };
 
-    let org_id = org_id.into_inner();
-    let incoming_groups = groups.into_inner();
+    let incoming_groups = groups;
 
     // Validate all group IDs
     for group in &incoming_groups {
         if !SemanticFieldGroup::validate_id(&group.id) {
-            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
-                "error": format!("Invalid semantic group ID: '{}'. IDs must be lowercase, alphanumeric, dash-separated", group.id)
-            })));
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::BAD_REQUEST)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({
+                        "error": format!("Invalid semantic group ID: '{}'. IDs must be lowercase, alphanumeric, dash-separated", group.id)
+                    }).to_string(),
+                ))
+                .unwrap();
         }
     }
 
@@ -464,15 +511,20 @@ pub async fn save_semantic_groups(
     .with_category(SettingCategory::Correlation);
 
     match crate::service::db::system_settings::set(&setting).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
-            "message": "Semantic groups saved successfully",
-            "total_groups": total_groups
-        }))),
+        Ok(_) => axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({
+                    "message": "Semantic groups saved successfully",
+                    "total_groups": total_groups
+                })
+                .to_string(),
+            ))
+            .unwrap(),
         Err(e) => {
             log::error!("Error saving semantic groups for org {org_id}: {e}");
-            Ok(MetaHttpResponse::internal_error(format!(
-                "Failed to save semantic groups: {e}"
-            )))
+            MetaHttpResponse::internal_error(format!("Failed to save semantic groups: {e}"))
         }
     }
 }
@@ -480,6 +532,8 @@ pub async fn save_semantic_groups(
 /// Save semantic groups (OSS - Not Supported)
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/alerts/deduplication/semantic-groups",
     context_path = "/api",
     tag = "Alerts",
     operation_id = "SaveSemanticGroups",
@@ -494,10 +548,15 @@ pub async fn save_semantic_groups(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[put("/{org_id}/alerts/deduplication/semantic-groups")]
 pub async fn save_semantic_groups(
-    _org_id: web::Path<String>,
-    _groups: web::Json<serde_json::Value>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Enterprise feature not available"))
+    _org_id: Path<String>,
+    _groups: Json<serde_json::Value>,
+) -> Response {
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::FORBIDDEN)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            "\"Enterprise feature not available\"",
+        ))
+        .unwrap()
 }

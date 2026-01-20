@@ -923,7 +923,9 @@ fn calculate_deltas_multi(
             }
             end_time
         } else {
-            meta.response_start_time
+            // Need to subtract 1 microsecond for the delta end time
+            // since the cache start time will include the records for that start time
+            meta.response_start_time - 1
         };
         if meta.response_start_time > current_end_time {
             // There is a gap (delta) between current coverage and the next meta

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, get, post, web};
+use axum::{
+    Json,
+    body::Bytes,
+    extract::{Path, Query},
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -35,7 +39,10 @@ use infra::errors;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
-use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
+use {
+    crate::service::organization::is_org_in_free_trial_period,
+    axum::http::StatusCode as AxumStatusCode,
+};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
@@ -67,6 +74,8 @@ use crate::{
 
 /// SearchStreamData
 #[utoipa::path(
+    post,
+    path = "/{org_id}/_search_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchSQLMultiStream",
@@ -136,40 +145,46 @@ use crate::{
         )
     )
 )]
-#[post("/{org_id}/_search_multi")]
 pub async fn search_multi(
-    org_id: web::Path<String>,
-    web::Query(query): web::Query<HashMap<String, String>>,
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    web::Json(multi_req): web::Json<search::MultiStreamRequest>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+    headers: HeaderMap,
+    Json(multi_req): Json<search::MultiStreamRequest>,
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let org_id = org_id.into_inner();
     let started_at = Utc::now().timestamp_micros();
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone())
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
+                return Ok((
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response());
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                return Ok((
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response());
             }
             _ => {}
         }
@@ -183,7 +198,7 @@ pub async fn search_multi(
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     let search_event_context = search_type
@@ -212,7 +227,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     }
     let queries_len = queries.len();
@@ -224,7 +239,7 @@ pub async fn search_multi(
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+                return map_error_to_http_response(&(e.into()), Some(trace_id));
             }
         };
         vrl_stream_name = stream_name.clone();
@@ -262,7 +277,7 @@ pub async fn search_multi(
             )
             .await
         {
-            return Ok(map_error_to_http_response(&e, Some(trace_id)));
+            return map_error_to_http_response(&e, Some(trace_id));
         }
 
         // Check permissions on stream
@@ -301,14 +316,14 @@ pub async fn search_multi(
                 )
                 .await
                 {
-                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
                 }
             }
 
             let keys_used = match get_cipher_key_names(&req.query.sql) {
                 Ok(v) => v,
                 Err(e) => {
-                    return Ok(map_error_to_http_response(&e, Some(trace_id)));
+                    return map_error_to_http_response(&e, Some(trace_id));
                 }
             };
             if !keys_used.is_empty() {
@@ -342,7 +357,7 @@ pub async fn search_multi(
                     )
                     .await
                     {
-                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
                     }
                     // Check permissions on key ends
                 }
@@ -506,9 +521,14 @@ pub async fn search_multi(
                 if let errors::Error::ErrorCode(code) = err
                     && let errors::ErrorCodes::SearchCancelQuery(_) = code
                 {
-                    return Ok(HttpResponse::TooManyRequests().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
-                    ));
+                    return (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        Json(meta::http::HttpResponse::error_code_with_trace_id(
+                            &code,
+                            Some(trace_id),
+                        )),
+                    )
+                        .into_response();
                 }
             }
         }
@@ -658,11 +678,13 @@ pub async fn search_multi(
         )
         .await;
     }
-    Ok(HttpResponse::Ok().json(multi_res))
+    Json(multi_res).into_response()
 }
 
 /// SearchMultiStreamPartition
 #[utoipa::path(
+    post,
+    path = "/{org_id}/_search_partition_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
@@ -713,13 +735,13 @@ pub async fn search_multi(
         )
     )
 )]
-#[post("/{org_id}/_search_partition_multi")]
 pub async fn _search_partition_multi(
-    org_id: web::Path<String>,
-    in_req: HttpRequest,
-    web::Json(req): web::Json<search::MultiSearchPartitionRequest>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+    Json(req): Json<search::MultiSearchPartitionRequest>,
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -731,11 +753,9 @@ pub async fn _search_partition_multi(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
-    let org_id = org_id.into_inner();
     let user_id = &user_email.user_id;
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
@@ -743,16 +763,24 @@ pub async fn _search_partition_multi(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
+                return Ok((
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response());
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                return Ok((
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response());
             }
             _ => {}
         }
@@ -795,7 +823,7 @@ pub async fn _search_partition_multi(
                     "",
                 ])
                 .inc();
-            Ok(HttpResponse::Ok().json(res))
+            Json(res).into_response()
         }
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -820,13 +848,15 @@ pub async fn _search_partition_multi(
                 ])
                 .inc();
             log::error!("search error: {err:?}");
-            Ok(map_error_to_http_response(&err, Some(trace_id)))
+            map_error_to_http_response(&err, Some(trace_id))
         }
     }
 }
 
 /// SearchAround
 #[utoipa::path(
+    post,
+    path = "/{org_id}/{stream_names}/_around_multi",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchAroundMulti",
@@ -871,16 +901,16 @@ pub async fn _search_partition_multi(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-#[get("/{org_id}/{stream_names}/_around_multi")]
 pub async fn around_multi(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
+    Path(path): Path<(String, String)>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+) -> Response {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let (org_id, stream_names) = path.into_inner();
+    let (org_id, stream_names) = path;
     let http_span = if cfg.common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_names}/_around_multi",
@@ -890,11 +920,15 @@ pub async fn around_multi(
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
     let user_id = Some(user_email.user_id.clone());
 
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_names = base64::decode_url(&stream_names)?;
+    let stream_names = match base64::decode_url(&stream_names) {
+        Ok(decoded) => decoded,
+        Err(e) => {
+            return MetaHttpResponse::bad_request(format!("Failed to decode stream names: {}", e));
+        }
+    };
     let stream_names = stream_names.split(',').collect::<Vec<&str>>();
 
     let mut around_sqls = stream_names
@@ -928,7 +962,7 @@ pub async fn around_multi(
             &org_id,
             stream_name,
             stream_type,
-            query.clone(),
+            Query(query.clone()),
             Some(around_sqls[i].clone()),
             None,
             user_id.clone(),
@@ -959,7 +993,7 @@ pub async fn around_multi(
                     ])
                     .inc();
                 log::error!("multi search around error: {err:?}");
-                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+                return map_error_to_http_response(&err, Some(trace_id));
             }
         };
 
@@ -975,7 +1009,7 @@ pub async fn around_multi(
         let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
-    Ok(HttpResponse::Ok().json(multi_resp))
+    Json(multi_resp).into_response()
 }
 
 /// Parse simple multi-stream request format and convert to MultiStreamRequest
@@ -1050,6 +1084,8 @@ const fn default_size() -> i64 {
 
 /// SearchStreamMulti HTTP2 streaming endpoint
 #[utoipa::path(
+    post,
+    path = "/{org_id}/_search_multi_stream",
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchStreamMultiHttp2",
@@ -1084,23 +1120,21 @@ const fn default_size() -> i64 {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/_multi_search_stream")]
 pub async fn search_multi_stream(
-    org_id: web::Path<String>,
-    web::Query(query): web::Query<HashMap<String, String>>,
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-    in_req: HttpRequest,
-    body: web::Bytes,
-) -> HttpResponse {
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let cfg = get_config();
-    let org_id = org_id.into_inner();
     // Create a tracing span
     let http_span = if cfg.common.tracing_search_enabled {
-        tracing::info_span!("/api/{org_id}/_multi_search_stream")
+        tracing::info_span!("/api/{org_id}/_search_multi_stream")
     } else {
         Span::none()
     };
-    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let trace_id = get_or_create_trace_id(&headers, &http_span);
 
     // Log the request
     log::debug!(
@@ -1111,16 +1145,24 @@ pub async fn search_multi_stream(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                ));
+                return (
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        format!("org {org_id} has expired its trial period"),
+                    )),
+                )
+                    .into_response();
             }
             Err(e) => {
-                return HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                ));
+                return (
+                    AxumStatusCode::FORBIDDEN,
+                    Json(MetaHttpResponse::error(
+                        StatusCode::FORBIDDEN,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response();
             }
             _ => {}
         }
@@ -1144,13 +1186,20 @@ pub async fn search_multi_stream(
 
             #[cfg(feature = "enterprise")]
             {
+                let query_string = query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&");
                 report_to_audit(
                     user_id,
-                    org_id,
+                    org_id.clone(),
                     trace_id,
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_multi_stream", org_id),
+                    query_string,
                     body_bytes,
                 )
                 .await;
@@ -1181,11 +1230,17 @@ pub async fn search_multi_stream(
                     {
                         report_to_audit(
                             user_id,
-                            org_id,
+                            org_id.clone(),
                             trace_id,
                             http_response.status().into(),
                             Some(error_message),
-                            &in_req,
+                            "POST".to_string(),
+                            format!("/api/{}/_search_multi_stream", org_id),
+                            query
+                                .iter()
+                                .map(|(k, v)| format!("{}={}", k, v))
+                                .collect::<Vec<_>>()
+                                .join("&"),
                             body_bytes,
                         )
                         .await;
@@ -1237,7 +1292,13 @@ pub async fn search_multi_stream(
                                 trace_id.clone(),
                                 http_response.status().into(),
                                 Some(error_message),
-                                &in_req,
+                                "POST".to_string(),
+                                format!("/api/{}/_search_multi_stream", org_id),
+                                query
+                                    .iter()
+                                    .map(|(k, v)| format!("{}={}", k, v))
+                                    .collect::<Vec<_>>()
+                                    .join("&"),
                                 body_bytes.clone(),
                             )
                             .await;
@@ -1278,7 +1339,13 @@ pub async fn search_multi_stream(
                             trace_id.clone(),
                             403,
                             Some(format!("Unauthorized Access to stream: {stream_name}")),
-                            &in_req,
+                            "POST".to_string(),
+                            format!("/api/{}/_search_multi_stream", org_id),
+                            query
+                                .iter()
+                                .map(|(k, v)| format!("{}={}", k, v))
+                                .collect::<Vec<_>>()
+                                .join("&"),
                             body_bytes.clone(),
                         )
                         .await;
@@ -1319,7 +1386,13 @@ pub async fn search_multi_stream(
                     trace_id.clone(),
                     http_response.status().into(),
                     Some(error_message),
-                    &in_req,
+                    "POST".to_string(),
+                    format!("/api/{}/_search_multi_stream", org_id),
+                    query
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
                     body_bytes.clone(),
                 )
                 .await;
@@ -1333,9 +1406,13 @@ pub async fn search_multi_stream(
 
     #[cfg(feature = "enterprise")]
     let audit_ctx = Some(AuditContext {
-        method: in_req.method().to_string(),
-        path: in_req.path().to_string(),
-        query_params: in_req.query_string().to_string(),
+        method: "POST".to_string(),
+        path: format!("/api/{}/_search_multi_stream", org_id),
+        query_params: query
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&"),
         body: body_bytes,
     });
     #[cfg(not(feature = "enterprise"))]
@@ -1343,12 +1420,12 @@ pub async fn search_multi_stream(
 
     let search_span = setup_tracing_with_trace_id(
         &trace_id,
-        tracing::info_span!("service::search::multi_search_stream_h2"),
+        tracing::info_span!("service::search::search_multi_stream_h2"),
     )
     .await;
 
     // Spawn the multi-stream search task
-    actix_web::rt::spawn(process_search_stream_request_multi(
+    tokio::spawn(process_search_stream_request_multi(
         org_id.clone(),
         user_id,
         trace_id.clone(),
@@ -1405,19 +1482,23 @@ pub async fn search_multi_stream(
         futures::stream::iter(chunks_iter)
     });
 
-    HttpResponse::Ok()
-        .content_type("text/event-stream")
-        .streaming(stream)
+    axum::response::Response::builder()
+        .header("content-type", "text/event-stream")
+        .body(axum::body::Body::from_stream(stream))
+        .unwrap()
 }
 
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 pub async fn report_to_audit(
     user_id: String,
     org_id: String,
     trace_id: String,
     code: u16,
     error_message: Option<String>,
-    req: &HttpRequest,
+    http_method: String,
+    http_path: String,
+    http_query_params: String,
     req_body: String,
 ) {
     use o2_enterprise::enterprise::common::{
@@ -1433,9 +1514,9 @@ pub async fn report_to_audit(
             _timestamp: chrono::Utc::now().timestamp(),
             protocol: Protocol::Http,
             response_meta: ResponseMeta {
-                http_method: req.method().to_string(),
-                http_path: req.path().to_string(),
-                http_query_params: req.query_string().to_string(),
+                http_method,
+                http_path,
+                http_query_params,
                 http_body: req_body,
                 http_response_code: code,
                 error_msg: error_message,

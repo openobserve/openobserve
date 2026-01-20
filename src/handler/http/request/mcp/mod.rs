@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, get, post, web};
+use axum::{
+    body::{Body, Bytes},
+    extract::Path,
+    http::{StatusCode, header},
+    response::Response,
+};
 #[cfg(feature = "enterprise")]
 use {
-    actix_web::HttpRequest,
+    axum::{Json, http::HeaderMap},
     futures_util::StreamExt,
     o2_enterprise::enterprise::ai::mcp::{
         MCPRequest, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream,
@@ -25,15 +30,24 @@ use {
 
 #[cfg(not(feature = "enterprise"))]
 /// Returns a 404 response for non-enterprise builds
-fn mcp_only_in_enterprise() -> actix_web::Result<HttpResponse> {
-    Ok(HttpResponse::NotFound().json(serde_json::json!({
-        "error": "MCP server is only available in enterprise edition"
-    })))
+fn mcp_only_in_enterprise() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "error": "MCP server is only available in enterprise edition"
+            }))
+            .unwrap(),
+        ))
+        .unwrap()
 }
 
 /// Handler for MCP POST requests (single request/response)
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequest",
@@ -53,23 +67,20 @@ fn mcp_only_in_enterprise() -> actix_web::Result<HttpResponse> {
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[post("/{org_id}/mcp")]
 pub async fn handle_mcp_post(
-    _org_id: web::Path<String>,
-    web::Json(mcp_request): web::Json<MCPRequest>,
-    req: HttpRequest,
-) -> actix_web::Result<HttpResponse> {
+    Path(_org_id): Path<String>,
+    headers: HeaderMap,
+    Json(mcp_request): Json<MCPRequest>,
+) -> Response {
     // Extract auth token from Authorization header
-    let auth_token = req
-        .headers()
-        .get("Authorization")
+    let auth_token = headers
+        .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
     // Check Accept header to determine response format
-    let accept_header = req
-        .headers()
-        .get("Accept")
+    let accept_header = headers
+        .get(header::ACCEPT)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json");
 
@@ -78,39 +89,54 @@ pub async fn handle_mcp_post(
 
     if wants_sse {
         // Return streaming SSE response (MCP Streamable HTTP spec)
-        let stream = handle_mcp_request_stream(mcp_request, auth_token)
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("MCP error: {e}")))?;
+        let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
+            Ok(s) => s,
+            Err(e) => {
+                return Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                    .unwrap();
+            }
+        };
 
-        let actix_stream = stream.map(|result| {
-            result.map_err(|e| {
-                actix_web::error::ErrorInternalServerError(format!("Stream error: {e}"))
-            })
-        });
+        let body_stream =
+            stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
-        Ok(HttpResponse::Ok()
-            .content_type("text/event-stream")
-            .insert_header(("Cache-Control", "no-cache"))
-            .insert_header(("X-Accel-Buffering", "no"))
-            .streaming(actix_stream))
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header("X-Accel-Buffering", "no")
+            .body(Body::from_stream(body_stream))
+            .unwrap()
     } else {
         // Return single JSON response (fallback for simpler clients)
-        let response = handle_mcp_request(mcp_request, auth_token)
-            .await
-            .map_err(|e| {
+        let response = match handle_mcp_request(mcp_request, auth_token).await {
+            Ok(r) => r,
+            Err(e) => {
                 log::error!("MCP handle_mcp_request error: {e}");
-                actix_web::error::ErrorInternalServerError(format!("MCP error: {e}"))
-            })?;
+                return Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                    .unwrap();
+            }
+        };
 
-        Ok(HttpResponse::Ok()
-            .content_type("application/json")
-            .json(response))
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&response).unwrap()))
+            .unwrap()
     }
 }
 
 /// Handler for MCP GET requests (streaming)
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequestStream",
@@ -130,19 +156,14 @@ pub async fn handle_mcp_post(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/mcp")]
 pub async fn handle_mcp_get(
-    _org_id: web::Path<String>,
-    // This is `Bytes` because body in HTTP GET is not defined,
-    // and actix-web tends to drop JSON body.
-    // This is a workaround to prevent that.
-    body: web::Bytes,
-    req: HttpRequest,
-) -> actix_web::Result<HttpResponse> {
+    Path(_org_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     // Extract auth token from Authorization header
-    let auth_token = req
-        .headers()
-        .get("Authorization")
+    let auth_token = headers
+        .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
@@ -150,37 +171,62 @@ pub async fn handle_mcp_get(
     // for server-initiated notifications. This is deprecated
     // and therefore not supported by O2
     if body.is_empty() {
-        return Ok(HttpResponse::MethodNotAllowed()
-            .insert_header(("Allow", "POST"))
-            .json(serde_json::json!({
-                "error": "GET requests must include a JSON-RPC request body. Use POST for standard requests."
-            })));
+        return Response::builder()
+            .status(StatusCode::METHOD_NOT_ALLOWED)
+            .header(header::ALLOW, "POST")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "error": "GET requests must include a JSON-RPC request body. Use POST for standard requests."
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
     }
 
     // Parse JSON from body manually (GET with body is non-standard but MCP spec allows it)
-    let mcp_request: MCPRequest = serde_json::from_slice(&body)
-        .map_err(|e| actix_web::error::ErrorBadRequest(format!("Invalid JSON: {e}")))?;
+    let mcp_request: MCPRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!(
+                    "{{\"error\": \"Invalid JSON: {}\"}}",
+                    e
+                )))
+                .unwrap();
+        }
+    };
 
     // Handle the request with streaming (returns SSE format)
-    let stream = handle_mcp_request_stream(mcp_request, auth_token)
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("MCP error: {e}")))?;
+    let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
+        Ok(s) => s,
+        Err(e) => {
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                .unwrap();
+        }
+    };
 
-    // Convert the stream error type to actix_web::Error
-    let actix_stream = stream.map(|result| {
-        result.map_err(|e| actix_web::error::ErrorInternalServerError(format!("Stream error: {e}")))
-    });
+    let body_stream = stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
-    Ok(HttpResponse::Ok()
-        .content_type("text/event-stream")
-        .insert_header(("Cache-Control", "no-cache"))
-        .insert_header(("X-Accel-Buffering", "no"))
-        .streaming(actix_stream))
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header("X-Accel-Buffering", "no")
+        .body(Body::from_stream(body_stream))
+        .unwrap()
 }
 
 // Dummy handlers for non-enterprise builds
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequest",
@@ -199,16 +245,14 @@ pub async fn handle_mcp_get(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[post("/{org_id}/mcp")]
-pub async fn handle_mcp_post(
-    _org_id: web::Path<String>,
-    _body: web::Bytes,
-) -> actix_web::Result<HttpResponse> {
+pub async fn handle_mcp_post(Path(_org_id): Path<String>, _body: Bytes) -> Response {
     mcp_only_in_enterprise()
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/mcp",
     context_path = "/api",
     tag = "MCP",
     operation_id = "MCPRequestStream",
@@ -227,11 +271,7 @@ pub async fn handle_mcp_post(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[get("/{org_id}/mcp")]
-pub async fn handle_mcp_get(
-    _org_id: web::Path<String>,
-    _body: web::Bytes,
-) -> actix_web::Result<HttpResponse> {
+pub async fn handle_mcp_get(Path(_org_id): Path<String>, _body: Bytes) -> Response {
     mcp_only_in_enterprise()
 }
 
@@ -241,6 +281,8 @@ pub async fn handle_mcp_get(
 /// Must be publicly accessible (no auth) per OAuth spec
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
+    post,
+    path = "/.well-known/oauth-authorization-server",
     context_path = "",
     tag = "MCP",
     operation_id = "OAuthServerMetadata",
@@ -251,8 +293,7 @@ pub async fn handle_mcp_get(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/.well-known/oauth-authorization-server")]
-pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResponse> {
+pub async fn oauth_authorization_server_metadata() -> Response {
     use once_cell::sync::Lazy;
 
     static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
@@ -260,9 +301,11 @@ pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResp
         let base_url = dex_config.dex_url.as_str();
         OAuthServerMetadata::build(base_url)
     });
-    Ok(HttpResponse::Ok()
-        .content_type("application/json")
-        .json(&*METADATA))
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&*METADATA).unwrap()))
+        .unwrap()
 }
 
 /// Handler for OAuth 2.0 Authorization Server Metadata (Non-Enterprise)
@@ -270,6 +313,8 @@ pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResp
 /// This endpoint provides discovery information for OAuth clients
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/.well-known/oauth-authorization-server",
     context_path = "",
     tag = "MCP",
     operation_id = "OAuthServerMetadata",
@@ -280,7 +325,6 @@ pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResp
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[get("/.well-known/oauth-authorization-server")]
-pub async fn oauth_authorization_server_metadata() -> actix_web::Result<HttpResponse> {
+pub async fn oauth_authorization_server_metadata() -> Response {
     mcp_only_in_enterprise()
 }

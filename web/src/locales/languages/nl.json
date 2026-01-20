@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Ga aan de slag"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -334,7 +335,8 @@
     "report": "Rapporten",
     "pipeline": "Pijpleidingen",
     "language": "taal",
-    "actions": "Acties"
+    "actions": "Acties",
+    "incidents": "Incidenten"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -372,7 +374,22 @@
     "viewURL": "URL bekijken",
     "events": "Evenementen",
     "location": "Locatie",
-    "frustrationCount": "Frustraties"
+    "frustrationCount": "Frustraties",
+    "loadingMsg": "Wacht even, we zijn RUM-gegevens aan het laden.",
+    "breadcrumbs": "Broodkruimels",
+    "tags": "Labels",
+    "searchEvents": "Gebeurtenissen zoeken",
+    "loadingSessions": "Wacht even, we zijn bezig met het ophalen van sessies.",
+    "errorStack": "Foutstapel",
+    "sessionReplay": "Sessie opnieuw afspelen",
+    "viewSessionReplay": "Bekijk de herhaling van de sessie",
+    "playSessionReplay": "Sessie opnieuw afspelen",
+    "discoverSessionTitle": "Ontdek Session Replay om gebruikersinteracties in detail te begrijpen",
+    "discoverSessionMessage": "Session Replay legt gebruikersinteracties op uw website of applicatie vast en herhaalt deze. Zo kun je visueel bekijken hoe gebruikers navigeren, waar ze klikken, wat ze typen en hoe ze met je inhoud omgaan.",
+    "getStartedRUM": "Ga aan de slag met Real User Monitoring",
+    "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
+    "eventID": "ID van het evenement",
+    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op."
   },
   "about": {
     "name": "OpenObserve",
@@ -1607,7 +1624,8 @@
       "alertSettings": "Stel je waarschuwingsregels in en kies hoe je op de hoogte wilt worden gehouden.",
       "deduplication": "Voorkom dat dezelfde waarschuwing meerdere keren wordt verzonden door soortgelijke meldingen te groeperen.",
       "advanced": "Contextvariabelen, beschrijving en rijsjabloon"
-    }
+    },
+    "template": "Sjabloon overschrijven"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2381,7 +2399,13 @@
     "deduplicateFields": "Deduplicatievelden",
     "deduplicateFieldTooltip": "Selecteer welke veldtoewijzingen u wilt gebruiken voor deduplicatie van vingerafdrukken",
     "alertDeduplicationMessage": "Waarschuwingen met dezelfde waarden voor deze velden worden ontdubbeld (bijvoorbeeld dezelfde vingerafdruk = dezelfde veldwaarden)",
-    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist"
+    "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist",
+    "scope": "Toepassingsgebied",
+    "scopeTooltip": "Scope-dimensies definiëren de omgevingsgrenzen (cluster, regio, host) en worden samengevoegd om het scopedeel van de FQN te vormen: {scope}/{workload}",
+    "stable": "Stabiel",
+    "stableTooltip": "Stabiele dimensies hebben een lage kardinaliteit en worden gebruikt voor de berekening van de correlatiesleutel",
+    "normalize": "Normaliseer",
+    "noSemanticGroupsInCategory": "Geen semantische groepen in de categorie: {category}"
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",

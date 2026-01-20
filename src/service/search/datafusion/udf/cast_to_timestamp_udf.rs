@@ -65,7 +65,7 @@ impl ScalarUDFImpl for CastToTimestampUdf {
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        let ttm = ToTimestampMicrosFunc::new();
+        let ttm = ToTimestampMicrosFunc::new_with_config(&args.config_options);
         let ret = ttm.invoke_with_args(args)?;
         match ret.data_type() {
             DataType::Int32 | DataType::Int64 | DataType::Null | DataType::Float64 => {

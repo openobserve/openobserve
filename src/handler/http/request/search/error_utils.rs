@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,24 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, http::StatusCode};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use infra::errors;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, handler::http::router::ERROR_HEADER,
 };
 
-pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> HttpResponse {
+pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {
         errors::Error::ErrorCode(code) => match code {
             errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                HttpResponse::TooManyRequests()
-                    .append_header((ERROR_HEADER, code.to_json()))
-                    .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id))
+                (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    [(ERROR_HEADER, code.to_json())],
+                    Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+                )
+                    .into_response()
             }
-            errors::ErrorCodes::SearchTimeout(_) => HttpResponse::RequestTimeout()
-                .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            errors::ErrorCodes::SearchTimeout(_) => (
+                StatusCode::REQUEST_TIMEOUT,
+                [(ERROR_HEADER, code.to_json())],
+                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            )
+                .into_response(),
             errors::ErrorCodes::InvalidParams(_)
             | errors::ErrorCodes::SearchSQLExecuteError(_)
             | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
@@ -38,34 +48,51 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             | errors::ErrorCodes::FullTextSearchFieldNotFound
             | errors::ErrorCodes::SearchFieldNotFound(_)
             | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_) => HttpResponse::BadRequest()
-                .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            errors::ErrorCodes::SearchHistogramNotAvailable(_) => HttpResponse::BadRequest()
-                .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            | errors::ErrorCodes::SearchStreamNotFound(_) => (
+                StatusCode::BAD_REQUEST,
+                [(ERROR_HEADER, code.to_json())],
+                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            )
+                .into_response(),
+            errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
+                StatusCode::BAD_REQUEST,
+                [(ERROR_HEADER, code.to_json())],
+                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            )
+                .into_response(),
             errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => HttpResponse::InternalServerError()
-                .append_header((ERROR_HEADER, code.to_json()))
-                .json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            | errors::ErrorCodes::SearchParquetFileNotFound => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [(ERROR_HEADER, code.to_json())],
+                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+            )
+                .into_response(),
         },
-        errors::Error::ResourceError(_) => HttpResponse::ServiceUnavailable()
-            .append_header((ERROR_HEADER, err.to_string()))
-            .json(MetaHttpResponse::error(
+        errors::Error::ResourceError(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [(ERROR_HEADER, err.to_string())],
+            Json(MetaHttpResponse::error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 err,
             )),
-        _ => HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, err.to_string()))
-            .json(MetaHttpResponse::error(
+        )
+            .into_response(),
+        _ => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, err.to_string())],
+            Json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 err,
             )),
+        )
+            .into_response(),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use axum::http::StatusCode;
+
     use super::*;
 
     #[test]

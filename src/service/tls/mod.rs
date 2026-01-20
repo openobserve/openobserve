@@ -19,7 +19,6 @@ use std::{
     sync::Arc,
 };
 
-use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
 use itertools::Itertools;
 use rustls_pemfile::{certs, private_key};
 use x509_parser::prelude::*;
@@ -65,10 +64,20 @@ pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
 pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
-        native_roots_cert_store()?
+        // Load native system certificates
+        let mut cert_store = rustls::RootCertStore::empty();
+        let certs = rustls_native_certs::load_native_certs();
+        for cert in certs.certs {
+            cert_store.add(cert)?;
+        }
+        if let Some(err) = certs.errors.first() {
+            log::warn!("Failed to load some native certificates: {}", err);
+        }
+        cert_store
     } else {
         // default use webpki, and add custom ca certificates
-        let mut cert_store = webpki_roots_cert_store();
+        let mut cert_store = rustls::RootCertStore::empty();
+        cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
         let cert_file =
             &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
                 anyhow::anyhow!(
@@ -93,7 +102,17 @@ pub fn client_tls_config() -> Result<Arc<rustls::ClientConfig>, anyhow::Error> {
 }
 
 pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
-    todo!()
+    let cfg = config::get_config();
+    let mut client_builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(cfg.route.timeout))
+        .pool_max_idle_per_host(cfg.route.max_connections);
+
+    if cfg.http.tls_enabled {
+        let tls_config = client_tls_config()?;
+        client_builder = client_builder.use_preconfigured_tls(tls_config);
+    }
+
+    Ok(client_builder.build()?)
 }
 
 pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {

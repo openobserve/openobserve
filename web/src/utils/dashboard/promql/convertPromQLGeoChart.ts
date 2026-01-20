@@ -110,7 +110,6 @@ export class GeoConverter implements PromQLChartConverter {
       },
       tooltip: {
         trigger: "item",
-        confine: true,
         showDelay: 0,
         transitionDuration: 0.2,
         textStyle: {

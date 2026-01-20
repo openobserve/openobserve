@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, get, post, web};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Json, Response},
+};
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
     ingestion_used, license_expired,
@@ -21,7 +24,9 @@ use o2_enterprise::enterprise::license::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::utils::auth::UserEmail, handler::http::extractors::Headers, service::db::license,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::extractors::Headers,
+    service::db::license,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -34,7 +39,7 @@ struct LicenseResponse {
     ingestion_exceeded: u8,
 }
 
-struct SaveLicenseRequest {
+pub struct SaveLicenseRequest {
     key: License,
     raw_key: String,
 }
@@ -98,8 +103,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
-#[get("/license")]
-pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> HttpResponse {
+pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
     // we want anyone to be able to see the license info, so we bypass
     // all the permission checks here.
     let (key, license) = match get_license().await {
@@ -114,21 +118,20 @@ pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> HttpRespon
         ingestion_exceeded: ingestion_limit_exceeded_count(),
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
     };
-    HttpResponse::Ok().json(res)
+    MetaHttpResponse::json(res)
 }
 
-#[post("/license")]
 pub async fn store_license(
-    web::Json(req): web::Json<SaveLicenseRequest>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
+    axum::Json(req): axum::Json<SaveLicenseRequest>,
+) -> Response {
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {
-        return HttpResponse::Forbidden().json("Unauthorized Access to license");
+        return MetaHttpResponse::forbidden("Unauthorized Access to license");
     }
 
     if let Err(e) = check_license(&req.key).await {
-        return HttpResponse::BadRequest().json(serde_json::json!({"message":e.to_string()}));
+        return MetaHttpResponse::bad_request(e.to_string());
     };
 
     let db = infra::db::get_db().await;
@@ -136,9 +139,7 @@ pub async fn store_license(
         .await
         .unwrap();
     match license::update().await {
-        Ok(_) => HttpResponse::Created().finish(),
-        Err(e) => {
-            HttpResponse::InternalServerError().json(serde_json::json!({"message":e.to_string()}))
-        }
+        Ok(_) => (StatusCode::CREATED, Json("")).into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
