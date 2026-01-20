@@ -488,9 +488,13 @@ const handleChartDataUpdate = (resultMetaData: any) => {
         // Determine result count based on query mode
         // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
         if (props.selectedTab === "sql" || (props.selectedTab === "custom" && props.isAggregationEnabled)) {
-          if (latestPartition?.total !== undefined) {
-            resultCount = latestPartition.total;
-            console.log("[PreviewAlert] Got count from total field (SQL/Custom with agg):", resultCount);
+          // Sum up total from all partitions instead of just taking the last one
+          // This handles streaming responses where data comes in multiple partitions
+          if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
+              return sum + (partition?.total || 0);
+            }, 0);
+            console.log("[PreviewAlert] Got count from summing all partition totals (SQL/Custom with agg):", resultCount);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
             console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
@@ -515,9 +519,12 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
             console.log("[PreviewAlert] Got count from hits array (PromQL):", resultCount);
-          } else if (latestPartition?.total !== undefined) {
-            resultCount = latestPartition.total;
-            console.log("[PreviewAlert] Got count from total field (PromQL fallback):", resultCount);
+          } else if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
+            // Sum up total from all partitions for PromQL fallback
+            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
+              return sum + (partition?.total || 0);
+            }, 0);
+            console.log("[PreviewAlert] Got count from summing all partition totals (PromQL fallback):", resultCount);
           }
         }
         // Custom mode without aggregations: sum zo_sql_num from all partitions
@@ -533,11 +540,14 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             }
           }
         }
-        // Fallback for any other modes
+        // Fallback for any other modes (traces, logs without aggregation, etc.)
         else {
-          if (latestPartition?.total !== undefined) {
-            resultCount = latestPartition.total;
-            console.log("[PreviewAlert] Got count from total field (fallback):", resultCount);
+          // Sum up total from all partitions instead of just taking the last one
+          if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
+              return sum + (partition?.total || 0);
+            }, 0);
+            console.log("[PreviewAlert] Got count from summing all partition totals (fallback):", resultCount);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
             console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
@@ -1026,6 +1036,11 @@ watch(
 // Refresh data on mount if we already have a query
 onMounted(() => {
   console.log("[PreviewAlert] onMounted called, query:", props.query);
+  // Skip for PromQL to avoid duplicate API calls (watchers handle it)
+  if (props.selectedTab === "promql") {
+    console.log("[PreviewAlert] Skipping onMounted refresh for PromQL");
+    return;
+  }
   if (props.query) {
     console.log("[PreviewAlert] onMounted calling refreshDataOnce");
     refreshDataOnce();
