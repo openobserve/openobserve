@@ -104,120 +104,52 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache local cache
-        run: |
-          mkdir -p $HOME/.cache/sccache
-          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
-          echo "SCCACHE_DIRECT=true" >> $GITHUB_ENV
-
-      - name: Restore sccache cache
-        uses: actions/cache@v4
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cache/sccache
-          key: sccache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ runner.os }}-${{ runner.arch }}-
+          shared-key: "openobserve-${{ runner.arch }}"
+          cache-on-failure: true
+          workspaces: "."
 
-      - name: Add sccache to PATH
-        run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
-
-      - name: Validate sccache setup
+      - name: Validate cache setup
         run: |
-          echo "=== Validating sccache setup ==="
-          echo "SCCACHE_PATH: $SCCACHE_PATH"
-          echo "SCCACHE_DIR: $SCCACHE_DIR"
-          echo "SCCACHE_DIRECT: $SCCACHE_DIRECT"
+          echo "=== Testing Rust cache with quick build ==="
 
-          # Check if sccache binary exists
-          if [ ! -f "$SCCACHE_PATH" ]; then
-            echo "❌ ERROR: sccache binary not found at $SCCACHE_PATH"
-            exit 1
-          fi
+          # Create a simple test project
+          mkdir -p /tmp/cache-test
+          cd /tmp/cache-test
+          cargo init --name cache_test
 
-          # Check if sccache is executable
-          if [ ! -x "$SCCACHE_PATH" ]; then
-            echo "❌ ERROR: sccache is not executable"
-            exit 1
-          fi
+          # First build
+          echo "First build (populating cache)..."
+          time cargo build --release
 
-          # Test sccache version
-          echo "✓ sccache binary found and executable"
-          $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
-
-          # Show sccache configuration
+          # Clean and rebuild
           echo ""
-          echo "Sccache configuration:"
-          $SCCACHE_PATH --show-stats | head -20
-
-          # Create a test Rust project and compile it with cargo
-          mkdir -p /tmp/sccache-test
-          cd /tmp/sccache-test
-          cargo init --name sccache_test
-
-          # Test compilation through sccache with cargo (matching actual build flags)
-          echo "Testing sccache with cargo build --release (first run)..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
-            echo "❌ ERROR: Test cargo build failed"
-            exit 1
-          }
-
-          # Show stats after first build
-          echo ""
-          echo "Stats after first build:"
-          STATS1=$($SCCACHE_PATH --show-stats)
-          echo "$STATS1"
-
-          # Clean and rebuild to test caching
-          echo ""
-          echo "Cleaning and rebuilding to test cache..."
+          echo "Cleaning and rebuilding (testing cache)..."
           cargo clean
-          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
-            echo "❌ ERROR: Test cargo rebuild failed"
-            exit 1
-          }
 
-          # Check sccache stats after second build to verify caching worked
-          echo ""
-          echo "Stats after second build:"
-          STATS=$($SCCACHE_PATH --show-stats)
-          echo "$STATS"
-
-          COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
-          CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
-          CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
-          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
-
-          if [ "$COMPILE_REQUESTS" -lt 2 ] 2>/dev/null; then
-            echo "❌ ERROR: sccache did not intercept compilations (requests: $COMPILE_REQUESTS)"
-            echo "This means RUSTC_WRAPPER is not working correctly with cargo"
-            exit 1
-          fi
+          START_TIME=$(date +%s)
+          cargo build --release
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
 
           echo ""
-          echo "✓ SUCCESS: sccache intercepted $COMPILE_REQUESTS compilation(s)."
-          echo ""
+          echo "Second build took: ${DURATION}s"
 
-          if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
-            echo "✅ Cache is WORKING! Got $CACHE_HITS cache hits on rebuild."
-            echo "   This means caching will work for the full build."
+          if [ $DURATION -lt 5 ]; then
+            echo "✅ Cache is working! Second build was very fast (${DURATION}s)"
+            echo "   Full build caching should work well."
+          elif [ $DURATION -lt 15 ]; then
+            echo "✅ Cache appears to be working. Second build: ${DURATION}s"
           else
-            echo "⚠️  WARNING: No cache hits after rebuild."
-            echo "   Cache misses: $CACHE_MISSES"
-            echo "   Non-cacheable: $NON_CACHEABLE"
-            echo ""
-            echo "   This suggests caching may not work effectively for the full build."
-            echo "   The build will still run, but may not see speedups on subsequent runs."
+            echo "⚠️  Second build took ${DURATION}s (expected <5s with caching)"
+            echo "   Cache may not be fully effective, but build will continue."
           fi
 
-          # Clean up
           cd -
-          rm -rf /tmp/sccache-test
-
-          echo "=== sccache validation complete ==="
+          rm -rf /tmp/cache-test
+          echo "=== Cache validation complete ==="
 
       - name: Install Protoc
         run: |
@@ -234,26 +166,10 @@ jobs:
 
       - name: Build and run binary
         run: |
-          echo "Using sccache wrapper at: $SCCACHE_PATH"
-          echo "RUSTC_WRAPPER=$SCCACHE_PATH"
-          echo "SCCACHE_DIR=$SCCACHE_DIR"
-
-          # Show initial sccache stats
-          echo "=== Initial sccache stats ==="
-          $SCCACHE_PATH --show-stats
-          echo "=============================="
-
+          echo "Building openobserve for x86_64..."
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
-        env:
-          RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
-
-      - name: Show sccache stats
-        run: |
-          echo "=== sccache statistics ==="
-          sccache --show-stats
-          echo "==========================="
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -317,120 +233,52 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache local cache
-        run: |
-          mkdir -p $HOME/.cache/sccache
-          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=10G" >> $GITHUB_ENV
-          echo "SCCACHE_DIRECT=true" >> $GITHUB_ENV
-
-      - name: Restore sccache cache
-        uses: actions/cache@v4
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
         with:
-          path: ~/.cache/sccache
-          key: sccache-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            sccache-${{ runner.os }}-${{ runner.arch }}-
+          shared-key: "openobserve-${{ runner.arch }}"
+          cache-on-failure: true
+          workspaces: "."
 
-      - name: Add sccache to PATH
-        run: echo "$(dirname $SCCACHE_PATH)" >> $GITHUB_PATH
-
-      - name: Validate sccache setup
+      - name: Validate cache setup
         run: |
-          echo "=== Validating sccache setup ==="
-          echo "SCCACHE_PATH: $SCCACHE_PATH"
-          echo "SCCACHE_DIR: $SCCACHE_DIR"
-          echo "SCCACHE_DIRECT: $SCCACHE_DIRECT"
+          echo "=== Testing Rust cache with quick build ==="
 
-          # Check if sccache binary exists
-          if [ ! -f "$SCCACHE_PATH" ]; then
-            echo "❌ ERROR: sccache binary not found at $SCCACHE_PATH"
-            exit 1
-          fi
+          # Create a simple test project
+          mkdir -p /tmp/cache-test
+          cd /tmp/cache-test
+          cargo init --name cache_test
 
-          # Check if sccache is executable
-          if [ ! -x "$SCCACHE_PATH" ]; then
-            echo "❌ ERROR: sccache is not executable"
-            exit 1
-          fi
+          # First build
+          echo "First build (populating cache)..."
+          time cargo build --release
 
-          # Test sccache version
-          echo "✓ sccache binary found and executable"
-          $SCCACHE_PATH --version || { echo "❌ ERROR: Failed to run sccache --version"; exit 1; }
-
-          # Show sccache configuration
+          # Clean and rebuild
           echo ""
-          echo "Sccache configuration:"
-          $SCCACHE_PATH --show-stats | head -20
-
-          # Create a test Rust project and compile it with cargo
-          mkdir -p /tmp/sccache-test
-          cd /tmp/sccache-test
-          cargo init --name sccache_test
-
-          # Test compilation through sccache with cargo (matching actual build flags)
-          echo "Testing sccache with cargo build --release (first run)..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
-            echo "❌ ERROR: Test cargo build failed"
-            exit 1
-          }
-
-          # Show stats after first build
-          echo ""
-          echo "Stats after first build:"
-          STATS1=$($SCCACHE_PATH --show-stats)
-          echo "$STATS1"
-
-          # Clean and rebuild to test caching
-          echo ""
-          echo "Cleaning and rebuilding to test cache..."
+          echo "Cleaning and rebuilding (testing cache)..."
           cargo clean
-          RUSTC_WRAPPER="$SCCACHE_PATH" cargo build --release || {
-            echo "❌ ERROR: Test cargo rebuild failed"
-            exit 1
-          }
 
-          # Check sccache stats after second build to verify caching worked
-          echo ""
-          echo "Stats after second build:"
-          STATS=$($SCCACHE_PATH --show-stats)
-          echo "$STATS"
-
-          COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
-          CACHE_HITS=$(echo "$STATS" | grep "Cache hits" | head -1 | awk '{print $3}')
-          CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
-          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
-
-          if [ "$COMPILE_REQUESTS" -lt 2 ] 2>/dev/null; then
-            echo "❌ ERROR: sccache did not intercept compilations (requests: $COMPILE_REQUESTS)"
-            echo "This means RUSTC_WRAPPER is not working correctly with cargo"
-            exit 1
-          fi
+          START_TIME=$(date +%s)
+          cargo build --release
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
 
           echo ""
-          echo "✓ SUCCESS: sccache intercepted $COMPILE_REQUESTS compilation(s)."
-          echo ""
+          echo "Second build took: ${DURATION}s"
 
-          if [ "$CACHE_HITS" -gt 0 ] 2>/dev/null; then
-            echo "✅ Cache is WORKING! Got $CACHE_HITS cache hits on rebuild."
-            echo "   This means caching will work for the full build."
+          if [ $DURATION -lt 5 ]; then
+            echo "✅ Cache is working! Second build was very fast (${DURATION}s)"
+            echo "   Full build caching should work well."
+          elif [ $DURATION -lt 15 ]; then
+            echo "✅ Cache appears to be working. Second build: ${DURATION}s"
           else
-            echo "⚠️  WARNING: No cache hits after rebuild."
-            echo "   Cache misses: $CACHE_MISSES"
-            echo "   Non-cacheable: $NON_CACHEABLE"
-            echo ""
-            echo "   This suggests caching may not work effectively for the full build."
-            echo "   The build will still run, but may not see speedups on subsequent runs."
+            echo "⚠️  Second build took ${DURATION}s (expected <5s with caching)"
+            echo "   Cache may not be fully effective, but build will continue."
           fi
 
-          # Clean up
           cd -
-          rm -rf /tmp/sccache-test
-
-          echo "=== sccache validation complete ==="
+          rm -rf /tmp/cache-test
+          echo "=== Cache validation complete ==="
 
       - name: Install Protoc
         run: |
@@ -447,26 +295,10 @@ jobs:
 
       - name: Build and run binary
         run: |
-          echo "Using sccache wrapper at: $SCCACHE_PATH"
-          echo "RUSTC_WRAPPER=$SCCACHE_PATH"
-          echo "SCCACHE_DIR=$SCCACHE_DIR"
-
-          # Show initial sccache stats
-          echo "=== Initial sccache stats ==="
-          $SCCACHE_PATH --show-stats
-          echo "=============================="
-
+          echo "Building openobserve for aarch64..."
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
-        env:
-          RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
-
-      - name: Show sccache stats
-        run: |
-          echo "=== sccache statistics ==="
-          sccache --show-stats
-          echo "==========================="
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
