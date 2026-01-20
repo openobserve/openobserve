@@ -2073,8 +2073,12 @@ export default defineComponent({
 
     // Build tab event handlers
     const handleBuildQueryChanged = (query: string) => {
-      // Optionally sync generated query back to main search
-      console.log("Generated query from Build tab:", query);
+      // Sync generated query back to main search object
+      // This allows users to switch back to logs tab and see the built query
+      if (query && query.trim()) {
+        searchObj.data.query = query;
+        console.log("[Index] Updated searchObj.data.query from Build tab:", query);
+      }
     };
 
     const handleVisualizationSaved = (config: any) => {

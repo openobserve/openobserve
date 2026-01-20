@@ -200,18 +200,74 @@ export class SQLQueryParser {
         throw new Error("Query must have SELECT columns");
       }
 
-      // Check for SELECT * - not supported for Build tab
-      if (
+      // Check for SELECT * - create default histogram + count visualization
+      const isSelectStar =
         selectAst.columns.length === 1 &&
         selectAst.columns[0].expr &&
-        selectAst.columns[0].expr.type === "star"
-      ) {
-        throw new Error("SELECT * is not supported in Build tab - please select specific columns");
+        ((selectAst.columns[0].expr.type === "star") ||
+         (selectAst.columns[0].expr.type === "column_ref" &&
+          selectAst.columns[0].expr.column === "*"));
+
+      let xAxis: AxisItem[] = [];
+      let yAxis: AxisItem[] = [];
+      let breakdown: AxisItem[] = [];
+
+      if (isSelectStar) {
+        console.log("[SQLQueryParser] SELECT * detected, creating default histogram + count");
+
+        // Create default x-axis: histogram(_timestamp) as "x_axis_1"
+        xAxis = [{
+          label: "Timestamp",
+          alias: "x_axis_1",
+          column: "_timestamp",
+          type: "build",
+          color: null,
+          functionName: "histogram",
+          sortBy: "ASC",
+          args: [
+            {
+              type: "field",
+              value: {
+                field: "_timestamp",
+              },
+            },
+          ],
+          isDerived: false,
+          havingConditions: [],
+          treatAsNonTimestamp: false,
+          showFieldAsJson: false,
+        }];
+
+        // Create default y-axis: count(_timestamp) as "y_axis_1"
+        yAxis = [{
+          label: "Count",
+          alias: "y_axis_1",
+          type: "build",
+          color: this.getNextColor(),
+          functionName: "count",
+          sortBy: null,
+          args: [
+            {
+              type: "field",
+              value: {
+                field: "_timestamp",
+              },
+            },
+          ],
+          isDerived: false,
+          havingConditions: [],
+          treatAsNonTimestamp: true,
+          showFieldAsJson: false,
+        }];
+      } else {
+        // Parse columns normally
+        console.log("[SQLQueryParser] Step 4: Parsing columns...");
+        const parsed = this.parseColumns(selectAst.columns);
+        xAxis = parsed.xAxis;
+        yAxis = parsed.yAxis;
+        breakdown = parsed.breakdown;
       }
 
-      // Parse columns (SELECT clause)
-      console.log("[SQLQueryParser] Step 4: Parsing columns...");
-      const { xAxis, yAxis, breakdown } = this.parseColumns(selectAst.columns);
       console.log("[SQLQueryParser] Parsed axes - xAxis:", xAxis.length, "yAxis:", yAxis.length, "breakdown:", breakdown.length);
 
       // Parse WHERE clause to filters
@@ -258,7 +314,7 @@ export class SQLQueryParser {
       return {
         query: sqlQuery,
         vrlFunctionQuery: "",
-        customQuery: true,
+        customQuery: false, // Set to false for visual query builder
         joins,
         fields: {
           stream,
@@ -719,7 +775,18 @@ export class SQLQueryParser {
       return defaultFilter;
     }
 
-    return this.parseFilterRecursive(whereClause);
+    const result = this.parseFilterRecursive(whereClause);
+
+    // If result is a single condition, wrap it in a group
+    if ('column' in result && result.filterType === 'condition') {
+      return {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [result],
+      };
+    }
+
+    return result as PanelFilter;
   }
 
   /**

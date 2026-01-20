@@ -405,72 +405,98 @@ export default defineComponent({
         try {
           // Skip if query is empty or an array (multiple queries not supported)
           if (existingQuery && typeof existingQuery === "string" && existingQuery.trim()) {
+            console.log("[BuildQueryTab] Attempting to parse query:", existingQuery);
+
             // Parse the SQL query to panel object
-            const streamType = store.state.organizationData.organizationSettings?.stream_type || "logs";
+            const streamType = logsPageSearchObj.data?.stream?.selectedStream?.[0]?.stream_type ||
+                             store.state.organizationData.organizationSettings?.stream_type ||
+                             "logs";
+
             const parsedQuery = parseSQLQueryToPanelObject(existingQuery, streamType);
+            console.log("[BuildQueryTab] Parsed query result:", parsedQuery);
 
             // Populate dashboard panel fields from parsed query
             if (parsedQuery && parsedQuery.fields) {
               // Set stream name
               if (parsedQuery.fields.stream) {
                 dashboardPanelData.data.queries[0].fields.stream = parsedQuery.fields.stream;
+                console.log("[BuildQueryTab] Set stream:", parsedQuery.fields.stream);
               }
 
               // Set stream type
               if (parsedQuery.fields.stream_type) {
                 dashboardPanelData.data.queries[0].fields.stream_type = parsedQuery.fields.stream_type;
+                console.log("[BuildQueryTab] Set stream_type:", parsedQuery.fields.stream_type);
               }
 
               // Set x-axis fields (GROUP BY fields)
               if (parsedQuery.fields.x && parsedQuery.fields.x.length > 0) {
                 dashboardPanelData.data.queries[0].fields.x = cloneDeep(parsedQuery.fields.x);
+                console.log("[BuildQueryTab] Set x-axis fields:", parsedQuery.fields.x.length);
               }
 
               // Set y-axis fields (aggregations)
               if (parsedQuery.fields.y && parsedQuery.fields.y.length > 0) {
                 dashboardPanelData.data.queries[0].fields.y = cloneDeep(parsedQuery.fields.y);
+                console.log("[BuildQueryTab] Set y-axis fields:", parsedQuery.fields.y.length);
               }
 
               // Set breakdown field
-              if (parsedQuery.fields.z && parsedQuery.fields.z.length > 0) {
-                dashboardPanelData.data.queries[0].fields.z = cloneDeep(parsedQuery.fields.z);
+              if (parsedQuery.fields.breakdown && parsedQuery.fields.breakdown.length > 0) {
+                dashboardPanelData.data.queries[0].fields.breakdown = cloneDeep(parsedQuery.fields.breakdown);
+                console.log("[BuildQueryTab] Set breakdown fields:", parsedQuery.fields.breakdown.length);
               }
 
               // Set filters (WHERE clause)
-              if (parsedQuery.fields.filter && parsedQuery.fields.filter.length > 0) {
+              if (parsedQuery.fields.filter && parsedQuery.fields.filter.conditions) {
                 dashboardPanelData.data.queries[0].fields.filter = cloneDeep(parsedQuery.fields.filter);
+                console.log("[BuildQueryTab] Set filters with", parsedQuery.fields.filter.conditions.length, "conditions");
               }
 
               // Set joins
               if (parsedQuery.joins && parsedQuery.joins.length > 0) {
                 dashboardPanelData.data.queries[0].joins = cloneDeep(parsedQuery.joins);
+                console.log("[BuildQueryTab] Set joins:", parsedQuery.joins.length);
               }
 
               // Set config options (limit, sort)
               if (parsedQuery.config) {
-                if (parsedQuery.config.limit !== undefined) {
+                if (parsedQuery.config.limit !== undefined && parsedQuery.config.limit > 0) {
                   dashboardPanelData.data.config.limit = parsedQuery.config.limit;
+                  console.log("[BuildQueryTab] Set limit:", parsedQuery.config.limit);
                 }
               }
 
+              // Set customQuery to false to enable visual builder
+              dashboardPanelData.data.queries[0].customQuery = false;
+
               queryParsed = true;
+              console.log("[BuildQueryTab] Successfully parsed and populated query fields");
             }
           }
         } catch (error) {
           // If parsing fails, log warning and fall back to default initialization
           console.warn(
-            "[BuildQueryTab] Failed to parse existing query, using default initialization.",
-            "\nQuery:",
-            existingQuery,
-            "\nError:",
-            error
+            "[BuildQueryTab] Failed to parse existing query, using default initialization."
           );
+          console.warn("Query:", existingQuery);
+          console.warn("Error:", error);
+
+          // Show error to user
+          $q.notify({
+            type: "warning",
+            message: `Could not parse SQL query for visual builder: ${error.message || "Unknown error"}`,
+            caption: "Starting with empty query builder instead",
+            timeout: 5000,
+          });
+
           queryParsed = false;
         }
       }
 
       // If no query was parsed, generate initial SQL (auto SQL mode)
       if (!queryParsed) {
+        console.log("[BuildQueryTab] No query parsed, generating default auto SQL");
         makeAutoSQLQuery();
       }
     };
@@ -589,16 +615,19 @@ export default defineComponent({
         dashboardPanelData.data.queries[0]?.fields?.y,
         dashboardPanelData.data.queries[0]?.fields?.breakdown,
         dashboardPanelData.data.queries[0]?.fields?.filter,
+        dashboardPanelData.data.queries[0]?.fields?.stream,
       ],
       () => {
         // Only generate auto SQL if we're in auto query mode (not custom SQL)
         if (!dashboardPanelData.data.queries[0].customQuery) {
           makeAutoSQLQuery();
+
+          // Emit the generated query to parent
+          const generatedQuery = dashboardPanelData.data.queries[0]?.query || "";
+          if (generatedQuery) {
+            emit("query-changed", generatedQuery);
+          }
         }
-
-
-        // Update chartData to trigger chart re-render
-        // chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       },
       { deep: true }
     );
