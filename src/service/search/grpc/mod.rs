@@ -33,7 +33,7 @@ pub struct QueryParams {
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
-    pub time_range: Option<(i64, i64)>,
+    pub time_range: (i64, i64),
     pub work_group: Option<String>,
     pub use_inverted_index: bool,
 }

@@ -970,7 +970,7 @@ mod tests {
             org_id: "org".to_string(),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
-            time_range: None,
+            time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
         });
@@ -1010,7 +1010,7 @@ mod tests {
             org_id: "org".to_string(),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
-            time_range: None,
+            time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
         });
@@ -1098,7 +1098,7 @@ mod tests {
             org_id: "org".to_string(),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
-            time_range: None,
+            time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
         });
@@ -1138,7 +1138,7 @@ mod tests {
             org_id: "org".to_string(),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
-            time_range: None,
+            time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
         });
@@ -1179,7 +1179,7 @@ mod tests {
             org_id: "org".to_string(),
             stream_type: StreamType::Logs,
             stream_name: "test".to_string(),
-            time_range: None,
+            time_range: (0, 1000),
             work_group: None,
             use_inverted_index: false,
         });

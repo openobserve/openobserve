@@ -657,6 +657,7 @@ pub struct TableBuilder {
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    timestamp_filter: Option<(i64, i64)>,
 }
 
 impl TableBuilder {
@@ -666,6 +667,7 @@ impl TableBuilder {
             file_stat_cache: None,
             index_condition: None,
             fst_fields: vec![],
+            timestamp_filter: None,
         }
     }
 
@@ -689,6 +691,11 @@ impl TableBuilder {
 
     pub fn fst_fields(mut self, fst_fields: Vec<String>) -> Self {
         self.fst_fields = fst_fields;
+        self
+    }
+
+    pub fn timestamp_filter(mut self, timestamp_filter: (i64, i64)) -> Self {
+        self.timestamp_filter = Some(timestamp_filter);
         self
     }
 

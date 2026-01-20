@@ -215,7 +215,7 @@ pub(crate) async fn create_context(
         org_id: org_id.to_string(),
         stream_type: StreamType::Metrics,
         stream_name: stream_name.to_string(),
-        time_range: Some(time_range),
+        time_range,
         work_group: None,
         use_inverted_index: true,
     });

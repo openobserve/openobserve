@@ -24,7 +24,7 @@ use datafusion::{
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
-        execution_plan::{Boundedness, EmissionType},
+        execution_plan::{Boundedness, EmissionType, SchedulingType},
         expressions::Column,
         memory::MemoryStream,
     },
@@ -124,6 +124,7 @@ impl NewEmptyExec {
             EmissionType::Incremental,
             Boundedness::Bounded,
         )
+        .with_scheduling_type(SchedulingType::Cooperative)
     }
 
     pub fn name(&self) -> &str {

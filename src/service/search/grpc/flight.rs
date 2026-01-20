@@ -198,7 +198,7 @@ pub async fn search(
         org_id: org_id.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
-        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
+        time_range: (req.search_info.start_time, req.search_info.end_time),
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
@@ -207,10 +207,8 @@ pub async fn search(
     });
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: use_inverted_index: {}, index_condition: {:?}, index_optimizer_rule: {:?}",
-        query_params.use_inverted_index,
-        index_condition,
-        idx_optimize_rule
+        "[trace_id {trace_id}] flight->search: use_inverted_index: {}, index_condition: {index_condition:?}, index_optimizer_rule: {idx_optimize_rule:?}",
+        query_params.use_inverted_index
     );
 
     // search in object storage
@@ -221,7 +219,7 @@ pub async fn search(
             &org_id,
             stream_type,
             &stream_name,
-            query_params.time_range,
+            Some(query_params.time_range),
             &search_partition_keys,
             &req.search_info.file_id_list,
         )
