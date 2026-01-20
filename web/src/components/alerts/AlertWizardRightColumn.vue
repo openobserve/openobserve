@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
           <!-- Status Indicator -->
           <div
-            v-if="evaluationStatus"
+            v-if="evaluationStatus && !isRealTime"
             class="alert-status-indicator tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded"
             :class="{
               'status-would-trigger': evaluationStatus.wouldTrigger,
@@ -187,6 +187,11 @@ export default defineComponent({
       { deep: true, immediate: true }
     );
 
+    // Computed property to check if this is a real-time alert
+    const isRealTime = computed(() => {
+      return props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+    });
+
     // Load saved state from localStorage or use defaults
     const loadExpandState = () => {
       try {
@@ -276,6 +281,7 @@ export default defineComponent({
       previewSectionStyle,
       summarySectionStyle,
       evaluationStatus,
+      isRealTime,
     };
   },
 });
