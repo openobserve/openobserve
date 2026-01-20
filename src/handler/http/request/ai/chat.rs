@@ -52,6 +52,9 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     DEFAULT_AGENT_TYPE
 }
 
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::ai::agent::meta::Role;
+
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
@@ -134,7 +137,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let config = get_o2_config();
 
         // Create root span for AI tracing if enabled
-        let span = if config.ai.traces_enabled {
+        let span = if config.ai.tracing_enabled {
             tracing::info_span!(
                 "http.request",
                 http.method = "POST",
@@ -382,7 +385,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let org_id_str = org_id.clone();
 
         // Create root span for AI tracing if enabled
-        let span = if config.ai.traces_enabled {
+        let span = if config.ai.tracing_enabled {
             tracing::info_span!(
                 "http.request",
                 http.method = "POST",

@@ -785,7 +785,8 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
-                  // Handle tool_call events - show spinner, don't add to chat yet
+
+                  // Handle tool_call events - show spinner indicator, don't add to chat yet
                   if (data && data.type === 'tool_call') {
                     // If there's already an active tool call, complete it first
                     if (activeToolCall.value) {
@@ -804,17 +805,15 @@ export default defineComponent({
                       }
                     }
 
-                    // Set new active tool call (shows spinner indicator)
-                  // Handle tool_call events - add as content block for interleaved display
-                  if (data && data.type === 'tool_call') {
-                    const toolCallBlock: ContentBlock = {
-                      type: 'tool_call',
+                    // Show active indicator (blue spinner box) - don't add to chat yet
+                    activeToolCall.value = {
                       tool: data.tool,
                       message: data.message,
                       context: data.context || {}
                     };
 
-                    // Show active indicator
+                    // Reset text segment - next text will start a new block
+                    currentTextSegment.value = '';
                     await scrollToBottom();
                     continue;
                   }
@@ -2659,6 +2658,12 @@ export default defineComponent({
     &.dark-mode {
       background: rgba(255, 152, 0, 0.12);
     }
+  }
+
+  .tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .tool-call-name {
