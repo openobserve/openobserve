@@ -673,7 +673,7 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         await page.waitForTimeout(500);
 
         // Enter Query B in Tab 2
-        const queryB = 'node_cpu_seconds_total{mode="idle"}';
+        const queryB = 'request_count{}';
         testLogger.info(`Entering query in Tab 2: "${queryB}"`);
         await enterPromQLQuery(page, queryB);
 
