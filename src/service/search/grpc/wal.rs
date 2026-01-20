@@ -52,7 +52,7 @@ use crate::{
     service::{
         file_list,
         search::{
-            datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
+            datafusion::table_provider::memtable::NewMemTable,
             generate_filter_from_equal_items, generate_search_schema_diff,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -202,8 +202,6 @@ pub async fn search_parquet(
         return Err(Error::ResourceError(e.to_string()));
     }
 
-    let start = std::time::Instant::now();
-
     let session = config::meta::search::Session {
         id: format!("{trace_id}-wal"),
         storage_type: StorageType::Wal,
@@ -211,26 +209,21 @@ pub async fn search_parquet(
         target_partitions: cfg.limit.cpu_num,
     };
 
-    let table = match TableBuilder::new()
-        .sorted_by_time(sorted_by_time)
-        .file_stat_cache(file_stat_cache.clone())
-        .index_condition(index_condition.clone())
-        .fst_fields(fst_fields.clone())
-        .timestamp_filter(query.time_range)
-        .build(
-            session,
-            files,
-            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
-        )
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            // release all files
+    let start = std::time::Instant::now();
+    let tables = super::create_tables_from_files(
+        files,
+        query.time_range,
+        session,
+        schema,
+        sorted_by_time,
+        file_stat_cache,
+        index_condition,
+        fst_fields,
+        || {
             wal::release_files(&lock_files);
-            return Err(e.into());
-        }
-    };
+        },
+    )
+    .await?;
 
     // lock these files for this request
     wal::lock_request(&query.trace_id, &lock_files);
@@ -251,7 +244,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 /// search in local WAL, which haven't been sync to object storage

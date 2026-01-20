@@ -52,7 +52,6 @@ use tracing::Instrument;
 use crate::service::{
     file_list,
     search::{
-        datafusion::exec::TableBuilder,
         grpc::{
             tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
@@ -242,7 +241,7 @@ pub async fn search(
         cfg.limit.cpu_num
     };
 
-    let start = std::time::Instant::now();
+    log::debug!("search->storage: session target_partitions: {target_partitions}");
 
     let session = config::meta::search::Session {
         id: format!("{trace_id}-storage"),
@@ -251,49 +250,19 @@ pub async fn search(
         target_partitions,
     };
 
-    log::debug!("search->storage: session target_partitions: {target_partitions}");
-
-    // Split files into two groups:
-    // 1. Files completely within the query time range (no timestamp filter needed)
-    // 2. Files partially overlapping with the query time range (need timestamp filter)
-    let (start_time, end_time) = query.time_range;
-    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
-        .into_iter()
-        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
-
-    log::info!(
-        "[trace_id {trace_id}] search->storage: split files - without filter: {}, with filter: {}",
-        files_without_filter.len(),
-        files_with_filter.len()
-    );
-
-    let mut tables = Vec::new();
-    let schema_arc = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
-
-    // Create table for files without timestamp filter
-    if !files_without_filter.is_empty() {
-        let table = TableBuilder::new()
-            .sorted_by_time(sorted_by_time)
-            .file_stat_cache(file_stat_cache.clone())
-            .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone())
-            .build(session.clone(), files_without_filter, schema_arc.clone())
-            .await?;
-        tables.push(table);
-    }
-
-    // Create table for files with timestamp filter
-    if !files_with_filter.is_empty() {
-        let table = TableBuilder::new()
-            .sorted_by_time(sorted_by_time)
-            .file_stat_cache(file_stat_cache.clone())
-            .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone())
-            .timestamp_filter(query.time_range)
-            .build(session.clone(), files_with_filter, schema_arc.clone())
-            .await?;
-        tables.push(table);
-    }
+    let start = std::time::Instant::now();
+    let tables = super::create_tables_from_files(
+        files,
+        query.time_range,
+        session,
+        schema,
+        sorted_by_time,
+        file_stat_cache,
+        index_condition,
+        fst_fields,
+        || {},
+    )
+    .await?;
 
     log::info!(
         "{}",

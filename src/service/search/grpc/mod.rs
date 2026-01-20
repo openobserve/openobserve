@@ -15,9 +15,15 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use config::meta::{search::ScanStats, stream::StreamType};
-use datafusion::datasource::TableProvider;
+use arrow_schema::Schema;
+use config::meta::{
+    search::ScanStats,
+    stream::{FileKey, StreamType},
+};
+use datafusion::{datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache};
 use infra::errors::Result;
+
+use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 
 pub mod flight;
 pub mod storage;
@@ -36,4 +42,72 @@ pub struct QueryParams {
     pub time_range: (i64, i64),
     pub work_group: Option<String>,
     pub use_inverted_index: bool,
+}
+
+/// Create tables from files, automatically splitting them based on time range overlap:
+/// - Files completely within the query time range: no timestamp filter applied
+/// - Files partially overlapping with the query time range: timestamp filter applied
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn create_tables_from_files<F>(
+    files: Vec<FileKey>,
+    time_range: (i64, i64),
+    session: config::meta::search::Session,
+    schema: Arc<Schema>,
+    sorted_by_time: bool,
+    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
+    on_error: F,
+) -> Result<Vec<Arc<dyn TableProvider>>>
+where
+    F: Fn() + Clone,
+{
+    // Split files into two groups based on time range overlap
+    let (start_time, end_time) = time_range;
+    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
+        .into_iter()
+        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
+    let mut tables = Vec::new();
+    let schema_arc = Arc::new(schema.as_ref().clone().with_metadata(Default::default()));
+
+    // Helper to create table with common configuration
+    let create_table = |files: Vec<FileKey>, timestamp_filter: Option<(i64, i64)>| {
+        let session = session.clone();
+        let schema_arc = schema_arc.clone();
+        let file_stat_cache = file_stat_cache.clone();
+        let index_condition = index_condition.clone();
+        let fst_fields = fst_fields.clone();
+        let on_error = on_error.clone();
+
+        async move {
+            let mut builder = TableBuilder::new()
+                .sorted_by_time(sorted_by_time)
+                .file_stat_cache(file_stat_cache)
+                .index_condition(index_condition)
+                .fst_fields(fst_fields);
+
+            if let Some(time_range) = timestamp_filter {
+                builder = builder.timestamp_filter(time_range);
+            }
+
+            builder
+                .build(session, files, schema_arc)
+                .await
+                .inspect_err(|_| on_error())
+        }
+    };
+
+    // Create table for files without timestamp filter
+    if !files_without_filter.is_empty() {
+        let table = create_table(files_without_filter, None).await?;
+        tables.push(table);
+    }
+
+    // Create table for files with timestamp filter
+    if !files_with_filter.is_empty() {
+        let table = create_table(files_with_filter, Some(time_range)).await?;
+        tables.push(table);
+    }
+
+    Ok(tables)
 }
