@@ -261,7 +261,6 @@ export default defineComponent({
         if (!isValidHex) {
           return "";
         }
-
         const isDark = isDarkColor(hex);
         return `background-color: ${hex}; color: ${
           isDark ? "#ffffff" : "#000000"
