@@ -337,6 +337,16 @@ export default defineComponent({
           throw new Error("No organization selected");
         }
 
+        // If a specific stream is selected but we don't have available streams yet,
+        // first fetch all streams to populate the dropdown
+        if (availableStreams.value.length === 0 && streamFilter.value !== "all") {
+          console.log('[ServiceGraph] Fetching all streams first to populate dropdown');
+          const allStreamsResponse = await serviceGraphService.getCurrentTopology(orgId, undefined);
+          if (allStreamsResponse.data.availableStreams && allStreamsResponse.data.availableStreams.length > 0) {
+            availableStreams.value = allStreamsResponse.data.availableStreams;
+          }
+        }
+
         // Stream-only implementation - no store stats needed
         // Use JSON topology endpoint
         const response = await serviceGraphService.getCurrentTopology(
@@ -388,19 +398,22 @@ export default defineComponent({
         };
 
         // Update availableStreams ref for the stream selector dropdown
-        // Extract unique stream names from edges if not provided by API
-        if (rawData.availableStreams && rawData.availableStreams.length > 0) {
-          availableStreams.value = rawData.availableStreams;
-        } else {
-          // Fallback: extract stream names from connection_type or other edge properties
-          const streamSet = new Set<string>();
-          edges.forEach((edge: any) => {
-            // If edges have stream_name property, collect them
-            if (edge.stream_name) {
-              streamSet.add(edge.stream_name);
-            }
-          });
-          availableStreams.value = Array.from(streamSet).sort();
+        // IMPORTANT: Only update availableStreams when fetching "all" streams to maintain complete list
+        if (streamFilter.value === "all") {
+          // Use availableStreams from API, or fallback to extracting from edges
+          if (rawData.availableStreams && rawData.availableStreams.length > 0) {
+            availableStreams.value = rawData.availableStreams;
+          } else {
+            // Fallback: extract stream names from edge stream_name property if API didn't provide them
+            const streamSet = new Set<string>();
+            edges.forEach((edge: any) => {
+              // If edges have stream_name property, collect them
+              if (edge.stream_name) {
+                streamSet.add(edge.stream_name);
+              }
+            });
+            availableStreams.value = Array.from(streamSet).sort();
+          }
         }
 
         console.log('[ServiceGraph] Loaded topology:', graphData.value);

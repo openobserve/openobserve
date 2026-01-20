@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use actix_web::{Responder, post, web};
+use axum::{extract::Path, response::Response};
 use config::utils::json;
 
 use crate::{
@@ -28,6 +28,8 @@ use crate::{
 
 /// HandleUserAttributionEvent
 #[utoipa::path(
+    post,
+    path = "/{org_id}/billings/new_user_attribution",
     context_path = "/api",
     tag = "Marketing",
     operation_id = "HandleUserAttributionEvent",
@@ -55,13 +57,13 @@ use crate::{
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/billings/new_user_attribution")]
 pub async fn handle_new_attribution_event(
+    Path(_org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req_body: web::Json<NewUserAttribution>,
-) -> impl Responder {
+    axum::Json(req_body): axum::Json<NewUserAttribution>,
+) -> Response {
     let email = user_email.user_id.as_str();
-    let new_usr_attribution = req_body.into_inner();
+    let new_usr_attribution = req_body;
 
     // Send new user info to ActiveCampaign via segment proxy
     log::info!("sending track event to segment");

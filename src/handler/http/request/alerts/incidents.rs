@@ -1,11 +1,11 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -15,9 +15,11 @@
 
 //! HTTP handlers for alert incident management (Enterprise only)
 
-#[cfg(feature = "enterprise")]
-use actix_web::Responder;
-use actix_web::{HttpResponse, get, patch, post, web};
+use axum::{
+    Json,
+    extract::{Path, Query},
+    response::Response,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -58,6 +60,8 @@ pub struct ListIncidentsResponse {
 #[cfg(feature = "enterprise")]
 /// ListIncidents
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "ListIncidents",
@@ -76,13 +80,10 @@ pub struct ListIncidentsResponse {
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents")]
 pub async fn list_incidents(
-    path: web::Path<String>,
-    query: web::Query<ListIncidentsQuery>,
-) -> HttpResponse {
-    let org_id = path.into_inner();
-
+    Path(org_id): Path<String>,
+    Query(query): Query<ListIncidentsQuery>,
+) -> Response {
     match crate::service::alerts::incidents::list_incidents(
         &org_id,
         query.status.as_deref(),
@@ -101,6 +102,8 @@ pub async fn list_incidents(
 #[cfg(feature = "enterprise")]
 /// GetIncident
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncident",
@@ -119,10 +122,7 @@ pub async fn list_incidents(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
-pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
-    let (org_id, incident_id) = path.into_inner();
-
+pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
     match crate::service::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await {
         Ok(Some(incident)) => MetaHttpResponse::json(incident),
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
@@ -133,6 +133,8 @@ pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
 #[cfg(feature = "enterprise")]
 /// UpdateIncidentStatus
 #[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/status",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "UpdateIncidentStatus",
@@ -153,12 +155,10 @@ pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
 pub async fn update_incident_status(
-    path: web::Path<(String, String)>,
-    body: web::Json<UpdateIncidentStatusRequest>,
-) -> HttpResponse {
-    let (org_id, incident_id) = path.into_inner();
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Json(body): Json<UpdateIncidentStatusRequest>,
+) -> Response {
     let status = &body.status;
 
     // Validate status
@@ -183,6 +183,8 @@ pub async fn update_incident_status(
 #[cfg(feature = "enterprise")]
 /// GetIncidentStats
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/stats",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentStats",
@@ -200,10 +202,7 @@ pub async fn update_incident_status(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/stats")]
-pub async fn get_incident_stats(path: web::Path<String>) -> HttpResponse {
-    let org_id = path.into_inner();
-
+pub async fn get_incident_stats(Path(org_id): Path<String>) -> Response {
     // Get counts - simple implementation
     let open_count = match infra::table::alert_incidents::count_open(&org_id).await {
         Ok(c) => c as i64,
@@ -241,6 +240,8 @@ pub struct TriggerRcaQuery {
 #[cfg(feature = "enterprise")]
 /// TriggerIncidentRca
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
@@ -261,11 +262,10 @@ pub struct TriggerRcaQuery {
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-#[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
 pub async fn trigger_incident_rca(
-    path: web::Path<(String, String)>,
-    query: web::Query<TriggerRcaQuery>,
-) -> impl Responder {
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Query(query): Query<TriggerRcaQuery>,
+) -> Response {
     use o2_enterprise::enterprise::{
         alerts::{
             rca_agent::RcaAgentClient,
@@ -274,7 +274,6 @@ pub async fn trigger_incident_rca(
         common::config::get_config as get_o2_config,
     };
 
-    let (org_id, incident_id) = path.into_inner();
     let o2_config = get_o2_config();
 
     // Check if RCA is enabled
@@ -283,8 +282,13 @@ pub async fn trigger_incident_rca(
     }
 
     if o2_config.incidents.rca_agent_url.is_empty() {
-        return HttpResponse::ServiceUnavailable()
-            .json(serde_json::json!({"error": "RCA agent URL is not configured"}));
+        return axum::response::Response::builder()
+            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({"error": "RCA agent URL is not configured"}).to_string(),
+            ))
+            .unwrap();
     }
 
     // Get incident with alerts
@@ -318,8 +322,13 @@ pub async fn trigger_incident_rca(
 
     // Check agent health
     if let Err(e) = client.health().await {
-        return HttpResponse::ServiceUnavailable()
-            .json(serde_json::json!({"error": format!("RCA agent not available: {e}")}));
+        return axum::response::Response::builder()
+            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({"error": format!("RCA agent not available: {e}")}).to_string(),
+            ))
+            .unwrap();
     }
 
     // Choose streaming or non-streaming based on query parameter
@@ -334,9 +343,11 @@ pub async fn trigger_incident_rca(
             }
         };
 
-        HttpResponse::Ok()
-            .content_type("text/event-stream")
-            .streaming(stream)
+        axum::response::Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
+            .body(axum::body::Body::from_stream(stream))
+            .unwrap()
     } else {
         // Perform RCA analysis (non-streaming)
         let rca_content = match rca_service::analyze_incident(client, context).await {
@@ -353,6 +364,8 @@ pub async fn trigger_incident_rca(
 #[cfg(feature = "enterprise")]
 /// GetIncidentServiceGraph
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/service_graph",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentServiceGraph",
@@ -371,11 +384,11 @@ pub async fn trigger_incident_rca(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph")]
-pub async fn get_incident_service_graph(path: web::Path<(String, String)>) -> HttpResponse {
+pub async fn get_incident_service_graph(
+    Path((org_id, incident_id)): Path<(String, String)>,
+) -> Response {
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-    let (org_id, incident_id) = path.into_inner();
     let o2_config = get_o2_config();
 
     // Check if alert graph is enabled
@@ -394,6 +407,8 @@ pub async fn get_incident_service_graph(path: web::Path<(String, String)>) -> Ht
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/service_graph",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentServiceGraph",
@@ -412,13 +427,14 @@ pub async fn get_incident_service_graph(path: web::Path<(String, String)>) -> Ht
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/{incident_id}/service_graph")]
-pub async fn get_incident_service_graph(_path: web::Path<(String, String)>) -> HttpResponse {
+pub async fn get_incident_service_graph(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
@@ -437,13 +453,14 @@ pub async fn get_incident_service_graph(_path: web::Path<(String, String)>) -> H
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-#[post("/v2/{org_id}/alerts/incidents/{incident_id}/rca")]
-pub async fn trigger_incident_rca(_path: web::Path<(String, String)>) -> HttpResponse {
+pub async fn trigger_incident_rca(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "ListIncidents",
@@ -462,16 +479,18 @@ pub async fn trigger_incident_rca(_path: web::Path<(String, String)>) -> HttpRes
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents")]
-pub async fn list_incidents(
-    _path: web::Path<String>,
-    _query: web::Query<ListIncidentsQuery>,
-) -> HttpResponse {
-    MetaHttpResponse::forbidden("Not Supported")
+pub async fn list_incidents(_path: Path<String>, _query: Query<ListIncidentsQuery>) -> Response {
+    // Only supported with enterprise features enabled
+    MetaHttpResponse::json(ListIncidentsResponse {
+        incidents: vec![],
+        total: 0,
+    })
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncident",
@@ -490,13 +509,14 @@ pub async fn list_incidents(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/{incident_id}")]
-pub async fn get_incident(_path: web::Path<(String, String)>) -> HttpResponse {
+pub async fn get_incident(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/status",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "UpdateIncidentStatus",
@@ -516,16 +536,17 @@ pub async fn get_incident(_path: web::Path<(String, String)>) -> HttpResponse {
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
 pub async fn update_incident_status(
-    _path: web::Path<(String, String)>,
-    _body: web::Json<UpdateIncidentStatusRequest>,
-) -> HttpResponse {
+    _path: Path<(String, String)>,
+    _body: Json<UpdateIncidentStatusRequest>,
+) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/stats",
     context_path = "/api",
     tag = "Incidents",
     operation_id = "GetIncidentStats",
@@ -543,8 +564,7 @@ pub async fn update_incident_status(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"}))
     )
 )]
-#[get("/v2/{org_id}/alerts/incidents/stats")]
-pub async fn get_incident_stats(_path: web::Path<String>) -> HttpResponse {
+pub async fn get_incident_stats(_path: Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 

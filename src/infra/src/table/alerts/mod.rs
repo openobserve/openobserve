@@ -108,6 +108,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         alert.stream_name = value.stream_name;
         alert.is_real_time = value.is_real_time;
         alert.destinations = destinations;
+        alert.template = value.template;
         alert.context_attributes = context_attributes;
         alert.row_template = value.row_template.unwrap_or_default();
         alert.row_template_type = row_template_type.into();
@@ -595,6 +596,7 @@ fn update_mutable_fields(
     let last_satisfied_at = alert.get_last_satisfied_at_from_table();
     let is_real_time = alert.is_real_time;
     let destinations = serde_json::to_value(alert.destinations)?;
+    let template = alert.template.filter(|s| !s.is_empty());
     let context_attributes = alert
         .context_attributes
         .map(serde_json::to_value)
@@ -681,6 +683,7 @@ fn update_mutable_fields(
 
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
+    alert_am.template = Set(template);
     alert_am.context_attributes = Set(context_attributes);
     alert_am.row_template = Set(row_template);
     alert_am.row_template_type = Set(row_template_type);

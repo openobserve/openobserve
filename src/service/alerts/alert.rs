@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,9 +18,9 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(feature = "enterprise")]
-use actix_http::header::HeaderMap;
 use async_trait::async_trait;
+#[cfg(feature = "enterprise")]
+use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
@@ -151,6 +151,14 @@ pub enum AlertError {
 
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
+
+    #[error(
+        "No template configured for alert destination {dest}. Either set a template on the alert or on the destination."
+    )]
+    TemplateNotConfigured { dest: String },
+
+    #[error("Alert template {template} not found")]
+    AlertTemplateNotFound { template: String },
 
     #[error(
         "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
@@ -317,6 +325,18 @@ async fn prepare_alert(
                 return Err(AlertError::DecodeVrl(e));
             }
         }
+    }
+
+    // Validate alert-level template if specified
+    if let Some(ref template_name) = alert.template
+        && !template_name.is_empty()
+        && db::alerts::templates::get(org_id, template_name)
+            .await
+            .is_err()
+    {
+        return Err(AlertError::AlertTemplateNotFound {
+            template: template_name.clone(),
+        });
     }
 
     // before saving alert check alert destination
@@ -905,8 +925,23 @@ impl AlertExt for Alert {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
-        for dest in self.destinations.iter() {
-            let (dest, template) = destinations::get_with_template(&self.org_id, dest).await?;
+
+        // Get alert-level template if specified (takes precedence over destination templates)
+        let alert_template = if let Some(ref template_name) = self.template {
+            Some(
+                db::alerts::templates::get(&self.org_id, template_name)
+                    .await
+                    .map_err(|_| AlertError::AlertTemplateNotFound {
+                        template: template_name.clone(),
+                    })?,
+            )
+        } else {
+            None
+        };
+
+        for dest_name in self.destinations.iter() {
+            let (dest, dest_template) =
+                destinations::get_with_template(&self.org_id, dest_name).await?;
             let Module::Alert {
                 destination_type, ..
             } = dest.module
@@ -915,10 +950,33 @@ impl AlertExt for Alert {
                     db::alerts::destinations::DestinationError::UnsupportedType,
                 ));
             };
+
+            // Use alert-level template if specified, otherwise fall back to destination template
+            let template = match (&alert_template, &dest_template) {
+                (Some(alert_tpl), _) => alert_tpl,
+                (None, Some(dest_tpl)) => dest_tpl,
+                (None, None) => {
+                    no_of_error += 1;
+                    err_message = format!(
+                        "{err_message} No template configured for destination {};",
+                        dest.name
+                    );
+                    log::error!(
+                        "No template configured for alert {}/{}/{}/{} destination {}",
+                        self.org_id,
+                        self.stream_type,
+                        self.stream_name,
+                        self.name,
+                        dest.name
+                    );
+                    continue;
+                }
+            };
+
             match send_notification(
                 self,
                 &destination_type,
-                &template,
+                template,
                 rows,
                 rows_end_time,
                 start_time,

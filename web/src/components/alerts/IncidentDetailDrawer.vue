@@ -15,98 +15,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
-    class="tw:h-full tw:flex tw:flex-col"
-    style="width: 94vw"
-  >
+  <q-page data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
     <!-- Header -->
-    <div class="incident-detail-header row items-center no-wrap q-px-md tw:p-4">
-      <div class="col">
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-          <div class="tw:text-[18px]">
-            {{ t("alerts.incidents.header") }}
-          </div>
-          <!-- Incident name with colored indicator -->
-          <span
-            :class="[
-              'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
-              store.state.theme === 'dark'
-                ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                : 'tw:text-blue-600 tw:bg-blue-50'
-            ]"
-            data-test="incident-detail-title"
+    <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
+      <div class="flex items-center tw:gap-3 tw:flex-1">
+        <div
+          data-test="incident-detail-back-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="close"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div class="text-h6">
+          {{ t("alerts.incidents.header") }}
+        </div>
+        <!-- Incident name with colored indicator -->
+        <span
+          v-if="incidentDetails"
+          :class="[
+            'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+            store.state.theme === 'dark'
+              ? 'tw:text-blue-400 tw:bg-blue-900/50'
+              : 'tw:text-blue-600 tw:bg-blue-50'
+          ]"
+          data-test="incident-detail-title"
+        >
+          {{ incidentDetails.title }}
+          <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw:text-xs">
+            {{ incidentDetails.title }}
+          </q-tooltip>
+        </span>
+
+        <!-- Compact Status, Severity, Alerts badges -->
+        <div v-if="incidentDetails" class="tw:flex tw:items-center tw:gap-2">
+          <!-- Status Badge -->
+          <q-badge
+            :color="getStatusColor(incidentDetails.status)"
+            class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+            outline
           >
-            {{ incidentDetails?.title }}
-            <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw:text-xs">
-              {{ incidentDetails.title }}
+            <div class="tw:flex tw:items-center tw:gap-1.5">
+              <q-icon name="info" size="14px" />
+              <span>{{ getStatusLabel(incidentDetails.status) }}</span>
+            </div>
+            <q-tooltip :delay="200" class="tw:text-xs">
+              {{ t("alerts.incidents.status") }}: {{ getStatusLabel(incidentDetails.status) }}
             </q-tooltip>
-          </span>
+          </q-badge>
 
-          <!-- Compact Status, Severity, Alerts badges -->
-          <div v-if="incidentDetails" class="tw:flex tw:items-center tw:gap-2">
-            <!-- Status Badge -->
-            <q-badge
-              :color="getStatusColor(incidentDetails.status)"
-              class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-              outline
-            >
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <q-icon name="info" size="14px" />
-                <span>{{ getStatusLabel(incidentDetails.status) }}</span>
-              </div>
-              <q-tooltip :delay="200" class="tw:text-xs">
-                {{ t("alerts.incidents.status") }}: {{ getStatusLabel(incidentDetails.status) }}
-              </q-tooltip>
-            </q-badge>
+          <!-- Severity Badge -->
+          <q-badge
+            :style="{ backgroundColor: getSeverityColorHex(incidentDetails.severity), color: '#fff' }"
+            class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+          >
+            <div class="tw:flex tw:items-center tw:gap-1.5">
+              <q-icon name="warning" size="14px" />
+              <span>{{ incidentDetails.severity }}</span>
+            </div>
+            <q-tooltip :delay="200" class="tw:text-xs">
+              {{ t("alerts.incidents.severity") }}: {{ incidentDetails.severity }}
+            </q-tooltip>
+          </q-badge>
 
-            <!-- Severity Badge -->
-            <q-badge
-              :style="{ backgroundColor: getSeverityColorHex(incidentDetails.severity), color: '#fff' }"
-              class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-            >
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <q-icon name="warning" size="14px" />
-                <span>{{ incidentDetails.severity }}</span>
-              </div>
-              <q-tooltip :delay="200" class="tw:text-xs">
-                {{ t("alerts.incidents.severity") }}: {{ incidentDetails.severity }}
-              </q-tooltip>
-            </q-badge>
-
-            <!-- Alert Count Badge -->
-            <q-badge
-              color="primary"
-              class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-              outline
-            >
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <q-icon name="notifications_active" size="14px" />
-                <span>{{ incidentDetails.alert_count }} Alerts</span>
-              </div>
-              <q-tooltip :delay="200" class="tw:text-xs">
-                {{ t("alerts.incidents.alertCount") }}: {{ incidentDetails.alert_count }} correlated alerts
-              </q-tooltip>
-            </q-badge>
-          </div>
+          <!-- Alert Count Badge -->
+          <q-badge
+            color="primary"
+            class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
+            outline
+          >
+            <div class="tw:flex tw:items-center tw:gap-1.5">
+              <q-icon name="notifications_active" size="14px" />
+              <span>{{ incidentDetails.alert_count }} Alerts</span>
+            </div>
+            <q-tooltip :delay="200" class="tw:text-xs">
+              {{ t("alerts.incidents.alertCount") }}: {{ incidentDetails.alert_count }} correlated alerts
+            </q-tooltip>
+          </q-badge>
         </div>
       </div>
-      <div class="col-auto">
-        <q-btn
-          data-test="incident-detail-close-btn"
-          @click="close"
-          round
-          flat
-          icon="cancel"
-        />
-      </div>
     </div>
-    <q-separator />
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="tw:flex-1 tw:flex tw:overflow-hidden">
+    <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:overflow-hidden" style="height: calc(100vh - 130px);">
+      <!-- AI Chat Panel (conditionally shown on the right) -->
+      <div
+        v-if="showAIChat"
+        class="ai-chat-panel tw:w-[380px] tw:flex-shrink-0 tw:flex tw:flex-col tw:overflow-hidden"
+        :class="store.state.theme === 'dark' ? 'tw:border-l tw:border-gray-700' : 'tw:border-l tw:border-gray-200'"
+        style="order: 3;"
+      >
+        <SREChat
+          context-type="incident"
+          :context-data="incidentContextData"
+          @close="closeAIChat"
+        />
+      </div>
+
       <!-- Left Column: Incident Details -->
-      <div class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'tw:border-r tw:border-gray-700' : 'tw:border-r tw:border-gray-200'">
+      <div class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'tw:border-r tw:border-gray-700' : 'tw:border-r tw:border-gray-200'"  style="order: 1;">
 
         <!-- Top Section (52% height) - Table of Contents -->
         <div
@@ -440,49 +454,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Tabs and Content -->
-      <div class="tabs-content-column tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden">
+      <div class="tabs-content-column tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden" style="order: 2;">
         <!-- Tabs -->
         <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:pt-4 tw:pb-2 q-px-md tw:flex-shrink-0">
-          <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
-            <q-tab
-              name="incidentAnalysis"
-              icon="psychology"
-              label="Incident Analysis"
-            />
-            <q-tab
-              name="serviceGraph"
-              icon="hub"
-              label="Alert Graph"
-            />
-            <q-tab
-              name="alertTriggers"
-              icon="notifications_active"
-            >
-              <template #default>
-                <div class="tw:flex tw:items-center tw:gap-1.5">
-                  <span>Alert Triggers</span>
-                  <span class="tw:text-xs tw:opacity-70">({{ triggers.length }})</span>
-                </div>
-              </template>
-            </q-tab>
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <q-tabs v-model="activeTab" inline-label dense no-caps align="left">
+              <q-tab
+                name="incidentAnalysis"
+                icon="psychology"
+                label="Incident Analysis"
+              />
+              <q-tab
+                name="serviceGraph"
+                icon="hub"
+                label="Alert Graph"
+              />
+              <q-tab
+                name="alertTriggers"
+                icon="notifications_active"
+              >
+                <template #default>
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                    <span>Alert Triggers</span>
+                    <span class="tw:text-xs tw:opacity-70">({{ triggers.length }})</span>
+                  </div>
+                </template>
+              </q-tab>
 
-            <!-- New Telemetry Tabs -->
-            <q-tab
-              name="logs"
-              icon="description"
-              :label="t('common.logs')"
-            />
-            <q-tab
-              name="metrics"
-              icon="bar_chart"
-              :label="t('search.metrics')"
-            />
-            <q-tab
-              name="traces"
-              icon="timeline"
-              :label="t('menu.traces')"
-            />
-          </q-tabs>
+              <!-- Show telemetry tabs inline when AI chat is closed -->
+              <q-tab
+                v-if="!showAIChat"
+                name="logs"
+                icon="description"
+                :label="t('common.logs')"
+              />
+              <q-tab
+                v-if="!showAIChat"
+                name="metrics"
+                icon="bar_chart"
+                :label="t('search.metrics')"
+              />
+              <q-tab
+                v-if="!showAIChat"
+                name="traces"
+                icon="timeline"
+                :label="t('menu.traces')"
+              />
+            </q-tabs>
+
+            <!-- Telemetry Dropdown Menu - Only show when AI chat is open -->
+            <q-btn
+              v-if="showAIChat"
+              flat
+              dense
+              icon="menu"
+              size="sm"
+              class="tw:ml-2"
+            >
+              <q-tooltip :delay="500">View Telemetry Data</q-tooltip>
+              <q-menu>
+                <q-list dense style="min-width: 150px;">
+                  <q-item
+                    clickable
+                    v-close-popup
+                    @click="activeTab = 'logs'"
+                    :class="activeTab === 'logs' ? 'bg-primary text-white' : ''"
+                  >
+                    <q-item-section avatar>
+                      <q-icon name="description" size="18px" />
+                    </q-item-section>
+                    <q-item-section>{{ t('common.logs') }}</q-item-section>
+                  </q-item>
+                  <q-item
+                    clickable
+                    v-close-popup
+                    @click="activeTab = 'metrics'"
+                    :class="activeTab === 'metrics' ? 'bg-primary text-white' : ''"
+                  >
+                    <q-item-section avatar>
+                      <q-icon name="bar_chart" size="18px" />
+                    </q-item-section>
+                    <q-item-section>{{ t('search.metrics') }}</q-item-section>
+                  </q-item>
+                  <q-item
+                    clickable
+                    v-close-popup
+                    @click="activeTab = 'traces'"
+                    :class="activeTab === 'traces' ? 'bg-primary text-white' : ''"
+                  >
+                    <q-item-section avatar>
+                      <q-icon name="timeline" size="18px" />
+                    </q-item-section>
+                    <q-item-section>{{ t('menu.traces') }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </div>
 
           <!-- Action buttons -->
           <div class="tw:flex tw:gap-2 tw:ml-auto tw:items-center">
@@ -495,10 +563,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               @click="acknowledgeIncident"
               :loading="updating"
-              class="tw:px-3"
+              class="tw:px-2"
             >
-              <q-icon name="check_circle" size="16px" class="tw:mr-1" />
-              {{ t("alerts.incidents.acknowledge") }}
+              <q-icon name="check_circle" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
+              <span v-if="!showAIChat">{{ t("alerts.incidents.acknowledge") }}</span>
               <q-tooltip :delay="500">Mark incident as acknowledged and being worked on</q-tooltip>
             </q-btn>
             <q-btn
@@ -510,10 +578,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               @click="resolveIncident"
               :loading="updating"
-              class="tw:px-3"
+              class="tw:px-2"
             >
-              <q-icon name="task_alt" size="16px" class="tw:mr-1" />
-              {{ t("alerts.incidents.resolve") }}
+              <q-icon name="task_alt" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
+              <span v-if="!showAIChat">{{ t("alerts.incidents.resolve") }}</span>
               <q-tooltip :delay="500">Mark incident as resolved and close it</q-tooltip>
             </q-btn>
             <q-btn
@@ -525,10 +593,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               @click="reopenIncident"
               :loading="updating"
-              class="tw:px-3"
+              class="tw:px-2"
             >
-              <q-icon name="refresh" size="16px" class="tw:mr-1" />
-              {{ t("alerts.incidents.reopen") }}
+              <q-icon name="refresh" size="16px" :class="showAIChat ? '' : 'tw:mr-1'" />
+              <span v-if="!showAIChat">{{ t("alerts.incidents.reopen") }}</span>
               <q-tooltip :delay="500">Reopen this resolved incident</q-tooltip>
             </q-btn>
 
@@ -851,6 +919,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-spinner-hourglass size="lg" color="primary" />
     </div>
   </div>
+  </q-page>
 </template>
 
 <script lang="ts">
@@ -871,15 +940,16 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
+import SREChat from "@/components/SREChat.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
     TelemetryCorrelationDashboard,
     IncidentServiceGraph,
+    SREChat,
   },
-  emits: ["close", "status-updated"],
-  setup(_props, { emit }) {
+  setup() {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
@@ -892,6 +962,7 @@ export default defineComponent({
     const alerts = ref<any[]>([]);
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
+    const showAIChat = ref(false);
 
     // Tab management
     const activeTab = ref("incidentAnalysis");
@@ -967,6 +1038,27 @@ export default defineComponent({
       }
     });
 
+    // Computed property for SRE chat incident context
+    const incidentContextData = computed(() => {
+      if (!incidentDetails.value) return null;
+
+      return {
+        id: incidentDetails.value.id,
+        title: incidentDetails.value.title,
+        status: incidentDetails.value.status,
+        severity: incidentDetails.value.severity,
+        alert_count: incidentDetails.value.alert_count,
+        first_alert_at: incidentDetails.value.first_alert_at,
+        last_alert_at: incidentDetails.value.last_alert_at,
+        stable_dimensions: incidentDetails.value.stable_dimensions,
+        topology_context: incidentDetails.value.topology_context,
+        triggers: triggers.value,
+        rca_analysis: hasExistingRca.value
+          ? incidentDetails.value?.topology_context?.suggested_root_cause
+          : rcaStreamContent.value,
+      };
+    });
+
     // Computed properties for TelemetryCorrelationDashboard
     const telemetryTimeRange = computed(() => {
       if (!incidentDetails.value) {
@@ -1028,12 +1120,12 @@ export default defineComponent({
       }
     };
 
-    // Watch for URL query parameter
+    // Watch for URL route parameter
     watch(
-      () => router.currentRoute.value.query.incident_id,
+      () => router.currentRoute.value.params.id,
       (incidentIdFromUrl) => {
         if (incidentIdFromUrl && typeof incidentIdFromUrl === 'string') {
-          // Load incident from URL query parameter
+          // Load incident from URL route parameter
           // Validate incident ID format (e.g., UUID validation)
           if (incidentIdFromUrl.trim().length > 0) {
             loadDetails(incidentIdFromUrl);
@@ -1055,7 +1147,9 @@ export default defineComponent({
       // Clear correlation data when closing
       correlationData.value = null;
       correlationError.value = null;
-      emit("close");
+
+      // Navigate back to incident list
+      router.push({ name: "incidentList" });
     };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
@@ -1593,31 +1687,12 @@ export default defineComponent({
     };
 
     const openSREChat = () => {
-      // Set SRE chat context with full incident context
-      store.state.sreChatContext = {
-        type: 'incident',
-        data: {
-          id: incidentDetails.value?.id,
-          title: incidentDetails.value?.title,
-          status: incidentDetails.value?.status,
-          severity: incidentDetails.value?.severity,
-          alert_count: incidentDetails.value?.alert_count,
-          first_alert_at: incidentDetails.value?.first_alert_at,
-          last_alert_at: incidentDetails.value?.last_alert_at,
-          stable_dimensions: incidentDetails.value?.stable_dimensions,
-          topology_context: incidentDetails.value?.topology_context,
-          triggers: triggers.value,
-          rca_analysis: hasExistingRca.value
-            ? incidentDetails.value?.topology_context?.suggested_root_cause
-            : rcaStreamContent.value,
-        },
-      };
+      // Toggle the chat panel within the incident detail page
+      showAIChat.value = !showAIChat.value;
+    };
 
-      // Close the drawer first
-      close();
-
-      // Then open the SRE chat
-      store.dispatch("setIsSREChatOpen", true);
+    const closeAIChat = () => {
+      showAIChat.value = false;
     };
 
     const getTimezone = () => {
@@ -1653,6 +1728,7 @@ export default defineComponent({
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
+      incidentContextData,
       refreshCorrelation,
       close,
       acknowledgeIncident,
@@ -1660,6 +1736,8 @@ export default defineComponent({
       reopenIncident,
       triggerRca,
       openSREChat,
+      closeAIChat,
+      showAIChat,
       scrollToSection,
       toggleSection,
       getStatusColor,
@@ -1784,6 +1862,29 @@ body.body--dark .muted-text {
 
 body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
 body.body--dark .tabs-content-column .tw:overflow-auto::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* AI Chat Panel Styles */
+.ai-chat-panel {
+  min-width: 380px;
+  max-width: 380px;
+}
+
+.ai-chat-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chat-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-chat-panel::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
   background: #475569;
 }
 </style>

@@ -52,7 +52,7 @@ pub fn run() {
                         nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
                         let leader_uuid = &nodes[0].uuid;
                         let is_leader = leader_uuid == &LOCAL_NODE.uuid;
-                        log::info!(
+                        log::debug!(
                             "[PIPELINE_ERROR_CLEANUP] Leader election: leader={}, current={}, is_leader={}, total_nodes={}",
                             leader_uuid,
                             LOCAL_NODE.uuid,

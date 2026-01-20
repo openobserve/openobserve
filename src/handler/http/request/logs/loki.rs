@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, Read};
+use std::io::Read;
 
-use actix_web::{HttpRequest, HttpResponse, http::header, post, web};
+use axum::{
+    body::Bytes,
+    extract::Path,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+};
+use config::axum::middlewares::{get_process_time, insert_process_time_header};
 use flate2::read::GzDecoder;
 use prost::Message;
 use proto::loki_rpc;
@@ -23,10 +29,12 @@ use proto::loki_rpc;
 use crate::{
     common::meta::loki::{LokiError, LokiPushRequest},
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-    service::logs,
+    service::{ingestion::get_thread_id, logs},
 };
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/loki/api/v1/push",
     context_path = "/api",
     tag = "Logs",
     operation_id = "LogsIngestionLoki",
@@ -59,34 +67,19 @@ use crate::{
         (status = 500, description = "Internal Server Error - Server error during log processing", content_type = "text/plain", body = String),
     )
 )]
-#[post("/{org_id}/loki/api/v1/push")]
-pub async fn loki_push(
-    thread_id: web::Data<usize>,
-    org_id: web::Path<String>,
-    req: HttpRequest,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+pub async fn loki_push(Path(org_id): Path<String>, headers: HeaderMap, body: Bytes) -> Response {
     // log start processing time
-    let process_time = if config::get_config().limit.http_slow_log_threshold > 0 {
-        config::utils::time::now_micros()
-    } else {
-        0
-    };
+    let process_time = get_process_time();
+    let thread_id = get_thread_id();
 
-    let thread_id = **thread_id;
-    let org_id = org_id.into_inner();
-
-    let content_type = req
-        .headers()
+    let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or(CONTENT_TYPE_PROTO);
-    let content_encoding = req
-        .headers()
+    let content_encoding = headers
         .get("Content-Encoding")
         .and_then(|h| h.to_str().ok());
-    let user_email = req
-        .headers()
+    let user_email = headers
         .get("user_id")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("loki_user");
@@ -97,7 +90,7 @@ pub async fn loki_push(
                 Ok(req) => req,
                 Err(e) => {
                     log::error!("[Loki::JSON] Parse error for org '{org_id}': {e:?}");
-                    return Ok(e.into());
+                    return e.into_response();
                 }
             };
             logs::loki::LokiRequest::Json(loki_request)
@@ -107,41 +100,36 @@ pub async fn loki_push(
                 Ok(req) => req,
                 Err(e) => {
                     log::error!("[Loki::Protobuf] Parse error for org '{org_id}': {e:?}");
-                    return Ok(e.into());
+                    return e.into_response();
                 }
             };
             logs::loki::LokiRequest::Protobuf(protobuf_request)
         }
         _ => {
             log::error!("[Loki] Unsupported content type '{content_type}' for org '{org_id}'");
-            return Ok(LokiError::UnsupportedContentType {
+            return LokiError::UnsupportedContentType {
                 content_type: content_type.to_string(),
             }
-            .into());
+            .into_response();
         }
     };
 
     let mut resp = match logs::loki::handle_request(thread_id, &org_id, request, user_email).await {
-        Ok(_) => HttpResponse::NoContent().finish(),
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => {
             log::error!("[Loki] Processing error for org '{org_id}': {e:?}");
-            e.into()
+            e.into_response()
         }
     };
 
-    if process_time > 0 {
-        resp.headers_mut().insert(
-            header::HeaderName::from_static("o2_process_time"),
-            header::HeaderValue::from_str(&process_time.to_string()).unwrap(),
-        );
-    }
+    insert_process_time_header(process_time, resp.headers_mut());
 
-    Ok(resp)
+    resp
 }
 
 fn parse_json_request(
     content_encoding: Option<&str>,
-    body: web::Bytes,
+    body: Bytes,
 ) -> Result<LokiPushRequest, LokiError> {
     let json_data = match content_encoding {
         Some("gzip") => {
@@ -164,7 +152,7 @@ fn parse_json_request(
 
 fn parse_protobuf_request(
     content_encoding: Option<&str>,
-    body: web::Bytes,
+    body: Bytes,
 ) -> Result<loki_rpc::PushRequest, LokiError> {
     let decompressed = match content_encoding {
         Some("snappy") | None => snap::raw::Decoder::new()
@@ -184,7 +172,13 @@ fn parse_protobuf_request(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{App, test};
+    use axum::{
+        Router,
+        body::Body,
+        http::{Request, StatusCode},
+        routing::post,
+    };
+    use tower::ServiceExt;
 
     use super::*;
 
@@ -194,38 +188,36 @@ mod tests {
 
     #[tokio::test]
     async fn test_loki_push_routing() {
-        let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(0_usize))
-                .service(loki_push),
-        )
-        .await;
+        let app = Router::new().route("/{org_id}/loki/api/v1/push", post(loki_push));
 
         // Test JSON routing
-        let req = test::TestRequest::post()
+        let req = Request::builder()
+            .method("POST")
             .uri("/test_org/loki/api/v1/push")
-            .insert_header(("content-type", "application/json"))
-            .set_payload(create_valid_loki_json())
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_server_error() || resp.status() == 204);
+            .header("content-type", "application/json")
+            .body(Body::from(create_valid_loki_json()))
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        assert!(resp.status().is_server_error() || resp.status() == StatusCode::NO_CONTENT);
 
         // Test invalid JSON
-        let req = test::TestRequest::post()
+        let req = Request::builder()
+            .method("POST")
             .uri("/test_org/loki/api/v1/push")
-            .insert_header(("content-type", "application/json"))
-            .set_payload("invalid")
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 400);
+            .header("content-type", "application/json")
+            .body(Body::from("invalid"))
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
         // Test unsupported content type
-        let req = test::TestRequest::post()
+        let req = Request::builder()
+            .method("POST")
             .uri("/test_org/loki/api/v1/push")
-            .insert_header(("content-type", "text/plain"))
-            .set_payload("data")
-            .to_request();
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 400);
+            .header("content-type", "text/plain")
+            .body(Body::from("data"))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }

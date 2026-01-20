@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{
     io::{BufReader, Cursor, Lines},
 };
 
-use actix_web::web;
+use axum::body::Bytes;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -385,13 +385,13 @@ pub struct GCPIngestionResponse {
 }
 
 pub enum IngestionRequest {
-    JSON(web::Bytes),
-    Multi(web::Bytes),
+    JSON(Bytes),
+    Multi(Bytes),
     JsonValues(IngestionValueType, Vec<json::Value>),
     GCP(GCPIngestionRequest),
     KinesisFH(KinesisFHRequest),
-    RUM(web::Bytes),
-    Usage(web::Bytes),
+    RUM(Bytes),
+    Usage(Bytes),
 }
 
 pub enum IngestionValueType {

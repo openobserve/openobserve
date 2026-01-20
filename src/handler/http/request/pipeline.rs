@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{
-    HttpResponse, delete, get, http, post, put,
-    web::{self, Json, Query},
-};
 use ahash::HashMap;
+use axum::{
+    Json,
+    extract::{Path, Query},
+    http::StatusCode,
+    response::Response,
+};
 use config::{ider, meta::pipeline::Pipeline};
 
 #[cfg(feature = "enterprise")]
@@ -34,7 +34,7 @@ use crate::{
     service::{db::pipeline::PipelineError, pipeline},
 };
 
-impl From<PipelineError> for HttpResponse {
+impl From<PipelineError> for Response {
     fn from(value: PipelineError) -> Self {
         match value {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
@@ -48,8 +48,10 @@ impl From<PipelineError> for HttpResponse {
 /// CreatePipeline
 
 #[utoipa::path(
+    post,
+    path = "/{org_id}/pipelines",
     context_path = "/api",
-    tag = "Pipeline",
+    tag = "Pipelines",
     operation_id = "createPipeline",
     summary = "Create new pipeline",
     description = "Creates a new data processing pipeline with specified transformations and routing rules. Pipelines define how incoming data is processed before storage",
@@ -66,16 +68,14 @@ impl From<PipelineError> for HttpResponse {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a data pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Create a data pipeline", "category": "pipelines"}))
     )
 )]
-#[post("/{org_id}/pipelines")]
 pub async fn save_pipeline(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Json(mut pipeline): Json<Pipeline>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+) -> Response {
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
 
@@ -87,17 +87,19 @@ pub async fn save_pipeline(
         pipeline.id = ider::generate();
     }
     match pipeline::save_pipeline(pipeline).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
+        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
+            StatusCode::OK,
             "Pipeline created successfully",
-        ))),
-        Err(e) => Ok(e.into()),
+        )),
+        Err(e) => e.into(),
     }
 }
 
 /// ListPipelines
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "listPipelines",
@@ -114,15 +116,14 @@ pub async fn save_pipeline(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List all pipelines", "category": "pipelines"}))
     )
 )]
-#[get("/{org_id}/pipelines")]
-async fn list_pipelines(
-    org_id: web::Path<String>,
+pub async fn list_pipelines(
+    Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
+    #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
+) -> Response {
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -143,9 +144,7 @@ async fn list_pipelines(
                 _permitted = list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -153,12 +152,12 @@ async fn list_pipelines(
 
     let pipelines = match pipeline::list_pipelines(&org_id, _permitted).await {
         Ok(pipelines) => pipelines,
-        Err(e) => return Ok(e.into()),
+        Err(e) => return e.into(),
     };
 
     let pipeline_triggers = match pipeline::list_pipeline_triggers(&org_id).await {
         Ok(pipelines) => pipelines,
-        Err(e) => return Ok(e.into()),
+        Err(e) => return e.into(),
     };
 
     // Fetch pipeline errors from DB
@@ -182,16 +181,18 @@ async fn list_pipelines(
         }
     };
 
-    Ok(HttpResponse::Ok().json(PipelineList::from(
+    MetaHttpResponse::json(PipelineList::from(
         pipelines,
         pipeline_triggers,
         pipeline_errors,
-    )))
+    ))
 }
 
 /// GetStreamsWithPipeline
 
 #[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/streams",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "getStreamsWithPipeline",
@@ -208,21 +209,21 @@ async fn list_pipelines(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List streams using pipelines"}))
+        ("x-o2-mcp" = json!({"description": "List streams using pipelines", "category": "pipelines"}))
     )
 )]
-#[get("/{org_id}/pipelines/streams")]
-async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response {
     match pipeline::list_streams_with_pipeline(&org_id).await {
-        Ok(stream_params) => Ok(HttpResponse::Ok().json(stream_params)),
-        Err(e) => Ok(e.into()),
+        Ok(stream_params) => MetaHttpResponse::json(stream_params),
+        Err(e) => e.into(),
     }
 }
 
 /// DeletePipeline
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/pipelines/{pipeline_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipeline",
@@ -241,24 +242,24 @@ async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpRespo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines"}))
     )
 )]
-#[delete("/{org_id}/pipelines/{pipeline_id}")]
-async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, pipeline_id) = path.into_inner();
+pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
     match pipeline::delete_pipeline(&pipeline_id).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
+        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
+            StatusCode::OK,
             "Pipeline deleted successfully",
-        ))),
-        Err(e) => Ok(e.into()),
+        )),
+        Err(e) => e.into(),
     }
 }
 
 /// DeletePipelineBulk
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/pipelines/bulk",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "deletePipelineBulk",
@@ -279,20 +280,17 @@ async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/pipelines/bulk")]
-async fn delete_pipeline_bulk(
-    path: web::Path<String>,
+pub async fn delete_pipeline_bulk(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(id, &org_id, &_user_id, "pipelines", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -313,16 +311,18 @@ async fn delete_pipeline_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 /// UpdatePipeline
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "updatePipeline",
@@ -341,23 +341,24 @@ async fn delete_pipeline_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Update a pipeline", "category": "pipelines"}))
     )
 )]
-#[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpResponse, Error> {
+pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Response {
     match pipeline::update_pipeline(pipeline).await {
-        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
+        Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
+            StatusCode::OK,
             "Pipeline updated successfully",
-        ))),
-        Err(e) => Ok(e.into()),
+        )),
+        Err(e) => e.into(),
     }
 }
 
 /// EnablePipeline
 
 #[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipeline",
@@ -378,16 +379,13 @@ pub async fn update_pipeline(Json(pipeline): Json<Pipeline>) -> Result<HttpRespo
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline"}))
+        ("x-o2-mcp" = json!({"description": "Enable or disable a pipeline", "category": "pipelines"}))
     )
 )]
-#[put("/{org_id}/pipelines/{pipeline_id}/enable")]
 pub async fn enable_pipeline(
-    path: web::Path<(String, String)>,
+    Path((org_id, pipeline_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, pipeline_id) = path.into_inner();
-
+) -> Response {
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
@@ -404,14 +402,16 @@ pub async fn enable_pipeline(
                 "Pipeline successfully {}",
                 if enable { "enabled" } else { "disabled" }
             );
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
+            MetaHttpResponse::json(MetaHttpResponse::message(StatusCode::OK, resp_msg))
         }
-        Err(e) => Ok(e.into()),
+        Err(e) => e.into(),
     }
 }
 
 /// EnablePipelineBulk
 #[utoipa::path(
+    post,
+    path = "/{org_id}/pipelines/bulk/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "enablePipelineBulk",
@@ -435,14 +435,12 @@ pub async fn enable_pipeline(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/{org_id}/pipelines/bulk/enable")]
 pub async fn enable_pipeline_bulk(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    Json(req): Json<PipelineBulkEnableRequest>,
     Headers(_user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    Json(req): Json<PipelineBulkEnableRequest>,
+) -> Response {
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
@@ -458,7 +456,7 @@ pub async fn enable_pipeline_bulk(
 
         for id in &req.ids {
             if !check_permissions(id, &org_id, &user_id, "pipelines", "PUT", None).await {
-                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
     }
@@ -479,9 +477,9 @@ pub async fn enable_pipeline_bulk(
             }
         }
     }
-    Ok(MetaHttpResponse::json(PipelineBulkEnableResponse {
+    MetaHttpResponse::json(PipelineBulkEnableResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,28 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{
-    Error, FromRequest, HttpRequest, dev::Payload, error::ErrorBadRequest, http::header::HeaderMap,
+use axum::{
+    Json,
+    extract::FromRequestParts,
+    http::{StatusCode, header::HeaderMap, request::Parts},
+    response::{IntoResponse, Response},
 };
-use futures::future::{Ready, ready};
 use serde::de::DeserializeOwned;
 
 /// Wrapper extractor to deserialize headers into a struct
 pub struct Headers<T>(pub T);
 
-impl<T> FromRequest for Headers<T>
-where
-    T: DeserializeOwned + 'static,
-{
-    type Error = Error;
-    type Future = Ready<Result<Self, Self::Error>>;
+/// Rejection type for Headers extractor
+pub struct HeadersRejection {
+    message: String,
+}
 
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let headers = req.headers();
+impl IntoResponse for HeadersRejection {
+    fn into_response(self) -> Response {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "code": 400,
+                "message": self.message
+            })),
+        )
+            .into_response()
+    }
+}
+
+impl<S, T> FromRequestParts<S> for Headers<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send + Sync + 'static,
+{
+    type Rejection = HeadersRejection;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let headers = &parts.headers;
 
         match deserialize_headers::<T>(headers) {
-            Ok(inner) => ready(Ok(Headers(inner))),
-            Err(e) => ready(Err(ErrorBadRequest(e))),
+            Ok(inner) => Ok(Headers(inner)),
+            Err(e) => Err(HeadersRejection { message: e }),
         }
     }
 }
@@ -54,7 +74,7 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
 
 #[cfg(test)]
 mod tests {
-    use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
+    use http::header::{HeaderMap, HeaderName, HeaderValue};
     use serde::Deserialize;
 
     use super::*;

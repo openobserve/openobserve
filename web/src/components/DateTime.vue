@@ -764,12 +764,12 @@ export default defineComponent({
 
     const getPeriodLabel = computed(() => {
       const periodMapping = {
-        s: t("common.seconds"),
-        m: t("common.minutes"),
-        h: t("common.hours"),
-        d: t("common.days"),
-        w: t("common.weeks"),
-        M: t("common.months"),
+        s: "Seconds",
+        m: "Minutes",
+        h: "Hours",
+        d: "Days",
+        w: "Weeks",
+        M: "Months",
       };
       return periodMapping[relativePeriod.value];
     });

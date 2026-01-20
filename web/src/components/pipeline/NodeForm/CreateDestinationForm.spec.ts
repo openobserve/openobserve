@@ -584,6 +584,7 @@ describe("CreateDestinationForm", () => {
       expect(destinationService.create).toHaveBeenCalledWith({
         org_identifier: "test-org",
         destination_name: "Test Destination",
+        module: "pipeline",
         data: expect.objectContaining({
           name: "Test Destination",
           url: "https://example.com/api/test", // Merged URL + endpoint
@@ -624,6 +625,7 @@ describe("CreateDestinationForm", () => {
 
       expect(destinationService.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          module: "pipeline",
           data: expect.objectContaining({
             destination_type_name: "splunk",
           }),
@@ -658,6 +660,7 @@ describe("CreateDestinationForm", () => {
       expect(destinationService.create).toHaveBeenCalledWith({
         org_identifier: "test-org",
         destination_name: "Custom Destination",
+        module: "pipeline",
         data: expect.objectContaining({
           url: "https://example.com", // No endpoint appended
         }),
@@ -1114,6 +1117,7 @@ describe("CreateDestinationForm", () => {
 
       expect(destinationService.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          module: "pipeline",
           data: expect.objectContaining({
             metadata: {
               source: "http:source",

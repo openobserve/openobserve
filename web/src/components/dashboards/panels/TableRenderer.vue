@@ -92,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-    <template v-slot:bottom>
-      <slot name="bottom" />
+    <template v-slot:bottom="scope" v-if="$slots.bottom">
+      <slot name="bottom" v-bind="scope" />
     </template>
   </q-table>
 </template>

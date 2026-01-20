@@ -59,6 +59,6 @@ jobs:
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v2.1.1
         with:
+          webhook: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}
+          webhook-type: incoming-webhook
           payload: ${{ steps.slack-msg.outputs.payload }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.STALE_PR_SLACK_NOTIFICATION }}

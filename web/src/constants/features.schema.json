@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Feature Registry Schema",
+  "description": "Schema for validating the features.json configuration file",
+  "type": "object",
+  "required": ["features"],
+  "properties": {
+    "features": {
+      "type": "array",
+      "description": "Array of feature definitions",
+      "items": {
+        "type": "object",
+        "required": ["id", "availability"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the feature",
+            "pattern": "^[a-z_]+$",
+            "minLength": 1
+          },
+          "nameKey": {
+            "type": "string",
+            "description": "Custom i18n translation key for the feature name (optional, defaults to about.feature_{id})",
+            "pattern": "^[a-z_\\.]+$"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category for grouping features",
+            "enum": ["core", "enterprise", "support", "infrastructure"]
+          },
+          "availability": {
+            "type": "object",
+            "description": "Feature availability across different editions",
+            "required": ["opensource", "enterprise", "cloud"],
+            "properties": {
+              "opensource": {
+                "description": "Availability in Open Source edition (boolean or i18n key)",
+                "oneOf": [
+                  { "type": "boolean" },
+                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
+                ]
+              },
+              "enterprise": {
+                "description": "Availability in Enterprise edition (boolean or i18n key)",
+                "oneOf": [
+                  { "type": "boolean" },
+                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
+                ]
+              },
+              "cloud": {
+                "description": "Availability in Cloud edition (boolean or i18n key)",
+                "oneOf": [
+                  { "type": "boolean" },
+                  { "type": "string", "pattern": "^[a-z_\\.]+$" }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "order": {
+            "type": "integer",
+            "description": "Display order priority (lower numbers appear first)",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

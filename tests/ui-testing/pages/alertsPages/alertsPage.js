@@ -246,6 +246,16 @@ export class AlertsPage {
         return result;
     }
 
+    /**
+     * Create a scheduled alert with PromQL query for metrics streams
+     * Tests fix for bug #9967 - cannot save alert when selecting PromQL mode
+     */
+    async createScheduledAlertWithPromQL(metricsStreamName, promqlQuery, destinationName, randomValue, promqlCondition = {}) {
+        const result = await this.creationWizard.createScheduledAlertWithPromQL(metricsStreamName, promqlQuery, destinationName, randomValue, promqlCondition);
+        this.currentAlertName = result;
+        return result;
+    }
+
     async testConditionOperatorToggle(streamName, randomValue) {
         return this.creationWizard.testConditionOperatorToggle(streamName, randomValue);
     }
@@ -1238,5 +1248,238 @@ export class AlertsPage {
         // Scheduled alerts typically have 1-minute evaluation intervals
         // Wait longer for scheduled alerts (90 seconds)
         return this.verifyAlertTrigger(pm, alertName, sourceStreamName, triggerField, triggerValue, 90000, validationStreamName);
+    }
+
+    // ==================== BUG #9967 / PROMQL ALERT UI METHODS ====================
+    // Methods for comprehensive testing of PromQL alert creation and validation
+    // These support the Sentinel-compliant test pattern (no raw selectors in spec files)
+
+    /**
+     * Click the Add Alert button and wait for dialog
+     */
+    async clickAddAlertButton() {
+        const addAlertBtn = this.page.locator(this.locators.addAlertButton);
+        await addAlertBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(addAlertBtn).toBeEnabled({ timeout: 15000 });
+        await addAlertBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        testLogger.info('Clicked Add Alert button');
+    }
+
+    /**
+     * Fill the alert name input
+     */
+    async fillAlertName(alertName) {
+        await this.page.locator(this.locators.alertNameInput).fill(alertName);
+        testLogger.info('Filled alert name', { alertName });
+    }
+
+    /**
+     * Select stream type from dropdown
+     */
+    async selectStreamType(streamType) {
+        await this.page.locator(this.locators.streamTypeDropdown).click();
+        await this.page.getByRole('option', { name: streamType }).locator('div').nth(2).click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Selected stream type', { streamType });
+    }
+
+    /**
+     * Select a metrics stream from dropdown with fallback to first available
+     */
+    async selectMetricsStream(streamName) {
+        const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
+        await streamDropdown.click();
+
+        const testStreamOption = this.page.getByText(streamName, { exact: true });
+        try {
+            await expect(testStreamOption).toBeVisible({ timeout: 5000 });
+            await testStreamOption.click();
+            testLogger.info('Selected metrics stream', { stream: streamName });
+            return true;
+        } catch (e) {
+            // Retry: click dropdown again
+            await streamDropdown.click();
+            await this.page.waitForTimeout(1000);
+
+            if (await testStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await testStreamOption.click();
+                testLogger.info('Selected metrics stream on retry', { stream: streamName });
+                return true;
+            } else {
+                // Use first available metrics stream from dropdown
+                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+                if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await anyStreamOption.click();
+                    testLogger.info('Using first available metrics stream');
+                    return true;
+                }
+                testLogger.warn('No metrics streams available');
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Select scheduled alert type
+     */
+    async selectScheduledAlertType() {
+        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        testLogger.info('Selected scheduled alert type');
+    }
+
+    /**
+     * Click the Continue button to advance wizard steps
+     */
+    async clickContinueButton() {
+        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Click the Back button to close alert wizard
+     */
+    async clickBackButton() {
+        await this.page.locator(this.locators.alertBackButton).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    /**
+     * Click a specific step indicator in the wizard (0-indexed)
+     */
+    async clickStepIndicator(stepIndex) {
+        const stepIndicator = this.page.locator('.q-stepper__tab').nth(stepIndex);
+        await stepIndicator.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked step indicator', { stepIndex });
+    }
+
+    // ==================== QUERY TAB METHODS ====================
+
+    /**
+     * Expect PromQL tab to be visible
+     */
+    async expectPromqlTabVisible() {
+        const promqlTab = this.page.locator('[data-test="tab-promql"]');
+        await expect(promqlTab).toBeVisible({ timeout: 10000 });
+        testLogger.info('PromQL tab is visible');
+    }
+
+    /**
+     * Expect Custom tab to be visible
+     */
+    async expectCustomTabVisible() {
+        const customTab = this.page.locator('[data-test="tab-custom"]');
+        await expect(customTab).toBeVisible();
+        testLogger.info('Custom tab is visible');
+    }
+
+    /**
+     * Expect SQL tab to be visible
+     */
+    async expectSqlTabVisible() {
+        const sqlTab = this.page.locator('[data-test="tab-sql"]');
+        await expect(sqlTab).toBeVisible();
+        testLogger.info('SQL tab is visible');
+    }
+
+    /**
+     * Click PromQL tab
+     */
+    async clickPromqlTab() {
+        await this.page.locator('[data-test="tab-promql"]').click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked PromQL tab');
+    }
+
+    /**
+     * Click Custom tab
+     */
+    async clickCustomTab() {
+        await this.page.locator('[data-test="tab-custom"]').click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked Custom tab');
+    }
+
+    // ==================== PROMQL CONDITION ROW METHODS ====================
+
+    /**
+     * Get the PromQL condition row locator
+     */
+    getPromqlConditionRow() {
+        return this.page.locator(this.locators.alertSettingsRow).filter({ hasText: 'Trigger if the value is' });
+    }
+
+    /**
+     * Expect PromQL condition row "Trigger if the value is" to be visible
+     */
+    async expectPromqlConditionRowVisible() {
+        const promqlConditionRow = this.getPromqlConditionRow();
+        await expect(promqlConditionRow).toBeVisible({ timeout: 10000 });
+        testLogger.info('PromQL condition row is visible');
+    }
+
+    /**
+     * Expect PromQL condition row NOT to be visible (for Custom mode)
+     */
+    async expectPromqlConditionRowNotVisible() {
+        const promqlConditionRow = this.getPromqlConditionRow();
+        await expect(promqlConditionRow).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('PromQL condition row is NOT visible');
+    }
+
+    /**
+     * Expect operator dropdown to be visible in PromQL condition row
+     */
+    async expectOperatorDropdownVisible() {
+        const promqlConditionRow = this.getPromqlConditionRow();
+        const operatorDropdown = promqlConditionRow.locator('.q-select').first();
+        await expect(operatorDropdown).toBeVisible();
+        testLogger.info('Operator dropdown is visible');
+    }
+
+    /**
+     * Expect value input to be visible in PromQL condition row
+     */
+    async expectValueInputVisible() {
+        const promqlConditionRow = this.getPromqlConditionRow();
+        const valueInput = promqlConditionRow.locator('input[type="number"]');
+        await expect(valueInput).toBeVisible();
+        testLogger.info('Value input is visible');
+    }
+
+    /**
+     * Get the current value from the PromQL condition value input
+     */
+    async getPromqlConditionValue() {
+        const promqlConditionRow = this.getPromqlConditionRow();
+        const valueInput = promqlConditionRow.locator('input[type="number"]');
+        await expect(valueInput).toBeVisible();
+        const value = await valueInput.inputValue();
+        testLogger.info('Retrieved PromQL condition value', { value });
+        return value;
+    }
+
+    // ==================== ALERT LIST VERIFICATION ====================
+
+    /**
+     * Expect alert row to be visible in the list
+     */
+    async expectAlertRowVisible(alertName, timeout = 10000) {
+        const alertRow = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`);
+        await expect(alertRow).toBeVisible({ timeout });
+        testLogger.info('Alert row is visible', { alertName });
+    }
+
+    /**
+     * Click the update button for a specific alert
+     */
+    async clickAlertUpdateButton(alertName) {
+        const updateBtn = this.page.locator(`[data-test="alert-list-${alertName}-update-alert"]`);
+        await updateBtn.click();
+        await this.page.waitForLoadState('networkidle');
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked update button for alert', { alertName });
     }
 }

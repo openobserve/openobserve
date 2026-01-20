@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :label="t(`pipeline.history`)"
                     @click="goToPipelineHistory"
-                    icon="history"
                 />
                 <q-btn
                     data-test="pipeline-list-backfill-btn"
@@ -72,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     :label="t('pipeline.backfill')"
                     @click="goToBackfillJobs"
-                    icon="refresh"
                 />
                 <q-btn
                   data-test="pipeline-list-import-pipeline-btn"

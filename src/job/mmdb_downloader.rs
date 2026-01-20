@@ -56,9 +56,7 @@ async fn run_download_files() {
 
     // send request and await response
     let client = reqwest::ClientBuilder::new()
-        .connect_timeout(std::time::Duration::from_secs(
-            cfg.limit.http_request_timeout,
-        ))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()
         .expect("Failed to build mmdb downloader client");
 

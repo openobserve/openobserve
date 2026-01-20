@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,14 +115,6 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::timed_annotations::delete_annotations,
         request::dashboards::timed_annotations::update_annotations,
         request::dashboards::timed_annotations::delete_annotation_panels,
-        request::alerts::deprecated::save_alert,
-        request::alerts::deprecated::update_alert,
-        request::alerts::deprecated::list_stream_alerts,
-        request::alerts::deprecated::list_alerts,
-        request::alerts::deprecated::get_alert,
-        request::alerts::deprecated::delete_alert,
-        request::alerts::deprecated::enable_alert,
-        request::alerts::deprecated::trigger_alert,
         request::alerts::create_alert,
         request::alerts::get_alert,
         request::alerts::export_alert,
@@ -223,14 +215,10 @@ use crate::{common::meta, handler::http::request};
         request::search::search_job::retry_job,
         request::search::search_stream::search_http2_stream,
         request::search::search_stream::values_http2_stream,
-        // Patterns (enterprise)
         request::patterns::extract_patterns,
-        // Service Graph (enterprise)
         crate::service::traces::service_graph::api::get_current_topology,
-        // Service Streams (enterprise)
         request::service_streams::get_dimension_analytics,
         request::service_streams::correlate_streams,
-        // Alert Deduplication (enterprise)
         request::alerts::deduplication::get_config,
         request::alerts::deduplication::set_config,
         request::alerts::deduplication::delete_config,

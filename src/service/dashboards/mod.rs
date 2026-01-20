@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -117,7 +117,7 @@ pub enum DashboardError {
     /// Error that occurs when trying to get the list of dashboards that a user is permitted to
     /// get.
     #[error(transparent)]
-    ListPermittedDashboardsError(actix_web::Error),
+    ListPermittedDashboardsError(anyhow::Error),
 
     #[error("Permission denied")]
     PermissionDenied,
@@ -381,6 +381,15 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
+    // Check if dashboard exists and belongs to the specified folder.
+    // Note: We don't need to explicitly check if the folder exists because
+    // the folder-dashboard relationship is enforced by a foreign key constraint.
+    // If the dashboard exists in the folder, the folder must exist.
+    let existing = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
+    if existing.is_none() {
+        return Err(DashboardError::DashboardNotFound);
+    }
+
     let dashboard = put(org_id, dashboard_id, folder_id, None, dashboard, hash).await?;
 
     #[cfg(feature = "enterprise")]
@@ -667,7 +676,7 @@ async fn filter_permitted_dashboards(
         "dashboard",
     )
     .await
-    .map_err(DashboardError::ListPermittedDashboardsError)?;
+    .map_err(|e| DashboardError::ListPermittedDashboardsError(anyhow::anyhow!(e)))?;
 
     let permitted_dashboards = dashboards
         .into_iter()

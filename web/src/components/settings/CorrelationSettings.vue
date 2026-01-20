@@ -26,11 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:px-4">
-      <app-tabs
-        :tabs="tabs"
-        v-model:active-tab="activeTab"
-        @update:active-tab="onTabChange"
-      />
+      <div class="flex justify-start">
+        <q-tabs v-model="activeTab" inline-label dense @update:model-value="onTabChange">
+          <q-tab
+            name="identity"
+            :label="t('settings.correlation.serviceIdentityTab')"
+            no-caps
+          />
+          <q-tab
+            name="services"
+            :label="t('settings.correlation.discoveredServicesTab')"
+            no-caps
+          />
+          <q-tab
+            name="alert-correlation"
+            :label="t('settings.correlation.alertCorrelationTab')"
+            no-caps
+          />
+        </q-tabs>
+      </div>
 
       <div class="tw:overflow-hidden">
         <ServiceIdentityConfig

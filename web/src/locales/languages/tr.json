@@ -334,7 +334,8 @@
     "report": "Raporlar",
     "pipeline": "Boru hatları",
     "language": "Dil",
-    "actions": "Eylemler"
+    "actions": "Eylemler",
+    "incidents": "Olaylar"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -1607,7 +1608,8 @@
       "alertSettings": "Uyarı kurallarınızı belirleyin ve nasıl bilgilendirilmek istediğinizi seçin.",
       "deduplication": "Benzer uyarıları birlikte gruplandırarak aynı uyarıyı birden çok kez göndermekten kaçının.",
       "advanced": "Bağlam değişkenleri, açıklama ve satır şablonu"
-    }
+    },
+    "template": "Şablon Geçersiz Kılma"
   },
   "alert_templates": {
     "header": "Şablonlar",

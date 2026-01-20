@@ -550,10 +550,42 @@ export default defineComponent({
         for (let i = 0; i < histogramFields.value.length; i++) {
           if (
             histogramFields.value[i]?.args &&
-            histogramFields.value[i]?.args[0]?.value
+            histogramFields.value[i]?.args.length > 0
           ) {
-            histogramInterval.value = histogramFields.value[i]?.args[0]?.value;
-            break;
+            // Histogram function signature: histogram(field, interval)
+            // args[0] = timestamp field (object)
+            // args[1] = interval (string like '5m', '1h', etc.)
+
+            // Check if there's a second argument (the interval)
+            if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
+              const intervalArg = histogramFields.value[i].args[1];
+
+              // Extract interval value with explicit type checking
+              let intervalValue: string | null = null;
+
+              if (typeof intervalArg === 'string') {
+                // Direct string value
+                intervalValue = intervalArg;
+              } else if (typeof intervalArg === 'object' && intervalArg !== null) {
+                // Object with value property
+                if ('value' in intervalArg && typeof intervalArg.value === 'string') {
+                  intervalValue = intervalArg.value;
+                }
+              }
+
+              // Set the histogram interval only if we have a valid non-empty string
+              if (intervalValue && intervalValue.trim() !== '') {
+                histogramInterval.value = intervalValue;
+              } else {
+                // No valid interval - use Auto mode
+                histogramInterval.value = null;
+              }
+              break;
+            } else {
+              // No interval specified - this is "Auto" mode
+              histogramInterval.value = null;
+              break;
+            }
           }
         }
       }

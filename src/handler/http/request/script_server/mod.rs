@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,80 +15,145 @@
 
 use std::collections::HashMap;
 
-use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
+use axum::{
+    body::{Body, Bytes},
+    extract::{Path, Query},
+    http::{StatusCode, header},
+    response::Response,
+};
 use config::meta::actions::action::ActionType;
 use o2_enterprise::enterprise::actions::action_deployer::ACTION_DEPLOYER;
 
-#[post("/{org_id}/v1/job")]
-pub async fn create_job(path: web::Path<String>, body: web::Bytes) -> impl Responder {
-    let org_id = path.into_inner();
-
+pub async fn create_job(Path(org_id): Path<String>, body: Bytes) -> Response {
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.create_app(&org_id, body).await {
-            Ok(created_at) => HttpResponse::Ok().body(created_at.to_rfc3339()),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+            Ok(created_at) => Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::from(created_at.to_rfc3339()))
+                .unwrap(),
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                ))
+                .unwrap(),
         };
     }
 
-    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!("AppDeployer not initialized")).unwrap(),
+        ))
+        .unwrap()
 }
 
-#[delete("/{org_id}/v1/job/{name}")]
-pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, name) = path.into_inner();
-
+pub async fn delete_job(Path((org_id, name)): Path<(String, String)>) -> Response {
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.delete_app(&org_id, &name).await {
-            Ok(_) => HttpResponse::Ok().finish(),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+            Ok(_) => Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::empty())
+                .unwrap(),
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                ))
+                .unwrap(),
         };
     }
-    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!("AppDeployer not initialized")).unwrap(),
+        ))
+        .unwrap()
 }
 
-#[get("/{org_id}/v1/job/{name}")]
-pub async fn get_app_details(path: web::Path<(String, String)>) -> impl Responder {
-    let (org_id, name) = path.into_inner();
-
+pub async fn get_app_details(Path((org_id, name)): Path<(String, String)>) -> Response {
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.get_app_status(&org_id, &name).await {
-            Ok(resp) => HttpResponse::Ok().json(resp),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+            Ok(resp) => Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_string(&resp).unwrap()))
+                .unwrap(),
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                ))
+                .unwrap(),
         };
     }
-    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!("AppDeployer not initialized")).unwrap(),
+        ))
+        .unwrap()
 }
 
-#[get("/{org_id}/v1/job")]
-pub async fn list_deployed_apps(path: web::Path<String>) -> impl Responder {
-    let org_id = path.into_inner();
-
+pub async fn list_deployed_apps(Path(org_id): Path<String>) -> Response {
     if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.list_apps(&org_id).await {
-            Ok(resp) => HttpResponse::Ok().json(resp),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+            Ok(resp) => Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_string(&resp).unwrap()))
+                .unwrap(),
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                ))
+                .unwrap(),
         };
     }
 
-    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!("AppDeployer not initialized")).unwrap(),
+        ))
+        .unwrap()
 }
 
 // Patch a resource
-#[put("/{org_id}/v1/job/{id}")]
 pub async fn patch_action(
-    path: web::Path<(String, String)>,
-    query: web::Query<HashMap<String, String>>,
-    body: web::Bytes,
-) -> impl Responder {
-    let (org_id, id) = path.into_inner();
-
+    Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> Response {
     // Extract the "action_type" from query parameters and handle missing cases properly
     let action_type: ActionType = match query.get("action_type") {
         Some(value) => match value.clone().as_str().try_into() {
             Ok(action_type) => action_type,
-            Err(e) => return HttpResponse::BadRequest().json(e.to_string()),
+            Err(e) => {
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                    ))
+                    .unwrap();
+            }
         },
-        None => return HttpResponse::BadRequest().body("Missing required 'action_type' parameter"),
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("Missing required 'action_type' parameter"))
+                .unwrap();
+        }
     };
 
     if let Some(deployer) = ACTION_DEPLOYER.get() {
@@ -96,10 +161,25 @@ pub async fn patch_action(
             .update_action(&org_id, &id, action_type, body)
             .await
         {
-            Ok(modified_at) => HttpResponse::Ok().body(modified_at.to_rfc3339()),
-            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+            Ok(modified_at) => Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::from(modified_at.to_rfc3339()))
+                .unwrap(),
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!(e.to_string())).unwrap(),
+                ))
+                .unwrap(),
         };
     }
 
-    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!("AppDeployer not initialized")).unwrap(),
+        ))
+        .unwrap()
 }

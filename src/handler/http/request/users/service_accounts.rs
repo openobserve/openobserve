@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{Error, HttpRequest, HttpResponse, post, web};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 #[cfg(feature = "enterprise")]
 use {
     crate::service::self_reporting::audit,
@@ -24,12 +28,10 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-#[post("/token")]
 pub async fn exchange_token(
-    req: HttpRequest,
-    body: web::Json<o2_dex::meta::auth::TokenExchangeRequest>,
-) -> Result<HttpResponse, Error> {
-    let result = o2_dex::service::token_exchange::exchange_token(&body.into_inner()).await;
+    Json(body): Json<o2_dex::meta::auth::TokenExchangeRequest>,
+) -> Response {
+    let result = o2_dex::service::token_exchange::exchange_token(&body).await;
 
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
@@ -37,10 +39,10 @@ pub async fn exchange_token(
         _timestamp: now_micros(),
         protocol: Protocol::Http,
         response_meta: ResponseMeta {
-            http_method: req.method().to_string(),
-            http_path: req.path().to_string(),
+            http_method: "POST".to_string(),
+            http_path: "/token".to_string(),
             http_body: "".to_string(),
-            http_query_params: req.query_string().to_string(),
+            http_query_params: "".to_string(),
             http_response_code: 200,
             error_msg: None,
             trace_id: None,
@@ -65,29 +67,24 @@ pub async fn exchange_token(
                     audit_message.response_meta.http_response_code = 401;
                     audit_message._timestamp = now_micros();
                     audit(audit_message).await;
-                    return Ok(HttpResponse::Unauthorized().json(e.to_string()));
+                    return (StatusCode::UNAUTHORIZED, Json(e.to_string())).into_response();
                 }
             }
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Ok().json(response))
+            (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => {
             log::error!("Error: {e}");
             audit_message.response_meta.http_response_code = 401;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Unauthorized().json(e.to_string()))
+            (StatusCode::UNAUTHORIZED, Json(e.to_string())).into_response()
         }
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[post("/token")]
-pub async fn exchange_token(
-    _req: HttpRequest,
-    _body: web::Json<String>,
-) -> Result<HttpResponse, Error> {
-    use actix_web::error::ErrorForbidden;
-    Err(ErrorForbidden("Not allowed"))
+pub async fn exchange_token(Json(_body): Json<String>) -> Response {
+    (StatusCode::FORBIDDEN, Json("Not allowed")).into_response()
 }

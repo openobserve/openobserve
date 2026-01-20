@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,12 @@
 
 use std::{collections::HashMap, io::Error, sync::Arc};
 
-use actix_multipart::Multipart;
-use actix_web::{
-    HttpResponse,
-    http::{self, StatusCode},
-};
 use arrow_schema::Schema;
+use axum::{
+    extract::Multipart,
+    http::{self, StatusCode},
+    response::Response as HttpResponse,
+};
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
@@ -30,7 +30,6 @@ use config::{
     meta::stream::StreamType,
     utils::{flatten::format_key, json, schema::infer_json_schema_from_map, time::BASE_TIME},
 };
-use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
@@ -73,12 +72,12 @@ pub async fn save_enrichment_data(
     let stream_name = format_stream_name(table_name.to_string());
 
     if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
+        let mut resp = MetaHttpResponse::internal_error("not an ingester");
+        resp.headers_mut().insert(
+            ERROR_HEADER,
+            http::HeaderValue::from_str("not an ingester").unwrap(),
+        );
+        return Ok(resp);
     }
 
     // check if we are allowed to ingest
@@ -88,15 +87,13 @@ pub async fn save_enrichment_data(
         &stream_name,
         None,
     ) {
-        return Ok(HttpResponse::BadRequest()
-            .append_header((
-                ERROR_HEADER,
-                format!("enrichment table [{stream_name}] is being deleted"),
-            ))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("enrichment table [{stream_name}] is being deleted"),
-            )));
+        let error_msg = format!("enrichment table [{stream_name}] is being deleted");
+        let mut resp = MetaHttpResponse::bad_request(&error_msg);
+        resp.headers_mut().insert(
+            ERROR_HEADER,
+            http::HeaderValue::from_str(&error_msg).unwrap(),
+        );
+        return Ok(resp);
     }
 
     // Estimate the size of the payload in json format in bytes
@@ -105,10 +102,9 @@ pub async fn save_enrichment_data(
         match json::to_value(p) {
             Ok(v) => bytes_in_payload += json::estimate_json_bytes(&v),
             Err(_) => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST,
+                return Ok(MetaHttpResponse::bad_request(
                     "Invalid JSON payload: Could not convert file data into valid JSON object",
-                )));
+                ));
             }
         }
     }
@@ -131,14 +127,9 @@ pub async fn save_enrichment_data(
     // if not, we can append the data
     // if it does, we need to return an error
     if total_expected_size_in_mb > enrichment_table_max_size {
-        return Ok(
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!(
-                    "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
-                ),
-            )),
-        );
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
+        )));
     }
 
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -197,15 +188,13 @@ pub async fn save_enrichment_data(
         .unwrap_or(Schema::empty());
     if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
         log::error!("Schema mismatch for enrichment table {org_id}/{stream_name}");
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((
-                ERROR_HEADER,
-                format!("Schema mismatch for enrichment table {org_id}/{stream_name}"),
-            ))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Schema mismatch for enrichment table {org_id}/{stream_name}"),
-            )));
+        let error_msg = format!("Schema mismatch for enrichment table {org_id}/{stream_name}");
+        let mut resp = MetaHttpResponse::internal_error(&error_msg);
+        resp.headers_mut().insert(
+            ERROR_HEADER,
+            http::HeaderValue::from_str(&error_msg).unwrap(),
+        );
+        return Ok(resp);
     }
 
     // check for schema evolution
@@ -221,7 +210,7 @@ pub async fn save_enrichment_data(
     .await;
 
     if records.is_empty() {
-        return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
+        return Ok(MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
             "Saved enrichment table",
         )));
@@ -250,15 +239,14 @@ pub async fn save_enrichment_data(
         .await
         {
             log::error!("Error writing enrichment table to database: {e}");
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!("Error writing enrichment table to database: {e}"),
-                ))
-                .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error writing enrichment table to database".to_string(),
-                )));
+            let error_msg = format!("Error writing enrichment table to database: {e}");
+            let mut resp =
+                MetaHttpResponse::internal_error("Error writing enrichment table to database");
+            resp.headers_mut().insert(
+                ERROR_HEADER,
+                http::HeaderValue::from_str(&error_msg).unwrap(),
+            );
+            return Ok(resp);
         }
     } else {
         // If data size is greater than the merge threshold, we can store it directly to s3
@@ -313,7 +301,7 @@ pub async fn save_enrichment_data(
 
     log::info!("save enrichment data to: {org_id}/{table_name}/{append_data} success with stats");
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
+    Ok(MetaHttpResponse::json(MetaHttpResponse::message(
         StatusCode::OK,
         "Saved enrichment table",
     )))
@@ -379,16 +367,14 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     let mut headers_set = HashSet::new();
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let Some(content_disposition) = field.content_disposition() else {
+    while let Ok(Some(mut field)) = payload.next_field().await {
+        let Some(file_name) = field.file_name() else {
             continue;
         };
-        if content_disposition.get_filename().is_none() {
-            continue;
-        };
+        let _file_name = file_name.to_string();
 
         let mut data = bytes::Bytes::new();
-        while let Some(chunk) = field.next().await {
+        while let Some(chunk) = field.chunk().await.transpose() {
             let chunked_data = chunk.unwrap();
             // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
             data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
@@ -524,12 +510,18 @@ pub async fn delete_from_file_list(
 
 #[cfg(test)]
 mod tests {
-    use actix_multipart::Multipart;
-    use actix_web::test;
     use bytes::Bytes;
-    use futures::stream;
+    use futures_util::stream;
 
     use super::*;
+
+    // Since axum::Multipart has a private inner field and no public constructor,
+    // we use unsafe transmute to convert multer::Multipart to axum::Multipart.
+    // This is safe because axum::Multipart is a simple wrapper struct with the same memory layout:
+    // pub struct Multipart { inner: multer::Multipart<'static> }
+    unsafe fn create_axum_multipart(multer_multipart: multer::Multipart<'static>) -> Multipart {
+        unsafe { std::mem::transmute::<multer::Multipart<'static>, Multipart>(multer_multipart) }
+    }
 
     // Helper function to create a mock Multipart from CSV data
     fn create_multipart_from_csv(csv_data: &str, filename: &str) -> Multipart {
@@ -547,33 +539,23 @@ mod tests {
         body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
 
         // Create a stream from the body
-        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
+        let stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(body))]);
 
-        // Create HttpRequest with proper headers
-        let req = test::TestRequest::post()
-            .insert_header((
-                "content-type",
-                format!("multipart/form-data; boundary={boundary}"),
-            ))
-            .to_http_request();
+        // Create multer::Multipart directly
+        let multer_multipart = multer::Multipart::new(stream, boundary);
 
-        Multipart::new(req.headers(), stream)
+        // Wrap it in Axum's Multipart using unsafe transmute
+        unsafe { create_axum_multipart(multer_multipart) }
     }
 
     // Helper function to create empty multipart
     fn create_empty_multipart() -> Multipart {
         let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
         let body = format!("--{boundary}--\r\n");
-        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
 
-        let req = test::TestRequest::post()
-            .insert_header((
-                "content-type",
-                format!("multipart/form-data; boundary={boundary}"),
-            ))
-            .to_http_request();
-
-        Multipart::new(req.headers(), stream)
+        let stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(body))]);
+        let multer_multipart = multer::Multipart::new(stream, boundary);
+        unsafe { create_axum_multipart(multer_multipart) }
     }
 
     // Helper function to create multipart with field without filename
@@ -586,16 +568,9 @@ mod tests {
         body.extend_from_slice(b"some value");
         body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
 
-        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
-
-        let req = test::TestRequest::post()
-            .insert_header((
-                "content-type",
-                format!("multipart/form-data; boundary={boundary}"),
-            ))
-            .to_http_request();
-
-        Multipart::new(req.headers(), stream)
+        let stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(body))]);
+        let multer_multipart = multer::Multipart::new(stream, boundary);
+        unsafe { create_axum_multipart(multer_multipart) }
     }
 
     #[tokio::test]
@@ -861,16 +836,9 @@ mod tests {
         // End boundary
         body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
 
-        let stream = stream::iter(vec![Ok(Bytes::from(body))]);
-
-        let req = test::TestRequest::post()
-            .insert_header((
-                "content-type",
-                format!("multipart/form-data; boundary={boundary}"),
-            ))
-            .to_http_request();
-
-        let multipart = Multipart::new(req.headers(), stream);
+        let stream = stream::iter(vec![Ok::<_, std::io::Error>(Bytes::from(body))]);
+        let multer_multipart = multer::Multipart::new(stream, boundary);
+        let multipart = unsafe { create_axum_multipart(multer_multipart) };
 
         let result = extract_multipart(multipart, false).await;
 

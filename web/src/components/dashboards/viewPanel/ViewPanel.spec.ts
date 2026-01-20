@@ -455,8 +455,280 @@ describe("ViewPanel", () => {
       wrapper.vm.histogramFields = [];
       wrapper.vm.promqlMode = false;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Histogram Interval Extraction (Bug Fix Tests)", () => {
+    /**
+     * These tests verify the fix for the bug where histogram intervals displayed as "[object object]"
+     * The bug was caused by incorrectly accessing args[0].value instead of args[1]
+     *
+     * Histogram function signature: histogram(field, interval)
+     * - args[0] = timestamp field (object)
+     * - args[1] = interval value (string or object with value property)
+     */
+
+    beforeEach(async () => {
+      // Setup common test data
+      mockGetPanel.mockResolvedValue({
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp, "5m") FROM logs',
+          fields: { x: [], y: [], z: [] },
+        }],
+      });
+    });
+
+    it("should correctly extract string interval from histogram args (e.g., '5m', '1h')", async () => {
+      // Test case 1: String intervals
+      // Simulates: histogram(_timestamp, '5m')
+      const histogramFieldWithStringInterval = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" }, // args[0] - timestamp field
+          "5m", // args[1] - interval as string
+        ],
+      };
+
+      const panelData = {
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp, "5m") FROM logs',
+          fields: {
+            x: [histogramFieldWithStringInterval],
+            y: [],
+            z: []
+          },
+        }],
+      };
+
+      mockGetPanel.mockResolvedValue(panelData);
+
+      // Also update the mockDashboardPanelData to ensure the component reads the correct data
+      Object.assign(mockDashboardPanelData.data, panelData);
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+      // Wait for async operations in onMounted
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // The component should extract '5m' from args[1]
+      expect(wrapper.vm.histogramInterval).toBe("5m");
+      expect(wrapper.vm.histogramInterval).not.toBe("[object object]");
+    });
+
+    it("should correctly extract interval from object format (e.g., {value: '1h'})", async () => {
+      // Test case 2: Object intervals
+      // Simulates: histogram(_timestamp, {value: '1h'})
+      const histogramFieldWithObjectInterval = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" }, // args[0] - timestamp field
+          { value: "1h" }, // args[1] - interval as object
+        ],
+      };
+
+      const panelData = {
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp, "1h") FROM logs',
+          fields: {
+            x: [histogramFieldWithObjectInterval],
+            y: [],
+            z: []
+          },
+        }],
+      };
+
+      mockGetPanel.mockResolvedValue(panelData);
+      Object.assign(mockDashboardPanelData.data, panelData);
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // The component should extract '1h' from args[1].value
+      expect(wrapper.vm.histogramInterval).toBe("1h");
+      expect(wrapper.vm.histogramInterval).not.toBe("[object object]");
+    });
+
+    it("should set interval to null when histogram has no interval argument (Auto mode)", async () => {
+      // Test case 3: Missing intervals
+      // Simulates: histogram(_timestamp) - no interval specified
+      const histogramFieldWithoutInterval = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" }, // args[0] - timestamp field only
+          // No args[1] - missing interval
+        ],
+      };
+
+      mockGetPanel.mockResolvedValue({
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp) FROM logs',
+          fields: {
+            x: [histogramFieldWithoutInterval],
+            y: [],
+            z: []
+          },
+        }],
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      // The component should set null for Auto mode
+      expect(wrapper.vm.histogramInterval).toBe(null);
+    });
+
+    it("should set interval to null when interval is empty string", async () => {
+      // Test case 4: Empty string intervals
+      // Simulates: histogram(_timestamp, '')
+      const histogramFieldWithEmptyString = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" }, // args[0] - timestamp field
+          "", // args[1] - empty string
+        ],
+      };
+
+      mockGetPanel.mockResolvedValue({
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp, "") FROM logs',
+          fields: {
+            x: [histogramFieldWithEmptyString],
+            y: [],
+            z: []
+          },
+        }],
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      // The component should treat empty string as Auto mode
+      expect(wrapper.vm.histogramInterval).toBe(null);
+    });
+
+    it("should set interval to null when interval argument is explicitly null", async () => {
+      // Test case 5: Null values
+      // Simulates: histogram(_timestamp, null)
+      const histogramFieldWithNullInterval = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" }, // args[0] - timestamp field
+          null, // args[1] - explicit null
+        ],
+      };
+
+      mockGetPanel.mockResolvedValue({
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp) FROM logs',
+          fields: {
+            x: [histogramFieldWithNullInterval],
+            y: [],
+            z: []
+          },
+        }],
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      // The component should handle null gracefully
+      expect(wrapper.vm.histogramInterval).toBe(null);
+    });
+
+    it("should handle object interval with empty value property", async () => {
+      // Edge case: Object with empty string value
+      // Simulates: histogram(_timestamp, {value: ''})
+      const histogramFieldWithEmptyObjectValue = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" },
+          { value: "" }, // Object with empty string value
+        ],
+      };
+
+      mockGetPanel.mockResolvedValue({
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp) FROM logs',
+          fields: {
+            x: [histogramFieldWithEmptyObjectValue],
+            y: [],
+            z: []
+          },
+        }],
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      // Should treat empty value as Auto mode
+      expect(wrapper.vm.histogramInterval).toBe(null);
+    });
+
+    it("should handle multiple histogram fields and use first valid interval", async () => {
+      // Test with multiple histogram fields
+      const histogramField1 = {
+        functionName: "histogram",
+        args: [
+          { column: "_timestamp" },
+          "10m",
+        ],
+      };
+
+      const histogramField2 = {
+        functionName: "histogram",
+        args: [
+          { column: "event_time" },
+          "30m",
+        ],
+      };
+
+      const panelData = {
+        title: "Test Panel",
+        type: "line",
+        queryType: "sql",
+        queries: [{
+          query: 'SELECT histogram(_timestamp, "10m"), histogram(event_time, "30m") FROM logs',
+          fields: {
+            x: [histogramField1, histogramField2],
+            y: [],
+            z: []
+          },
+        }],
+      };
+
+      mockGetPanel.mockResolvedValue(panelData);
+      Object.assign(mockDashboardPanelData.data, panelData);
+
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Should use the first histogram field's interval
+      expect(wrapper.vm.histogramInterval).toBe("10m");
     });
   });
 

@@ -15,10 +15,12 @@
 
 import { vi } from "vitest";
 
-vi.mock("rudder-sdk-js", () => {
+vi.mock("@rudderstack/analytics-js", () => {
   return {
-    ready: vi.fn(),
-    load: vi.fn(),
-    track: vi.fn(),
+    RudderAnalytics: class {
+      ready = vi.fn();
+      load = vi.fn();
+      track = vi.fn();
+    },
   };
 });

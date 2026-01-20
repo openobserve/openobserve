@@ -853,7 +853,7 @@ def test_values_endpoint(create_session, base_url):
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
-    url = f"{base_url}api/{org_id}/{stream_name}/_values?fields=kubernetes_container_name&size=10&start_time={ten_min_ago}&end_time={end_time}&sql=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&type=logs"
+    url = f"{base_url}api/{org_id}/{stream_name}/_values?fields=kubernetes_container_name&size=10&start_time={ten_min_ago}&end_time={end_time}&sql=&type=logs"
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
     headers = {
         "Content-Type": "application/json",

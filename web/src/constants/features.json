@@ -1,0 +1,262 @@
+{
+  "features": [
+    {
+      "id": "logs",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "metrics",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "traces",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "rum",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "alerts",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "dashboards",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "reports",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "vrl_functions",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "pipelines",
+      "category": "core",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "high_availability",
+      "category": "infrastructure",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "multitenancy",
+      "category": "infrastructure",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "dynamic_schema",
+      "category": "infrastructure",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "multilingual_gui",
+      "category": "infrastructure",
+      "availability": {
+        "opensource": true,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "sso",
+      "category": "enterprise",
+      "nameKey": "about.feature_sso",
+      "availability": {
+        "opensource": false,
+        "enterprise": "about.value_sso_requires_ha",
+        "cloud": true
+      }
+    },
+    {
+      "id": "rbac",
+      "category": "enterprise",
+      "nameKey": "about.feature_rbac",
+      "availability": {
+        "opensource": false,
+        "enterprise": "about.value_rbac_requires_ha",
+        "cloud": true
+      }
+    },
+    {
+      "id": "federated_search",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": false
+      }
+    },
+    {
+      "id": "query_management",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": false
+      }
+    },
+    {
+      "id": "workload_management",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": false
+      }
+    },
+    {
+      "id": "audit_trail",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "action_scripts",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": false
+      }
+    },
+    {
+      "id": "sensitive_data_redaction",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "influence_roadmap",
+      "category": "enterprise",
+      "nameKey": "about.feature_influence_roadmap",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": "about.value_roadmap_enterprise_plan"
+      }
+    },
+    {
+      "id": "pipelines_external",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "extreme_performance",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "query_optimizer",
+      "category": "enterprise",
+      "availability": {
+        "opensource": false,
+        "enterprise": true,
+        "cloud": true
+      }
+    },
+    {
+      "id": "license",
+      "category": "support",
+      "nameKey": "about.feature_license",
+      "availability": {
+        "opensource": "about.value_license_agpl",
+        "enterprise": "about.value_license_enterprise",
+        "cloud": "about.value_license_cloud"
+      }
+    },
+    {
+      "id": "support",
+      "category": "support",
+      "nameKey": "about.feature_support",
+      "availability": {
+        "opensource": "about.value_support_community",
+        "enterprise": "about.value_support_enterprise",
+        "cloud": "about.value_support_cloud"
+      }
+    },
+    {
+      "id": "cost",
+      "category": "support",
+      "nameKey": "about.feature_cost",
+      "availability": {
+        "opensource": "about.value_cost_free",
+        "enterprise": "about.value_cost_enterprise",
+        "cloud": "about.value_cost_cloud"
+      }
+    }
+  ]
+}

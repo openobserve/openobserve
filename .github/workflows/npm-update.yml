@@ -14,7 +14,7 @@ jobs:
   update-dependencies:
     name: Update NPM Dependencies
     runs-on:
-      labels: repo-openobserve-standard-8
+      labels: ubicloud-standard-8
 
     steps:
       - name: Clone the current repo

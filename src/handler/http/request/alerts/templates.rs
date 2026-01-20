@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, put, web};
+use axum::{Json, extract::Path, http::StatusCode, response::Response};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -29,7 +27,7 @@ use crate::{
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
 
-impl From<TemplateError> for HttpResponse {
+impl From<TemplateError> for Response {
     fn from(value: TemplateError) -> Self {
         match value {
             TemplateError::InfraError(e) => {
@@ -46,6 +44,8 @@ impl From<TemplateError> for HttpResponse {
 
 /// CreateTemplate
 #[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/templates",
     context_path = "/api",
     tag = "Templates",
     operation_id = "CreateTemplate",
@@ -60,35 +60,32 @@ impl From<TemplateError> for HttpResponse {
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create alert template"}))
+        ("x-o2-mcp" = json!({"description": "Create alert template", "category": "alerts"}))
     )
 )]
-#[post("/{org_id}/alerts/templates")]
-pub async fn save_template(
-    path: web::Path<String>,
-    tmpl: web::Json<Template>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let tmpl = tmpl.into_inner().into(&org_id);
+pub async fn save_template(Path(org_id): Path<String>, Json(tmpl): Json<Template>) -> Response {
+    let tmpl = tmpl.into(&org_id);
     match templates::save("", tmpl, true).await {
-        Ok(v) => Ok(MetaHttpResponse::json(
+        Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Template saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
                 .with_name(v.name),
-        )),
-        Err(e) => Ok(e.into()),
+        ),
+        Err(e) => e.into(),
     }
 }
 
 /// UpdateTemplate
 #[utoipa::path(
+    put,
+    path = "/{org_id}/alerts/templates/{template_name}",
     context_path = "/api",
     tag = "Templates",
     operation_id = "UpdateTemplate",
@@ -104,31 +101,31 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
-    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),    
+    request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update alert template"}))
+        ("x-o2-mcp" = json!({"description": "Update alert template", "category": "alerts"}))
     )
 )]
-#[put("/{org_id}/alerts/templates/{template_name}")]
 pub async fn update_template(
-    path: web::Path<(String, String)>,
-    tmpl: web::Json<Template>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
-    let tmpl = tmpl.into_inner().into(&org_id);
+    Path((org_id, name)): Path<(String, String)>,
+    Json(tmpl): Json<Template>,
+) -> Response {
+    let tmpl = tmpl.into(&org_id);
     match templates::save(&name, tmpl, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Template updated")),
-        Err(e) => Ok(e.into()),
+        Ok(_) => MetaHttpResponse::ok("Template updated"),
+        Err(e) => e.into(),
     }
 }
 
 /// GetTemplateByName
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/templates/{template_name}",
     context_path = "/api",
     tag = "Templates",
     operation_id = "GetTemplate",
@@ -150,20 +147,20 @@ pub async fn update_template(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get template details"}))
+        ("x-o2-mcp" = json!({"description": "Get template details", "category": "alerts"}))
     )
 )]
-#[get("/{org_id}/alerts/templates/{template_name}")]
-async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Response {
     match templates::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(Template::from(data))),
-        Err(e) => Ok(e.into()),
+        Ok(data) => MetaHttpResponse::json(Template::from(data)),
+        Err(e) => e.into(),
     }
 }
 
 /// ListTemplates
 #[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/templates",
     context_path = "/api",
     tag = "Templates",
     operation_id = "ListTemplates",
@@ -184,17 +181,13 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all alert templates"}))
+        ("x-o2-mcp" = json!({"description": "List all alert templates", "category": "alerts"}))
     )
 )]
-#[get("/{org_id}/alerts/templates")]
-async fn list_templates(
-    path: web::Path<String>,
-    _req: HttpRequest,
+pub async fn list_templates(
+    Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-
+) -> Response {
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -209,24 +202,24 @@ async fn list_templates(
                 _permitted = list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
     }
 
     match templates::list(&org_id, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(
-            data.into_iter().map(Template::from).collect::<Vec<_>>(),
-        )),
-        Err(e) => Ok(e.into()),
+        Ok(data) => {
+            MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>())
+        }
+        Err(e) => e.into(),
     }
 }
 
 /// DeleteTemplate
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/alerts/templates/{template_name}",
     context_path = "/api",
     tag = "Templates",
     operation_id = "DeleteAlertTemplate",
@@ -249,19 +242,19 @@ async fn list_templates(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Delete alert template"}))
+        ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts"}))
     )
 )]
-#[delete("/{org_id}/alerts/templates/{template_name}")]
-async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, name) = path.into_inner();
+pub async fn delete_template(Path((org_id, name)): Path<(String, String)>) -> Response {
     match templates::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Template deleted")),
-        Err(e) => Ok(e.into()),
+        Ok(_) => MetaHttpResponse::ok("Template deleted"),
+        Err(e) => e.into(),
     }
 }
 
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/alerts/templates/bulk",
     context_path = "/api",
     tag = "Templates",
     operation_id = "DeleteAlertTemplateBulk",
@@ -285,20 +278,17 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/alerts/templates/bulk")]
-async fn delete_template_bulk(
-    path: web::Path<String>,
+pub async fn delete_template_bulk(
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    Json(req): Json<BulkDeleteRequest>,
+) -> Response {
     let _user_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if !check_permissions(name, &org_id, &_user_id, "templates", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -319,9 +309,9 @@ async fn delete_template_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }

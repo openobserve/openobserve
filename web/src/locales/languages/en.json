@@ -324,6 +324,7 @@
     "help": "Help",
     "dashboard": "Dashboards",
     "alerts": "Alerts",
+    "incidents": "Incidents",
     "openapi": "OpenAPI",
     "docs": "Docs",
     "billings": "Billing",
@@ -846,7 +847,7 @@
     "close": "Close",
     "filterAll": "All",
     "filterFile": "File",
-    "filterUrl": "Url",
+    "filterUrl": "URL",
     "dataSource": "Data Source",
     "uploadFile": "Upload File",
     "fromUrl": "From URL",
@@ -1545,6 +1546,7 @@
     "multiWindow": "Compare with past",
     "multiWindowSubLabel": "Compare current results with data from another time period",
     "destination": "Destination",
+    "template": "Template Override",
     "additionalVariables": "Additional Variables",
     "description": "Description",
     "stream_name": "Stream Name",
@@ -1663,7 +1665,7 @@
       "defaultWindowDescription": "In absence of semantic field match, alerts and data from given duration is considered related",
       "defaultWindowPlaceholder": "Use alert period by default",
       "cancelButton": "Cancel",
-      "saveButton": "Save Settings"
+      "saveButton": "Save"
     },
     "placeholders": {
       "typeSomething": "Type something",
@@ -1737,6 +1739,7 @@
     "incidents": {
       "title": "Incidents",
       "header": "Alert Incidents",
+      "search": "Search incidents...",
       "noIncidents": "No incidents found",
       "id": "ID",
       "status": "Status",
@@ -2058,7 +2061,9 @@
       "metrics": "Metrics",
       "retry": "Retry",
       "filters": "Filters",
-      "availableDimensions": "Available Dimensions"
+      "availableDimensions": "Available Dimensions",
+      "semanticFieldGroupsTitle": "Field Mappings",
+      "groupsLabel": "groups"
     }
   },
   "reports": {

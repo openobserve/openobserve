@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{HttpResponse, delete, get, put, web};
+use axum::{
+    Json,
+    body::Bytes,
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 #[cfg(feature = "enterprise")]
 use {
     crate::common::meta::http::HttpResponse as MetaHttpResponse,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-#[delete("/{org_id}/query_manager/{trace_id}")]
-pub async fn cancel_query(params: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn cancel_query(Path(params): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let (org_id, trace_id) = params.into_inner();
+        let (org_id, trace_id) = params;
         let trace_ids = trace_id.split(',').collect::<Vec<&str>>();
         cancel_query_inner(&org_id, &trace_ids).await
     }
@@ -34,22 +37,18 @@ pub async fn cancel_query(params: web::Path<(String, String)>) -> Result<HttpRes
     #[cfg(not(feature = "enterprise"))]
     {
         drop(params);
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
-#[put("/{org_id}/query_manager/cancel")]
-pub async fn cancel_multiple_query(
-    params: web::Path<String>,
-    body: web::Bytes,
-) -> Result<HttpResponse, Error> {
+pub async fn cancel_multiple_query(Path(params): Path<String>, body: Bytes) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let org_id = params.into_inner();
+        let org_id = params;
         let trace_ids: Vec<String> = match config::utils::json::from_slice(&body) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return MetaHttpResponse::bad_request(e);
             }
         };
         let trace_ids = trace_ids.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
@@ -60,32 +59,31 @@ pub async fn cancel_multiple_query(
     {
         drop(params);
         drop(body);
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
-#[get("/{org_id}/query_manager/status")]
-pub async fn query_status(_params: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn query_status(Path(_params): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let res = crate::service::search::query_status().await;
         match res {
-            Ok(query_status) => Ok(HttpResponse::Ok().json(query_status)),
-            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+            Ok(query_status) => Json(query_status).into_response(),
+            Err(e) => MetaHttpResponse::bad_request(e),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }
 
-pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<HttpResponse, Error> {
+pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
     #[cfg(feature = "enterprise")]
     {
         if trace_ids.is_empty() {
-            return Ok(HttpResponse::BadRequest().json("Invalid trace_id"));
+            return (StatusCode::BAD_REQUEST, Json("Invalid trace_id")).into_response();
         }
         let mut res = Vec::with_capacity(trace_ids.len());
         for trace_id in trace_ids {
@@ -100,16 +98,16 @@ pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<Http
             };
             match ret {
                 Ok(status) => res.push(status),
-                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+                Err(e) => return MetaHttpResponse::bad_request(e),
             }
         }
-        Ok(HttpResponse::Ok().json(res))
+        Json(res).into_response()
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = org_id;
         let _ = trace_ids;
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
     }
 }

@@ -328,7 +328,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should dynamically update the filtered data when applying the dynamic filter on the dashboard", async ({
+  test("should dynamically update the filtered data when applying the dynamic filter on the dashboard", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -384,7 +384,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelEdit.editPanel(panelName);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.savePanel();
-    await pm.dashboardPanelActions.deletePanel(panelName);
+    await pm.dashboardPanelEdit.deletePanel(panelName);
 
     // Return to dashboard list and delete the created dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -656,58 +656,6 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    await pm.dashboardPanelActions.savePanel();
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
-  });
-
-  test.skip("should create the specified URL using the DrillDown feature", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-    const panelName =
-      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
-    const drilldownName = pm.dashboardDrilldown.generateUniqueDrilldownName();
-
-    // Navigate to dashboards
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-
-    // Create a new dashboard
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    // Add a panel
-    await pm.dashboardCreate.addPanel();
-    await pm.dashboardPanelActions.addPanelName(panelName);
-    await pm.chartTypeSelector.selectChartType("area");
-    await pm.chartTypeSelector.selectStreamType("logs");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_annotations_kubectl_kubernetes_io_default_container",
-      "y"
-    );
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_annotations_kubernetes_io_psp",
-      "b"
-    );
-
-    // Set date-time filter and timezone
-    await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("4", "w");
-    await pm.dashboardPanelActions.applyDashboardBtn();
-
-    // Verify chart is visible
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    // Configure drilldown
-    await pm.dashboardPanelConfigs.openConfigPanel();
-    await pm.dashboardDrilldown.addDrilldownByURL(
-      drilldownName,
-      "https://google.com"
-    );
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);

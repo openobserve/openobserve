@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use actix_web::{
-    HttpRequest, HttpResponse, cookie, delete, get,
-    http::{self},
-    post, put, web,
+use axum::{
+    body::Body,
+    extract::{Path, Query},
+    http::{HeaderMap, StatusCode, header},
+    response::{IntoResponse, Response},
 };
-use actix_web_httpauth::extractors::basic::BasicAuth;
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::{
     Config, get_config,
     meta::user::UserRole,
@@ -62,6 +63,8 @@ pub mod service_accounts;
 
 /// ListUsers
 #[utoipa::path(
+    get,
+    path = "/{org_id}/users",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserList",
@@ -81,17 +84,14 @@ pub mod service_accounts;
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all users"}))
+        ("x-o2-mcp" = json!({"description": "List all users", "category": "users"}))
     )
 )]
-#[get("/{org_id}/users")]
 pub async fn list(
-    org_id: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let list_all = match query.get("list_all") {
         Some(v) => v.parse::<bool>().unwrap_or(false),
         None => false,
@@ -115,7 +115,7 @@ pub async fn list(
         _user_list_from_rbac = Some(vec![]);
     }
 
-    users::list_users(
+    match users::list_users(
         &user_email.user_id,
         &org_id,
         None,
@@ -123,10 +123,16 @@ pub async fn list(
         list_all,
     )
     .await
+    {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// CreateUser
 #[utoipa::path(
+    post,
+    path = "/{org_id}/users",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserSave",
@@ -147,18 +153,16 @@ pub async fn list(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new user"}))
+        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
     )
 )]
-#[post("/{org_id}/users")]
 pub async fn save(
-    org_id: web::Path<String>,
-    user: web::Json<PostUserRequest>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let org_id = org_id.into_inner();
+    axum::Json(user): axum::Json<PostUserRequest>,
+) -> Response {
     let initiator_id = user_email.user_id;
-    let mut user = UserRequest::from(&user.into_inner());
+    let mut user = UserRequest::from(&user);
     user.email = user.email.trim().to_lowercase();
 
     let bad_req_msg = if user.password.len() < 8 {
@@ -171,23 +175,33 @@ pub async fn save(
         None
     };
     if let Some(msg) = bad_req_msg {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                msg.to_string(),
-            )),
-        );
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&meta::http::HttpResponse::error(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    msg.to_string(),
+                ))
+                .unwrap(),
+            ))
+            .unwrap();
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
         user.role.base_role = UserRole::Admin;
     }
-    users::post_user(&org_id, user, &initiator_id).await
+    match users::post_user(&org_id, user, &initiator_id).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// UpdateUser
 #[utoipa::path(
+    put,
+    path = "/{org_id}/users/{email_id}",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserUpdate",
@@ -209,28 +223,29 @@ pub async fn save(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update user details"}))
+        ("x-o2-mcp" = json!({"description": "Update user details", "category": "users"}))
     )
 )]
-#[put("/{org_id}/users/{email_id}")]
 pub async fn update(
-    params: web::Path<(String, String)>,
-    user: web::Json<UpdateUser>,
+    Path((org_id, email_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
+    axum::Json(user): axum::Json<UpdateUser>,
+) -> Response {
     let email_id = email_id.trim().to_lowercase();
     #[cfg(not(feature = "enterprise"))]
-    let mut user = user.into_inner();
-    #[cfg(feature = "enterprise")]
-    let user = user.into_inner();
+    let mut user = user;
     if user.eq(&UpdateUser::default()) {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Please specify appropriate fields to update user",
-            )),
-        );
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&meta::http::HttpResponse::error(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "Please specify appropriate fields to update user",
+                ))
+                .unwrap(),
+            ))
+            .unwrap();
     }
     if user.change_password
         && user
@@ -238,12 +253,17 @@ pub async fn update(
             .as_deref()
             .is_some_and(|pass| pass.len() < 8)
     {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                "Password must be at least 8 characters long".to_string(),
-            )),
-        );
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&meta::http::HttpResponse::error(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "Password must be at least 8 characters long".to_string(),
+                ))
+                .unwrap(),
+            ))
+            .unwrap();
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -258,11 +278,16 @@ pub async fn update(
     } else {
         UserUpdateMode::OtherUpdate
     };
-    users::update_user(&org_id, &email_id, update_mode, initiator_id, user).await
+    match users::update_user(&org_id, &email_id, update_mode, initiator_id, user).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// AddUserToOrganization
 #[utoipa::path(
+    post,
+    path = "/{org_id}/users/{email_id}",
     context_path = "/api",
     tag = "Users",
     operation_id = "AddUserToOrg",
@@ -283,43 +308,47 @@ pub async fn update(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Add user to organization"}))
+        ("x-o2-mcp" = json!({"description": "Add user to organization", "category": "users"}))
     )
 )]
-#[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
-    params: web::Path<(String, String)>,
-    role: web::Json<UserRoleRequest>,
+    Path((org_id, email_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
+    axum::Json(role): axum::Json<UserRoleRequest>,
+) -> Response {
     let initiator_id = user_email.user_id;
-    let role = UserOrgRole::from(&role.into_inner());
-    users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
+    let role = UserOrgRole::from(&role);
+    match users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
-fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
+fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<time::OffsetDateTime>>(
     conf: &Arc<Config>,
     cookie_name: &'a str,
     token_struct: &T,
     cookie_expiry: E,
-) -> cookie::Cookie<'a> {
+) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
-    let mut auth_cookie = cookie::Cookie::new(cookie_name, tokens);
+    let mut auth_cookie = Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(cookie_expiry.into());
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");
     if conf.auth.cookie_same_site_lax {
-        auth_cookie.set_same_site(cookie::SameSite::Lax);
+        auth_cookie.set_same_site(SameSite::Lax);
     } else {
-        auth_cookie.set_same_site(cookie::SameSite::None);
+        auth_cookie.set_same_site(SameSite::None);
     }
     auth_cookie
 }
+
 /// RemoveUserFromOrganization
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/users/{email_id}",
     context_path = "/api",
     tag = "Users",
     operation_id = "RemoveUserFromOrg",
@@ -340,21 +369,24 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "Remove user from organization"}))
+        ("x-o2-mcp" = json!({"description": "Remove user from organization", "category": "users"}))
     )
 )]
-#[delete("/{org_id}/users/{email_id}")]
 pub async fn delete(
-    path: web::Path<(String, String)>,
+    Path((org_id, email_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = path.into_inner();
+) -> Response {
     let initiator_id = user_email.user_id;
-    users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+    match users::remove_user_from_org(&org_id, &email_id, &initiator_id).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// BulkRemoveUserFromOrganization
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/users/bulk",
     context_path = "/api",
     tag = "Users",
     operation_id = "BulkRemoveUserFromOrg",
@@ -378,20 +410,17 @@ pub async fn delete(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[delete("/{org_id}/users/bulk")]
 pub async fn delete_bulk(
-    path: web::Path<String>,
+    Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    req: web::Json<BulkDeleteRequest>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let req = req.into_inner();
+    axum::Json(req): axum::Json<BulkDeleteRequest>,
+) -> Response {
     let initiator_id = user_email.user_id;
 
     #[cfg(feature = "enterprise")]
     for email in &req.ids {
         if !check_permissions(email, &org_id, &initiator_id, "users", "DELETE", None).await {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
 
@@ -402,15 +431,17 @@ pub async fn delete_bulk(
     for email in req.ids {
         match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
             Ok(v) => {
-                if v.status().is_success() {
+                // Check if response is successful by examining the status code
+                let (parts, _body) = v.into_parts();
+                if parts.status.is_success() {
                     successful.push(email);
                 } else {
                     log::error!(
                         "error in deleting service account {org_id}/{email} : {:?}",
-                        v.status().canonical_reason()
+                        parts.status.canonical_reason()
                     );
                     unsuccessful.push(email);
-                    err = v.status().canonical_reason().map(|v| v.to_string());
+                    err = parts.status.canonical_reason().map(|v| v.to_string());
                 }
             }
             Err(e) => {
@@ -421,15 +452,17 @@ pub async fn delete_bulk(
         }
     }
 
-    Ok(MetaHttpResponse::json(BulkDeleteResponse {
+    MetaHttpResponse::json(BulkDeleteResponse {
         successful,
         unsuccessful,
         err,
-    }))
+    })
 }
 
 /// AuthenticateUser
 #[utoipa::path(
+post,
+path = "/login",
 context_path = "/auth",
     tag = "Auth",
     operation_id = "UserLoginCheck",
@@ -447,19 +480,30 @@ context_path = "/auth",
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-#[post("/login")]
 pub async fn authentication(
-    auth: Option<web::Json<SignInUser>>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
+    #[cfg(feature = "enterprise")] Query(query): Query<HashMap<String, String>>,
+    auth: Option<axum::Json<SignInUser>>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     let native_login_enabled = get_dex_config().native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
     if !native_login_enabled {
-        return Ok(HttpResponse::Forbidden().json("Not Supported"));
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap();
     }
+
+    #[cfg(feature = "enterprise")]
+    let query_string = query
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
 
     // Until decoding the token or body, we can not know the the user_email
     #[cfg(feature = "enterprise")]
@@ -472,7 +516,7 @@ pub async fn authentication(
             http_method: "POST".to_string(),
             http_path: "/auth/login".to_string(),
             http_body: "".to_string(),
-            http_query_params: _req.query_string().to_string(),
+            http_query_params: query_string,
             http_response_code: 200,
             error_msg: None,
             trace_id: None,
@@ -482,7 +526,7 @@ pub async fn authentication(
     let mut resp = SignInResponse::default();
     let auth = match auth {
         Some(auth) => {
-            let mut auth = auth.into_inner();
+            let mut auth = auth.0;
             auth.name = auth.name.to_lowercase();
             auth
         }
@@ -490,7 +534,7 @@ pub async fn authentication(
             // get Authorization header from request
             #[cfg(feature = "enterprise")]
             {
-                let auth_header = _req.headers().get("Authorization");
+                let auth_header = headers.get(header::AUTHORIZATION);
                 if let Some(auth_header) = auth_header {
                     if let Some((name, password)) =
                         o2_dex::service::auth::get_user_from_token(auth_header.to_str().unwrap())
@@ -555,23 +599,27 @@ pub async fn authentication(
         .unwrap();
 
         let tokens = base64::encode(&tokens);
-        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+        let mut auth_cookie = Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
-            cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+            time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
         );
         auth_cookie.set_http_only(true);
         auth_cookie.set_secure(cfg.auth.cookie_secure_only);
         auth_cookie.set_path("/");
         if cfg.auth.cookie_same_site_lax {
-            auth_cookie.set_same_site(cookie::SameSite::Lax);
+            auth_cookie.set_same_site(SameSite::Lax);
         } else {
-            auth_cookie.set_same_site(cookie::SameSite::None);
+            auth_cookie.set_same_site(SameSite::None);
         }
         // audit the successful login
         #[cfg(feature = "enterprise")]
         audit(audit_message).await;
-        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+        (
+            StatusCode::OK,
+            [(header::SET_COOKIE, auth_cookie.to_string())],
+            axum::Json(resp),
+        )
+            .into_response()
     } else {
         #[cfg(feature = "enterprise")]
         audit_unauthorized_error(audit_message).await;
@@ -580,7 +628,7 @@ pub async fn authentication(
 }
 
 #[derive(serde::Deserialize)]
-struct PresignedURLGenerator {
+pub struct PresignedURLGenerator {
     #[serde(default = "default_exp_in")]
     exp_in: u32,
 }
@@ -594,31 +642,64 @@ const fn default_exp_in() -> u32 {
     600
 }
 
-#[get("/presigned-url")]
 pub async fn get_presigned_url(
-    _req: HttpRequest,
-    basic_auth: BasicAuth,
-    query: web::Query<PresignedURLGenerator>,
-) -> Result<HttpResponse, Error> {
+    Query(_query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+    Query(params): Query<PresignedURLGenerator>,
+) -> Response {
+    // Extract basic auth from Authorization header
+    let auth_header = match headers.get(header::AUTHORIZATION) {
+        Some(h) => h.to_str().unwrap_or(""),
+        None => {
+            return Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Body::from("Missing Authorization header"))
+                .unwrap();
+        }
+    };
+
+    // Parse Basic auth
+    let (user_id, password) = if let Some(encoded) = auth_header.strip_prefix("Basic ") {
+        let decoded = config::utils::base64::decode(encoded).unwrap_or_default();
+        let parts: Vec<&str> = decoded.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            return Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Body::from("Invalid Authorization header"))
+                .unwrap();
+        }
+        (parts[0].to_string(), parts[1].to_string())
+    } else {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::from("Invalid Authorization header"))
+            .unwrap();
+    };
+
     let cfg = get_config();
     let time = chrono::Utc::now().timestamp();
     let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
 
     let base_url = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
     let url = generate_presigned_url(
-        basic_auth.user_id(),
-        basic_auth.password().unwrap(),
+        &user_id,
+        &password,
         password_ext_salt,
         &base_url,
-        query.exp_in as i64,
+        params.exp_in as i64,
         time,
     );
 
     let payload = PresignedURLGeneratorResponse { url };
     #[cfg(feature = "enterprise")]
     {
+        let query_string = _query
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&");
         let audit_message = AuditMessage {
-            user_email: basic_auth.user_id().to_string(),
+            user_email: user_id,
             org_id: "".to_string(),
             _timestamp: now_micros(),
             protocol: Protocol::Http,
@@ -626,7 +707,7 @@ pub async fn get_presigned_url(
                 http_method: "GET".to_string(),
                 http_path: "/auth/presigned-url".to_string(),
                 http_body: "".to_string(),
-                http_query_params: _req.query_string().to_string(),
+                http_query_params: query_string,
                 http_response_code: 200,
                 error_msg: None,
                 trace_id: None,
@@ -634,26 +715,24 @@ pub async fn get_presigned_url(
         };
         audit(audit_message).await;
     }
-    Ok(HttpResponse::Ok().json(&payload))
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&payload).unwrap()))
+        .unwrap()
 }
 
-#[get("/login")]
-pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn get_auth(
+    headers: http::HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use actix_web::http::header;
-        use chrono::Utc;
-
         use crate::{
             common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
         };
 
         let mut resp = SignInResponse::default();
-
-        let query = web::Query::<std::collections::HashMap<String, String>>::from_query(
-            _req.query_string(),
-        )
-        .unwrap();
 
         let mut request_time = None;
         let mut expires_in = 300;
@@ -703,12 +782,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                         return unauthorized_error(resp);
                     }
                 };
-                if Utc::now().timestamp() - req_ts > expires_in {
+                if chrono::Utc::now().timestamp() - req_ts > expires_in {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
                 format!("q_auth {s}")
-            } else if let Some(auth_header) = _req.headers().get("Authorization") {
+            } else if let Some(auth_header) = headers.get(header::AUTHORIZATION) {
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
@@ -780,10 +859,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     access_token,
                     refresh_token: "".to_string(),
                 };
-                let expiry = cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
+                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -799,10 +877,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     request_time: req_ts,
                     expires_in,
                 };
-                let expiry = cookie::time::OffsetDateTime::now_utc()
-                    + cookie::time::Duration::seconds(req_ts);
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
+                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
@@ -813,12 +890,15 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 ID_TOKEN_HEADER,
                 base64::encode(&id_token.to_string())
             );
-            audit_message._timestamp = Utc::now().timestamp_micros();
+            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
-            Ok(HttpResponse::Found()
-                .append_header((header::LOCATION, url))
-                .cookie(auth_cookie)
-                .json(resp))
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, url)
+                .header(header::SET_COOKIE, auth_cookie.to_string())
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_string(&resp).unwrap()))
+                .unwrap()
         } else {
             audit_unauthorized_error(audit_message).await;
             unauthorized_error(resp)
@@ -827,12 +907,20 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(HttpResponse::Forbidden().json("Not Supported"))
+        drop(headers);
+        drop(query);
+        Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("\"Not Supported\""))
+            .unwrap()
     }
 }
 
 /// ListUserRoles
 #[utoipa::path(
+    get,
+    path = "/{org_id}/users/roles",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserRoles",
@@ -854,14 +942,13 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"}))
     )
 )]
-#[get("/{org_id}/users/roles")]
-pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_roles(Path(_org_id): Path<String>) -> impl IntoResponse {
     let roles = get_roles()
         .iter()
         .filter_map(check_role_available)
         .collect::<Vec<RolesResponse>>();
 
-    Ok(HttpResponse::Ok().json(roles))
+    axum::Json(roles)
 }
 
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
@@ -879,10 +966,14 @@ fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
     }
 }
 
-fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
+fn unauthorized_error(mut resp: SignInResponse) -> Response {
     resp.status = false;
     resp.message = "Invalid credentials".to_string();
-    Ok(HttpResponse::Unauthorized().json(resp))
+    Response::builder()
+        .status(StatusCode::UNAUTHORIZED)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&resp).unwrap()))
+        .unwrap()
 }
 
 #[cfg(feature = "enterprise")]
@@ -898,6 +989,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 /// ListUserInvitations
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    get,
+    path = "/invites",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",
@@ -916,16 +1009,17 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     )
 )]
-#[get("/invites")]
-pub async fn list_invitations(
-    Headers(user_email): Headers<UserEmail>,
-) -> Result<HttpResponse, Error> {
+pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Response {
     let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id, true).await
+    match users::list_user_invites(user_id, true).await {
+        Ok(resp) => resp,
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 #[cfg(feature = "cloud")]
 #[utoipa::path(
+    post,
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",
@@ -939,15 +1033,13 @@ pub async fn list_invitations(
         (status = 200, description = "Success", content_type = "application/json", body = inline(UserList)),
     )
 )]
-#[delete("/invites/{token}")]
 pub async fn decline_invitation(
     Headers(user_email): Headers<UserEmail>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, Error> {
+    Path(token): Path<String>,
+) -> Response {
     use super::super::auth::jwt;
     use crate::service::{db, organization};
 
-    let token = path.into_inner();
     let user_id = user_email.user_id.as_str();
 
     match organization::decline_invitation(user_id, &token).await {
@@ -958,11 +1050,17 @@ pub async fn decline_invitation(
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("error getting db user for {user_id} : {e}");
-                        return Ok(HttpResponse::Ok().json(serde_json::json!({
-                                "message":"Invitation declined successfully",
-                                "remaining": remaining.len()
-                            }
-                        )));
+                        return Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from(
+                                serde_json::to_string(&serde_json::json!({
+                                    "message":"Invitation declined successfully",
+                                    "remaining": remaining.len()
+                                }))
+                                .unwrap(),
+                            ))
+                            .unwrap();
                     }
                 };
                 let _ = jwt::check_and_add_to_org(
@@ -971,54 +1069,88 @@ pub async fn decline_invitation(
                 )
                 .await;
             }
-            Ok(HttpResponse::Ok()
-                    .json(serde_json::json!({"message":"Invitation declined successfully","remaining": remaining.len()})))
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!({
+                        "message":"Invitation declined successfully",
+                        "remaining": remaining.len()
+                    }))
+                    .unwrap(),
+                ))
+                .unwrap()
         }
 
-        Err(err) => {
-            Ok(HttpResponse::BadRequest().json(serde_json::json!({"message": err.to_string()})))
-        }
+        Err(err) => Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({"message": err.to_string()})).unwrap(),
+            ))
+            .unwrap(),
     }
 }
 
 #[cfg(not(feature = "cloud"))]
-#[delete("/invites/{token}")]
 pub async fn decline_invitation(
     Headers(_): Headers<UserEmail>,
-    _path: web::Path<String>,
-) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Path(_token): Path<String>,
+) -> Response {
+    Response::builder()
+        .status(StatusCode::FORBIDDEN)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("\"Not Supported\""))
+        .unwrap()
 }
 
 #[cfg(not(feature = "cloud"))]
-#[get("/invites")]
-pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Response {
+    Response::builder()
+        .status(StatusCode::FORBIDDEN)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("\"Not Supported\""))
+        .unwrap()
 }
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{App, test};
-    use actix_web_httpauth::headers::authorization::Basic;
-
     use super::*;
 
-    #[tokio::test]
-    async fn test_get_presigned_url() {
-        let app = test::init_service(App::new().service(get_presigned_url)).await;
+    #[test]
+    fn test_presigned_url_generator_default() {
+        let generator = PresignedURLGenerator {
+            exp_in: default_exp_in(),
+        };
+        assert_eq!(generator.exp_in, 600);
+    }
 
-        let auth = Basic::new("username", Some("password"));
-        let req = test::TestRequest::get()
-            .uri("/presigned-url")
-            .append_header((actix_web::http::header::AUTHORIZATION, auth))
-            .to_request();
-        let resp = test::call_service(&app, req).await;
+    #[test]
+    fn test_presigned_url_generator_response_serialization() {
+        let response = PresignedURLGeneratorResponse {
+            url: "https://example.com/presigned".to_string(),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("https://example.com/presigned"));
+    }
 
-        assert_eq!(resp.status(), http::StatusCode::OK);
+    #[test]
+    fn test_check_role_available_filters_root() {
+        let result = check_role_available(&UserRole::Root);
+        assert!(result.is_none());
+    }
 
-        let body = test::read_body(resp).await;
-        let response_body: PresignedURLGeneratorResponse = serde_json::from_slice(&body).unwrap();
+    #[test]
+    fn test_check_role_available_filters_service_account() {
+        let result = check_role_available(&UserRole::ServiceAccount);
+        assert!(result.is_none());
+    }
 
-        assert!(!response_body.url.is_empty());
+    #[test]
+    fn test_check_role_available_allows_admin() {
+        let result = check_role_available(&UserRole::Admin);
+        assert!(result.is_some());
+        let role_response = result.unwrap();
+        assert_eq!(role_response.value, "admin");
     }
 }

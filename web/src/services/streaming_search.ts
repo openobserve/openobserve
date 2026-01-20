@@ -149,7 +149,7 @@ const stream = {
         ? (window as any).use_cache
         : true;
         
-    const url = `/api/${org_identifier}/_multi_search_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
+    const url = `/api/${org_identifier}/_search_multi_stream?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&trace_id=${traceId}`;
     return http().post(url, query);
   },
   

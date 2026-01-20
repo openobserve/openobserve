@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, Responder, post, web};
+#[cfg(feature = "enterprise")]
+use axum::body::Body;
+use axum::{Json, extract::Path, http::StatusCode, response::Response};
 // Re-export enterprise types for OpenAPI and route handlers
 #[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::alerts::rca_agent::{
@@ -48,6 +50,8 @@ pub fn init_agent_client() -> Result<(), String> {
 
 /// Non-streaming agent chat endpoint
 #[utoipa::path(
+    post,
+    path = "/{org_id}/agent/chat",
     context_path = "/api",
     tag = "Agents",
     operation_id = "AgentChat",
@@ -83,13 +87,10 @@ pub fn init_agent_client() -> Result<(), String> {
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[post("/{org_id}/agent/chat")]
 pub async fn agent_chat(
-    path: web::Path<String>,
-    #[allow(unused_variables)] web::Json(req): web::Json<AgentChatRequest>,
-) -> Result<HttpResponse, actix_web::Error> {
-    let _org_id = path.into_inner();
-
+    Path(_org_id): Path<String>,
+    #[allow(unused_variables)] Json(req): Json<AgentChatRequest>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use config::get_config;
@@ -103,7 +104,7 @@ pub async fn agent_chat(
 
         // Check if agent is enabled
         if !o2_config.incidents.rca_enabled || o2_config.incidents.rca_agent_url.is_empty() {
-            return Ok(MetaHttpResponse::bad_request("Agent chat not enabled"));
+            return MetaHttpResponse::bad_request("Agent chat not enabled");
         }
 
         // Create agent client
@@ -115,9 +116,9 @@ pub async fn agent_chat(
         ) {
             Ok(c) => c,
             Err(e) => {
-                return Ok(MetaHttpResponse::internal_error(format!(
+                return MetaHttpResponse::internal_error(format!(
                     "Failed to create agent client: {e}"
-                )));
+                ));
             }
         };
 
@@ -145,23 +146,21 @@ pub async fn agent_chat(
 
         // Query agent
         match client.query(&req.agent_type, query_req).await {
-            Ok(response) => Ok(MetaHttpResponse::json(response)),
-            Err(e) => Ok(MetaHttpResponse::internal_error(format!(
-                "Agent query failed: {e}"
-            ))),
+            Ok(response) => MetaHttpResponse::json(response),
+            Err(e) => MetaHttpResponse::internal_error(format!("Agent query failed: {e}")),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        Ok(MetaHttpResponse::bad_request(
-            "Agent chat is only available in enterprise version",
-        ))
+        MetaHttpResponse::bad_request("Agent chat is only available in enterprise version")
     }
 }
 
 /// Streaming agent chat endpoint (SSE)
 #[utoipa::path(
+    post,
+    path = "/{org_id}/agent/chat/stream",
     context_path = "/api",
     tag = "Agents",
     operation_id = "AgentChatStream",
@@ -184,20 +183,15 @@ pub async fn agent_chat(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
 )]
-#[post("/{org_id}/agent/chat/stream")]
 pub async fn agent_chat_stream(
-    path: web::Path<String>,
-    #[allow(unused_variables)] web::Json(req): web::Json<AgentChatRequest>,
-) -> impl Responder {
-    let _org_id = path.into_inner();
-
+    Path(_org_id): Path<String>,
+    #[allow(unused_variables)] Json(req): Json<AgentChatRequest>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use async_stream::stream;
         use futures::StreamExt;
         use o2_enterprise::enterprise::alerts::rca_agent::QueryRequest;
-        use serde_json::json;
-        use web::Bytes;
 
         // Get global agent client (connection pooling)
         let client = match get_agent_client() {
@@ -219,7 +213,7 @@ pub async fn agent_chat_stream(
                     req.history
                         .iter()
                         .map(|msg| {
-                            json!({
+                            serde_json::json!({
                                 "role": msg.role,
                                 "content": msg.content
                             })
@@ -233,22 +227,22 @@ pub async fn agent_chat_stream(
         let agent_type = req.agent_type.clone();
         let s = stream! {
             // Send immediate status event BEFORE calling agent service
-            let status_event = json!({
+            let status_event = serde_json::json!({
                 "role": "assistant",
                 "content": "",
                 "status": "processing"
             });
-            yield Ok::<Bytes, std::io::Error>(Bytes::from(format!("data: {}\n\n", status_event)));
+            yield Ok::<bytes::Bytes, std::io::Error>(bytes::Bytes::from(format!("data: {}\n\n", status_event)));
 
             // Now call the external agent service
             let response = match client.query_stream(&agent_type, query_req).await {
                 Ok(r) => r,
                 Err(e) => {
-                    let error_event = json!({
+                    let error_event = serde_json::json!({
                         "type": "error",
                         "error": format!("Agent query failed: {}", e)
                     });
-                    yield Ok(Bytes::from(format!("data: {}\n\n", error_event)));
+                    yield Ok(bytes::Bytes::from(format!("data: {}\n\n", error_event)));
                     return;
                 }
             };
@@ -269,16 +263,25 @@ pub async fn agent_chat_stream(
             }
         };
 
-        HttpResponse::Ok()
-            .content_type("text/event-stream")
-            .streaming(Box::pin(s))
+        axum::http::Response::builder()
+            .status(StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
+            .header(axum::http::header::CACHE_CONTROL, "no-cache")
+            .header("X-Accel-Buffering", "no")
+            .body(Body::from_stream(s))
+            .unwrap_or_else(|_| Response::new(Body::empty()))
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
-        HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Agent chat is only available in enterprise version"
-        }))
+        use axum::response::IntoResponse;
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Agent chat is only available in enterprise version"
+            })),
+        )
+            .into_response()
     }
 }
 

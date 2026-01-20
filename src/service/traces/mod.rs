@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,12 @@ use std::{
     time::Instant,
 };
 
-use actix_web::{HttpResponse, http, web};
+use axum::{
+    Json,
+    body::Bytes,
+    http,
+    response::{IntoResponse, Response as HttpResponse},
+};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -61,7 +66,8 @@ use crate::{
         alerts::alert::AlertExt,
         format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, grpc::get_val, write_file,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+            grpc::get_val, write_file,
         },
         logs::O2IngestJsonData,
         metadata::{
@@ -87,7 +93,7 @@ const ATTR_STATUS_MESSAGE: &str = "status_message";
 
 pub async fn otlp_proto(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
@@ -95,10 +101,7 @@ pub async fn otlp_proto(
         Ok(v) => v,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {e}"),
-            )));
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid proto: {e}")));
         }
     };
     match handle_otlp_request(
@@ -122,7 +125,7 @@ pub async fn otlp_proto(
 
 pub async fn otlp_json(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     in_stream_name: Option<&str>,
     user: IngestUser,
 ) -> Result<HttpResponse, Error> {
@@ -130,10 +133,7 @@ pub async fn otlp_json(
         Ok(req) => req,
         Err(e) => {
             log::error!("[TRACES:OTLP] Invalid json: {e}");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {e}"),
-            )));
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
         }
     };
     match handle_otlp_request(
@@ -164,20 +164,17 @@ pub async fn handle_otlp_request(
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
+            return Ok(MetaHttpResponse::too_many_requests(e));
         } else {
             log::error!("[TRACES:OTLP] ingestion error: {e}");
-            return Ok(
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                Json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
                     e,
                 )),
-            );
+            )
+                .into_response());
         }
     }
 
@@ -185,16 +182,12 @@ pub async fn handle_otlp_request(
     {
         match super::organization::is_org_in_free_trial_period(org_id).await {
             Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
+                return Ok(MetaHttpResponse::forbidden(format!(
+                    "org {org_id} has expired its trial period"
                 )));
             }
             Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    http::StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
+                return Ok(MetaHttpResponse::forbidden(e.to_string()));
             }
             _ => {}
         }
@@ -410,14 +403,14 @@ pub async fn handle_otlp_request(
                             log::error!(
                                 "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
                             );
-                            return Ok(HttpResponse::InternalServerError()
-                            .append_header((ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object")))
-                            .json(
-                                MetaHttpResponse::error(
+                            return Ok((
+                                http::StatusCode::INTERNAL_SERVER_ERROR,
+                                [(ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object"))],
+                                Json(MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR,
                                     "stream did not receive a valid json object",
-                                ),
-                            ));
+                                )),
+                            ).into_response());
                         }
                     };
 
@@ -471,15 +464,15 @@ pub async fn handle_otlp_request(
                                 log::error!(
                                     "[TRACES:OTLP] stream did not receive a valid json object"
                                 );
-                                return Ok(HttpResponse::InternalServerError()
-                                    .append_header((
-                                        ERROR_HEADER,
-                                        "stream did not receive a valid json object",
-                                    ))
-                                    .json(MetaHttpResponse::error(
+                                return Ok((
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    [(ERROR_HEADER, "stream did not receive a valid json object")],
+                                    Json(MetaHttpResponse::error(
                                         http::StatusCode::INTERNAL_SERVER_ERROR,
                                         "stream did not receive a valid json object",
-                                    )));
+                                    )),
+                                )
+                                    .into_response());
                             }
                         };
 
@@ -531,20 +524,20 @@ pub async fn handle_otlp_request(
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)
-        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
-            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
+            http::StatusCode::BAD_REQUEST
         } else {
-            (
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                HttpResponse::InternalServerError(),
-            )
+            http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok(http_status
-            .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
-            .json(MetaHttpResponse::error(
+        return Ok((
+            status_code,
+            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
+            Json(MetaHttpResponse::error(
                 status_code,
                 format!("error while writing trace data: {e}"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -569,7 +562,7 @@ pub async fn handle_otlp_request(
 /// For internal service only, so don't need to check UDS
 pub async fn ingest_json(
     org_id: &str,
-    body: web::Bytes,
+    body: Bytes,
     req_type: OtlpRequestType,
     traces_stream_name: &str,
     user: IngestUser,
@@ -578,20 +571,17 @@ pub async fn ingest_json(
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
-            return Ok(
-                HttpResponse::TooManyRequests().json(MetaHttpResponse::error(
-                    http::StatusCode::TOO_MANY_REQUESTS,
-                    e,
-                )),
-            );
+            return Ok(MetaHttpResponse::too_many_requests(e));
         } else {
             log::error!("[TRACES:JSON] ingestion error: {e}");
-            return Ok(
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+            return Ok((
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                Json(MetaHttpResponse::error(
                     http::StatusCode::SERVICE_UNAVAILABLE,
                     e,
                 )),
-            );
+            )
+                .into_response());
         }
     }
 
@@ -644,17 +634,20 @@ pub async fn ingest_json(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
                     &trace_id
                 );
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(
                         ERROR_HEADER,
                         format!(
                             "[trace_id: {trace_id}] stream did not receive a valid json object"
                         ),
-                    ))
-                    .json(MetaHttpResponse::error(
+                    )],
+                    Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         "stream did not receive a valid json object",
-                    )));
+                    )),
+                )
+                    .into_response());
             }
         };
 
@@ -684,20 +677,20 @@ pub async fn ingest_json(
     {
         log::error!("Error while writing traces: {e}");
         // Check if this is a schema validation error (InvalidData)
-        let (status_code, mut http_status) = if e.kind() == std::io::ErrorKind::InvalidData {
-            (http::StatusCode::BAD_REQUEST, HttpResponse::BadRequest())
+        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
+            http::StatusCode::BAD_REQUEST
         } else {
-            (
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                HttpResponse::InternalServerError(),
-            )
+            http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok(http_status
-            .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
-            .json(MetaHttpResponse::error(
+        return Ok((
+            status_code,
+            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
+            Json(MetaHttpResponse::error(
                 status_code,
                 format!("error while writing trace data: {e}"),
-            )));
+            )),
+        )
+            .into_response());
     }
 
     let time = start.elapsed().as_secs_f64();
@@ -746,17 +739,19 @@ fn format_response(
 
     match req_type {
         OtlpRequestType::HttpJson => Ok(if partial {
-            HttpResponse::PartialContent().json(res)
+            (http::StatusCode::PARTIAL_CONTENT, Json(res)).into_response()
         } else {
-            HttpResponse::Ok().json(res)
+            MetaHttpResponse::json(res)
         }),
         _ => {
             let mut out = BytesMut::with_capacity(res.encoded_len());
             res.encode(&mut out).expect("Out of memory");
-            Ok(HttpResponse::Ok()
-                .status(http::StatusCode::OK)
-                .content_type("application/x-protobuf")
-                .body(out))
+            Ok((
+                http::StatusCode::OK,
+                [(http::header::CONTENT_TYPE, "application/x-protobuf")],
+                out.to_vec(),
+            )
+                .into_response())
         }
     }
 }
@@ -994,7 +989,13 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
+    let writer = ingester::get_writer(
+        get_thread_id(),
+        org_id,
+        StreamType::Traces.as_str(),
+        stream_name,
+    )
+    .await;
     let req_stats = write_file(
         &writer,
         org_id,
@@ -1094,7 +1095,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(response.status(), http::StatusCode::OK);
     }
 
     #[test]
@@ -1112,10 +1113,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(
-            response.status(),
-            actix_web::http::StatusCode::PARTIAL_CONTENT
-        );
+        assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
     }
 
     #[test]
@@ -1131,7 +1129,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(
             response.headers().get("content-type").unwrap(),
             "application/x-protobuf"
@@ -1153,7 +1151,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(
             response.headers().get("content-type").unwrap(),
             "application/x-protobuf"
@@ -1175,7 +1173,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(response.status(), http::StatusCode::OK);
         assert_eq!(
             response.headers().get("content-type").unwrap(),
             "application/x-protobuf"
@@ -1198,10 +1196,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(
-            response.status(),
-            actix_web::http::StatusCode::PARTIAL_CONTENT
-        );
+        assert_eq!(response.status(), http::StatusCode::PARTIAL_CONTENT);
     }
 
     // Test get_span_status with invalid status codes
@@ -1335,7 +1330,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK); // Should be OK, not partial
+        assert_eq!(response.status(), http::StatusCode::OK); // Should be OK, not partial
     }
 
     #[test]
@@ -1353,7 +1348,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert_eq!(response.status(), actix_web::http::StatusCode::OK); // Negative is treated as no rejection
+        assert_eq!(response.status(), http::StatusCode::OK); // Negative is treated as no rejection
     }
 
     // Test span status edge cases

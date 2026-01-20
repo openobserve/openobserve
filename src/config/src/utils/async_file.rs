@@ -20,13 +20,14 @@ use std::{
     time::SystemTime,
 };
 
-use async_walkdir::WalkDir;
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use futures::StreamExt;
 use tokio::{
     fs::{File, metadata, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
+
+use crate::utils::async_walkdir::{Filtering, WalkDir};
 
 #[inline(always)]
 pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
@@ -283,11 +284,11 @@ where
         async move {
             let is_dir = path.is_dir();
             if filter(path) {
-                async_walkdir::Filtering::Continue
+                Filtering::Continue
             } else if is_dir {
-                async_walkdir::Filtering::IgnoreDir
+                Filtering::IgnoreDir
             } else {
-                async_walkdir::Filtering::Ignore
+                Filtering::Ignore
             }
         }
     });

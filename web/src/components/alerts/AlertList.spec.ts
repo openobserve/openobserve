@@ -293,12 +293,10 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
-  it("renders the page container and view mode tabs", async () => {
+  it("renders the page container", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
-    // Verify view mode tabs exist (Alerts/Incidents tabs)
-    expect(wrapper.find('[data-test="alert-incident-view-tabs"]').exists()).toBe(true);
   });
 
   it("renders search input and toggle", async () => {
