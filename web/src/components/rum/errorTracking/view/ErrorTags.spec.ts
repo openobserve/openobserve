@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
+import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -94,6 +95,7 @@ describe("ErrorTags Component", () => {
         error: mockError,
       },
       global: {
+        plugins: [i18n],
         stubs: {
           "q-separator": {
             template: '<div data-test="separator" />',

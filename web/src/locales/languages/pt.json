@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
-    "id": "CARTEIRA DE IDENTIDADE"
+    "id": "CARTEIRA DE IDENTIDADE",
+    "getStarted": "Comece"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -373,7 +374,22 @@
     "viewURL": "Exibir URL",
     "events": "Eventos",
     "location": "Localização",
-    "frustrationCount": "Frustrações"
+    "frustrationCount": "Frustrações",
+    "loadingMsg": "Espere aí, estamos carregando dados do RUM.",
+    "breadcrumbs": "Pão ralado",
+    "tags": "Etiquetas",
+    "searchEvents": "Pesquisar eventos",
+    "loadingSessions": "Espere aí, estamos buscando sessões.",
+    "errorStack": "Pilha de erros",
+    "sessionReplay": "Repetição da sessão",
+    "viewSessionReplay": "Exibir repetição da sessão",
+    "playSessionReplay": "Reproduzir repetição da sessão",
+    "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
+    "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
+    "getStartedRUM": "Comece com o monitoramento real de usuários",
+    "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
+    "eventID": "ID do evento",
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
   },
   "about": {
     "name": "Abra o Observe",

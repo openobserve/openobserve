@@ -107,7 +107,8 @@
     "addFolder": "Add Folder",
     "status": "Status",
     "chunkLoadErrorMsg": "A new version of the application is available. Please refresh the page to continue.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Get Started"
   },
   "search": {
     "resetFields": "Reset selected table fields",
@@ -372,7 +373,22 @@
     "sizekb": "Size (kb)",
     "viewURL": "View URL",
     "events": "Events",
-    "location": "Location"
+    "location": "Location",
+    "loadingMsg": "Hold on tight, we're loading RUM data.",
+    "breadcrumbs": "Breadcrumbs",
+    "tags": "Tags",
+    "searchEvents": "Search Events",
+    "loadingSessions": "Hold on tight, we're fetching sessions.",
+    "errorStack": "Error Stack",
+    "sessionReplay": "Session Replay",
+    "viewSessionReplay": "View Session Replay",
+    "playSessionReplay": "Play Session Replay",
+    "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
+    "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
+    "getStartedRUM": "Get started with Real User Monitoring",
+    "loadingErrorDetails": "Hold on tight, we're fetching error details.",
+    "eventID": "Event ID",
+    "loadingApplicationErrors": "Hold on tight, we're fetching application errors."
   },
   "about": {
     "name": "OpenObserve",

@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
-    "id": "KİMLİK"
+    "id": "KİMLİK",
+    "getStarted": "Başlayın"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -373,7 +374,22 @@
     "viewURL": "URL'yi görüntüle",
     "events": "Olaylar",
     "location": "Yer",
-    "frustrationCount": "Hayal kırıklıkları"
+    "frustrationCount": "Hayal kırıklıkları",
+    "loadingMsg": "Sıkı durun, RUM verilerini yüklüyoruz.",
+    "breadcrumbs": "Ekmek kırıntıları",
+    "tags": "Etiketler",
+    "searchEvents": "Etkinlikleri Ara",
+    "loadingSessions": "Sıkı durun, seansları getiriyoruz.",
+    "errorStack": "Hata Yığını",
+    "sessionReplay": "Oturum Tekrar Oynatma",
+    "viewSessionReplay": "Oturum Tekrarını Görüntüle",
+    "playSessionReplay": "Oturum Oynatma Oynatma",
+    "discoverSessionTitle": "Kullanıcı Etkileşimlerini Ayrıntılı Anlamak için Oturum Tekrarını Keşfedin",
+    "discoverSessionMessage": "Session Replay, web sitenizdeki veya uygulamanızdaki kullanıcı etkileşimlerini yakalar ve tekrarlar. Bu, kullanıcıların nasıl gezindiklerini, nereye tıkladıklarını, ne yazdıklarını ve içeriğinizle nasıl etkileşim kurduklarını görsel olarak incelemenizi sağlar.",
+    "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
+    "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
+    "eventID": "Olay Kimliği",
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
   },
   "about": {
     "name": "Açık Gözlem",

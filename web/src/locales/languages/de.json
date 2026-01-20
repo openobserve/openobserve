@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
-    "id": "ID"
+    "id": "ID",
+    "getStarted": "Fangen Sie an"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -373,7 +374,22 @@
     "viewURL": "URL anzeigen",
     "events": "Ereignisse",
     "location": "Standort",
-    "frustrationCount": "Frustrationen"
+    "frustrationCount": "Frustrationen",
+    "loadingMsg": "Halten Sie sich fest, wir laden RUM-Daten.",
+    "breadcrumbs": "Semmelbrösel",
+    "tags": "Schlagworte",
+    "searchEvents": "Veranstaltungen suchen",
+    "loadingSessions": "Halt dich fest, wir veranstalten Sessions.",
+    "errorStack": "Fehlerstapel",
+    "sessionReplay": "Sitzungswiederholung",
+    "viewSessionReplay": "Sitzungswiederholung anzeigen",
+    "playSessionReplay": "Sitzungswiederholung abspielen",
+    "discoverSessionTitle": "Entdecken Sie Session Replay, um Benutzerinteraktionen im Detail zu verstehen",
+    "discoverSessionMessage": "Session Replay erfasst Benutzerinteraktionen auf Ihrer Website oder Anwendung und spielt sie erneut ab. Auf diese Weise können Sie visuell überprüfen, wie Benutzer navigieren, wohin sie klicken, was sie eingeben und wie sie mit Ihren Inhalten interagieren",
+    "getStartedRUM": "Erste Schritte mit Real User Monitoring",
+    "loadingErrorDetails": "Halten Sie sich fest, wir rufen Fehlerdetails ab.",
+    "eventID": "ID des Ereignisses",
+    "loadingApplicationErrors": "Halten Sie sich fest, wir holen Anwendungsfehler ab."
   },
   "about": {
     "name": "Observe öffnen",
