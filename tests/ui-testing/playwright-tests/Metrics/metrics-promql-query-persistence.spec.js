@@ -365,18 +365,59 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         await page.keyboard.press('Escape');
         await page.waitForTimeout(300);
 
-        const addButton = page.locator('[data-test="metrics-add-query-btn"], button').filter({
-            hasText: /Add Query|Add|^\+$/
-        }).first();
+        testLogger.info('Looking for Add Query button...');
 
-        if (await addButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await addButton.click({ force: true });
-            await page.waitForTimeout(1500);
-            testLogger.info('Added new query tab');
-            return true;
+        // Try multiple selectors for the add query button
+        const selectors = [
+            '[data-test="`dashboard-panel-query-tab-add`"]',  // Exact data-test attribute
+            'button[data-test*="panel-query-tab-add"]',        // Partial match
+            'button.q-btn[icon="add"]',                        // Button with add icon
+            'button.q-btn.q-btn--round.q-btn--flat',          // Round flat button (likely the add button)
+            '.q-tab__content + button[icon="add"]',           // Add button next to tabs
+            'button.q-btn:has(.q-icon[name="add"])',          // Button containing add icon
+        ];
+
+        for (const selector of selectors) {
+            testLogger.info(`Trying selector: ${selector}`);
+            const addButton = page.locator(selector).first();
+
+            if (await addButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+                testLogger.info(`✓ Found add button with selector: ${selector}`);
+                await addButton.click({ force: true });
+                await page.waitForTimeout(1500);
+
+                // Verify a new tab was created by counting tabs
+                const tabs = page.locator('[role="tab"]');
+                const tabCount = await tabs.count();
+                testLogger.info(`✓ Tab count after add: ${tabCount}`);
+
+                testLogger.info('✓ Added new query tab successfully');
+                return true;
+            }
         }
 
-        testLogger.warn('Add query button not found');
+        // If specific selectors don't work, try finding any round button with add icon
+        const roundButtons = page.locator('button.q-btn--round');
+        const buttonCount = await roundButtons.count();
+        testLogger.info(`Found ${buttonCount} round buttons`);
+
+        for (let i = 0; i < buttonCount; i++) {
+            const btn = roundButtons.nth(i);
+            const hasAddIcon = await btn.locator('.q-icon').evaluate(icon => {
+                return icon.textContent === 'add' || icon.getAttribute('aria-label')?.includes('add');
+            }).catch(() => false);
+
+            if (hasAddIcon && await btn.isVisible().catch(() => false)) {
+                testLogger.info(`Found add button at index ${i}`);
+                await btn.click({ force: true });
+                await page.waitForTimeout(1500);
+                testLogger.info('✓ Added new query tab successfully');
+                return true;
+            }
+        }
+
+        testLogger.error('❌ Add query button not found with any selector');
+        await page.screenshot({ path: `add-button-not-found-${Date.now()}.png` }).catch(() => {});
         return false;
     }
 
@@ -532,11 +573,95 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
         // Enter Query A in Tab 1
         const queryA = 'up{job="prometheus"}';
         await enterPromQLQuery(page, queryA);
-        testLogger.info(`Tab 1 query set: ${queryA}`);
+
+        // VERIFY queryA was actually entered in Tab 1
+        const tab1InitialQuery = await getCurrentQueryText(page);
+        testLogger.info(`Tab 1 query set: "${queryA}"`);
+        testLogger.info(`Tab 1 query verified: "${tab1InitialQuery}"`);
+
+        if (!tab1InitialQuery.includes(queryA.substring(0, 10))) {
+            testLogger.error(`❌ CRITICAL: Failed to enter queryA in Tab 1!`);
+            testLogger.error(`Expected: "${queryA}"`);
+            testLogger.error(`Got: "${tab1InitialQuery}"`);
+            await page.screenshot({ path: `tab1-initial-query-failed-${Date.now()}.png` }).catch(() => {});
+            throw new Error(`Failed to enter queryA in Tab 1. Expected "${queryA}" but got "${tab1InitialQuery}"`);
+        }
+
+        // Count tabs before adding
+        const tabsBeforeAdd = await page.locator('[role="tab"]').count();
+        testLogger.info(`Tabs before adding: ${tabsBeforeAdd}`);
 
         // Create Tab 2
-        await addQueryTab(page);
+        const tab2Created = await addQueryTab(page);
+
+        if (!tab2Created) {
+            testLogger.error('❌ CRITICAL: Failed to create Tab 2 - test cannot continue');
+            throw new Error('Failed to create Tab 2 - add button not found');
+        }
+
         await page.waitForTimeout(1000); // Extra wait for tab to be fully created and active
+
+        // Count tabs after adding
+        const tabsAfterAdd = await page.locator('[role="tab"]').count();
+        testLogger.info(`Tabs after adding: ${tabsAfterAdd}`);
+
+        if (tabsAfterAdd <= tabsBeforeAdd) {
+            testLogger.error(`❌ CRITICAL: Tab count did not increase (Before: ${tabsBeforeAdd}, After: ${tabsAfterAdd})`);
+            throw new Error('Tab 2 was not created - tab count did not increase');
+        }
+
+        // Explicitly verify we're on Tab 2 by checking which tab is active
+        const tab2Locator = page.locator('[role="tab"]').filter({
+            hasText: /Query 2|Tab 2/i
+        }).first();
+        const tab2Exists = await tab2Locator.count() > 0;
+
+        if (!tab2Exists) {
+            testLogger.error('❌ CRITICAL: Tab 2 element not found in DOM');
+            throw new Error('Tab 2 element not found after creation');
+        }
+
+        const isTab2Active = await tab2Locator.evaluate(el => {
+            return el.classList.contains('q-tab--active') || el.getAttribute('aria-selected') === 'true';
+        }).catch(() => false);
+
+        if (!isTab2Active) {
+            testLogger.warn('Tab 2 not active after creation, explicitly switching to it');
+            await switchToTab(page, 2);
+            await page.waitForTimeout(1000);
+        } else {
+            testLogger.info('✓ Tab 2 is active after creation');
+        }
+
+        // CRITICAL: Verify Tab 2 is ACTUALLY the active tab before entering query
+        const allTabs = page.locator('[role="tab"]');
+        const tabCount = await allTabs.count();
+        testLogger.info(`Current tab count: ${tabCount}`);
+
+        for (let i = 0; i < tabCount; i++) {
+            const tab = allTabs.nth(i);
+            const tabText = await tab.textContent();
+            const isActive = await tab.evaluate(el => {
+                return el.classList.contains('q-tab--active') ||
+                       el.getAttribute('aria-selected') === 'true';
+            }).catch(() => false);
+            testLogger.info(`Tab ${i + 1}: "${tabText}" - Active: ${isActive}`);
+        }
+
+        // Double-check Tab 2 is active
+        const currentActiveTab = await page.locator('[role="tab"][aria-selected="true"], [role="tab"].q-tab--active').textContent().catch(() => 'unknown');
+        testLogger.info(`Currently active tab: "${currentActiveTab}"`);
+
+        if (!currentActiveTab.match(/Query 2|Tab 2/i)) {
+            testLogger.error(`❌ CRITICAL: Tab 2 is NOT active! Active tab is: "${currentActiveTab}"`);
+            testLogger.info('Force switching to Tab 2...');
+            await switchToTab(page, 2);
+            await page.waitForTimeout(2000);
+
+            // Verify again
+            const activeAfterSwitch = await page.locator('[role="tab"][aria-selected="true"], [role="tab"].q-tab--active').textContent().catch(() => 'unknown');
+            testLogger.info(`Active tab after force switch: "${activeAfterSwitch}"`);
+        }
 
         // Switch Tab 2 to PromQL Custom mode (new tabs may default to Builder mode)
         await switchToPromQLCustomMode(page);
@@ -549,12 +674,25 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
 
         // Enter Query B in Tab 2
         const queryB = 'node_cpu_seconds_total{mode="idle"}';
+        testLogger.info(`Entering query in Tab 2: "${queryB}"`);
         await enterPromQLQuery(page, queryB);
-        testLogger.info(`Tab 2 query set: ${queryB}`);
 
+        // Verify the query was actually entered in Tab 2
+        const verifyQueryB = await getCurrentQueryText(page);
+        testLogger.info(`Tab 2 query entered: "${queryB}"`);
+        testLogger.info(`Tab 2 query verified: "${verifyQueryB}"`);
+
+        if (!verifyQueryB.includes(queryB.substring(0, 15))) {
+            testLogger.error(`❌ CRITICAL: Query mismatch in Tab 2!`);
+            testLogger.error(`Expected: "${queryB}"`);
+            testLogger.error(`Got: "${verifyQueryB}"`);
+            await page.screenshot({ path: `tab2-query-mismatch-${Date.now()}.png` }).catch(() => {});
+        }
+
+        await page.waitForTimeout(5000);
         // Switch back to Tab 1 and verify Query A
         await switchToTab(page, 1);
-        await page.waitForTimeout(1000); // Wait for editor to update
+        await page.waitForTimeout(5000); // Wait for editor to update
         const tab1Query = await getCurrentQueryText(page);
         testLogger.info(`Tab 1 query read: "${tab1Query}"`);
         expect(tab1Query).toContain(queryA.replace(/\s+/g, ' ').trim());
