@@ -114,8 +114,8 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   // Step 4+: Show alert settings (threshold, period, frequency, cooldown, destinations)
   if (wizardStep >= 4) {
     if (isRealTime) {
-      // Real-time alert summary
-      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${clickable(translate('alerts.summary.queryConditions'), 'conditions')} ${translate('alerts.summary.areMet')}`);
+      // Real-time alert summary - triggers immediately when query conditions match
+      parts.push(`✓ ${translate('alerts.summary.triggersWhen')}: ${translate('alerts.summary.eventsDetected')} ${translate('alerts.summary.inRealTime')}`);
     } else {
       // Scheduled alert summary
       if (formData.trigger_condition?.period) {
@@ -132,7 +132,7 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
         parts.push(`✓ ${translate('alerts.summary.monitors')}: ${clickable(period, fieldId)} ${translate('alerts.summary.ofData')}`);
       }
 
-      // Trigger condition
+      // Trigger condition (only for scheduled alerts - real-time doesn't use threshold)
       if (formData.query_condition && formData.trigger_condition?.operator && formData.trigger_condition?.threshold !== undefined) {
         const threshold = formData.trigger_condition.threshold;
         const operator = formData.trigger_condition.operator;
@@ -165,13 +165,11 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   // Build the final summary with plain English first, then bullet points
   const bulletPoints = parts.join('\n');
 
-  // Add plain English summary first (only from step 4 onwards)
-  if (wizardStep >= 4) {
-    const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate);
-    if (plainEnglish) {
-      // Return plain English first, then bullet points (with single line break for tighter spacing)
-      return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
-    }
+  // Add plain English summary first (show from step 1 onwards for better UX)
+  const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate, wizardStep);
+  if (plainEnglish) {
+    // Return plain English first, then bullet points (with single line break for tighter spacing)
+    return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
   }
 
   return bulletPoints;
@@ -296,8 +294,9 @@ function getSilenceText(silence: number, t: (key: string) => string): string {
 
 /**
  * Generate a plain English summary of the alert
+ * Shows progressive summary based on wizard step
  */
-function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string): string {
+function generatePlainEnglishSummary(formData: any, destinations: any[], isRealTime: boolean, t: (key: string) => string, wizardStep: number = 6): string {
   if (!formData || !formData.stream_name) return '';
 
   const parts: string[] = [];
@@ -308,6 +307,18 @@ function generatePlainEnglishSummary(formData: any, destinations: any[], isRealT
   const hourText = t('alerts.summary.hour') || 'hour';
   const hoursText = t('alerts.summary.hours') || 'hours';
 
+  // Step 1-3: Show basic information about configuring the alert
+  if (wizardStep < 4) {
+    const streamType = formData.stream_type || 'logs';
+    const streamName = formData.stream_name;
+    if (isRealTime) {
+      return `Configuring a real-time alert for ${streamType} stream "${streamName}"`;
+    } else {
+      return `Configuring a scheduled alert for ${streamType} stream "${streamName}"`;
+    }
+  }
+
+  // Step 4+: Show full alert logic
   if (isRealTime) {
     parts.push(t('alerts.summary.plainEnglish.realTime') || 'Alert me immediately when matching events occur in real-time');
   } else {
