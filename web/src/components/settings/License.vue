@@ -180,23 +180,22 @@
             <q-card>
               <q-card-section>
                 <div class="text-h6 q-mb-md tw:mx-auto">Usage Information</div>
-                <div  class="text-center q-mb-md tw:mt-[10px]">
-                  <div class="text-subtitle2 q-mb-sm">Ingestion Usage</div>
-                  <q-circular-progress
-                    :value="ingestionUsagePercent"
-                    size="120px"
-                    :thickness="0.15"
-                    :color="getIngestionUsageColor()"
-                    track-color="grey-3"
-                    show-value
-                    class="q-ma-md"
-                  >
-                    <span class="text-h6">{{ ingestionUsagePercent }}%</span>
-                  </q-circular-progress>
-                  <div class="text-caption text-weight-bold">
+                <div class="tw:mb-md">
+                  <div class="text-subtitle2 q-mb-sm text-center">Daily Ingestion Usage (GB)</div>
+                  <div v-if="usageDashboardData" class="usage-chart-container" style="height: 300px;">
+                    <RenderDashboardCharts
+                      :key="dashboardRenderKey"
+                      :dashboardData="usageDashboardData"
+                      :currentTimeObj="currentTimeObj"
+                      :viewOnly="true"
+                      :allowAlertCreation="false"
+                      searchType="dashboards"
+                    />
+                  </div>
+                  <div class="text-caption text-weight-bold text-center q-mt-sm">
                     {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day'}` }}
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+                  <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs text-center" style="font-size: 10px;">
                     * Usage shows 0% for unlimited plans
                   </div>
                 </div>
@@ -269,16 +268,21 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed } from "vue";
+import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 
+const RenderDashboardCharts = defineAsyncComponent(
+  () => import("@/views/Dashboards/RenderDashboardCharts.vue")
+);
+
 export default defineComponent({
   name: "License",
   components: {
     LicensePeriod,
+    RenderDashboardCharts,
   },
   setup() {
     const $q = useQuasar();
@@ -290,6 +294,8 @@ export default defineComponent({
     const showLicenseKeyModal = ref(false);
     const isLicenseKeyAutoFilled = ref(false);
     const store = useStore();
+    const usageDashboardData = ref<any>(null);
+    const dashboardRenderKey = ref(0);
 
     const loadLicenseData = async () => {
       try {
@@ -469,7 +475,7 @@ export default defineComponent({
       const now = Date.now();
       const expiryDate = store.state.zoConfig.license_expiry;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-      
+
       if (daysUntilExpiry > 1) {
         return `${daysUntilExpiry} days remaining until your license expires`;
       } else if (daysUntilExpiry === 1) {
@@ -479,8 +485,235 @@ export default defineComponent({
       }
     };
 
+    // Current time object for dashboard (calendar start date to current date)
+    // Similar to TelemetryCorrelationDashboard, we pass microsecond timestamps to Date constructor
+    const currentTimeObj = computed(() => {
+      const now = new Date();
+      const calendarStartDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+      // Convert to microseconds (16 digits) and pass to Date constructor
+      const startTimeMicros = calendarStartDate.getTime() * 1000;
+      const endTimeMicros = now.getTime() * 1000;
+
+      return {
+        __global: {
+          start_time: new Date(startTimeMicros),
+          end_time: new Date(endTimeMicros),
+        },
+      };
+    });
+
+    // Get ingestion limit value for threshold
+    const ingestionLimitGB = computed(() => {
+      if (isIngestionUnlimited.value) {
+        return null; // No limit for unlimited plans
+      }
+      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+    });
+
+    // Generate usage dashboard data
+    const generateUsageDashboard = () => {
+      const ingestionLimit = ingestionLimitGB.value;
+
+      // Build the threshold configuration
+      const thresholds: any[] = [];
+      if (ingestionLimit !== null) {
+        // Add warning threshold at 80% of limit
+        thresholds.push({
+          value: ingestionLimit * 0.8,
+          color: "#FFA500", // Orange
+          colorMode: "line",
+          operator: ">=",
+          label: "Warning (80%)",
+        });
+
+        // Add critical threshold at 100% of limit
+        thresholds.push({
+          value: ingestionLimit,
+          color: "#FF0000", // Red
+          colorMode: "line",
+          operator: ">=",
+          label: "Limit Exceeded",
+        });
+      }
+
+      const query = `SELECT histogram(_timestamp, '1 day') AS x_axis_1, sum(size) AS y_axis_1 FROM "usage" WHERE event = 'Ingestion' GROUP BY x_axis_1 ORDER BY x_axis_1`;
+
+      // Get timestamps in microseconds (16 digits)
+      const now = new Date();
+      const calendarStartDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const startTimeMicros = calendarStartDate.getTime() * 1000;
+      const endTimeMicros = now.getTime() * 1000;
+
+      const dashboard = {
+        version: 8,
+        dashboardId: "",
+        title: "Ingestion Usage",
+        description: "Daily ingestion usage with threshold limits",
+        role: "",
+        owner: "",
+        created: new Date().toISOString(),
+        tabs: [
+          {
+            tabId: "default",
+            name: "Default",
+            panels: [
+              {
+                id: "Panel_ID_License_Usage",
+                type: "bar",
+                title: "",
+                description: "",
+                config: {
+                  show_legends: false,
+                  legends_position: null,
+                  unit: "gbytes",
+                  decimals: 2,
+                  line_thickness: 1.5,
+                  step_value: "0",
+                  top_results_others: false,
+                  axis_border_show: true,
+                  label_option: {
+                    rotate: 0,
+                  },
+                  axis_label_rotate: 0,
+                  show_symbol: false,
+                  line_interpolation: "smooth",
+                  legend_width: {
+                    unit: "px",
+                  },
+                  legend_height: {
+                    unit: "px",
+                  },
+                  base_map: {
+                    type: "osm",
+                  },
+                  map_type: {
+                    type: "world",
+                  },
+                  map_view: {
+                    zoom: 1,
+                    lat: 0,
+                    lng: 0,
+                  },
+                  map_symbol_style: {
+                    size: "by Value",
+                    size_by_value: {
+                      min: 1,
+                      max: 100,
+                    },
+                    size_fixed: 2,
+                  },
+                  drilldown: [],
+                  mark_line: thresholds,
+                  override_config: [],
+                  connect_nulls: false,
+                  no_value_replacement: "",
+                  wrap_table_cells: false,
+                  table_transpose: false,
+                  table_dynamic_columns: false,
+                  mappings: [],
+                  color: {
+                    mode: "palette-classic-by-series",
+                    fixedColor: ["#53ca53"],
+                    seriesBy: "last",
+                    colorBySeries: [],
+                  },
+                  trellis: {
+                    layout: null,
+                    num_of_columns: 1,
+                    group_by_y_axis: false,
+                  },
+                  show_gridlines: true,
+                  aggregation: "last",
+                  lat_label: "latitude",
+                  lon_label: "longitude",
+                  weight_label: "weight",
+                  name_label: "name",
+                  table_aggregations: ["last"],
+                  promql_table_mode: "single",
+                  visible_columns: [],
+                  hidden_columns: [],
+                  sticky_columns: [],
+                },
+                queryType: "sql",
+                queries: [
+                  {
+                    query: query,
+                    vrlFunctionQuery: "",
+                    customQuery: true,
+                    fields: {
+                      stream: "usage",
+                      stream_type: "logs",
+                      x: [
+                        {
+                          label: "Timestamp",
+                          alias: "x_axis_1",
+                          column: "x_axis_1",
+                          color: null,
+                          isDerived: false,
+                        },
+                      ],
+                      y: [
+                        {
+                          label: "Ingestion (GB)",
+                          alias: "y_axis_1",
+                          column: "y_axis_1",
+                          color: "#53ca53",
+                          isDerived: false,
+                        },
+                      ],
+                      z: [],
+                      breakdown: [],
+                      filter: {
+                        filterType: "group",
+                        logicalOperator: "AND",
+                        conditions: [],
+                      },
+                    },
+                    config: {
+                      promql_legend: "",
+                      layer_type: "scatter",
+                      weight_fixed: 1,
+                      limit: 0,
+                      min: 0,
+                      max: 100,
+                      time_shift: [],
+                    },
+                    joins: [],
+                  },
+                ],
+                layout: {
+                  "x": 0,
+                  "y": 0,
+                  "w": 192,
+                  "h": 16,
+                  "i": 1
+                },
+                htmlContent: "",
+                markdownContent: "",
+                customChartContent: "",
+              },
+            ],
+          },
+        ],
+        variables: {
+          list: [],
+          showDynamicFilters: false,
+        },
+        defaultDatetimeDuration: {
+          type: "absolute",
+          startTime: startTimeMicros,
+          endTime: endTimeMicros,
+        },
+      };
+
+      usageDashboardData.value = dashboard;
+      dashboardRenderKey.value++;
+    };
+
     onMounted(() => {
       loadLicenseData();
+      generateUsageDashboard();
     });
 
     return {
@@ -504,6 +737,11 @@ export default defineComponent({
       redirectToGetLicense,
       isLicenseKeyAutoFilled,
       checkAndAutoFillLicenseFromUrl,
+      usageDashboardData,
+      dashboardRenderKey,
+      currentTimeObj,
+      ingestionLimitGB,
+      generateUsageDashboard,
     };
   },
 });
