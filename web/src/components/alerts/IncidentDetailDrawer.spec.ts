@@ -197,7 +197,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -936,7 +936,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should navigate back to incident list on close", async () => {
@@ -947,7 +947,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
   });
 

@@ -750,7 +750,8 @@ pub async fn enrich_with_topology(
 
                     // Only add if from happened before to (chronological)
                     if from_node.first_fired_at < to_node.first_fired_at {
-                        // Determine edge type: ServiceDependency if SG edge exists, otherwise Temporal
+                        // Determine edge type: ServiceDependency if SG edge exists, otherwise
+                        // Temporal
                         let edge_type = if has_sg_edge {
                             EdgeType::ServiceDependency
                         } else {
