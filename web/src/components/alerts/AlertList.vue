@@ -2156,8 +2156,19 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
-      const selectedAlert = await getAlertById(row.alert_id);
-      showAddUpdateFn({ row: selectedAlert });
+      // Don't fetch alert data here - let the watcher handle it to avoid duplicate API calls
+      // Just trigger the route change with alert_id, the watcher will fetch and call showAddUpdateFn
+      await router.push({
+        name: "alertList",
+        query: {
+          ...router.currentRoute.value.query,
+          alert_id: row.alert_id,
+          action: "update",
+          name: row.name,
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value
+        },
+      });
     };
 
     const editAlertFromDrawer = async () => {
