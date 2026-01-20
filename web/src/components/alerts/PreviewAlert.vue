@@ -363,20 +363,12 @@ const fetchQuerySchema = async () => {
 
     const extractedFields = schemaRes.data;
 
-    // Debug: Log the schema response
-    console.log("[PreviewAlert] Schema response:", extractedFields);
-    console.log("[PreviewAlert] group_by:", extractedFields.group_by);
-    console.log("[PreviewAlert] projections:", extractedFields.projections);
-    console.log("[PreviewAlert] timeseries_field:", extractedFields.timeseries_field);
-
     // Determine chart type based on schema
     const chartType = determineChartType(extractedFields);
-    console.log("[PreviewAlert] Determined chart type:", chartType);
     dashboardPanelData.data.type = chartType;
 
     // Convert schema to fields
     const fields = convertSchemaToFields(extractedFields, chartType);
-    console.log("[PreviewAlert] Converted fields:", fields);
 
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
@@ -402,18 +394,6 @@ const fetchQuerySchema = async () => {
 
     chartData.value = cloneDeep(dashboardPanelData.data);
     selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
-
-    // DEBUG: Print complete panel object after result_schema
-    console.log("[PreviewAlert] ========== COMPLETE PANEL OBJECT (from result_schema) ==========");
-    console.log(JSON.stringify(dashboardPanelData.data, null, 2));
-    console.log("[PreviewAlert] ========== END PANEL OBJECT ==========");
-    console.log("[PreviewAlert] chartData.value has been set, PanelSchemaRenderer should now render");
-    console.log("[PreviewAlert] chartData.value keys:", Object.keys(chartData.value));
-    console.log("[PreviewAlert] Chart type:", dashboardPanelData.data.type);
-    console.log("[PreviewAlert] customQuery:", dashboardPanelData.data.queries[0].customQuery);
-    console.log("[PreviewAlert] x-axis fields:", JSON.stringify(dashboardPanelData.data.queries[0].fields.x));
-    console.log("[PreviewAlert] y-axis fields:", JSON.stringify(dashboardPanelData.data.queries[0].fields.y));
-    console.log("[PreviewAlert] breakdown fields:", JSON.stringify(dashboardPanelData.data.queries[0].fields.breakdown));
 
     // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
   } catch (error) {
@@ -460,30 +440,13 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   let resultCount = 0;
 
   try {
-    console.log("[PreviewAlert] resultMetaData type:", typeof resultMetaData);
-    console.log("[PreviewAlert] resultMetaData is array?", Array.isArray(resultMetaData));
-    console.log("[PreviewAlert] resultMetaData length:", resultMetaData?.length);
-
-    // For PromQL, also log the raw metadata to see its structure
-    if (props.selectedTab === "promql" && resultMetaData) {
-      console.log("[PreviewAlert] PromQL raw resultMetaData:", JSON.stringify(resultMetaData, null, 2));
-    }
-
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
       // Get metadata for first query (queryIndex = 0)
       const firstQueryMetadata = resultMetaData[0];
 
-      console.log("[PreviewAlert] First query metadata array:", firstQueryMetadata);
-
       if (Array.isArray(firstQueryMetadata) && firstQueryMetadata.length > 0) {
         // Get the latest partition metadata (last element in array)
         const latestPartition = firstQueryMetadata[firstQueryMetadata.length - 1];
-
-        console.log("[PreviewAlert] Latest partition metadata:", latestPartition);
-        console.log("[PreviewAlert] Latest partition keys:", Object.keys(latestPartition || {}));
-        console.log("[PreviewAlert] Has 'result' field?", 'result' in (latestPartition || {}));
-        console.log("[PreviewAlert] Has 'hits' field?", 'hits' in (latestPartition || {}));
-        console.log("[PreviewAlert] Has 'total' field?", 'total' in (latestPartition || {}));
 
         // Determine result count based on query mode
         // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
@@ -494,10 +457,8 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
               return sum + (partition?.total || 0);
             }, 0);
-            console.log("[PreviewAlert] Got count from summing all partition totals (SQL/Custom with agg):", resultCount);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
-            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
           }
         }
         // PromQL mode: count time series or data points
@@ -511,20 +472,13 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           if (latestPartition?.result && Array.isArray(latestPartition.result)) {
             // Count the number of time series
             resultCount = latestPartition.result.length;
-            console.log("[PreviewAlert] Got count from PromQL result array (time series count):", resultCount);
-
-            // Alternative: Could also count total data points across all series
-            // const totalPoints = latestPartition.result.reduce((sum, series) =>
-            //   sum + (series.values?.length || 0), 0);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
-            console.log("[PreviewAlert] Got count from hits array (PromQL):", resultCount);
           } else if (firstQueryMetadata.some((partition: any) => partition?.total !== undefined)) {
             // Sum up total from all partitions for PromQL fallback
             resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
               return sum + (partition?.total || 0);
             }, 0);
-            console.log("[PreviewAlert] Got count from summing all partition totals (PromQL fallback):", resultCount);
           }
         }
         // Custom mode without aggregations: sum zo_sql_num from all partitions
@@ -547,41 +501,15 @@ const handleChartDataUpdate = (resultMetaData: any) => {
             resultCount = firstQueryMetadata.reduce((sum: number, partition: any) => {
               return sum + (partition?.total || 0);
             }, 0);
-            console.log("[PreviewAlert] Got count from summing all partition totals (fallback):", resultCount);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
-            console.log("[PreviewAlert] Got count from hits array (fallback):", resultCount);
           } else {
             console.warn("[PreviewAlert] Could not determine result count from metadata:", latestPartition);
           }
         }
       }
 
-      console.log("[PreviewAlert] Final result count:", resultCount);
       evaluateAndSetStatus(resultCount);
-    } else {
-      console.log("[PreviewAlert] No result metadata available yet");
-
-      // For PromQL, the data might come through the chart data directly
-      // Let's check if we have chart data with results
-      if (props.selectedTab === "promql" && chartData.value) {
-        console.log("[PreviewAlert] Checking chartData for PromQL results...");
-        console.log("[PreviewAlert] chartData.value:", chartData.value);
-
-        // Try to get data from chart queries
-        if (chartData.value.queries && chartData.value.queries[0]) {
-          const queryData = chartData.value.queries[0];
-          console.log("[PreviewAlert] Query data:", queryData);
-          console.log("[PreviewAlert] Query data keys:", Object.keys(queryData));
-
-          // Check if there's cached or loaded data
-          if (queryData.data || queryData.result) {
-            console.log("[PreviewAlert] Found data in query:", queryData.data || queryData.result);
-          } else {
-            console.log("[PreviewAlert] No data/result in query yet");
-          }
-        }
-      }
     }
   } catch (error) {
     console.error("[PreviewAlert] Error processing chart data:", error);
@@ -606,51 +534,14 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     // For PromQL, count the number of series (time series count)
     let resultCount = 0;
 
-    console.log("[PreviewAlert] seriesData type:", typeof seriesData);
-    console.log("[PreviewAlert] seriesData keys:", Object.keys(seriesData || {}));
-
-    // Log options if it exists
-    if (seriesData?.options) {
-      console.log("[PreviewAlert] seriesData.options keys:", Object.keys(seriesData.options));
-
-      // Log series if it exists
-      if (seriesData.options.series) {
-        console.log("[PreviewAlert] seriesData.options.series:", seriesData.options.series);
-        console.log("[PreviewAlert] seriesData.options.series.length:", seriesData.options.series.length);
-
-        // Log details of each series to understand what they are
-        seriesData.options.series.forEach((series: any, index: number) => {
-          console.log(`[PreviewAlert] Series ${index}:`, {
-            name: series.name,
-            type: series.type,
-            hasData: !!series.data,
-            dataLength: series.data?.length || 0,
-            encode: series.encode,
-            datasetIndex: series.datasetIndex
-          });
-        });
-      }
-    }
-
-    // Log extras to see if it has raw PromQL data
-    if (seriesData?.extras) {
-      console.log("[PreviewAlert] seriesData.extras keys:", Object.keys(seriesData.extras));
-      if (seriesData.extras.rawData || seriesData.extras.result) {
-        console.log("[PreviewAlert] Found raw data in extras:", seriesData.extras.rawData || seriesData.extras.result);
-      }
-    }
-
     if (Array.isArray(seriesData)) {
       resultCount = seriesData.length;
-      console.log("[PreviewAlert] PromQL series count from array:", resultCount);
     } else if (seriesData && typeof seriesData === 'object') {
       // Check if there's a nested array
       if (Array.isArray(seriesData.series)) {
         resultCount = seriesData.series.length;
-        console.log("[PreviewAlert] Found series in seriesData.series:", resultCount);
       } else if (Array.isArray(seriesData.data)) {
         resultCount = seriesData.data.length;
-        console.log("[PreviewAlert] Found series in seriesData.data:", resultCount);
       } else if (seriesData.options && Array.isArray(seriesData.options.series)) {
         // ECharts series are in options.series
         // Filter to only count actual data series with meaningful data
@@ -665,26 +556,16 @@ const handleSeriesDataUpdate = (seriesData: any) => {
           return (hasName || hasMultiplePoints) && hasData;
         });
         resultCount = dataSeries.length;
-        console.log("[PreviewAlert] Total series in options:", seriesData.options.series.length);
-        console.log("[PreviewAlert] Filtered data series count:", resultCount);
-        console.log("[PreviewAlert] Series types:", seriesData.options.series.map((s: any) => s.type || 'unknown'));
-        console.log("[PreviewAlert] Filtered series names:", dataSeries.map((s: any) => s.name || 'unnamed'));
       } else if (seriesData.options?.dataset?.source) {
         // Dataset-based series
         const source = seriesData.options.dataset.source;
         if (Array.isArray(source) && source.length > 1) {
           resultCount = source.length - 1; // Subtract header row
-          console.log("[PreviewAlert] Found series in dataset.source:", resultCount);
         }
-      }
-
-      if (resultCount === 0) {
-        console.log("[PreviewAlert] No series found in any expected location");
       }
     }
 
     if (resultCount > 0) {
-      console.log("[PreviewAlert] Evaluating PromQL alert with series count:", resultCount);
       evaluateAndSetStatus(resultCount);
     }
   } catch (error) {
@@ -694,8 +575,6 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 
 // Separate function to evaluate and set status based on result count
 const evaluateAndSetStatus = (resultCount: number) => {
-  console.log("[PreviewAlert] Evaluating status with count:", resultCount);
-
   const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
 
   // For aggregation, always use > 0 (backend checks if any aggregated results exist)
@@ -706,18 +585,11 @@ const evaluateAndSetStatus = (resultCount: number) => {
     // When aggregation is enabled, backend always checks for > 0 results
     threshold = 0;
     operator = ">";
-    console.log("[PreviewAlert] Using aggregation logic: > 0");
   } else {
     // Use regular trigger condition threshold values
     threshold = props.formData.trigger_condition?.threshold || 0;
     operator = props.formData.trigger_condition?.operator || ">=";
-    console.log("[PreviewAlert] Using trigger_condition threshold:", threshold, "operator:", operator);
   }
-
-  console.log("[PreviewAlert] Result count:", resultCount);
-  console.log("[PreviewAlert] Threshold:", threshold);
-  console.log("[PreviewAlert] Operator:", operator);
-  console.log("[PreviewAlert] Is real-time:", isRealTime);
 
   let wouldTrigger = false;
   let comparisonText = "";
@@ -729,7 +601,6 @@ const evaluateAndSetStatus = (resultCount: number) => {
       wouldTrigger: true,
       reason: 'When conditions match',
     };
-    console.log("[PreviewAlert] Real-time evaluation complete:", evaluationStatus.value);
     return;
   }
 
@@ -784,17 +655,9 @@ const evaluateAndSetStatus = (resultCount: number) => {
       ? `${resultCount} ${resultLabel} match (${comparisonText})`
       : `${resultCount} ${resultLabel} found - does not meet ${comparisonText}`,
   };
-
-  console.log("[PreviewAlert] Evaluation complete:", evaluationStatus.value);
-  console.log("[PreviewAlert] evaluationStatus.value is now:", evaluationStatus.value);
-  console.log("[PreviewAlert] Status bar should now be visible");
 };
 
-let refreshCallCounter = 0;
 const refreshData = () => {
-  const callId = ++refreshCallCounter;
-  console.log(`[PreviewAlert] refreshData #${callId} START`);
-
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping refreshData");
@@ -814,11 +677,9 @@ const refreshData = () => {
   if (previewTimerangeMinutes > 0) {
     // Use the configured preview timerange from env variable
     new_relative_time = previewTimerangeMinutes;
-    console.log(`[PreviewAlert] Using configured preview timerange: ${previewTimerangeMinutes} minutes`);
   } else {
     // Fall back to using the alert period
     new_relative_time = relativeTime;
-    console.log(`[PreviewAlert] Using alert period: ${relativeTime} minutes`);
   }
 
   const startTime = endTime - new_relative_time * 60 * 1000000;
@@ -848,8 +709,6 @@ const refreshData = () => {
 
   // Handle PromQL mode - configure for time-series visualization
   if (props.selectedTab === "promql") {
-    console.log("[PreviewAlert] Configuring panel for PromQL mode");
-
     // PromQL mode: query should be a string, not an object
     dashboardPanelData.data.queries[0].query = props.query || "";
     dashboardPanelData.data.queries[0].customQuery = false;
@@ -870,19 +729,12 @@ const refreshData = () => {
     chartData.value = newChartData;
     selectedTimeObj.value = newTimeObj;
 
-    console.log("[PreviewAlert] PromQL panel configured:", {
-      queryType: dashboardPanelData.data.queryType,
-      chartType: dashboardPanelData.data.type,
-      query: props.query
-    });
-
     return;
   }
 
   // Handle custom mode without aggregations - configure for histogram visualization
   // The backend automatically converts the query to histogram (zo_sql_key, zo_sql_num)
   if (props.selectedTab === "custom" && !props.isAggregationEnabled) {
-    console.log("[PreviewAlert] Configuring panel for custom mode without aggregations (histogram)");
 
     // Configure x-axis for zo_sql_key (timestamp buckets)
     xAxis = [
@@ -922,12 +774,6 @@ const refreshData = () => {
     chartData.value = newChartData;
     selectedTimeObj.value = newTimeObj;
 
-    console.log("[PreviewAlert] Custom (no agg) panel configured:", {
-      chartType: dashboardPanelData.data.type,
-      xAxis: JSON.stringify(xAxis),
-      yAxis: JSON.stringify(yAxis)
-    });
-
     return;
   }
 
@@ -953,8 +799,6 @@ const refreshData = () => {
   chartData.value = newChartData;
   selectedTimeObj.value = newTimeObj;
 
-  console.log(`[PreviewAlert] refreshData #${callId} END - chartData updated`);
-
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
 };
 
@@ -966,17 +810,13 @@ const refreshDataOnce = () => {
   const now = Date.now();
   const timeSinceLastCall = now - lastRefreshTime;
 
-  console.log(`[PreviewAlert] refreshDataOnce called, time since last: ${timeSinceLastCall}ms`);
-
   // Prevent multiple calls within 200ms (skip check on first call)
   // 200ms window catches both usePanelDataLoader watchers firing from dateTime + panelSchema updates
   if (lastRefreshTime > 0 && timeSinceLastCall < 200) {
-    console.log(`[PreviewAlert] ⚠️ Skipping duplicate call (${timeSinceLastCall}ms < 200ms)`);
     return;
   }
 
   lastRefreshTime = now;
-  console.log("[PreviewAlert] ✓ Calling refreshData");
   refreshData();
 };
 
@@ -995,18 +835,14 @@ watch(
     props.isUsingBackendSql,
   ],
   () => {
-    console.log("[PreviewAlert] Watch triggered, isInitialLoad:", isInitialLoad, "isEditorOpen:", props.isEditorOpen);
-
     // Skip if editor is open - we'll refresh when it closes
     if (props.isEditorOpen) {
-      console.log("[PreviewAlert] Skipping watch - editor is open");
       return;
     }
 
     // Skip the first watch trigger on mount since onMounted will handle it
     if (isInitialLoad) {
       isInitialLoad = false;
-      console.log("[PreviewAlert] Skipping first watch trigger");
       return;
     }
 
@@ -1019,14 +855,12 @@ watch(
                        props.formData.query_condition.aggregation.having.value !== '';
 
       if (!hasColumn || !hasValue) {
-        console.log("[PreviewAlert] Skipping refresh - aggregation enabled but required fields missing (column or value)");
         return;
       }
     }
 
     // Refresh if we have a valid query
     if (props.query) {
-      console.log("[PreviewAlert] Watch calling refreshDataOnce");
       refreshDataOnce();
     }
   },
@@ -1035,14 +869,11 @@ watch(
 
 // Refresh data on mount if we already have a query
 onMounted(() => {
-  console.log("[PreviewAlert] onMounted called, query:", props.query);
   // Skip for PromQL to avoid duplicate API calls (watchers handle it)
   if (props.selectedTab === "promql") {
-    console.log("[PreviewAlert] Skipping onMounted refresh for PromQL");
     return;
   }
   if (props.query) {
-    console.log("[PreviewAlert] onMounted calling refreshDataOnce");
     refreshDataOnce();
   }
 });

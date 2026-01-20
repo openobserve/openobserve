@@ -1542,7 +1542,6 @@ export default defineComponent({
 
     const handleAlertError = (err: any) => {
       if (err.response?.status !== HTTP_FORBIDDEN) {
-        console.log(err);
         q.notify({
           type: "negative",
           message: err.response?.data?.message || err.response?.data?.error || err.response?.data,
@@ -1581,13 +1580,11 @@ export default defineComponent({
 
     // Handle editor state change - track if editor is open
     const handleEditorStateChanged = (isOpen: boolean) => {
-      console.log("[AddAlert] SQL Editor state changed:", isOpen);
       isEditorOpen.value = isOpen;
     };
 
     // Handle editor closed event - refresh preview when SQL editor dialog closes
     const handleEditorClosed = () => {
-      console.log("[AddAlert] SQL Editor closed, refreshing preview");
       if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === 'function') {
         previewAlertRef.value.refreshData();
       }
