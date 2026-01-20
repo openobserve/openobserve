@@ -272,13 +272,11 @@ pub async fn search(
 
     // Create table for files without timestamp filter
     if !files_without_filter.is_empty() {
-        let builder = TableBuilder::new()
+        let table = TableBuilder::new()
             .sorted_by_time(sorted_by_time)
             .file_stat_cache(file_stat_cache.clone())
             .index_condition(index_condition.clone())
-            .fst_fields(fst_fields.clone());
-        // Don't call timestamp_filter() to keep it as None
-        let table = builder
+            .fst_fields(fst_fields.clone())
             .build(session.clone(), files_without_filter, schema_arc.clone())
             .await?;
         tables.push(table);
