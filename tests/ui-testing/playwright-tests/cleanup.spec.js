@@ -31,7 +31,8 @@ test.describe("Pre-Test Cleanup", () => {
         'rbac_viewer_delete_dest_',
         'rbac_viewer_update_dest_',
         'incident_e2e_dest_',
-        'e2e_promql_'              // alerts-regression.spec.js (Bug #9967 PromQL tests)
+        'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
+        /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
       [
@@ -125,7 +126,7 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up pipeline destinations matching test patterns
     await pm.apiCleanup.cleanupPipelineDestinations([
-      /^destination\d{2,3}$/  // destination12, destination123, etc.
+      /^destination\d{1,3}$/  // destination4, destination44, destination444, etc.
     ]);
 
     // Clean up functions matching test patterns
@@ -197,7 +198,22 @@ test.describe("Pre-Test Cleanup", () => {
       /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
-      /^url_404_[a-f0-9]{8}$/                                                                // url_404_<uuid> (invalid URL 404 test)
+      /^url_404_[a-f0-9]{8}$/,                                                               // url_404_<uuid> (invalid URL 404 test)
+      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test)
+      // Pytest API tests (test_enrichment_table_url.py) - uses api_url_<test>_<uuid8> naming
+      /^api_url_create_[a-f0-9]{8}$/,                                                         // api_url_create_<uuid> (create test)
+      /^api_url_status_[a-f0-9]{8}$/,                                                         // api_url_status_<uuid> (status test)
+      /^api_url_delete_[a-f0-9]{8}$/,                                                         // api_url_delete_<uuid> (delete test)
+      /^api_url_empty_[a-f0-9]{8}$/,                                                          // api_url_empty_<uuid> (empty URL test)
+      /^api_url_scheme_[a-f0-9]{8}$/,                                                         // api_url_scheme_<uuid> (invalid scheme test)
+      /^api_url_localhost_[a-f0-9]{8}$/,                                                      // api_url_localhost_<uuid> (localhost test)
+      /^api_url_private_[a-f0-9]{8}$/,                                                        // api_url_private_<uuid> (private IP test)
+      /^api_url_aws_[a-f0-9]{8}$/,                                                            // api_url_aws_<uuid> (AWS metadata test)
+      /^api_url_404_[a-f0-9]{8}$/,                                                            // api_url_404_<uuid> (404 error test)
+      /^api_url_append_[a-f0-9]{8}$/,                                                         // api_url_append_<uuid> (append test)
+      /^api_url_retry_[a-f0-9]{8}$/,                                                          // api_url_retry_<uuid> (retry test)
+      /^api_url_schema_[a-f0-9]{8}$/,                                                         // api_url_schema_<uuid> (schema mismatch test)
+      /^api_test_manual_\d+$/                                                                 // api_test_manual_<timestamp> (manual curl tests)
     ]);
 
     // Clean up streams matching test patterns

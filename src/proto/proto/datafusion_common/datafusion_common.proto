@@ -461,12 +461,14 @@ message CsvOptions {
   bytes newlines_in_values = 16; // Indicates if newlines are supported in values
   bytes terminator = 17; // Optional terminator character as a byte
   bytes truncated_rows = 18; // Indicates if truncated rows are allowed
+  optional uint32 compression_level = 19; // Optional compression level
 }
 
 // Options controlling CSV format
 message JsonOptions {
   CompressionTypeVariant compression = 1; // Compression type
   optional uint64 schema_infer_max_rec = 2; // Optional max records for schema inference
+  optional uint32 compression_level = 3; // Optional compression level
 }
 
 message TableParquetOptions {
@@ -519,6 +521,7 @@ message ParquetOptions {
   bool skip_metadata = 3; // default = true
   bool pushdown_filters = 5; // default = false
   bool reorder_filters = 6; // default = false
+  bool force_filter_selections = 34; // default = false
   uint64 data_pagesize_limit = 7; // default = 1024 * 1024
   uint64 write_batch_size = 8; // default = 1024
   string writer_version = 9; // default = "1.0"
@@ -608,6 +611,8 @@ message Statistics {
   Precision num_rows = 1;
   Precision total_byte_size = 2;
   repeated ColumnStats column_stats = 3;
+  // total_rows was removed - field 4 is reserved
+  reserved 4;
 }
 
 message ColumnStats {
@@ -616,4 +621,6 @@ message ColumnStats {
   Precision sum_value = 5;
   Precision null_count = 3;
   Precision distinct_count = 4;
+  Precision byte_size = 6;
 }
+ 

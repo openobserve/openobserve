@@ -26,15 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #before>
         <FieldList></FieldList>
       </template>
-      <template #separator>
-        <q-avatar
-          color="primary"
-          text-color="white"
-          size="1.25rem"
-          icon="drag_indicator"
-          class="tw:top-[0.625rem]"
-        />
-      </template>
       <template #after>
         <AppTable
           :columns="columns"

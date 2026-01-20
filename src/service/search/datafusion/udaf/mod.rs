@@ -15,7 +15,6 @@
 
 use arrow_schema::DataType;
 
-pub mod percentile_cont;
 pub mod summary_percentile;
 
 pub static NUMERICS: &[DataType] = &[

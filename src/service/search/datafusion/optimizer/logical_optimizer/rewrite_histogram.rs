@@ -21,6 +21,7 @@ use datafusion::{
         Result,
         tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
+    config::ConfigOptions,
     error::DataFusionError,
     functions::datetime::{
         date_bin::DateBinFunc,
@@ -71,15 +72,19 @@ impl OptimizerRule for RewriteHistogram {
     fn rewrite(
         &self,
         plan: LogicalPlan,
-        _config: &dyn OptimizerConfig,
+        config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
         if plan
             .expressions()
             .iter()
             .any(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
         {
-            let mut expr_rewriter =
-                HistogramToDatebin::new(self.start_time, self.end_time, self.histogram_interval);
+            let mut expr_rewriter = HistogramToDatebin::new(
+                self.start_time,
+                self.end_time,
+                self.histogram_interval,
+                config.options(),
+            );
 
             let name_preserver = NamePreserver::new(&plan);
             plan.map_expressions(|expr| {
@@ -103,14 +108,21 @@ pub struct HistogramToDatebin {
     start_time: i64,
     end_time: i64,
     histogram_interval: i64,
+    options: Arc<ConfigOptions>,
 }
 
 impl HistogramToDatebin {
-    pub fn new(start_time: i64, end_time: i64, histogram_interval: i64) -> Self {
+    pub fn new(
+        start_time: i64,
+        end_time: i64,
+        histogram_interval: i64,
+        options: Arc<ConfigOptions>,
+    ) -> Self {
         Self {
             start_time,
             end_time,
             histogram_interval,
+            options,
         }
     }
 }
@@ -156,12 +168,16 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     };
                     // construct expression
                     let arg2 = Expr::ScalarFunction(ScalarFunction {
-                        func: Arc::new(ScalarUDF::from(ToTimestampMicrosFunc::new())),
+                        func: Arc::new(ScalarUDF::from(ToTimestampMicrosFunc::new_with_config(
+                            &self.options,
+                        ))),
                         args: vec![args[0].clone()],
                     });
                     // construct optional origin-timestamp
                     let arg3 = Expr::ScalarFunction(ScalarFunction {
-                        func: Arc::new(ScalarUDF::from(ToTimestampFunc::new())),
+                        func: Arc::new(ScalarUDF::from(ToTimestampFunc::new_with_config(
+                            &self.options,
+                        ))),
                         args: vec![Expr::Literal(
                             ScalarValue::from("2001-01-01T00:00:00"),
                             None,

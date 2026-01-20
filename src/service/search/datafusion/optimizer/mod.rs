@@ -27,12 +27,12 @@ use datafusion::{
         eliminate_cross_join::EliminateCrossJoin,
         eliminate_duplicated_expr::EliminateDuplicatedExpr, eliminate_filter::EliminateFilter,
         eliminate_group_by_constant::EliminateGroupByConstant, eliminate_join::EliminateJoin,
-        eliminate_limit::EliminateLimit, eliminate_nested_union::EliminateNestedUnion,
-        eliminate_one_union::EliminateOneUnion, eliminate_outer_join::EliminateOuterJoin,
+        eliminate_limit::EliminateLimit, eliminate_outer_join::EliminateOuterJoin,
         extract_equijoin_predicate::ExtractEquijoinPredicate,
         filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
-        propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
-        push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
+        optimize_unions::OptimizeUnions, propagate_empty_relation::PropagateEmptyRelation,
+        push_down_filter::PushDownFilter, push_down_limit::PushDownLimit,
+        replace_distinct_aggregate::ReplaceDistinctWithAggregate,
         scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
@@ -103,7 +103,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
-    rules.push(Arc::new(EliminateNestedUnion::new()));
+    rules.push(Arc::new(OptimizeUnions::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(ReplaceDistinctWithAggregate::new()));
     rules.push(Arc::new(EliminateJoin::new()));
@@ -121,7 +121,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(EliminateLimit::new()));
     rules.push(Arc::new(PropagateEmptyRelation::new()));
     // Must be after PropagateEmptyRelation
-    rules.push(Arc::new(EliminateOneUnion::new()));
+    rules.push(Arc::new(OptimizeUnions::new()));
     rules.push(Arc::new(FilterNullJoinKeys::default()));
     rules.push(Arc::new(EliminateOuterJoin::new()));
 

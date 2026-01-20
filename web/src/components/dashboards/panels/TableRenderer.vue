@@ -304,19 +304,8 @@ export default defineComponent({
           setTimeout(() => {
             copiedCells.value.delete(key);
           }, 3000);
-
-          $q.notify({
-            type: "positive",
-            message: "Copied to clipboard",
-            timeout: 1000,
-          });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Failed to copy",
-            timeout: 1000,
-          });
         });
     };
 
