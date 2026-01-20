@@ -3,93 +3,9 @@ import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashb
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { getColorPalette } from "./colorPalette";
 import { fromZonedTime } from "date-fns-tz";
+import { units } from "./units";
 
-const units: any = {
-  bytes: [
-    { unit: "B", divisor: 1 },
-    { unit: "KB", divisor: 1024 },
-    { unit: "MB", divisor: 1024 * 1024 },
-    { unit: "GB", divisor: 1024 * 1024 * 1024 },
-    { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
-  ],
-  seconds: [
-    { unit: "ns", divisor: 0.000000001 },
-    { unit: "μs", divisor: 0.000001 },
-    { unit: "ms", divisor: 0.001 },
-    { unit: "s", divisor: 1 },
-    { unit: "m", divisor: 60 },
-    { unit: "h", divisor: 3600 },
-    { unit: "D", divisor: 86400 },
-    { unit: "M", divisor: 2592000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000 }, // Assuming 365 days in a year
-  ],
-  microseconds: [
-    { unit: "ns", divisor: 0.001 },
-    { unit: "μs", divisor: 1 },
-    { unit: "ms", divisor: 1000 },
-    { unit: "s", divisor: 1000000 },
-    { unit: "m", divisor: 60 * 1000000 },
-    { unit: "h", divisor: 3600 * 1000000 },
-    { unit: "D", divisor: 86400 * 1000000 },
-    { unit: "M", divisor: 2592000 * 1000000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000 * 1000000 }, // Assuming 365 days in a year
-  ],
-  milliseconds: [
-    { unit: "ns", divisor: 0.000001 },
-    { unit: "μs", divisor: 0.001 },
-    { unit: "ms", divisor: 1 },
-    { unit: "s", divisor: 1000 },
-    { unit: "m", divisor: 60 * 1000 },
-    { unit: "h", divisor: 3600 * 1000 },
-    { unit: "D", divisor: 86400 * 1000 },
-    { unit: "M", divisor: 2592000 * 1000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000 * 1000 }, // Assuming 365 days in a year
-  ],
-  nanoseconds: [
-    { unit: "ns", divisor: 1 },
-    { unit: "μs", divisor: 1000 },
-    { unit: "ms", divisor: 1000000 },
-    { unit: "s", divisor: 1000000000 },
-    { unit: "m", divisor: 60 * 1000000000 },
-    { unit: "h", divisor: 3600 * 1000000000 },
-    { unit: "D", divisor: 86400 * 1000000000 },
-    { unit: "M", divisor: 2592000 * 1000000000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000 * 1000000000 }, // Assuming 365 days in a year
-  ],
-  bps: [
-    { unit: "B/s", divisor: 1 },
-    { unit: "KB/s", divisor: 1024 },
-    { unit: "MB/s", divisor: 1024 * 1024 },
-    { unit: "GB/s", divisor: 1024 * 1024 * 1024 },
-    { unit: "TB/s", divisor: 1024 * 1024 * 1024 * 1024 },
-    { unit: "PB/s", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
-  ],
-  kilobytes: [
-    { unit: "B", divisor: 1 / 1024 },
-    { unit: "KB", divisor: 1 },
-    { unit: "MB", divisor: 1024 },
-    { unit: "GB", divisor: 1024 * 1024 },
-    { unit: "TB", divisor: 1024 * 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 },
-  ],
-  megabytes: [
-    { unit: "B", divisor: 1 / (1024 * 1024) },
-    { unit: "KB", divisor: 1 / 1024 },
-    { unit: "MB", divisor: 1 },
-    { unit: "GB", divisor: 1024 },
-    { unit: "TB", divisor: 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 },
-  ],
-  numbers: [
-    { unit: "", divisor: 1 },
-    { unit: "K", divisor: 1e3 },
-    { unit: "M", divisor: 1e6 },
-    { unit: "B", divisor: 1e9 },
-    { unit: "T", divisor: 1e12 },
-    { unit: "Q", divisor: 1e15 },
-  ],
-};
+
 
 /**
  * Converts a value to a specific unit of measurement.
@@ -239,86 +155,7 @@ export const getUnitValue = (
   }
 };
 
-/**
- * Applies user-configured series-to-color mappings to the given series list and
- * ensures auto-generated colors do not conflict with configured colors.
- *
- * - Enforces configured colors for mapped series names
- * - Tracks colors already in use (configured + existing on series)
- * - Reassigns auto-generated colors that collide with configured ones to the
- *   next available color from the theme palette; if exhausted, uses an HSL fallback
- *
- * This function mutates the provided `series` array in place.
- */
-export const applySeriesColorMappings = (
-  series: any[],
-  colorBySeries:
-    | Array<{ value: string; color: string | null }>
-    | undefined
-    | null,
-  theme: string,
-): void => {
-  if (!Array.isArray(series) || !colorBySeries?.length) return;
 
-  const configuredSeriesToColor = new Map<string, string>();
-  const configuredColors = new Set<string>();
-  for (const mapping of colorBySeries) {
-    if (mapping?.value && mapping?.color) {
-      configuredSeriesToColor.set(String(mapping.value), String(mapping.color));
-      configuredColors.add(String(mapping.color));
-    }
-  }
-
-  if (configuredSeriesToColor.size === 0) return;
-
-  const usedColors = new Set<string>(configuredColors);
-
-  const getSeriesColor = (s: any): string | undefined =>
-    s?.color ?? s?.itemStyle?.color;
-  const setSeriesColor = (s: any, clr: string) => {
-    if (!s) return;
-    if (s.color !== undefined) s.color = clr;
-    if (s.itemStyle?.color !== undefined) s.itemStyle.color = clr;
-  };
-
-  // Enforce configured colors and collect currently used colors
-  series.forEach((s: any) => {
-    const mapped = configuredSeriesToColor.get(s?.name);
-    if (mapped) {
-      setSeriesColor(s, mapped);
-      usedColors.add(mapped);
-    } else {
-      const current = getSeriesColor(s);
-      if (current) usedColors.add(current);
-    }
-  });
-
-  // Generate a unique non-conflicting color
-  const generateUniqueColor = (
-    used: Set<string>,
-    themeName: string,
-  ): string => {
-    const palette = getColorPalette(themeName);
-    for (const c of palette) {
-      if (!used.has(c)) return c;
-    }
-    const hue = (used.size * 137.508) % 360;
-    const saturation = 70 + (used.size % 20);
-    const lightness = 45 + (used.size % 20);
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  };
-
-  // Reassign auto-generated colors that collide with configured colors
-  series.forEach((s: any) => {
-    if (configuredSeriesToColor.has(s?.name)) return;
-    const current = getSeriesColor(s);
-    if (current && configuredColors.has(current)) {
-      const next = generateUniqueColor(usedColors, theme);
-      usedColors.add(next);
-      setSeriesColor(s, next);
-    }
-  });
-};
 
 /**
  * Formats a unit value.
@@ -496,62 +333,9 @@ export const findFirstValidMappedValue = (
   });
 };
 
-/**
- * Calculates the width of a given text.
- * Useful to calculate nameGap for the left axis
- *
- * @param {string} text - The text to calculate the width of.
- * @param {string} fontSize - The font size of the text.
- * @return {number} The width of the text in pixels.
- */
-export const calculateWidthText = (
-  text: string,
-  fontSize: string = "12px",
-): number => {
-  if (!text) return 0;
 
-  const span = document.createElement("span");
-  document.body.appendChild(span);
 
-  span.style.font = "sans-serif";
-  span.style.fontSize = fontSize || "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
 
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
-};
-
-/**
- * Calculates the optimal font size for a given text that fits the canvas width.
- * @param text - The text to calculate the font size for.
- * @param canvasWidth - canvas width in pixels
- * @returns {number} - The optimal font size in pixels.
- */
-export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
-  let minFontSize = 1; // Start with the smallest font size
-  let maxFontSize = 90; // Set a maximum possible font size
-  let optimalFontSize = minFontSize;
-
-  while (minFontSize <= maxFontSize) {
-    const midFontSize = Math.floor((minFontSize + maxFontSize) / 2);
-    const textWidth = calculateWidthText(text, `${midFontSize}px`);
-
-    if (textWidth > canvasWidth) {
-      maxFontSize = midFontSize - 1; // Text is too wide, reduce font size
-    } else {
-      optimalFontSize = midFontSize; // Text fits, but we try larger
-      minFontSize = midFontSize + 1;
-    }
-  }
-
-  return optimalFontSize; // Return the largest font size that fits
-};
 
 /**
  * Validates a single condition item
@@ -1654,10 +1438,9 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
         } catch (error) {
           // If validation fails
           errors.push(
-            `Panel ${panel?.id || "unknown"}: ${
-              error instanceof Error
-                ? error?.message
-                : "Unable to validate panel configuration"
+            `Panel ${panel?.id || "unknown"}: ${error instanceof Error
+              ? error?.message
+              : "Unable to validate panel configuration"
             }`,
           );
         }

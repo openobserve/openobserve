@@ -14,15 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
-  calculateOptimalFontSize,
   formatDate,
   formatUnitValue,
   getContrastColor,
-  applySeriesColorMappings,
   getUnitValue,
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
 } from "./convertDataIntoUnitValue";
+import { calculateOptimalFontSize } from "./textUtils";
+import { applySeriesColorMappings } from "./colors/seriesColor";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
 import {
@@ -36,6 +36,8 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
+import { getPromqlLegendName, getLegendPosition } from "./promql/legendUtils";
+import { getPropsByChartTypeForSeries } from "./promql/chartProps";
 
 let moment: any;
 let momentInitialized = false;
@@ -631,7 +633,7 @@ export const convertPromQLData = async (
                   panelSchema.config?.line_interpolation,
                 )
                   ? // TODO: replace this with type integrations
-                    panelSchema.config.line_interpolation.replace("step-", "")
+                  panelSchema.config.line_interpolation.replace("step-", "")
                   : false,
                 showSymbol: panelSchema.config?.show_symbol ?? false,
                 zlevel: 2,
@@ -1016,7 +1018,7 @@ export const convertPromQLData = async (
       legendWidth =
         panelSchema.config.legend_width.unit === "%"
           ? (chartPanelRef.value?.offsetWidth || 0) *
-            (panelSchema.config.legend_width.value / 100)
+          (panelSchema.config.legend_width.value / 100)
           : panelSchema.config.legend_width.value;
     } else {
       // Dynamically compute width to ensure legends do not overlap the chart
@@ -1026,7 +1028,7 @@ export const convertPromQLData = async (
         chartPanelRef.value?.offsetHeight || 400,
         options.series || [],
         panelSchema?.config?.legends_type === "scroll" ||
-          panelSchema?.config?.legends_type == null,
+        panelSchema?.config?.legends_type == null,
       );
     }
 
@@ -1074,7 +1076,7 @@ export const convertPromQLData = async (
     // Apply 80% height constraint for plain legends with bottom or auto position
     const maxHeight =
       panelSchema?.config?.legends_position === "bottom" ||
-      panelSchema?.config?.legends_position === null
+        panelSchema?.config?.legends_position === null
         ? chartHeight
         : undefined;
 
@@ -1088,12 +1090,12 @@ export const convertPromQLData = async (
         panelSchema.config.legend_height.unit === "%"
           ? chartHeight * (panelSchema.config.legend_height.value / 100)
           : panelSchema.config.legend_height.value;
-      
+
       // Apply the configured height using the same approach as calculateBottomLegendHeight
       if (options.grid) {
         options.grid.bottom = legendHeight;
       }
-      
+
       const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
       options.legend.top = legendTopPosition;
       options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1129,12 +1131,12 @@ export const convertPromQLData = async (
       panelSchema.config.legend_height.unit === "%"
         ? chartHeight * (panelSchema.config.legend_height.value / 100)
         : panelSchema.config.legend_height.value;
-    
+
     // Apply the configured height using the same approach as calculateBottomLegendHeight
     if (options.grid) {
       options.grid.bottom = legendHeight;
     }
-    
+
     const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
     options.legend.top = legendTopPosition;
     options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1174,155 +1176,8 @@ const calculateWidthText = (text: string): number => {
 
 
 
-/**
- * Retrieves the legend name for a given metric and label.
- *
- * @param {any} metric - The metric object containing the values for the legend name placeholders.
- * @param {string} label - The label template for the legend name. If null or empty, the metric object will be converted to a JSON string and returned.
- * @return {string} The legend name with the placeholders replaced by the corresponding values from the metric object.
- */
-const getPromqlLegendName = (metric: any, label: string) => {
-  if (label) {
-    let template = label || "";
-    const placeholders = template.match(/\{([^}]+)\}/g);
 
-    // Step 2: Iterate through each placeholder
-    placeholders?.forEach(function (placeholder: any) {
-      // Step 3: Extract the key from the placeholder
-      const key = placeholder.replace("{", "").replace("}", "");
 
-      // Step 4: Retrieve the corresponding value from the JSON object
-      const value = metric[key];
 
-      // Step 5: Replace the placeholder with the value in the template
-      if (value) {
-        template = template.replace(placeholder, value);
-      }
-    });
-    return template;
-  } else {
-    return JSON.stringify(metric);
-  }
-};
 
-/**
- * Determines the position of the legend based on the provided legendPosition.
- *
- * @param {string} legendPosition - The desired position of the legend. Possible values are "bottom" or "right".
- * @return {string} The position of the legend. Possible values are "horizontal" or "vertical".
- */
-const getLegendPosition = (legendPosition: string) => {
-  switch (legendPosition) {
-    case "bottom":
-      return "horizontal";
-    case "right":
-      return "vertical";
-    default:
-      return "horizontal";
-  }
-};
 
-/**
- * Returns the props object based on the given chart type.
- *
- * @param {string} type - The chart type.
- * @return {object} The props object for the given chart type.
- */
-export const getPropsByChartTypeForSeries = (type: string) => {
-  switch (type) {
-    case "bar":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "line":
-      return {
-        type: "line",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "scatter":
-      return {
-        type: "scatter",
-        emphasis: { focus: "series" },
-        symbolSize: 5,
-      };
-    case "pie":
-      return {
-        type: "pie",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "donut":
-      return {
-        type: "pie",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "h-bar":
-      return {
-        type: "bar",
-        orientation: "h",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "area":
-      return {
-        type: "line",
-        emphasis: { focus: "series" },
-        areaStyle: {},
-        lineStyle: { width: 1.5 },
-      };
-    case "stacked":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        lineStyle: { width: 1.5 },
-      };
-    case "area-stacked":
-      return {
-        type: "line",
-        stack: "Total",
-        areaStyle: {},
-        emphasis: {
-          focus: "series",
-        },
-        lineStyle: { width: 1.5 },
-      };
-    case "gauge":
-      return {
-        type: "gauge",
-        startAngle: 205,
-        endAngle: -25,
-        pointer: {
-          show: false,
-        },
-        axisTick: {
-          show: false,
-        },
-        splitLine: {
-          show: false,
-        },
-        axisLabel: {
-          show: false,
-        },
-      };
-    case "metric":
-      return {
-        type: "custom",
-        coordinateSystem: "polar",
-      };
-    case "h-stacked":
-      return {
-        type: "bar",
-        emphasis: { focus: "series" },
-        orientation: "h",
-        lineStyle: { width: 1.5 },
-      };
-    default:
-      return {
-        type: "bar",
-      };
-  }
-};

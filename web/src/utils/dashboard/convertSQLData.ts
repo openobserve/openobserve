@@ -25,29 +25,24 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
-  calculateOptimalFontSize,
-  calculateWidthText,
   formatDate,
   formatUnitValue,
   getContrastColor,
-  applySeriesColorMappings,
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
   calculateDynamicNameGap,
   calculateRotatedLabelBottomSpace,
 } from "./convertDataIntoUnitValue";
-import {
-  calculateGridPositions,
-  getTrellisGrid,
-} from "./calculateGridForSubPlot";
+import { calculateOptimalFontSize, calculateWidthText } from "./textUtils";
+import { applySeriesColorMappings } from "./colors/seriesColor";
+import { calculateGridPositions } from "./calculateGridForSubPlot";
 import { isGivenFieldInOrderBy } from "../query/sqlUtils";
 import {
   ColorModeWithoutMinMax,
   getSeriesColor,
   getSQLMinMaxValue,
 } from "./colorPalette";
-import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
 import { getDataValue } from "./aliasUtils";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
@@ -57,57 +52,12 @@ import {
   applyPieDonutChartAlignment,
   getChartDimensions,
   applyPieDonutCenterAdjustment,
-  calculateChartDimensions,
-  calculatePieChartRadius,
-  shouldApplyChartAlignment,
-  generateChartAlignmentProperties,
 } from "./legendConfiguration";
+import { processData } from "./sql/processData";
+import { calculatePieChartContainer, getPieChartRadius } from "./sql/pieChartUtils";
+import { updateTrellisConfig } from "./sql/trellisUtils";
 
-/**
- * Calculates chart container properties for pie/donut charts based on legend position and chart alignment
- * @param {any} panelSchema - The panel schema containing configuration
- * @param {number} chartWidth - Width of the chart container
- * @param {number} chartHeight - Height of the chart container
- * @param {any[]} seriesData - Series data for legend calculations
- * @returns {object} Object containing grid properties and available dimensions
- */
-const calculatePieChartContainer = (
-  panelSchema: any,
-  chartWidth: number,
-  chartHeight: number,
-  seriesData: any[] = [],
-) => {
-  const chartAlign = panelSchema.config?.chart_align;
-  const legendPosition = panelSchema.config?.legends_position;
 
-  // Calculate available space using our centralized helper function
-  const dimensions = calculateChartDimensions(
-    panelSchema,
-    chartWidth,
-    chartHeight,
-    seriesData,
-  );
-
-  // Determine if chart alignment should be applied
-  const shouldApplyAlignment = shouldApplyChartAlignment(
-    panelSchema,
-    seriesData,
-  );
-
-  // Generate CSS grid properties for chart alignment
-  const gridProperties = generateChartAlignmentProperties(
-    chartAlign,
-    legendPosition,
-    shouldApplyAlignment,
-  );
-
-  return {
-    gridProperties,
-    availableWidth: dimensions.availableWidth,
-    availableHeight: dimensions.availableHeight,
-    shouldUseGridAlignment: shouldApplyAlignment,
-  };
-};
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -242,162 +192,6 @@ export const convertSQLData = async (
 
   const breakDownKeys = getBreakDownKeys();
 
-  /**
-   * Process the SQL data and convert it into a format suitable for the echarts
-   * library.
-   *
-   * This function takes in the raw data returned from the SQL query and the
-   * panel schema, and returns a processed data array that can be fed into the
-   * echarts library.
-   *
-   * Here's a step-by-step breakdown of what this function does:
-   *
-   * 1. It checks if the data is empty or if the first item in the array is not
-   * an object. If either condition is true, it returns an empty array.
-   *
-   * 2. It extracts the top_results and top_results_others values from the
-   * panel schema config.
-   *
-   * 3. If top_results is not enabled, it simply returns the inner data array
-   * without any modifications.
-   *
-   * 4. It extracts the breakdown key, y-axis key, and x-axis key from the
-   * panel schema.
-   *
-   * 5. It aggregates the y-axis values by breakdown, ignoring items without a
-   * breakdown key. This is done using the reduce() method.
-   *
-   * 6. It sorts the breakdown object by value in descending order and extracts
-   * the top keys based on the configured number of top results. This is done
-   * using the Object.entries() and sort() methods.
-   *
-   * 7. It initializes an empty result array and an empty others object.
-   *
-   * 8. It loops through the inner data array and checks if the breakdown value
-   * is in the top keys. If it is, it adds the item to the result array. If it's
-   * not, and top_results_others is enabled, it adds the item to the others
-   * object.
-   *
-   * 9. If top_results_others is enabled, it loops through the others object and
-   * adds the aggregated values to the result array.
-   *
-   * 10. Finally, it returns the result array.
-   *
-   * @param {any[]} data - The data returned from the SQL query.
-   * @param {any} panelSchema - The schema of the panel.
-   * @returns {any[]} - The processed data array.
-   */
-  const processData = (data: any[], panelSchema: any): any[] => {
-    if (!data.length || !Array.isArray(data[0])) {
-      return [];
-    }
-
-    const { top_results, top_results_others } = panelSchema.config;
-
-    // get the limit series from the config
-    // if top_results is enabled then use the top_results value
-    // otherwise use the max_dashboard_series value
-    let limitSeries = top_results
-      ? (Math.min(
-          top_results,
-          store.state?.zoConfig?.max_dashboard_series ?? 100,
-        ) ?? 100)
-      : (store.state?.zoConfig?.max_dashboard_series ?? 100);
-
-    // For multi y-axis charts, divide the limit by number of y-axes
-    // to keep total series count at or below max_dashboard_series
-    // This applies when there are multiple y-axes AND breakdown fields
-    if (yAxisKeys.length > 1 && breakDownKeys.length > 0) {
-      limitSeries = Math.floor(limitSeries / yAxisKeys.length);
-    }
-
-    const innerDataArray = data[0];
-
-    if (!breakDownKeys.length) {
-      return innerDataArray;
-    }
-
-    const breakdownKey = breakDownKeys[0];
-    const yAxisKey = yAxisKeys[0];
-    const xAxisKey = xAxisKeys[0];
-
-    // Step 1: Aggregate y_axis values by breakdown, ensuring missing values are set to empty string
-    const breakdown = innerDataArray.reduce((acc, item) => {
-      let breakdownValue = getDataValue(item, breakdownKey);
-
-      // Convert null, undefined, and empty string to a default empty string
-      if (
-        breakdownValue == null ||
-        breakdownValue === "" ||
-        breakdownValue === undefined
-      ) {
-        breakdownValue = "";
-      }
-
-      const yAxisValue = getDataValue(item, yAxisKey);
-
-      acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
-      return acc;
-    }, {});
-
-    // Step 2: Sort and extract the top keys based on the configured number of top results
-    const allKeys = Object.entries(breakdown).sort(
-      ([, a]: any, [, b]: any) => b - a,
-    );
-
-    // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
-    // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
-    if (
-      (top_results &&
-        top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
-        allKeys.length > top_results) ||
-      (!top_results &&
-        allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
-    ) {
-      extras.limitNumberOfSeriesWarningMessage =
-        "Limiting the displayed series to ensure optimal performance";
-    }
-
-    const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
-
-    // Step 3: Initialize result array and others object for aggregation
-    const resultArray: any[] = [];
-    const othersObj: any = {};
-
-    innerDataArray.forEach((item) => {
-      let breakdownValue = getDataValue(item, breakdownKey);
-
-      // Ensure missing breakdown values are treated as empty strings
-      if (
-        breakdownValue == null ||
-        breakdownValue === "" ||
-        breakdownValue === undefined
-      ) {
-        breakdownValue = "";
-      }
-
-      if (topKeys.includes(breakdownValue.toString())) {
-        resultArray.push({ ...item, [breakdownKey]: breakdownValue });
-      } else if (top_results_others) {
-        const xAxisValue = String(getDataValue(item, xAxisKey));
-        othersObj[xAxisValue] =
-          (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
-      }
-    });
-
-    // Step 4: Add 'others' aggregation to the result array if enabled
-    if (top_results_others) {
-      Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
-        resultArray.push({
-          [breakdownKey]: "others",
-          [xAxisKey]: xAxisValue,
-          [yAxisKey]: yAxisValue,
-        });
-      });
-    }
-
-    return resultArray;
-  };
 
   const getMarkLineData = (panelSchema: any) => {
     return (
@@ -418,7 +212,15 @@ export const convertSQLData = async (
 
   const noValueConfigOption = panelSchema?.config?.no_value_replacement ?? "";
 
-  const processedData = processData(searchQueryData, panelSchema);
+  const limitSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+  const processedData = processData(
+    searchQueryData,
+    panelSchema,
+    limitSeries,
+    yAxisKeys,
+    breakDownKeys,
+    xAxisKeys
+  );
 
   const missingValue = () => {
     // Get the interval in minutes
@@ -493,7 +295,7 @@ export const convertSQLData = async (
     processedData?.forEach((d: any) => {
       const key =
         xAxisKeysWithoutTimeStamp.length > 0 ||
-        breakdownAxisKeysWithoutTimeStamp.length > 0
+          breakdownAxisKeysWithoutTimeStamp.length > 0
           ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
           : `${getDataValue(d, timeKey)}`;
 
@@ -637,29 +439,6 @@ export const convertSQLData = async (
    * @param {any[]} seriesData - The series data for legend calculation
    * @returns {number} - the radius percentage
    */
-  const getPieChartRadius = (seriesData: any[] = []) => {
-    // Get chart dimensions from chartPanelRef
-    const dimensions = getChartDimensions(chartPanelRef);
-
-    // Calculate available dimensions using our centralized helper function
-    const chartDimensions = calculateChartDimensions(
-      panelSchema,
-      dimensions.chartWidth,
-      dimensions.chartHeight,
-      seriesData,
-    );
-
-    // Use the optimized pie chart radius calculation
-    const radius = calculatePieChartRadius(
-      panelSchema,
-      chartDimensions.availableWidth,
-      chartDimensions.availableHeight,
-      dimensions.chartWidth,
-      dimensions.chartHeight,
-    );
-
-    return radius;
-  };
 
   const legendConfig = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -674,302 +453,6 @@ export const convertSQLData = async (
     bottom: "15%",
   };
 
-  const updateTrellisConfig = () => {
-    try {
-      if (!chartPanelRef?.value) {
-        throw new Error("Chart panel reference is not available");
-      }
-
-      // Validate panel dimensions
-      if (
-        chartPanelRef.value.offsetWidth <= 0 ||
-        chartPanelRef.value.offsetHeight <= 0
-      ) {
-        throw new Error("Invalid panel dimensions");
-      }
-
-      if (!options.series?.length) {
-        return;
-      }
-
-      const yAxisNameGap = getYAxisNameGap();
-
-      // If the trellis layout is custom, we need to calculate the number of columns in panel
-      let customCols = -1;
-      if (
-        panelSchema.config.trellis?.layout === "custom" &&
-        panelSchema.config.trellis?.num_of_columns
-      ) {
-        if (panelSchema.config.trellis.num_of_columns <= 0) {
-          throw new Error("Number of columns must be positive");
-        }
-
-        customCols = panelSchema.config.trellis?.num_of_columns;
-      }
-
-      if (panelSchema.config.trellis?.layout === "vertical") {
-        customCols = 1;
-      }
-
-      // When group_by_y_axis is enabled, create separate charts for each breakdown category,
-      // with each chart containing multiple series (one per y-axis metric)
-      const group_by_y_axis = panelSchema.config.trellis?.group_by_y_axis;
-
-      // Calculate grid layout for trellis charts
-      const gridData = getTrellisGrid(
-        chartPanelRef.value.offsetWidth,
-        chartPanelRef.value.offsetHeight,
-        group_by_y_axis
-          ? options.series.length / yAxisKeys.length
-          : options.series.length,
-        yAxisNameGap,
-        customCols,
-        panelSchema.config?.axis_width,
-      );
-
-      options.grid = gridData.gridArray;
-
-      chartPanelStyle.height = gridData.panelHeight + "px";
-
-      // Update axes configuration for trellis layout
-      options.xAxis = options.xAxis.slice(0, 1);
-      options.yAxis = [options.yAxis];
-
-      options.title = [];
-
-      // Store original series
-      const originalSeries = [...options.series];
-      options.series = [];
-
-      let seriesUniqueIndex = 0;
-
-      // Configure each series with its corresponding grid index
-      originalSeries.forEach((series: any, index: number) => {
-        let gridIndex = index;
-        let existingSeriesIndex = -1;
-        if (group_by_y_axis) {
-          // Find if there's already a series with the same originalSeriesName
-          existingSeriesIndex = options.series.findIndex(
-            (existingSeries: any) =>
-              existingSeries.originalSeriesName === series.originalSeriesName,
-          );
-
-          // Use existing gridIndex if found, otherwise use current index
-          gridIndex =
-            existingSeriesIndex !== -1
-              ? options.series[existingSeriesIndex].gridIndex
-              : seriesUniqueIndex++;
-        }
-        // Add the original series
-        const updatedSeries = {
-          ...series,
-          xAxisIndex: gridIndex,
-          yAxisIndex: gridIndex,
-          gridIndex: gridIndex,
-          zlevel: 2,
-        };
-        options.series.push(updatedSeries);
-
-        if (existingSeriesIndex === -1) {
-          options.series.push({
-            type: "line",
-            xAxisIndex: gridIndex,
-            yAxisIndex: gridIndex,
-            gridIndex: gridIndex,
-            data: [[convertedTimeStampToDataFormat, null]],
-            markArea: getSeriesMarkArea(),
-            markLine: getAnnotationMarkLine(),
-            zlevel: 1,
-          });
-        }
-
-        if (gridIndex > 0 && existingSeriesIndex === -1) {
-          options.xAxis.push({
-            ...deepCopy(options.xAxis[0]),
-            gridIndex: gridIndex,
-          });
-          options.yAxis.push({
-            ...deepCopy(options.yAxis[0]),
-            gridIndex: gridIndex,
-          });
-        }
-
-        // Add title for each chart
-        if (existingSeriesIndex === -1) {
-          options.title.push({
-            text: group_by_y_axis
-              ? series.originalSeriesName || series.name
-              : series.name,
-            textStyle: {
-              fontSize: 12,
-              width:
-                parseInt(gridData.gridArray[gridIndex].width) *
-                  (chartPanelRef.value.offsetWidth / 100) -
-                8,
-              overflow: "truncate",
-              ellipsis: "...",
-            },
-            top:
-              parseFloat(gridData.gridArray[gridIndex].top) -
-              (20 / (gridData.panelHeight as number)) * 100 +
-              "%",
-            left: gridData.gridArray[gridIndex].left,
-          });
-        }
-      });
-
-      updateYAxisOption(yAxisNameGap, gridData);
-      updateXAxisOption(yAxisNameGap, gridData);
-
-      options.legend.show = false;
-    } catch (err: any) {
-      console.error("Trellis configuration failed:", {
-        error: err?.message,
-        code: err?.code,
-        details: err?.details,
-      }); // Fallback to default single grid configuration
-      options.grid = defaultGrid;
-      options.xAxis = options.xAxis.slice(0, 1);
-      options.yAxis = [options.yAxis];
-
-      // Set default chartPanelStyle height
-      chartPanelStyle.height = chartPanelRef.value.offsetHeight + "px";
-    }
-  };
-
-  const getYAxisNameGap = () => {
-    const yAxisLabel = isHorizontalChart ? xAxisKeys[0] : yAxisKeys[0];
-
-    return (
-      calculateWidthText(
-        formatUnitValue(
-          getUnitValue(
-            largestLabel(getAxisDataFromKey(yAxisLabel)),
-            panelSchema.config?.unit,
-            panelSchema.config?.unit_custom,
-            panelSchema.config?.decimals,
-          ),
-        ),
-      ) + 8
-    );
-  };
-
-  /**
-   * This method is used to configure trellis layout for the chart,  it will update the yAxis label properties
-   * @param yAxisNameGap
-   * @param gridData
-   */
-  const updateYAxisOption = (
-    yAxisNameGap: number,
-    gridData: null | any = null,
-  ) => {
-    const maxYValue = getUnitValue(
-      Math.max(
-        ...yAxisKeys
-          .map((key: any) => getAxisDataFromKey(key))
-          .flat()
-          .filter((value: any) => typeof value === "number"),
-      ),
-      "null", // We don't need to add unit, as we are only calculating the max value. Unit will format the value
-      panelSchema.config?.unit_custom,
-      panelSchema.config?.decimals,
-    );
-
-    // Some units, currencies are formatted with , separator, we need to remove it and convert it to valid number
-    maxYValue.value = maxYValue.value.replace(",", "");
-
-    const [num, decimals] = maxYValue.value.split(".");
-
-    //  The purpose of addMaxValue is to ensure that the maxYValue.value is in a valid numeric format before updating the yAxis properties. By doing this check, the code ensures that only valid numeric values are used to set the max property of the yAxis, preventing potential errors or invalid configurations.
-    // Summary
-    // addMaxValue is a boolean that verifies if maxYValue.value is a valid numeric string.
-    // It ensures that the max property of the yAxis is only updated with valid numeric values.
-    const addMaxValue =
-      maxYValue.value ===
-      parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
-
-    options.yAxis.forEach((it: any, index: number) => {
-      if (addMaxValue) {
-        const rounedMaxValue = Math.ceil(parseFloat(maxYValue.value));
-        it.max = rounedMaxValue + rounedMaxValue * 0.1; // Add 10% to the max value, to ensure that the max value is not at the top of the chart
-      }
-
-      it.axisLabel = {
-        formatter: function (value: any) {
-          return formatUnitValue(
-            getUnitValue(
-              value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          );
-        },
-      };
-
-      let showAxisLabel = true;
-
-      if (isHorizontalChart) {
-        showAxisLabel = options.yAxis.length - gridData.gridNoOfCol <= index;
-      } else {
-        showAxisLabel = index % gridData.gridNoOfCol === 0;
-      }
-
-      // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
-      it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
-      it.axisLabel.margin = showAxisLabel ? 5 : 0;
-      it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
-      it.nameTextStyle.fontSize = 12;
-      it.axisLabel.show = showAxisLabel;
-      if (!showAxisLabel) it.name = "";
-    });
-  };
-
-  /**
-   * This method is used to configure trellis layout for the chart, it will update the xAxis label properties
-   * @param yAxisNameGap
-   * @param gridData
-   */
-  const updateXAxisOption = (
-    yAxisNameGap: number,
-    gridData: null | any = null,
-  ) => {
-    // Update xAxis label properties for each chart xAxis based on the grid position
-    options.xAxis.forEach((it: any, index: number) => {
-      let showAxisLabel = false;
-
-      if (isHorizontalChart) {
-        showAxisLabel = index % gridData.gridNoOfCol === 0;
-      } else {
-        showAxisLabel = options.xAxis.length - gridData.gridNoOfCol <= index;
-      }
-
-      // Calculate dynamic nameGap for non-horizontal charts when label rotation is applied
-      const axisLabelRotation = it.axisLabel?.rotate || 0;
-      const axisLabelWidth = it.axisLabel?.width || 120;
-      const axisLabelFontSize = showAxisLabel ? 12 : 10;
-      const axisLabelMargin = showAxisLabel ? 8 : 0;
-
-      const dynamicNameGap = isHorizontalChart
-        ? yAxisNameGap
-        : calculateDynamicNameGap(
-            axisLabelRotation,
-            axisLabelWidth,
-            axisLabelFontSize,
-            25,
-            axisLabelMargin,
-          );
-
-      it.axisTick.length = showAxisLabel ? 5 : 0;
-      it.nameGap = showAxisLabel ? dynamicNameGap : 0;
-      it.axisLabel.margin = axisLabelMargin;
-      it.axisLabel.fontSize = axisLabelFontSize;
-      it.nameTextStyle.fontSize = 12;
-      it.axisLabel.show = showAxisLabel;
-
-      if (!showAxisLabel) it.name = "";
-    });
-  };
 
   const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
 
@@ -1002,11 +485,22 @@ export const convertSQLData = async (
   // Calculate additional spacing needed for rotated labels
   // Skip rotation for time-based x-axis and horizontal chart types (h-bar, h-stacked)
   // For horizontal charts, labels should always be at 0 degrees (not rotated)
-  let labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-  let labelWidth = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
+  let labelRotation =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : panelSchema.config?.axis_label_rotate || 0;
+  let labelWidth =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : panelSchema.config?.axis_label_truncate_width || 0;
 
   // If truncate width is not set and not time-based/horizontal, calculate the actual max width from data
-  if (!hasTimestampField && !isHorizontalChart && labelWidth === 0 && xAxisKeys.length > 0) {
+  if (
+    !hasTimestampField &&
+    !isHorizontalChart &&
+    labelWidth === 0 &&
+    xAxisKeys.length > 0
+  ) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
     labelWidth = calculateWidthText(longestLabelStr, "12px");
   } else if (!hasTimestampField && !isHorizontalChart && labelWidth === 0) {
@@ -1018,22 +512,28 @@ export const convertSQLData = async (
 
   // Calculate the section height (nameGap) upfront so we can use it for bottom spacing
   // Skip rotation-based calculations for horizontal charts and time-based axes
-  const dynamicXAxisNameGap = (hasTimestampField || isHorizontalChart) ? 25 : calculateDynamicNameGap(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    25,
-    labelMargin,
-  );
+  const dynamicXAxisNameGap =
+    hasTimestampField || isHorizontalChart
+      ? 25
+      : calculateDynamicNameGap(
+          labelRotation,
+          labelWidth,
+          labelFontSize,
+          25,
+          labelMargin,
+        );
 
   // Additional bottom space is only needed for non-horizontal, non-time-based charts
-  const additionalBottomSpace = (hasTimestampField || isHorizontalChart) ? 0 : calculateRotatedLabelBottomSpace(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    !!hasXAxisName,
-    dynamicXAxisNameGap,
-  );
+  const additionalBottomSpace =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : calculateRotatedLabelBottomSpace(
+        labelRotation,
+        labelWidth,
+        labelFontSize,
+        !!hasXAxisName,
+        dynamicXAxisNameGap,
+      );
 
   const options: any = {
     backgroundColor: "transparent",
@@ -1048,17 +548,22 @@ export const convertSQLData = async (
             const baseBottom =
               legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
-                ? (panelSchema.config?.axis_width == null ? 50 : 60)
-                : (panelSchema.config?.axis_width == null ? 35 : 40);
-          // When an x-axis name is present, `nameGap` already reserves space
-          // between rotated labels and the axis name. Adding `additionalBottomSpace`
-          // here causes double-counting and extra blank space beneath the axis
-          // name. Only return the base bottom in this case.
-          return baseBottom;
+                ? panelSchema.config?.axis_width == null
+                  ? 50
+                  : 60
+                : panelSchema.config?.axis_width == null
+                  ? 35
+                  : 40;
+            // When an x-axis name is present, `nameGap` already reserves space
+            // between rotated labels and the axis name. Adding `additionalBottomSpace`
+            // here causes double-counting and extra blank space beneath the axis
+            // name. Only return the base bottom in this case.
+            return baseBottom;
           })()
         : (() => {
             const baseBottom =
-              legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+              legendConfig.orient === "vertical" &&
+              panelSchema.config?.show_legends
                 ? 0
                 : breakDownKeys.length > 0
                   ? 25
@@ -1229,8 +734,14 @@ export const convertSQLData = async (
       }
 
       // Use 0 for rotation and width if time-based field or horizontal chart
-      const labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-      const labelWidth = (hasTimestampField || isHorizontalChart) ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
+      const labelRotation =
+        hasTimestampField || isHorizontalChart
+          ? 0
+          : panelSchema.config?.axis_label_rotate || 0;
+      const labelWidth =
+        hasTimestampField || isHorizontalChart
+          ? 120
+          : panelSchema.config?.axis_label_truncate_width || 120;
       const labelFontSize = 12;
       const labelMargin = 10;
 
@@ -1258,8 +769,8 @@ export const convertSQLData = async (
               : index == xAxisKeys.length + breakDownKeys.length - 1
                 ? "auto"
                 : function (i: any) {
-                    return arr.includes(i);
-                  },
+                  return arr.includes(i);
+                },
           overflow:
             index == xAxisKeys.length + breakDownKeys.length - 1
               ? "none"
@@ -1287,8 +798,8 @@ export const convertSQLData = async (
             panelSchema.type == "h-stacked"
               ? "auto"
               : function (i: any) {
-                  return arr.includes(i);
-                },
+                return arr.includes(i);
+              },
         },
         data: data,
       };
@@ -1647,8 +1158,11 @@ export const convertSQLData = async (
             }
           },
         };
-        const xAxisLabelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-        const xAxisLabelWidth = panelSchema.config?.axis_label_truncate_width || 120;
+        const xAxisLabelRotation = hasTimestampField
+          ? 0
+          : panelSchema.config?.axis_label_rotate || 0;
+        const xAxisLabelWidth =
+          panelSchema.config?.axis_label_truncate_width || 120;
         options.xAxis[0].axisLabel = {
           rotate: xAxisLabelRotation,
         };
@@ -1755,7 +1269,19 @@ export const convertSQLData = async (
         panelSchema.config.trellis?.layout &&
         breakDownKeys.length
       )
-        updateTrellisConfig();
+        updateTrellisConfig(
+          chartPanelRef,
+          panelSchema,
+          options,
+          yAxisKeys,
+          xAxisKeys,
+          chartPanelStyle,
+          getAxisDataFromKey,
+          largestLabel,
+          getSeriesMarkArea,
+          getAnnotationMarkLine,
+          convertedTimeStampToDataFormat
+        );
 
       break;
     }
@@ -1764,7 +1290,19 @@ export const convertSQLData = async (
       options.series = getSeries({ barMinHeight: 1 });
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
+        updateTrellisConfig(
+          chartPanelRef,
+          panelSchema,
+          options,
+          yAxisKeys,
+          xAxisKeys,
+          chartPanelStyle,
+          getAxisDataFromKey,
+          largestLabel,
+          getSeriesMarkArea,
+          getAnnotationMarkLine,
+          convertedTimeStampToDataFormat
+        );
       }
 
       //swap x and y axis
@@ -1892,7 +1430,11 @@ export const convertSQLData = async (
         const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
 
         // Calculate responsive radius that accounts for dynamic resizing
-        const pieRadius = getPieChartRadius(options.series[0].data);
+        const pieRadius = getPieChartRadius(
+          chartPanelRef,
+          panelSchema,
+          options.series[0].data
+        );
         options.series[0].radius = `${pieRadius}%`;
 
         // Apply chart alignment - only when legend position is right and chart_align is explicitly set
@@ -2045,7 +1587,11 @@ export const convertSQLData = async (
         // Get current chart dimensions
         const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
 
-        const outerRadius: number = getPieChartRadius(options.series[0].data);
+        const outerRadius: number = getPieChartRadius(
+          chartPanelRef,
+          panelSchema,
+          options.series[0].data
+        );
 
         // Adjust inner radius based on outer radius size for better proportions
         const thickness = outerRadius > 70 ? 35 : 30;
@@ -2095,8 +1641,12 @@ export const convertSQLData = async (
           }
         },
       };
-      const stackedXAxisRotation = hasTimestampField ? 0 : (options.xAxis[0].axisLabel?.rotate || 0);
-      const stackedXAxisWidth = hasTimestampField ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
+      const stackedXAxisRotation = hasTimestampField
+        ? 0
+        : options.xAxis[0].axisLabel?.rotate || 0;
+      const stackedXAxisWidth = hasTimestampField
+        ? 120
+        : panelSchema.config?.axis_label_truncate_width || 120;
       options.xAxis[0].axisLabel.margin = 5;
       options.xAxis[0].axisLabel = {
         rotate: stackedXAxisRotation,
@@ -2153,7 +1703,7 @@ export const convertSQLData = async (
         });
       });
 
-      (options.visualMap = {
+      ((options.visualMap = {
         min: 0,
         max: zValues.reduce(
           (a: any, b: any) =>
@@ -2202,9 +1752,9 @@ export const convertSQLData = async (
               },
             },
           },
-        ]);
+        ]));
       // option.yAxis.data=xAxisFirstPositionUniqueValue;
-      (options.tooltip = {
+      ((options.tooltip = {
         position: "top",
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
@@ -2249,7 +1799,7 @@ export const convertSQLData = async (
             precision: panelSchema.config?.decimals,
             backgroundColor: store.state.theme === "dark" ? "#333" : "",
           },
-        });
+        }));
       // if auto sql
       if (panelSchema?.queries[0]?.customQuery == false) {
         // check if x axis has histogram or not
@@ -2289,7 +1839,7 @@ export const convertSQLData = async (
       }
 
       options.grid.bottom = 60;
-      (options.xAxis = [
+      ((options.xAxis = [
         {
           type: "category",
           data: xAxisZerothPositionUniqueValue,
@@ -2306,7 +1856,7 @@ export const convertSQLData = async (
               show: true,
             },
           }),
-        ];
+        ]);
       options.legend.show = false;
       break;
     }
@@ -2663,7 +2213,13 @@ export const convertSQLData = async (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          options.xAxis[0].nameGap = calculateDynamicNameGap(
+            0,
+            120,
+            12,
+            25,
+            10,
+          );
         }
       }
 
@@ -2862,7 +2418,13 @@ export const convertSQLData = async (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          options.xAxis[0].nameGap = calculateDynamicNameGap(
+            0,
+            120,
+            12,
+            25,
+            10,
+          );
         }
       }
 
@@ -3124,8 +2686,6 @@ const largestLabel = (data: any) => {
   return largestlabel;
 };
 
-
-
 const showTrellisConfig = (type: string) => {
   const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
   return supportedTypes.has(type);
@@ -3156,7 +2716,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
           panelSchema.config?.line_interpolation,
         )
           ? // TODO: replace this with type integrations
-          panelSchema.config.line_interpolation.replace("step-", "")
+            panelSchema.config.line_interpolation.replace("step-", "")
           : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,
