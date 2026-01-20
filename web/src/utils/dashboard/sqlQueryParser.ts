@@ -462,9 +462,9 @@ export class SQLQueryParser {
       label: this.generateLabel(alias),
       alias: alias,
       column: columnName,
-      type: "raw",
+      type: "build",  // Changed from "raw" to "build" to match addBreakDownAxisItem structure
       color: null,
-      functionName: null,
+      functionName: null,  // null for plain columns (non-aggregation, non-function)
       sortBy: null,
       args: [
         {
