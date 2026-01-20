@@ -136,9 +136,9 @@ jobs:
           cd /tmp/sccache-test
           cargo init --name sccache_test
 
-          # Test compilation through sccache with cargo (the way it will actually be used)
-          echo "Testing sccache with cargo build..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build || {
+          # Test compilation through sccache with cargo (matching actual build flags)
+          echo "Testing sccache with cargo build --release..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
@@ -148,8 +148,20 @@ jobs:
           echo "$STATS"
 
           COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
+          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
+          CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
+
           if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
             echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
+
+            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
+              echo "⚠️  WARNING: $NON_CACHEABLE compilations were non-cacheable"
+              echo "   This might affect caching performance in the full build"
+            fi
+
+            if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
+              echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
+            fi
           else
             echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
             echo "This means RUSTC_WRAPPER is not working correctly with cargo"
@@ -181,12 +193,21 @@ jobs:
       - name: Build and run binary
         run: |
           echo "Using sccache wrapper at: $SCCACHE_PATH"
+          echo "RUSTC_WRAPPER=$SCCACHE_PATH"
+          echo "SCCACHE_GHA_ENABLED=true"
+
+          # Show initial sccache stats
+          echo "=== Initial sccache stats ==="
+          $SCCACHE_PATH --show-stats
+          echo "=============================="
+
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
           RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
           SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_LOG: debug
 
       - name: Show sccache stats
         run: |
@@ -288,9 +309,9 @@ jobs:
           cd /tmp/sccache-test
           cargo init --name sccache_test
 
-          # Test compilation through sccache with cargo (the way it will actually be used)
-          echo "Testing sccache with cargo build..."
-          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build || {
+          # Test compilation through sccache with cargo (matching actual build flags)
+          echo "Testing sccache with cargo build --release..."
+          RUSTC_WRAPPER="$SCCACHE_PATH" SCCACHE_GHA_ENABLED=true cargo build --release || {
             echo "❌ ERROR: Test cargo build failed"
             exit 1
           }
@@ -300,8 +321,20 @@ jobs:
           echo "$STATS"
 
           COMPILE_REQUESTS=$(echo "$STATS" | grep "Compile requests" | head -1 | awk '{print $3}')
+          NON_CACHEABLE=$(echo "$STATS" | grep "Non-cacheable calls" | head -1 | awk '{print $3}')
+          CACHE_MISSES=$(echo "$STATS" | grep "Cache misses" | head -1 | awk '{print $3}')
+
           if [ "$COMPILE_REQUESTS" -gt 0 ] 2>/dev/null; then
             echo "✓ SUCCESS: sccache is working! It intercepted $COMPILE_REQUESTS compilation(s)."
+
+            if [ "$NON_CACHEABLE" -gt 0 ] 2>/dev/null; then
+              echo "⚠️  WARNING: $NON_CACHEABLE compilations were non-cacheable"
+              echo "   This might affect caching performance in the full build"
+            fi
+
+            if [ "$CACHE_MISSES" -gt 0 ] 2>/dev/null; then
+              echo "ℹ️  Cache misses: $CACHE_MISSES (expected on first run)"
+            fi
           else
             echo "❌ ERROR: sccache did not intercept any compilations (Compile requests: $COMPILE_REQUESTS)"
             echo "This means RUSTC_WRAPPER is not working correctly with cargo"
@@ -333,12 +366,21 @@ jobs:
       - name: Build and run binary
         run: |
           echo "Using sccache wrapper at: $SCCACHE_PATH"
+          echo "RUSTC_WRAPPER=$SCCACHE_PATH"
+          echo "SCCACHE_GHA_ENABLED=true"
+
+          # Show initial sccache stats
+          echo "=== Initial sccache stats ==="
+          $SCCACHE_PATH --show-stats
+          echo "=============================="
+
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
         env:
           RUSTC_WRAPPER: ${{ env.SCCACHE_PATH }}
           SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_LOG: debug
 
       - name: Show sccache stats
         run: |
