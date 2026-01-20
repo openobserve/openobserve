@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import incidentsService, { IncidentServiceGraph, AlertNode } from "@/services/incidents";
 
@@ -98,15 +99,52 @@ export default defineComponent({
     const graphData = ref<IncidentServiceGraph | null>(null);
     const chartRendererRef = ref<any>(null);
     const chartKey = ref(0);
+    const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
     const isDarkMode = computed(() => store.state.theme === "dark");
+
+    // D3-Force simulation to compute stable node positions
+    const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
+      const nodesCopy = nodes.map(n => ({ ...n }));
+      const edgesCopy = edges.map(e => ({
+        source: e.source,
+        target: e.target,
+        ...e,
+      }));
+
+      const simulation = forceSimulation(nodesCopy)
+        .force('charge', forceManyBody().strength(-200).distanceMax(1200)) // Minimal repulsion for very tight clustering
+        .force('link', forceLink(edgesCopy)
+          .id((d: any) => d.id)
+          .distance(100) // Reduced from 250 to 100 for much closer nodes
+          .strength(0.8) // Increased from 0.6 to pull nodes together more
+          .iterations(3)
+        )
+        .force('center', forceCenter(width / 2, height / 2).strength(0.1)) // Increased from 0.05 for stronger centering
+        .force('x', forceX(width / 2).strength(0.15)) // Increased for tighter clustering
+        .force('y', forceY(height / 2).strength(0.15)) // Increased for tighter clustering
+        .force('collision', forceCollide()
+          .radius((d: any) => (d.symbolSize || 60) / 2 + 30) // Reduced padding from 80 to 30
+          .strength(1.0)
+          .iterations(2)
+        )
+        .velocityDecay(0.35)
+        .stop();
+
+      // Run simulation for 5000 iterations to stabilize
+      for (let i = 0; i < 5000; i++) {
+        simulation.tick();
+      }
+
+      return simulation.nodes().map(n => ({ ...n }));
+    };
 
     const loadGraph = async () => {
       loading.value = true;
       try {
         const response = await incidentsService.getServiceGraph(props.orgId, props.incidentId);
         graphData.value = response.data;
-        chartKey.value++;
+        // Don't increment chartKey to preserve node positions
       } catch (error: any) {
         console.error("Failed to load service graph:", error);
 
@@ -152,45 +190,89 @@ export default defineComponent({
 
       const { nodes, edges } = graphData.value;
 
-      // Convert to ECharts graph format
-      const echartsNodes = nodes.map((node, index) => ({
+      // Prepare nodes for D3-force simulation
+      const preparedNodes = nodes.map((node, index) => ({
         name: `${node.alert_name}\n${node.service_name}`,
         id: index.toString(),
         symbolSize: getNodeSize(node),
-        itemStyle: {
-          color: getNodeColor(node, index),
-          borderColor: index === 0 ? "#dc2626" : getNodeColor(node, index),
-          borderWidth: index === 0 ? 4 : 2,
-        },
-        label: {
-          show: true,
-          position: "bottom",
-          distance: 5,
-          fontSize: 11,
-          color: isDarkMode.value ? "#e5e7eb" : "#374151",
-          formatter: `{b}`,
-        },
-        tooltip: {
-          formatter: () => {
-            const firstTime = new Date(node.first_fired_at / 1000).toLocaleString();
-            const lastTime = node.alert_count > 1 ? new Date(node.last_fired_at / 1000).toLocaleString() : null;
-
-            let html = `<div style="padding: 8px; font-size: 12px;">`;
-            html += `<strong style="font-size: 14px;">${node.alert_name}</strong><br/>`;
-            html += `Service: <strong>${node.service_name}</strong><br/><br/>`;
-            html += `Alert Count: <strong>${node.alert_count}</strong><br/>`;
-            html += `First Fired: ${firstTime}<br/>`;
-            if (lastTime) {
-              html += `Last Fired: ${lastTime}<br/>`;
-            }
-            if (index === 0) {
-              html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
-            }
-            html += `</div>`;
-            return html;
-          },
-        },
+        originalNode: node,
+        originalIndex: index,
       }));
+
+      // Prepare edges for D3-force simulation
+      const preparedEdges = edges.map((edge) => ({
+        source: edge.from_node_index.toString(),
+        target: edge.to_node_index.toString(),
+        originalEdge: edge,
+      }));
+
+      // Compute force-directed layout positions using D3 with smaller area for tighter clustering
+      // Only compute if we don't have cached positions for these nodes
+      let positionedNodes;
+      const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
+
+      if (hasAllPositions) {
+        // Use cached positions
+        positionedNodes = preparedNodes.map(n => ({
+          ...n,
+          x: nodePositions.value.get(n.id)!.x,
+          y: nodePositions.value.get(n.id)!.y,
+        }));
+      } else {
+        // Compute new positions and cache them
+        positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 300, 300);
+        positionedNodes.forEach((node: any) => {
+          nodePositions.value.set(node.id, { x: node.x, y: node.y });
+        });
+      }
+
+      // Convert to ECharts graph format with computed fixed positions
+      const echartsNodes = positionedNodes.map((node: any) => {
+        const originalNode = node.originalNode;
+        const index = node.originalIndex;
+
+        return {
+          name: node.name,
+          id: node.id,
+          x: node.x,
+          y: node.y,
+          fixed: true, // Lock position so ECharts doesn't re-layout
+          symbolSize: node.symbolSize,
+          itemStyle: {
+            color: getNodeColor(originalNode, index),
+            borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),
+            borderWidth: index === 0 ? 4 : 2,
+          },
+          label: {
+            show: true,
+            position: "bottom",
+            distance: 5,
+            fontSize: 11,
+            color: isDarkMode.value ? "#e5e7eb" : "#374151",
+            formatter: `{b}`,
+          },
+          tooltip: {
+            formatter: () => {
+              const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
+              const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
+
+              let html = `<div style="padding: 8px; font-size: 12px;">`;
+              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
+              html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
+              html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
+              html += `First Fired: ${firstTime}<br/>`;
+              if (lastTime) {
+                html += `Last Fired: ${lastTime}<br/>`;
+              }
+              if (index === 0) {
+                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+              }
+              html += `</div>`;
+              return html;
+            },
+          },
+        };
+      });
 
       const echartsEdges = edges.map((edge) => ({
         source: edge.from_node_index.toString(),
@@ -222,21 +304,18 @@ export default defineComponent({
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
           },
         },
-        animationDuration: 1500,
-        animationEasingUpdate: "quinticInOut",
+        animation: false, // Disable animation since we have pre-computed positions
         series: [
           {
             type: "graph",
-            layout: "force",
-            force: {
-              repulsion: 300,
-              gravity: 0.1,
-              edgeLength: 150,
-              layoutAnimation: true,
-            },
-            center: ["50%", "60%"],
+            layout: "none", // Use none since we pre-computed positions with D3
             roam: true,
             draggable: true,
+            focusNodeAdjacency: true,
+            scaleLimit: {
+              min: 0.4,
+              max: 3,
+            },
             data: echartsNodes,
             links: echartsEdges,
             emphasis: {
@@ -252,7 +331,7 @@ export default defineComponent({
         ],
       };
 
-      return { options, notMerge: true };
+      return { options, notMerge: !hasAllPositions }; // Merge when using cached positions
     });
 
     // Watch for incident changes

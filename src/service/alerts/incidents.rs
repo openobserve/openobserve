@@ -704,72 +704,80 @@ pub async fn enrich_with_topology(
         Ok(e) => e,
         Err(e) => {
             log::debug!(
-                "[incidents] Service graph not available for dependency edges: {e}, using temporal edges only"
+                "[incidents] Service graph query failed: {e}, will use temporal edges for cross-service correlation"
             );
-            // Continue with temporal edges only
-            infra::table::alert_incidents::update_topology(org_id, incident_id, &topology).await?;
-            return Ok(());
+            vec![] // Empty vec to continue with temporal edges
         }
     };
 
-    if !sg_edges.is_empty() {
-        // Build Service Graph topology
-        let (_sg_nodes, sg_edges, _) =
-            o2_enterprise::enterprise::service_graph::build_topology(sg_edges);
+    // Build Service Graph topology (even if empty, we need to create temporal edges)
+    let (_sg_nodes, sg_edges, _) = if !sg_edges.is_empty() {
+        o2_enterprise::enterprise::service_graph::build_topology(sg_edges)
+    } else {
+        log::debug!(
+            "[incidents] Service graph has no edges, will use temporal edges for cross-service correlation"
+        );
+        (vec![], vec![], std::collections::HashMap::new())
+    };
 
-        // Create service-to-node mapping for quick lookup
-        let mut service_nodes: HashMap<&str, Vec<usize>> = HashMap::new();
-        for (idx, node) in topology.nodes.iter().enumerate() {
-            service_nodes
-                .entry(&node.service_name)
-                .or_insert_with(Vec::new)
-                .push(idx);
-        }
+    // Create service-to-node mapping for quick lookup
+    let mut service_nodes: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (idx, node) in topology.nodes.iter().enumerate() {
+        service_nodes
+            .entry(&node.service_name)
+            .or_insert_with(Vec::new)
+            .push(idx);
+    }
 
-        // For each pair of services in the graph, check if there's a Service Graph edge
-        for (from_service, from_indices) in &service_nodes {
-            for (to_service, to_indices) in &service_nodes {
-                if from_service == to_service {
-                    continue; // Skip same service (handled by temporal edges)
-                }
+    // For each pair of services in the graph, check if there's a Service Graph edge
+    for (from_service, from_indices) in &service_nodes {
+        for (to_service, to_indices) in &service_nodes {
+            if from_service == to_service {
+                continue; // Skip same service (handled by temporal edges)
+            }
 
-                // Check if Service Graph has edge from_service -> to_service
-                let has_sg_edge = sg_edges
-                    .iter()
-                    .any(|e| &e.from == from_service && &e.to == to_service);
+            // Check if Service Graph has edge from_service -> to_service
+            let has_sg_edge = sg_edges
+                .iter()
+                .any(|e| &e.from == from_service && &e.to == to_service);
 
-                if has_sg_edge {
-                    // Add edge from each node in from_service to each node in to_service
-                    // that occurred chronologically after
-                    for &from_idx in from_indices {
-                        for &to_idx in to_indices {
-                            let from_node = &topology.nodes[from_idx];
-                            let to_node = &topology.nodes[to_idx];
+            // Add edge from each node in from_service to each node in to_service
+            // that occurred chronologically after
+            for &from_idx in from_indices {
+                for &to_idx in to_indices {
+                    let from_node = &topology.nodes[from_idx];
+                    let to_node = &topology.nodes[to_idx];
 
-                            // Only add if from happened before to (chronological)
-                            if from_node.first_fired_at < to_node.first_fired_at {
-                                // Check if edge already exists
-                                let edge_exists = topology.edges.iter().any(|e| {
-                                    e.from_node_index == from_idx
-                                        && e.to_node_index == to_idx
-                                        && matches!(e.edge_type, EdgeType::ServiceDependency)
-                                });
+                    // Only add if from happened before to (chronological)
+                    if from_node.first_fired_at < to_node.first_fired_at {
+                        // Determine edge type: ServiceDependency if SG edge exists, otherwise Temporal
+                        let edge_type = if has_sg_edge {
+                            EdgeType::ServiceDependency
+                        } else {
+                            EdgeType::Temporal
+                        };
 
-                                if !edge_exists {
-                                    topology.edges.push(AlertEdge {
-                                        from_node_index: from_idx,
-                                        to_node_index: to_idx,
-                                        edge_type: EdgeType::ServiceDependency,
-                                    });
-                                    log::debug!(
-                                        "[incidents] Added service dependency edge: {} ({}) -> {} ({})",
-                                        from_idx,
-                                        from_service,
-                                        to_idx,
-                                        to_service
-                                    );
-                                }
-                            }
+                        // Check if edge already exists
+                        let edge_exists = topology.edges.iter().any(|e| {
+                            e.from_node_index == from_idx
+                                && e.to_node_index == to_idx
+                                && e.edge_type == edge_type
+                        });
+
+                        if !edge_exists {
+                            topology.edges.push(AlertEdge {
+                                from_node_index: from_idx,
+                                to_node_index: to_idx,
+                                edge_type: edge_type.clone(),
+                            });
+                            log::debug!(
+                                "[incidents] Added {:?} edge: {} ({}) -> {} ({})",
+                                edge_type,
+                                from_idx,
+                                from_service,
+                                to_idx,
+                                to_service
+                            );
                         }
                     }
                 }
