@@ -474,7 +474,190 @@
     "community_lbl": "Community",
     "loading_license_info": "Loading license information...",
     "installation_id_lbl": "Installation ID",
-    "expired_lbl": "Expired"
+    "expired_lbl": "Expired",
+    "header_button": {
+      "cloud_features": "OpenObserve Features",
+      "enterprise_edition": "Edition: Enterprise",
+      "get_enterprise_free": "Get OpenObserve Enterprise (Free)"
+    },
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "Enterprise Features",
+        "offer_text": "Get all enterprise features completely free when you self-host OpenObserve",
+        "badge_text": "Free up to 200GB / day",
+        "features_title": "OpenObserve Cloud Features",
+        "features_subtitle": "All features included in your cloud subscription",
+        "primary_button_text": "Download Now"
+      },
+      "enterprise_without_license": {
+        "hero_title": "Enterprise Features",
+        "offer_text": "Request a free license to maximize your OpenObserve deployment",
+        "badge_text": "Free up to {quota}GB / day",
+        "features_title": "Available Enterprise Features",
+        "features_subtitle": "Get a free license to unlock unlimited capabilities",
+        "primary_button_text": "Get Free License",
+        "license_note": "100GB/day without license • 200GB/day with license"
+      },
+      "enterprise_with_license": {
+        "hero_title": "Your Enterprise Edition",
+        "offer_text": "You're running OpenObserve Enterprise with all features enabled",
+        "badge_text_unlimited": "Ingestion Limit: Unlimited",
+        "badge_text_limited": "Ingestion Limit: {limit}GB / day",
+        "features_title": "Active Enterprise Features",
+        "features_subtitle": "All features unlocked and ready to use",
+        "primary_button_text": "Manage License"
+      },
+      "open_source": {
+        "hero_title": "Get Enterprise Edition",
+        "offer_text": "Download and unlock all enterprise features completely free",
+        "badge_text": "Free up to 200GB / day",
+        "features_title": "Unlock All Enterprise Features",
+        "features_subtitle": "Everything you need for production-ready observability",
+        "primary_button_text": "Download Now"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "Logs, Metrics, Traces",
+          "note": "Full observability data ingestion and analysis"
+        },
+        "rum": {
+          "name": "RUM",
+          "note": "Real User Monitoring for frontend performance"
+        },
+        "alerts": {
+          "name": "Alerts",
+          "note": "Real-time alerting and notifications"
+        },
+        "dashboards": {
+          "name": "Dashboards",
+          "note": "Customizable visualization dashboards"
+        },
+        "reports": {
+          "name": "Reports",
+          "note": "Scheduled and on-demand reporting"
+        },
+        "vrl_functions": {
+          "name": "VRL Functions",
+          "note": "Vector Remap Language for data transformation"
+        },
+        "pipelines": {
+          "name": "Pipelines",
+          "note": "Data processing and transformation pipelines"
+        },
+        "high_availability": {
+          "name": "High Availability",
+          "note": "Distributed architecture for reliability"
+        },
+        "multitenancy": {
+          "name": "Multitenancy",
+          "note": "Organization-based data isolation"
+        },
+        "dynamic_schema": {
+          "name": "Dynamic Schema",
+          "note": "Automatic schema detection and evolution"
+        },
+        "multilingual_gui": {
+          "name": "Multilingual GUI",
+          "note": "Advanced internationalization support"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "Single Sign On",
+          "note": "Seamless authentication with SSO providers"
+        },
+        "rbac": {
+          "name": "Role Based Access Control",
+          "note": "Granular permissions and user management"
+        },
+        "federated_search": {
+          "name": "Federated Search / Supercluster",
+          "note": "Distribute queries across multiple clusters"
+        },
+        "query_management": {
+          "name": "Query Management",
+          "note": "Advanced query monitoring and optimization"
+        },
+        "workload_management": {
+          "name": "Workload Management",
+          "note": "Priority-based resource allocation and QoS"
+        },
+        "audit_trail": {
+          "name": "Audit Trail",
+          "note": "Complete activity logging for compliance"
+        },
+        "action_scripts": {
+          "name": "Action Scripts",
+          "note": "Automate responses to events and alerts"
+        },
+        "sensitive_data_redaction": {
+          "name": "Sensitive Data Redaction",
+          "note": "Protect PII and sensitive information"
+        },
+        "pipeline_remote_destinations": {
+          "name": "Pipeline Remote Destinations",
+          "note": "Send data to remote destinations"
+        },
+        "query_optimizer": {
+          "name": "Query Optimizer / Aggregation Cache",
+          "note": "TopK aggregation and query optimization"
+        },
+        "incident_management": {
+          "name": "Incident Management",
+          "note": "Track and manage incidents efficiently"
+        },
+        "sre_agent": {
+          "name": "SRE Agent",
+          "note": "Automated SRE operations and insights"
+        },
+        "ai_assistant": {
+          "name": "AI Assistant",
+          "note": "Intelligent query and analysis assistance"
+        },
+        "anomaly_detection": {
+          "name": "Anomaly Detection",
+          "note": "Automatically detect anomalies in data"
+        },
+        "metrics_auto_downsampling": {
+          "name": "Metrics Auto Downsampling",
+          "note": "Automatic metrics aggregation over time"
+        },
+        "log_patterns": {
+          "name": "Log Patterns",
+          "note": "Discover patterns in log data"
+        },
+        "mcp_server": {
+          "name": "MCP Server",
+          "note": "Model Context Protocol server integration"
+        },
+        "rate_limiting": {
+          "name": "Rate Limiting",
+          "note": "Control query and ingestion rates"
+        },
+        "broadcast_join": {
+          "name": "Broadcast Join",
+          "note": "Optimized distributed join operations"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "Logs, Metrics & Traces Correlation",
+          "note": "Automated detection and correlation"
+        },
+        "service_maps": {
+          "name": "Service Maps",
+          "note": "Visualize service dependencies"
+        }
+      },
+      "buttons": {
+        "contact_sales": "Contact Sales",
+        "learn_more": "Learn More"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "High Availability mode only"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "You are not authorized to manage the license."
+      }
+    }
   },
   "login": {
     "userid": "User ID",
