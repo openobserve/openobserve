@@ -275,7 +275,7 @@ export function calculateSummaryMetrics(planText: string): SummaryMetrics {
 
   return {
     totalTime: formatTime(metrics.maxTime),
-    totalRows: metrics.totalRows.toLocaleString(),
+    totalRows: metrics.totalRows.toLocaleString('en-US'),
     peakMemory: formatMemory(metrics.maxMemory),
   };
 }

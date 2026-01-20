@@ -142,10 +142,9 @@ export class AlertsPage {
             searchAcrossFoldersToggle: '[data-test="alert-list-search-across-folders-toggle"]',
             alertDeleteOption: 'Delete',
 
-            // View Mode Buttons (Alerts / Incidents) - Uses AppTabs component with tab-{value} pattern
-            alertIncidentViewTabs: '[data-test="alert-incident-view-tabs"]',  // Container for view tabs
-            alertsViewTab: '[data-test="tab-alerts"]',
-            incidentsViewTab: '[data-test="tab-incidents"]',
+            // Sidebar menu items for navigation (Alerts and Incidents are now separate pages)
+            alertMenuItem: '[data-test="menu-link-\\/alerts-item"]',
+            incidentsMenuItem: '[data-test="menu-link-\\/incidents-item"]',
 
             // Incidents view locators
             incidentListTable: '[data-test="incident-list-table"]',
@@ -665,6 +664,7 @@ export class AlertsPage {
         await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
     }
 
+<<<<<<< HEAD
     // ==================== VIEW MODE NAVIGATION (ALERTS / INCIDENTS as separate pages) ====================
 
     /**
@@ -691,12 +691,24 @@ export class AlertsPage {
         testLogger.info('Navigating to Alerts page');
         const orgId = process.env["ORGNAME"] || 'default';
         await this.page.goto(`/web/alerts?org_identifier=${orgId}`);
+=======
+    // ==================== ALERTS / INCIDENTS NAVIGATION ====================
+    // Alerts and Incidents are now separate pages accessible via sidebar menu
+
+    /**
+     * Navigate to Alerts page via sidebar menu
+     */
+    async navigateToAlertsPage() {
+        testLogger.info('Navigating to Alerts page');
+        await this.page.locator(this.locators.alertMenuItem).click();
+>>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.waitForAlertListPageReady();
         testLogger.info('Navigated to Alerts page');
     }
 
     /**
+<<<<<<< HEAD
      * Navigate to Incidents page
      * Note: Incidents is now a separate page at /web/incidents
      */
@@ -707,10 +719,20 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for incidents page to be ready
         await this.page.locator(this.locators.incidentListTable).waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+=======
+     * Navigate to Incidents page via sidebar menu
+     */
+    async navigateToIncidentsPage() {
+        testLogger.info('Navigating to Incidents page');
+        await this.page.locator(this.locators.incidentsMenuItem).click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.locator(this.locators.incidentList).waitFor({ state: 'visible', timeout: 30000 });
+>>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         testLogger.info('Navigated to Incidents page');
     }
 
     /**
+<<<<<<< HEAD
      * Wait for the current page to be ready
      * Note: With separate pages, this just ensures the current page is loaded
      */
@@ -736,6 +758,15 @@ export class AlertsPage {
             throw new Error('Not on a valid alerts or incidents page');
         }
         testLogger.info(`On ${isAlertsPage ? 'Alerts' : 'Incidents'} page`);
+=======
+     * Verify sidebar menu items are visible for navigation
+     */
+    async expectSidebarMenuItemsVisible() {
+        testLogger.info('Verifying sidebar menu items are visible');
+        await expect(this.page.locator(this.locators.alertMenuItem)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.incidentsMenuItem)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Sidebar menu items verified');
+>>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
     }
 
     /**

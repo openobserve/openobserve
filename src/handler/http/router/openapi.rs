@@ -315,8 +315,9 @@ use crate::{common::meta, handler::http::request};
             config::meta::alerts::incidents::IncidentSeverity,
             config::meta::alerts::incidents::CorrelationReason,
             config::meta::alerts::incidents::IncidentServiceGraph,
-            config::meta::alerts::incidents::IncidentServiceNode,
-            config::meta::alerts::incidents::IncidentServiceEdge,
+            config::meta::alerts::incidents::AlertNode,
+            config::meta::alerts::incidents::AlertEdge,
+            config::meta::alerts::incidents::EdgeType,
             config::meta::alerts::incidents::IncidentGraphStats,
             // Folders
             crate::handler::http::models::folders::CreateFolderRequestBody,

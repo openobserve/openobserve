@@ -380,6 +380,13 @@ export default defineComponent({
       );
     });
 
+    const isIncidentsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig.service_graph_enabled
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -562,7 +569,7 @@ export default defineComponent({
     });
 
     const updateIncidentsMenu = () => {
-      if (config.isCloud == "true" || config.isEnterprise == "true") {
+      if (isIncidentsEnabled.value) {
         const alertIndex = linksList.value.findIndex(
           (link) => link.name === "alertList",
         );

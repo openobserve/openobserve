@@ -197,7 +197,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -399,9 +399,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should check for existing RCA", () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
         suggested_root_cause: "Existing RCA content",
       };
@@ -411,9 +410,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should return false when no RCA exists", () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
       };
 
@@ -543,9 +541,8 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should include existing RCA in context data when available", async () => {
       wrapper.vm.incidentDetails.topology_context = {
-        service: "api",
-        upstream_services: [],
-        downstream_services: [],
+        nodes: [],
+        edges: [],
         related_incident_ids: [],
         suggested_root_cause: "Existing RCA",
       };
@@ -807,9 +804,31 @@ describe("IncidentDetailDrawer.vue", () => {
       const mockIncidentData = createIncidentWithAlerts({
         id: "test-123",
         topology_context: {
-          service: "api-gateway",
-          upstream_services: ["auth-service", "user-service"],
-          downstream_services: ["database", "cache"],
+          nodes: [
+            {
+              alert_id: "alert_cpu",
+              alert_name: "High CPU",
+              service_name: "api-gateway",
+              alert_count: 2,
+              first_fired_at: 1000,
+              last_fired_at: 2000,
+            },
+            {
+              alert_id: "alert_memory",
+              alert_name: "High Memory",
+              service_name: "auth-service",
+              alert_count: 1,
+              first_fired_at: 1500,
+              last_fired_at: 1500,
+            },
+          ],
+          edges: [
+            {
+              from_node_index: 0,
+              to_node_index: 1,
+              edge_type: "service_dependency",
+            },
+          ],
           related_incident_ids: ["incident-2", "incident-3"],
           suggested_root_cause: "High memory usage in auth-service",
         },
@@ -825,18 +844,14 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should display topology service", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.service).toBe("api-gateway");
+    it("should display topology nodes", () => {
+      expect(wrapper.vm.incidentDetails.topology_context.nodes).toHaveLength(2);
+      expect(wrapper.vm.incidentDetails.topology_context.nodes[0].alert_name).toBe("High CPU");
     });
 
-    it("should display upstream services", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.upstream_services).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.upstream_services).toContain("auth-service");
-    });
-
-    it("should display downstream services", () => {
-      expect(wrapper.vm.incidentDetails.topology_context.downstream_services).toHaveLength(2);
-      expect(wrapper.vm.incidentDetails.topology_context.downstream_services).toContain("database");
+    it("should display topology edges", () => {
+      expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
+      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe("service_dependency");
     });
   });
 
@@ -921,7 +936,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
 
     it("should navigate back to incident list on close", async () => {
@@ -932,7 +947,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList" });
+      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
     });
   });
 
