@@ -686,9 +686,23 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 const evaluateAndSetStatus = (resultCount: number) => {
   console.log("[PreviewAlert] Evaluating status with count:", resultCount);
 
-  const threshold = props.formData.trigger_condition?.threshold || 0;
-  const operator = props.formData.trigger_condition?.operator || ">=";
   const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+
+  // For aggregation, always use > 0 (backend checks if any aggregated results exist)
+  let threshold: number;
+  let operator: string;
+
+  if (props.isAggregationEnabled) {
+    // When aggregation is enabled, backend always checks for > 0 results
+    threshold = 0;
+    operator = ">";
+    console.log("[PreviewAlert] Using aggregation logic: > 0");
+  } else {
+    // Use regular trigger condition threshold values
+    threshold = props.formData.trigger_condition?.threshold || 0;
+    operator = props.formData.trigger_condition?.operator || ">=";
+    console.log("[PreviewAlert] Using trigger_condition threshold:", threshold, "operator:", operator);
+  }
 
   console.log("[PreviewAlert] Result count:", resultCount);
   console.log("[PreviewAlert] Threshold:", threshold);

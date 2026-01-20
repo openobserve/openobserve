@@ -1289,7 +1289,14 @@ export default defineComponent({
 
         // Only include aggregation if enabled
         if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
-          payload.query_condition.aggregation = formData.value.query_condition.aggregation;
+          // Filter out empty strings from group_by array
+          const groupBy = formData.value.query_condition.aggregation.group_by || [];
+          const filteredGroupBy = groupBy.filter((field: string) => field && field.trim() !== '');
+
+          payload.query_condition.aggregation = {
+            ...formData.value.query_condition.aggregation,
+            group_by: filteredGroupBy,
+          };
         }
 
         const response = await alertsService.generate_sql(
