@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
- <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit" >
-      <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]">
+ <q-page class="q-pa-none o2-custom-bg" style="height: calc(100vh - 48px); min-height: inherit; display: flex; flex-direction: column;" >
+      <div class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]" style="flex-shrink: 0;">
         <div class="flex items-center tw:h-[60px]">
           <div
             no-caps
@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="card-container tw:h-full tw:py-2">
+      <div class="card-container tw:py-2" style="flex: 1; overflow-y: auto; overflow-x: hidden;">
         <div>
        <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
-        <!-- Destination Type Selection for Alerts -->
-        <div v-if="isAlerts" class="col-12 q-pb-md">
+        <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
+        <div v-if="isAlerts && !destination" class="col-12 q-pb-md">
           <div class="text-subtitle2 q-mb-sm">{{ t('alert_destinations.destination_type') }}</div>
           <PrebuiltDestinationSelector
             v-model="formData.destination_type"
@@ -52,6 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="selectDestinationType"
             @update:search-query="destinationSearchQuery = $event"
           />
+        </div>
+
+        <!-- Destination Type Display for Edit Mode -->
+        <div v-if="isAlerts && destination && formData.destination_type" class="col-12 q-pb-md">
+          <div class="text-subtitle2 q-mb-xs">{{ t('alert_destinations.destination_type') }}</div>
+          <div class="flex items-center q-pa-sm el-border el-border-radius" data-test="destination-type-readonly">
+            <q-icon :name="getDestinationTypeIcon(formData.destination_type)" size="20px" class="q-mr-sm" />
+            <span class="text-body2">{{ getDestinationTypeName(formData.destination_type) }}</span>
+            <q-chip size="sm" color="grey-3" text-color="grey-8" class="q-ml-sm">{{ t('alert_destinations.readonly') }}</q-chip>
+          </div>
         </div>
 
         <!-- Prebuilt Destination Form (for alerts only) -->
@@ -73,6 +83,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="prebuilt-test-result"
             @retry="handleTestDestination"
           />
+
+          <!-- Additional Settings for Prebuilt Destinations -->
+          <div class="col-12 q-mt-md">
+            <div class="text-bold q-py-xs">
+              {{ t('alert_destinations.additional_settings') }}
+            </div>
+
+            <!-- Custom Headers -->
+            <div class="q-py-sm">
+              <div class="text-subtitle2 q-pb-xs">
+                {{ t('alert_destinations.custom_headers') }}
+              </div>
+              <div
+                v-for="(header, index) in apiHeaders"
+                :key="header.uuid"
+                class="row q-col-gutter-sm q-pb-sm"
+              >
+                <div class="col-5 q-ml-none">
+                  <q-input
+                    :data-test="`add-destination-header-${header['key']}-key-input`"
+                    v-model="header.key"
+                    stack-label
+                    borderless
+                    hide-bottom-space
+                    :placeholder="t('alert_destinations.api_header')"
+                    dense
+                    tabindex="0"
+                  />
+                </div>
+                <div class="col-5 q-ml-none">
+                  <q-input
+                    :data-test="`add-destination-header-${header['key']}-value-input`"
+                    v-model="header.value"
+                    :placeholder="t('alert_destinations.api_header_value')"
+                    stack-label
+                    borderless
+                    hide-bottom-space
+                    dense
+                    tabindex="0"
+                  />
+                </div>
+                <div class="col-2 q-ml-none">
+                  <q-btn
+                    :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                    icon="delete"
+                    class="q-ml-xs iconHoverBtn"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.edit')"
+                    @click="deleteApiHeader(header)"
+                  />
+                  <q-btn
+                    data-test="add-destination-add-header-btn"
+                    v-if="index === apiHeaders.length - 1"
+                    icon="add"
+                    class="q-ml-xs iconHoverBtn"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.edit')"
+                    @click="addApiHeader()"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Skip TLS Verify Toggle -->
+            <div class="q-py-sm">
+              <q-toggle
+                data-test="add-destination-skip-tls-verify-toggle"
+                class="o2-toggle-button-lg"
+                size="lg"
+                v-model="formData.skip_tls_verify"
+                :label="t('alert_destinations.skip_tls_verify')"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Legacy tabs for non-alert destinations -->
@@ -435,6 +527,7 @@ const {
   validateCredentials,
   testDestination,
   createDestination,
+  updateDestination,
   generatePreview,
   isTestInProgress,
   lastTestResult
@@ -534,6 +627,26 @@ const isPrebuiltDestination = computed(() => {
   return formData.value.destination_type && formData.value.destination_type !== 'custom';
 });
 
+// Helper methods for displaying destination type in edit mode
+const getDestinationTypeName = (typeId: string) => {
+  const type = availableTypes.value.find(t => t.id === typeId);
+  return type ? type.name : typeId;
+};
+
+const getDestinationTypeIcon = (typeId: string) => {
+  const iconMap: Record<string, string> = {
+    slack: 'chat',
+    discord: 'forum',
+    msteams: 'groups',
+    email: 'email',
+    pagerduty: 'warning',
+    opsgenie: 'notifications_active',
+    servicenow: 'support_agent',
+    custom: 'settings'
+  };
+  return iconMap[typeId] || 'webhook';
+};
+
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {
   setupDestinationData();
@@ -554,11 +667,91 @@ const setupDestinationData = () => {
     formData.value.type = props.destination.type || "http";
     formData.value.action_id = props.destination.action_id || "";
 
+    // Set destination_type for prebuilt destinations in edit mode
+    if (props.isAlerts && props.destination.template) {
+      // Extract destination type from template name (e.g., "system-prebuilt-slack" -> "slack")
+      const templateName = props.destination.template;
+      if (templateName.includes('prebuilt')) {
+        const parts = templateName.split('-');
+        const typeId = parts[parts.length - 1]; // Get last part (e.g., "slack", "msteams")
+        formData.value.destination_type = typeId;
+
+        // Restore prebuilt credentials from metadata and destination fields
+        const credentials: Record<string, any> = {};
+
+        // Step 1: Parse metadata and remove credential_ prefix
+        if (props.destination.metadata) {
+          try {
+            const metadata = typeof props.destination.metadata === 'string'
+              ? JSON.parse(props.destination.metadata)
+              : props.destination.metadata;
+
+            // Extract credential fields (remove credential_ prefix)
+            Object.entries(metadata).forEach(([key, value]) => {
+              if (key.startsWith('credential_')) {
+                const credentialKey = key.replace('credential_', '');
+                credentials[credentialKey] = value;
+              }
+            });
+          } catch (e) {
+            console.error('Failed to parse destination metadata:', e);
+          }
+        }
+
+        // Step 2: Restore sensitive fields from destination properties
+        // webhookUrl is stored in the url field for webhook-based destinations
+        if (props.destination.url) {
+          credentials.webhookUrl = props.destination.url;
+        }
+
+        // For ServiceNow, instanceUrl is the base URL
+        if (typeId === 'servicenow' && props.destination.url) {
+          credentials.instanceUrl = props.destination.url;
+        }
+
+        // For email destinations, recipients are in emails field
+        if (typeId === 'email' && props.destination.emails) {
+          credentials.recipients = Array.isArray(props.destination.emails)
+            ? props.destination.emails.join(', ')
+            : props.destination.emails;
+        }
+
+        // For PagerDuty, integrationKey is in headers (if present)
+        if (typeId === 'pagerduty' && props.destination.headers?.['X-Routing-Key']) {
+          credentials.integrationKey = props.destination.headers['X-Routing-Key'];
+        }
+
+        // For Opsgenie, apiKey is in Authorization header
+        if (typeId === 'opsgenie' && props.destination.headers?.['Authorization']) {
+          const authHeader = props.destination.headers['Authorization'];
+          if (authHeader.startsWith('GenieKey ')) {
+            credentials.apiKey = authHeader.replace('GenieKey ', '');
+          }
+        }
+
+        // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
+        // are automatically restored from metadata via Step 1 (credential_ prefix removal)
+        // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
+
+        prebuiltCredentials.value = credentials;
+      } else {
+        // Custom destination
+        formData.value.destination_type = 'custom';
+      }
+    }
+
     if (Object.keys(formData.value?.headers || {}).length) {
-      apiHeaders.value = [];
-      Object.entries(formData.value?.headers || {}).forEach(([key, value]) => {
-        addApiHeader(key, value);
-      });
+      // Filter out system/prebuilt headers - only load custom headers into the UI
+      const systemHeaders = ['Content-Type', 'Authorization', 'X-Routing-Key'];
+      const customHeadersOnly = Object.entries(formData.value?.headers || {})
+        .filter(([key]) => !systemHeaders.includes(key));
+
+      if (customHeadersOnly.length > 0) {
+        apiHeaders.value = [];
+        customHeadersOnly.forEach(([key, value]) => {
+          addApiHeader(key, value);
+        });
+      }
     }
     if (props.destination.output_format) {
       formData.value.output_format = props.destination.output_format;
@@ -657,20 +850,43 @@ const showPreview = () => {
 
 // Save prebuilt or custom destination
 const saveDestination = async () => {
-  // Handle prebuilt destinations
+  // Handle prebuilt destinations (both create and update)
   if (isPrebuiltDestination.value) {
     try {
-      await createDestination(
-        formData.value.destination_type,
-        formData.value.name,
-        prebuiltCredentials.value
-      );
+      // Build custom headers object from apiHeaders array
+      const customHeaders: Headers = {};
+      apiHeaders.value.forEach((header) => {
+        if (header["key"] && header["value"]) {
+          customHeaders[header.key] = header.value;
+        }
+      });
+
+      if (isUpdatingDestination.value) {
+        // Update existing prebuilt destination
+        await updateDestination(
+          formData.value.destination_type,
+          props.destination.name, // original name
+          formData.value.name, // potentially new name
+          prebuiltCredentials.value,
+          customHeaders, // custom headers
+          formData.value.skip_tls_verify || false // skipTlsVerify
+        );
+      } else {
+        // Create new prebuilt destination
+        await createDestination(
+          formData.value.destination_type,
+          formData.value.name,
+          prebuiltCredentials.value,
+          customHeaders, // custom headers
+          formData.value.skip_tls_verify || false // skipTlsVerify
+        );
+      }
 
       emit("get:destinations");
       emit("cancel:hideform");
       return;
     } catch (error) {
-      console.error('Failed to create prebuilt destination:', error);
+      console.error('Failed to save prebuilt destination:', error);
       return;
     }
   }
