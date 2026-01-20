@@ -476,7 +476,190 @@
     "value_cost_free": "Gratuito",
     "value_cost_enterprise": "Se ospitato autonomamente, è gratuito per l'acquisizione di dati fino a 200 GB/giorno. Pagato successivamente",
     "value_cost_cloud": "14 giorni di prova gratuita. Pagato successivamente",
-    "feature_comparison_lbl": "Confronto delle funzionalità"
+    "feature_comparison_lbl": "Confronto delle funzionalità",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "Funzionalità aziendali",
+        "offer_text": "Ottieni tutte le funzionalità aziendali completamente gratuite ospitando OpenObserve",
+        "badge_text": "Gratuito fino a 200 GB/giorno",
+        "features_title": "Funzionalità di OpenObserve Cloud",
+        "features_subtitle": "Tutte le funzionalità incluse nel tuo abbonamento cloud",
+        "primary_button_text": "Scarica ora"
+      },
+      "enterprise_without_license": {
+        "hero_title": "Funzionalità aziendali",
+        "offer_text": "Richiedi una licenza gratuita per massimizzare l'implementazione di OpenObserve",
+        "badge_text": "Gratuito fino a {quota} GB/giorno",
+        "features_title": "Funzionalità aziendali disponibili",
+        "features_subtitle": "Ottieni una licenza gratuita per sbloccare funzionalità illimitate",
+        "primary_button_text": "Ottieni la licenza gratuita",
+        "license_note": "100 GB/giorno senza licenza • 200 GB/giorno con licenza"
+      },
+      "enterprise_with_license": {
+        "hero_title": "La tua edizione Enterprise",
+        "offer_text": "Stai utilizzando OpenObserve Enterprise con tutte le funzionalità abilitate",
+        "badge_text_unlimited": "Limite di ingestione: illimitato",
+        "badge_text_limited": "Limite di ingestione: {limit} GB/giorno",
+        "features_title": "Funzionalità Active Enterprise",
+        "features_subtitle": "Tutte le funzionalità sono sbloccate e pronte all'uso",
+        "primary_button_text": "Gestisci licenza"
+      },
+      "open_source": {
+        "hero_title": "Ottieni l'edizione Enterprise",
+        "offer_text": "Scarica e sblocca tutte le funzionalità aziendali in modo completamente gratuito",
+        "badge_text": "Gratuito fino a 200 GB/giorno",
+        "features_title": "Sblocca tutte le funzionalità aziendali",
+        "features_subtitle": "Tutto ciò di cui hai bisogno per un'osservabilità pronta per la produzione",
+        "primary_button_text": "Scarica ora"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "Registri, metriche, tracce",
+          "note": "Acquisizione e analisi complete dei dati di osservabilità"
+        },
+        "rum": {
+          "name": "RUM",
+          "note": "Monitoraggio degli utenti reali per le prestazioni del frontend"
+        },
+        "alerts": {
+          "name": "Avvisi",
+          "note": "Avvisi e notifiche in tempo reale"
+        },
+        "dashboards": {
+          "name": "Dashboard",
+          "note": "Dashboard di visualizzazione personalizzabili"
+        },
+        "reports": {
+          "name": "Rapporti",
+          "note": "Reportistica pianificata e su richiesta"
+        },
+        "vrl_functions": {
+          "name": "Funzioni VRL",
+          "note": "Linguaggio di rimappatura vettoriale per la trasformazione dei dati"
+        },
+        "pipelines": {
+          "name": "Oleodotti",
+          "note": "Pipeline di elaborazione e trasformazione dei dati"
+        },
+        "high_availability": {
+          "name": "Alta disponibilità",
+          "note": "Architettura distribuita per l'affidabilità"
+        },
+        "multitenancy": {
+          "name": "Multitenancy",
+          "note": "Isolamento dei dati basato sull'organizzazione"
+        },
+        "dynamic_schema": {
+          "name": "Schema dinamico",
+          "note": "Rilevamento ed evoluzione automatici dello schema"
+        },
+        "multilingual_gui": {
+          "name": "GUI multilingue",
+          "note": "Supporto avanzato per l'internazionalizzazione"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "Accesso singolo",
+          "note": "Autenticazione senza interruzioni con i provider SSO"
+        },
+        "rbac": {
+          "name": "Controllo degli accessi basato sui ruoli",
+          "note": "Autorizzazioni granulari e gestione degli utenti"
+        },
+        "federated_search": {
+          "name": "Ricerca federata/Supercluster",
+          "note": "Distribuisci le query su più cluster"
+        },
+        "query_management": {
+          "name": "Gestione delle interrogazioni",
+          "note": "Monitoraggio e ottimizzazione avanzati delle query"
+        },
+        "workload_management": {
+          "name": "Gestione del carico di lavoro",
+          "note": "Allocazione delle risorse e QoS basata sulle priorità"
+        },
+        "audit_trail": {
+          "name": "Audit Trail",
+          "note": "Registrazione completa delle attività per la conformità"
+        },
+        "action_scripts": {
+          "name": "Script di azione",
+          "note": "Risposte automatiche a eventi e avvisi"
+        },
+        "sensitive_data_redaction": {
+          "name": "Redazione dei dati sensibili",
+          "note": "Proteggi le PII e le informazioni sensibili"
+        },
+        "pipeline_remote_destinations": {
+          "name": "Destinazioni remote della pipeline",
+          "note": "Inviare dati a destinazioni remote"
+        },
+        "query_optimizer": {
+          "name": "Ottimizzatore di interrogazioni/cache di aggregazione",
+          "note": "Aggregazione TopK e ottimizzazione delle query"
+        },
+        "incident_management": {
+          "name": "Gestione degli incidenti",
+          "note": "Monitora e gestisci gli incidenti in modo efficiente"
+        },
+        "sre_agent": {
+          "name": "Agente SRE",
+          "note": "Operazioni e approfondimenti SRE automatizzati"
+        },
+        "ai_assistant": {
+          "name": "Assistente AI",
+          "note": "Assistenza intelligente per interrogazioni e analisi"
+        },
+        "anomaly_detection": {
+          "name": "Rilevamento di anomalie",
+          "note": "Rileva automaticamente le anomalie nei dati"
+        },
+        "metrics_auto_downsampling": {
+          "name": "Downsampling automatico delle metriche",
+          "note": "Aggregazione automatica delle metriche nel tempo"
+        },
+        "log_patterns": {
+          "name": "Schemi di registro",
+          "note": "Scopri i modelli nei dati di registro"
+        },
+        "mcp_server": {
+          "name": "Server MCP",
+          "note": "Integrazione del server Model Context Protocol"
+        },
+        "rate_limiting": {
+          "name": "Limitazione della velocità",
+          "note": "Controlla i tassi di interrogazione e ingestione"
+        },
+        "broadcast_join": {
+          "name": "Broadcast Join",
+          "note": "Operazioni di join distribuite ottimizzate"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "Correlazione tra registri, metriche e tracce",
+          "note": "Rilevamento e correlazione automatici"
+        },
+        "service_maps": {
+          "name": "Mappe dei servizi",
+          "note": "Visualizza le dipendenze dei servizi"
+        }
+      },
+      "buttons": {
+        "contact_sales": "Contatta il reparto vendite",
+        "learn_more": "Scopri di più"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "Solo modalità High Availability"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "Non sei autorizzato a gestire la licenza."
+      }
+    },
+    "header_button": {
+      "cloud_features": "Funzionalità di OpenObserve",
+      "enterprise_edition": "Edizione: Enterprise",
+      "get_enterprise_free": "Scarica OpenObserve Enterprise (gratuito)"
+    }
   },
   "login": {
     "userid": "ID utente",
