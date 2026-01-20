@@ -45,7 +45,7 @@ static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
 pub(crate) struct Immutable {
     pub(crate) idx: usize,
     pub(crate) key: WriterKey,
-    pub(crate) memtable: MemTable,
+    pub(crate) memtable: RwLock<MemTable>,
 }
 
 pub async fn read_from_immutable(
@@ -65,9 +65,8 @@ pub async fn read_from_immutable(
         if stream_type == i.key.stream_type.as_ref()
             && (shared_memtable || org_id == i.key.org_id.as_ref())
         {
-            let (id, batche) =
-                i.memtable
-                    .read(org_id, stream_name, time_range, partition_filters)?;
+            let memtable = i.memtable.read().await;
+            let (id, batche) = memtable.read(org_id, stream_name, time_range, partition_filters)?;
             if memtable_ids.contains(&id) {
                 log::debug!(
                     "[trace_id {trace_id}] skip immutable memtable id: {id} already in memtable",
@@ -83,16 +82,22 @@ pub async fn read_from_immutable(
 
 impl Immutable {
     pub(crate) fn new(idx: usize, key: WriterKey, memtable: MemTable) -> Self {
-        Self { idx, key, memtable }
+        Self {
+            idx,
+            key,
+            memtable: RwLock::new(memtable),
+        }
     }
 
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
-        let (schema_size, paths) = self
-            .memtable
+        let memtable = self.memtable.read().await;
+        let (schema_size, paths) = memtable
             .persist(self.idx, &self.key.org_id, &self.key.stream_type)
             .await?;
+        let memtable_id = memtable.id();
+        drop(memtable);
         persist_stat.arrow_size += schema_size;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
@@ -113,7 +118,7 @@ impl Immutable {
             persist_stat += stat;
             // Add memtable id to the parquet file name
             let parquet_path =
-                add_memtable_id_to_file_name(&path, self.memtable.id()).with_extension("parquet");
+                add_memtable_id_to_file_name(&path, memtable_id).with_extension("parquet");
             fs::rename(&path, &parquet_path)
                 .await
                 .context(RenameFileSnafu { path: &path })?;
@@ -209,6 +214,22 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
         .dec();
 
     Ok(())
+}
+
+/// Remove a specific stream from all immutable tables.
+/// This is called when a stream is deleted to prevent stale data from appearing
+pub async fn clear_stream_from_immutables(org_id: &str, stream_name: &str) {
+    let r = IMMUTABLES.read().await;
+    for (_, immutable) in r.iter() {
+        let mut memtable = immutable.memtable.write().await;
+        if memtable.remove_stream(org_id, stream_name) {
+            log::info!(
+                "[INGESTER:IMMUTABLE] removed stream {}/{} from immutable memtable",
+                org_id,
+                stream_name
+            );
+        }
+    }
 }
 
 fn add_memtable_id_to_file_name(path: &Path, memtable_id: u64) -> PathBuf {

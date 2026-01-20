@@ -126,4 +126,11 @@ impl MemTable {
             self.arrow_bytes_written.load(Ordering::SeqCst) as usize,
         )
     }
+
+    /// Remove a specific stream from the memtable.
+    /// Returns true if the stream was found and removed.
+    pub(crate) fn remove_stream(&mut self, org_id: &str, stream_name: &str) -> bool {
+        let key = Arc::from(format!("{org_id}/{stream_name}"));
+        self.streams.remove(&key).is_some()
+    }
 }

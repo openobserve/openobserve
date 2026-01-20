@@ -295,22 +295,26 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-/// Delete WAL parquet files for a specific stream on this node.
+/// Delete all WAL data (memtable, immutable, and parquet files) for a specific stream on this node.
 /// This is called when a stream is deleted to prevent stale data from appearing
 /// if the stream is recreated with the same name (fixes #9866).
 ///
-/// Note: Memtable and immutable data cleanup is handled by the existing
-/// `is_deleting_stream` mechanism which blocks ingestion and search,
-/// and causes the WAL job to delete files instead of uploading.
+/// Order of operations: memory first (memtable, immutable), then disk (parquet files).
 pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &str) -> Result<()> {
     log::info!(
-        "[INGESTER:WAL] deleting WAL parquet files for stream: {}/{}/{}",
+        "[INGESTER:WAL] clearing all WAL data for stream: {}/{}/{}",
         org_id,
         stream_type,
         stream_name
     );
 
-    // Delete WAL parquet files from disk
+    // 1. Clear from active memtables (memory first)
+    clear_stream_from_memtables(org_id, stream_name).await;
+
+    // 2. Clear from immutable tables (memory)
+    crate::immutable::clear_stream_from_immutables(org_id, stream_name).await;
+
+    // 3. Delete WAL parquet files from disk
     // Files are stored at: {data_wal_dir}/files/{org_id}/{stream_type}/{stream_name}/
     let cfg = get_config();
     let wal_parquet_path = PathBuf::from(&cfg.common.data_wal_dir)
@@ -338,6 +342,23 @@ pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &st
     }
 
     Ok(())
+}
+
+/// Remove a specific stream from all active memtables.
+async fn clear_stream_from_memtables(org_id: &str, stream_name: &str) {
+    for w in WRITERS.iter() {
+        let r = w.read().await;
+        for (_, writer) in r.iter() {
+            let mut memtable = writer.memtable.write().await;
+            if memtable.remove_stream(org_id, stream_name) {
+                log::info!(
+                    "[INGESTER:MEMTABLE] removed stream {}/{} from active memtable",
+                    org_id,
+                    stream_name
+                );
+            }
+        }
+    }
 }
 
 impl Writer {
