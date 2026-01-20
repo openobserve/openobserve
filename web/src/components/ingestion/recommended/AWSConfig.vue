@@ -15,37 +15,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <CopyContent class="q-mt-sm" :content="content" />
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Check further documentation at:
+  <div class="q-ma-md aws-config-page">
+    <div class="tw:mb-4">
+      <h6 class="tw:text-lg tw:font-semibold tw:m-0 tw:mb-2 page-title">
+        AWS Integrations
+      </h6>
+      <p class="tw:text-sm tw:m-0 tw:mb-4 page-description">
+        Set up AWS monitoring in one click or configure individual services for granular control.
+      </p>
+
+      <q-tabs
+        v-model="activeTab"
+        dense
+        class="aws-tabs"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+      >
+        <q-tab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
+        <q-tab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+      </q-tabs>
+    </div>
+
+    <q-separator class="tw:mb-6" />
+
+    <q-tab-panels v-model="activeTab" animated>
+      <q-tab-panel name="quick-setup" class="tw:p-0">
+        <AWSQuickSetup />
+      </q-tab-panel>
+
+      <q-tab-panel name="individual-services" class="tw:p-0">
+        <AWSIndividualServices :initialSearch="searchQuery" />
+      </q-tab-panel>
+    </q-tab-panels>
+
+    <div class="tw:mt-8">
+      <div class="tw:mb-3">
+        <h6 class="tw:text-base tw:font-semibold tw:m-0 section-title">
+          Manual Configuration
+        </h6>
+        <p class="tw:text-sm tw:m-0 section-description">
+          Use these credentials for custom AWS integrations or manual setup.
+        </p>
       </div>
-      <ol class="tw:list-decimal tw:pl-[27px]">
-        <li
-          v-for="awsService in awsServiceLinks"
-          :key="awsService.name"
-          class="tw:py-1"
-        >
-          <a
-            :href="awsService.link"
-            class="tw:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ awsService.name }}</a
-          >
-        </li>
-      </ol>
+      <CopyContent :content="content" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import AWSQuickSetup from "./AWSQuickSetup.vue";
+import AWSIndividualServices from "./AWSIndividualServices.vue";
 
 export default defineComponent({
   name: "AWSConfig",
@@ -56,10 +82,36 @@ export default defineComponent({
     currUserEmail: {
       type: String,
     },
+    searchQuery: {
+      type: String,
+      default: "",
+    },
   },
-  components: { CopyContent },
+  components: {
+    CopyContent,
+    AWSQuickSetup,
+    AWSIndividualServices,
+  },
   setup(props) {
     const store = useStore();
+    const route = useRoute();
+
+    // If there's a search query, default to individual-services tab
+    const activeTab = ref(props.searchQuery || route.query.search ? "individual-services" : "quick-setup");
+
+    // Watch for search query changes in route
+    watch(() => route.query.search, (newSearch) => {
+      if (newSearch) {
+        activeTab.value = "individual-services";
+      }
+    });
+
+    // Watch for searchQuery prop changes
+    watch(() => props.searchQuery, (newSearch) => {
+      if (newSearch) {
+        activeTab.value = "individual-services";
+      }
+    });
     // TODO OK: Create interface for ENDPOINT
     const endpoint: any = ref({
       url: "",
@@ -79,85 +131,32 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
 
-    const awsServiceLinks = [
-      {
-        name: "Application Load Balancer (ALB)",
-        link: "https://short.openobserve.ai/aws/alb",
-      },
-      {
-        name: "Cloudwatch Logs",
-        link: "https://short.openobserve.ai/aws/cloudwatch-logs",
-      },
-      {
-        name: "Cost and Usage Reports (CUR)",
-        link: "https://short.openobserve.ai/aws-cur",
-      },
-      {
-        name: "Eventbridge/Cloudwatch Events",
-        link: "https://short.openobserve.ai/aws/eventbridge",
-      },
-      {
-        name: "Cloudwatch Metrics",
-        link: "https://short.openobserve.ai/aws/cloudwatch-metrics",
-      },
-      {
-        name: "VPC Flow Logs",
-        link: "https://short.openobserve.ai/aws/vpc-flow-logs",
-      },
-      {
-        name: "EC2 Instance Logs",
-        link: "https://short.openobserve.ai/aws/ec2",
-      },
-      {
-        name: "Cognito",
-        link: "https://short.openobserve.ai/aws/cognito",
-      },
-      {
-        name: "AWS Network Firewall Logs",
-        link: "https://short.openobserve.ai/aws/network-firewall-logs",
-      },
-      {
-        name: "AWS WAF Logs",
-        link: "https://short.openobserve.ai/aws/waf",
-      },
-      {
-        name: "RDS Logs",
-        link: "https://short.openobserve.ai/aws/rds",
-      },
-      {
-        name: "DynamoDB Logs",
-        link: "https://short.openobserve.ai/aws/dynamodb",
-      },
-      {
-        name: "Route53 Logs",
-        link: "https://short.openobserve.ai/aws/route53",
-      },
-      {
-        name: "API Gateway Logs",
-        link: "https://short.openobserve.ai/aws/api-gateway",
-      },
-      {
-        name: "Cloudfront Logs",
-        link: "https://short.openobserve.ai/aws/cloudfront",
-      },
-      {
-        name: "AWS IoT",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-iot.html",
-      },
-      {
-        name: "Other AWS Services (Via Kinesis streams)",
-        link: "https://docs.aws.amazon.com/streams/latest/dev/using-other-services.html",
-      },
-    ];
-
     return {
       store,
       config,
       endpoint,
       content,
       getImageURL,
-      awsServiceLinks,
+      activeTab,
     };
   },
 });
 </script>
+
+<style scoped lang="scss">
+.aws-config-page {
+  .body--light & {
+    .page-description,
+    .section-description {
+      color: #666;
+    }
+  }
+
+  .body--dark & {
+    .page-description,
+    .section-description {
+      color: #b0b0b0;
+    }
+  }
+}
+</style>
