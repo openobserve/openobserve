@@ -410,9 +410,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.cancelEnrichmentTableForm();
     });
 
-    // TODO: Re-enable when update form UI is investigated - the form doesn't show URL input
-    // without selecting update mode, and radio buttons aren't rendering consistently in CI
-    test.skip('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
+    test('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
         const tableName = generateTableName('schema_mismatch');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema mismatch - ${tableName}`);
@@ -433,18 +431,22 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyUpdateMode();
         testLogger.info('Edit form opened');
 
-        // Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
+        // Step 4: Select "Add new URL" mode to show the URL input field
+        // Default mode is "reload" which doesn't show URL input
+        await enrichmentPage.selectUpdateMode('append');
+        testLogger.info('Selected "Add new URL" update mode');
+
+        // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
-        // Using addUrlInEditMode instead of replaceUrlInEditMode to avoid update mode radio button issues
-        await enrichmentPage.addUrlInEditMode(DIFFERENT_SCHEMA_CSV_URL);
+        await enrichmentPage.fillUrlInput(DIFFERENT_SCHEMA_CSV_URL);
         testLogger.info('Added URL with different schema CSV');
 
-        // Save the changes
+        // Step 6: Save the changes
         await enrichmentPage.clickSaveButton();
         await enrichmentPage.page.waitForLoadState('networkidle');
         testLogger.info('Save clicked - job processing async');
 
-        // Step 4: Wait for job to complete (poll until buttons appear or warning icon shows)
+        // Step 7: Wait for job to complete (poll until buttons appear or warning icon shows)
         testLogger.info('Waiting for URL job to complete (expecting schema mismatch failure)...');
         const jobResult = await enrichmentPage.waitForUrlJobToFinish(tableName, 12, 5000);
 
@@ -457,12 +459,12 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         // Assert job completed (or has visible warning) before proceeding
         expect(jobResult.completed, 'URL job should complete within 60s').toBe(true);
 
-        // Step 5: Click on status icon to open URL Jobs dialog
+        // Step 8: Click on status icon to open URL Jobs dialog
         await enrichmentPage.clickUrlStatusIcon(tableName);
         await enrichmentPage.waitForUrlJobsDialog(tableName);
         testLogger.info('URL Jobs dialog opened');
 
-        // Step 6: Verify job shows failed status due to schema mismatch
+        // Step 9: Verify job shows failed status due to schema mismatch
         const isDialogVisible = await enrichmentPage.isJobsDialogVisible();
         expect(isDialogVisible, 'URL Jobs dialog should be visible').toBe(true);
 
