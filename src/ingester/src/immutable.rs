@@ -81,30 +81,6 @@ pub async fn read_from_immutable(
     Ok((ids, batches))
 }
 
-/// Remove a stream from all immutable memtables.
-/// This directly removes the stream data instead of marking it as deleted.
-/// Called when a stream is deleted (fixes #9866).
-pub async fn remove_stream_from_immutables(org_id: &str, stream_name: &str) {
-    let r = IMMUTABLES.read().await;
-    for (_, immutable) in r.iter() {
-        // Note: We can't modify the memtable directly here because Immutable
-        // owns a MemTable, not a mutable reference. The memtable data will be
-        // cleaned up when the immutable is persisted or dropped.
-        // The main cleanup happens in the active memtables via writer.rs
-        log::debug!(
-            "[INGESTER:IMMUTABLE] stream {}/{} will be excluded from immutable memtable {}",
-            org_id,
-            stream_name,
-            immutable.idx
-        );
-    }
-    log::info!(
-        "[INGESTER:IMMUTABLE] marked stream for removal: {}/{}",
-        org_id,
-        stream_name
-    );
-}
-
 impl Immutable {
     pub(crate) fn new(idx: usize, key: WriterKey, memtable: MemTable) -> Self {
         Self { idx, key, memtable }

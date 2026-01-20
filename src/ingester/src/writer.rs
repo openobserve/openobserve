@@ -295,44 +295,22 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-/// Clear all WAL data (memtable and immutable) for a specific stream on this node.
+/// Delete WAL parquet files for a specific stream on this node.
 /// This is called when a stream is deleted to prevent stale data from appearing
 /// if the stream is recreated with the same name (fixes #9866).
 ///
-/// Order of operations (memory first, then disk):
-/// 1. Clear memtable data (prevents new data from being written to disk)
-/// 2. Clear immutable data (prevents pending data from being persisted)
-/// 3. Delete WAL parquet files from disk
+/// Note: Memtable and immutable data cleanup is handled by the existing
+/// `is_deleting_stream` mechanism which blocks ingestion and search,
+/// and causes the WAL job to delete files instead of uploading.
 pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &str) -> Result<()> {
     log::info!(
-        "[INGESTER:WAL] clearing WAL data for stream: {}/{}/{}",
+        "[INGESTER:WAL] deleting WAL parquet files for stream: {}/{}/{}",
         org_id,
         stream_type,
         stream_name
     );
 
-    // 1. Clear memtable data for this specific stream
-    // Note: WriterKey only contains org_id and stream_type, not stream_name.
-    // A single Writer/MemTable can contain data for multiple streams of the same type.
-    // We only remove the specific stream from the memtable, leaving other streams intact.
-    for w in WRITERS.iter() {
-        let w = w.read().await;
-        for writer in w.values() {
-            let mut memtable = writer.memtable.write().await;
-            if memtable.remove_stream(org_id, stream_name) {
-                log::debug!(
-                    "[INGESTER:WAL] removed stream {}/{} from memtable",
-                    org_id,
-                    stream_name
-                );
-            }
-        }
-    }
-
-    // 2. Clear immutable data for this stream
-    crate::immutable::remove_stream_from_immutables(org_id, stream_name).await;
-
-    // 3. Delete WAL parquet files from disk
+    // Delete WAL parquet files from disk
     // Files are stored at: {data_wal_dir}/files/{org_id}/{stream_type}/{stream_name}/
     let cfg = get_config();
     let wal_parquet_path = PathBuf::from(&cfg.common.data_wal_dir)
@@ -358,13 +336,6 @@ pub async fn clear_stream_data(org_id: &str, stream_type: &str, stream_name: &st
             }
         }
     }
-
-    log::info!(
-        "[INGESTER:WAL] cleared WAL data for stream: {}/{}/{}",
-        org_id,
-        stream_type,
-        stream_name
-    );
 
     Ok(())
 }
