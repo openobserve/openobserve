@@ -100,7 +100,7 @@ describe("IncidentServiceGraph.vue", () => {
     wrapper?.unmount();
   });
 
-  const mountComponent = (props = {}, storeOverrides = {}) => {
+  const mountComponent = (props = {}, storeOverrides: { theme?: string } = {}) => {
     const mockStore = createMockStore(storeOverrides.theme);
 
     return mount(IncidentServiceGraph, {
@@ -212,10 +212,11 @@ describe("IncidentServiceGraph.vue", () => {
       await nextTick();
 
       const chartData = wrapper.vm.chartData;
+      // First node is always marked as root cause (red), so there should be 1
       const rootCauseNodes = chartData.options.series[0].data.filter(
         (n: any) => n.itemStyle.color === "#ef4444"
       );
-      expect(rootCauseNodes.length).toBe(0);
+      expect(rootCauseNodes.length).toBe(1);
     });
 
     it("should handle empty graph data", async () => {
@@ -426,9 +427,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const rootCauseNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-c"
-      );
+      // First node (index 0) is the root cause - service-a
+      const rootCauseNode = chartData.options.series[0].data[0];
       expect(rootCauseNode.itemStyle.color).toBe("#ef4444"); // red-500
     });
 
@@ -441,40 +441,73 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const highAlertNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-b"
-      );
+      // service-b has 7 alerts (>5), so it should be orange
+      // It's at index 1
+      const highAlertNode = chartData.options.series[0].data[1];
       expect(highAlertNode.itemStyle.color).toBe("#f97316"); // orange-500
     });
 
     it("should color normal nodes blue", async () => {
+      // Create data where index 0 will still be red, but we need a node that's not first and has <=5 alerts
+      const normalNodeData = {
+        nodes: [
+          {
+            alert_id: "alert_cpu_high",
+            alert_name: "High CPU Usage",
+            service_name: "service-a",
+            alert_count: 3,
+            first_fired_at: 1000000,
+            last_fired_at: 2000000,
+          },
+          {
+            alert_id: "alert_memory",
+            alert_name: "Memory Usage",
+            service_name: "service-b",
+            alert_count: 2, // <=5 alerts, not first, should be blue
+            first_fired_at: 1500000,
+            last_fired_at: 3000000,
+          },
+        ],
+        edges: [],
+        stats: {
+          total_services: 2,
+          total_alerts: 5,
+          services_with_alerts: 2,
+        },
+      };
+
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: mockGraphData,
+        data: normalNodeData,
       } as any);
 
       wrapper = mountComponent();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const normalNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-a"
-      );
+      // Second node with <=5 alerts should be blue
+      const normalNode = chartData.options.series[0].data[1];
       expect(normalNode.itemStyle.color).toBe("#3b82f6"); // blue-500
     });
 
     it("should prioritize root cause color over high alerts", async () => {
-      // Node with both root cause and high alerts
+      // First node with high alert count should be red (root cause takes priority)
       const mixedData = {
-        ...mockGraphData,
         nodes: [
-          ...mockGraphData.nodes,
           {
+            alert_id: "alert_high",
+            alert_name: "High Load",
             service_name: "service-d",
-            alert_count: 10,
-            is_root_cause: true,
-            is_primary: false,
+            alert_count: 10, // High alert count
+            first_fired_at: 1000000,
+            last_fired_at: 2000000,
           },
         ],
+        edges: [],
+        stats: {
+          total_services: 1,
+          total_alerts: 10,
+          services_with_alerts: 1,
+        },
       };
 
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
@@ -485,9 +518,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const mixedNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-d"
-      );
+      // First node should be red regardless of alert count
+      const mixedNode = chartData.options.series[0].data[0];
       expect(mixedNode.itemStyle.color).toBe("#ef4444"); // red-500 for root cause
     });
 
@@ -500,15 +532,9 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const node1 = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-a"
-      ); // 3 alerts
-      const node2 = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-b"
-      ); // 7 alerts
-      const node3 = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-c"
-      ); // 12 alerts
+      const node1 = chartData.options.series[0].data[0]; // 3 alerts
+      const node2 = chartData.options.series[0].data[1]; // 7 alerts
+      const node3 = chartData.options.series[0].data[2]; // 12 alerts
 
       expect(node1.symbolSize).toBe(45); // 30 + 3*5
       expect(node2.symbolSize).toBe(65); // 30 + 7*5
@@ -550,11 +576,10 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const primaryNode = chartData.options.series[0].data.find(
-        (node: any) => node.name === "service-a"
-      );
+      // First node (root cause) has a red border with width 4
+      const primaryNode = chartData.options.series[0].data[0];
 
-      expect(primaryNode.itemStyle.borderColor).toBe("#a855f7"); // purple
+      expect(primaryNode.itemStyle.borderColor).toBe("#dc2626"); // darker red
       expect(primaryNode.itemStyle.borderWidth).toBe(4);
     });
 
@@ -567,9 +592,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const nonPrimaryNode = chartData.options.series[0].data.find(
-        (node: any) => node.name === "service-b"
-      );
+      // Second node (not root cause) has same color border as the node color with width 2
+      const nonPrimaryNode = chartData.options.series[0].data[1];
 
       expect(nonPrimaryNode.itemStyle.borderColor).toBe("#f97316"); // orange (same as node color)
       expect(nonPrimaryNode.itemStyle.borderWidth).toBe(2);
@@ -722,7 +746,8 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const edge = chartData.options.series[0].links[0];
-      expect(edge.lineStyle.color).toBe("#6b7280");
+      // First edge is temporal, so it should be purple in dark mode
+      expect(edge.lineStyle.color).toBe("#a78bfa");
     });
 
     it("should apply light theme to edge colors", async () => {
@@ -735,7 +760,8 @@ describe("IncidentServiceGraph.vue", () => {
 
       const chartData = wrapper.vm.chartData;
       const edge = chartData.options.series[0].links[0];
-      expect(edge.lineStyle.color).toBe("#9ca3af");
+      // First edge is temporal, so it should be purple in light mode
+      expect(edge.lineStyle.color).toBe("#8b5cf6");
     });
 
     it("should apply dark theme to node labels", async () => {
@@ -828,14 +854,13 @@ describe("IncidentServiceGraph.vue", () => {
       await nextTick();
 
       const chartData = wrapper.vm.chartData;
-      const rootCauseNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-c"
-      );
+      // First node is the root cause
+      const rootCauseNode = chartData.options.series[0].data[0];
 
       // Root cause node should have tooltip formatter that includes root cause text
       expect(rootCauseNode.tooltip.formatter).toBeDefined();
       const tooltipHtml = rootCauseNode.tooltip.formatter();
-      expect(tooltipHtml).toContain("Suspected Root Cause");
+      expect(tooltipHtml).toContain("First Alert (Potential Root Cause)");
     });
   });
 
@@ -867,7 +892,7 @@ describe("IncidentServiceGraph.vue", () => {
       const node = chartData.options.series[0].data[0];
       const tooltip = node.tooltip.formatter();
 
-      expect(tooltip).toContain("Alerts:");
+      expect(tooltip).toContain("Alert Count:");
       expect(tooltip).toContain("3");
     });
 
@@ -880,12 +905,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const rootCauseNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-c"
-      );
+      // First node is the root cause
+      const rootCauseNode = chartData.options.series[0].data[0];
       const tooltip = rootCauseNode.tooltip.formatter();
 
-      expect(tooltip).toContain("Suspected Root Cause");
+      expect(tooltip).toContain("First Alert (Potential Root Cause)");
     });
 
     it("should show primary service indicator in tooltip", async () => {
@@ -897,12 +921,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const primaryNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-a"
-      );
+      // First node shows "First Alert (Potential Root Cause)" which is our primary indicator
+      const primaryNode = chartData.options.series[0].data[0];
       const tooltip = primaryNode.tooltip.formatter();
 
-      expect(tooltip).toContain("Primary Service");
+      expect(tooltip).toContain("First Alert (Potential Root Cause)");
     });
 
     it("should not show root cause indicator for non-root-cause nodes", async () => {
@@ -914,12 +937,11 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const normalNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-b"
-      );
+      // Second node is not the root cause
+      const normalNode = chartData.options.series[0].data[1];
       const tooltip = normalNode.tooltip.formatter();
 
-      expect(tooltip).not.toContain("Suspected Root Cause");
+      expect(tooltip).not.toContain("First Alert (Potential Root Cause)");
     });
   });
 
@@ -957,16 +979,30 @@ describe("IncidentServiceGraph.vue", () => {
 
     it("should handle node with zero alerts", async () => {
       const dataWithZeroAlerts = {
-        ...mockGraphData,
         nodes: [
-          ...mockGraphData.nodes,
           {
+            alert_id: "alert_1",
+            alert_name: "Alert 1",
+            service_name: "service-a",
+            alert_count: 5,
+            first_fired_at: 1000000,
+            last_fired_at: 2000000,
+          },
+          {
+            alert_id: "alert_2",
+            alert_name: "Alert 2",
             service_name: "service-d",
             alert_count: 0,
-            is_root_cause: false,
-            is_primary: false,
+            first_fired_at: 1500000,
+            last_fired_at: 1500000,
           },
         ],
+        edges: [],
+        stats: {
+          total_services: 2,
+          total_alerts: 5,
+          services_with_alerts: 1,
+        },
       };
 
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
@@ -977,9 +1013,8 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
-      const zeroAlertNode = chartData.options.series[0].data.find(
-        (n: any) => n.name === "service-d"
-      );
+      // Second node has 0 alerts
+      const zeroAlertNode = chartData.options.series[0].data[1];
       expect(zeroAlertNode.symbolSize).toBe(30); // Base size
     });
 
