@@ -14,6 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+
+// Mock rudder-sdk-js before other imports
+vi.mock("rudder-sdk-js", () => ({
+  default: {
+    ready: vi.fn(),
+    load: vi.fn(),
+    track: vi.fn(),
+  },
+}));
+
+// Mock segment_analytics service
+vi.mock("@/services/segment_analytics", () => ({
+  default: {
+    track: vi.fn(),
+  },
+}));
+
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -112,7 +129,11 @@ describe("SessionsList Component", () => {
             template: `
               <div data-test="splitter">
                 <div data-test="before-section"><slot name="before" /></div>
-                <div data-test="separator-section"><slot name="separator" /></div>
+                <div data-test="separator-section">
+                  <slot name="separator">
+                    <q-avatar data-test="avatar" />
+                  </slot>
+                </div>
                 <div data-test="after-section"><slot name="after" /></div>
               </div>
             `,

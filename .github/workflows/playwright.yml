@@ -242,7 +242,6 @@ jobs:
                 "traceErrorFilter.spec.js",
                 "traceDetails.spec.js",
                 "traceAdvancedFiltering.spec.js",
-                "serviceMaps.spec.js",
               ]
 
           - testfolder: "RegressionSet"

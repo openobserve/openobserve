@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="row q-mt-lg q-ml-xs">
     <div class="col-12">
-      <div class="tags-title text-bold q-mb-xs">Error Stack</div>
+      <div class="tags-title text-bold q-mb-xs">{{ t("rum.errorStack") }}</div>
       <div class="q-mb-sm">{{ error_stack[0] }}</div>
       <div class="error-stacks">
         <template v-for="(stack, index) in error_stack" :key="stack">
@@ -43,6 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+const { t } = useI18n();
 const props = defineProps({
   error_stack: {
     type: Array,

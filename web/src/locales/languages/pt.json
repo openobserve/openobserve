@@ -108,7 +108,8 @@
     "url": "URL",
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
-    "id": "CARTEIRA DE IDENTIDADE"
+    "id": "CARTEIRA DE IDENTIDADE",
+    "getStarted": "Comece"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -373,7 +374,22 @@
     "viewURL": "Exibir URL",
     "events": "Eventos",
     "location": "Localização",
-    "frustrationCount": "Frustrações"
+    "frustrationCount": "Frustrações",
+    "loadingMsg": "Espere aí, estamos carregando dados do RUM.",
+    "breadcrumbs": "Pão ralado",
+    "tags": "Etiquetas",
+    "searchEvents": "Pesquisar eventos",
+    "loadingSessions": "Espere aí, estamos buscando sessões.",
+    "errorStack": "Pilha de erros",
+    "sessionReplay": "Repetição da sessão",
+    "viewSessionReplay": "Exibir repetição da sessão",
+    "playSessionReplay": "Reproduzir repetição da sessão",
+    "discoverSessionTitle": "Descubra o Session Replay para entender detalhadamente as interações do usuário",
+    "discoverSessionMessage": "O Session Replay captura e reproduz as interações do usuário em seu site ou aplicativo. Isso permite que você analise visualmente como os usuários navegam, onde clicam, o que digitam e como interagem com seu conteúdo.",
+    "getStartedRUM": "Comece com o monitoramento real de usuários",
+    "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
+    "eventID": "ID do evento",
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
   },
   "about": {
     "name": "Abra o Observe",
@@ -460,7 +476,190 @@
     "value_cost_free": "Gratuito",
     "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 200 GB/dia de dados ingeridos. Pago depois disso",
     "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso",
-    "feature_comparison_lbl": "Comparação de recursos"
+    "feature_comparison_lbl": "Comparação de recursos",
+    "enterprise_offer": {
+      "cloud": {
+        "hero_title": "Características corporativas",
+        "offer_text": "Obtenha todos os recursos corporativos totalmente gratuitos ao hospedar o OpenObserve por conta própria",
+        "badge_text": "Gratuito até 200 GB por dia",
+        "features_title": "Recursos do OpenObserve Cloud",
+        "features_subtitle": "Todos os recursos incluídos em sua assinatura de nuvem",
+        "primary_button_text": "Faça o download agora"
+      },
+      "enterprise_without_license": {
+        "hero_title": "Características corporativas",
+        "offer_text": "Solicite uma licença gratuita para maximizar sua implantação do OpenObserve",
+        "badge_text": "Gratuito até {quota} GB por dia",
+        "features_title": "Recursos corporativos disponíveis",
+        "features_subtitle": "Obtenha uma licença gratuita para desbloquear recursos ilimitados",
+        "primary_button_text": "Obtenha uma licença gratuita",
+        "license_note": "100 GB/dia sem licença • 200 GB/dia com licença"
+      },
+      "enterprise_with_license": {
+        "hero_title": "Sua edição empresarial",
+        "offer_text": "Você está executando o OpenObserve Enterprise com todos os recursos habilitados",
+        "badge_text_unlimited": "Limite de ingestão: ilimitado",
+        "badge_text_limited": "Limite de ingestão: {limit} GB por dia",
+        "features_title": "Recursos corporativos ativos",
+        "features_subtitle": "Todos os recursos desbloqueados e prontos para uso",
+        "primary_button_text": "Gerenciar licença"
+      },
+      "open_source": {
+        "hero_title": "Obtenha a Enterprise Edition",
+        "offer_text": "Baixe e desbloqueie todos os recursos corporativos de forma totalmente gratuita",
+        "badge_text": "Gratuito até 200 GB por dia",
+        "features_title": "Desbloqueie todos os recursos corporativos",
+        "features_subtitle": "Tudo o que você precisa para uma observabilidade pronta para produção",
+        "primary_button_text": "Faça o download agora"
+      },
+      "core_features": {
+        "logs_metrics_traces": {
+          "name": "Registros, métricas e rastreamentos",
+          "note": "Ingestão e análise completas de dados de observabilidade"
+        },
+        "rum": {
+          "name": "RUM",
+          "note": "Monitoramento real de usuários para desempenho de front-end"
+        },
+        "alerts": {
+          "name": "Alertas",
+          "note": "Alertas e notificações em tempo real"
+        },
+        "dashboards": {
+          "name": "Painéis",
+          "note": "Painéis de visualização personalizáveis"
+        },
+        "reports": {
+          "name": "Relatórios",
+          "note": "Relatórios programados e sob demanda"
+        },
+        "vrl_functions": {
+          "name": "Funções VRL",
+          "note": "Linguagem de remapeamento vetorial para transformação de dados"
+        },
+        "pipelines": {
+          "name": "Oleodutos",
+          "note": "Pipelines de processamento e transformação de dados"
+        },
+        "high_availability": {
+          "name": "Alta disponibilidade",
+          "note": "Arquitetura distribuída para confiabilidade"
+        },
+        "multitenancy": {
+          "name": "Multilocação",
+          "note": "Isolamento de dados baseado na organização"
+        },
+        "dynamic_schema": {
+          "name": "Esquema dinâmico",
+          "note": "Detecção e evolução automáticas de esquemas"
+        },
+        "multilingual_gui": {
+          "name": "GUI multilíngue",
+          "note": "Suporte avançado de internacionalização"
+        }
+      },
+      "enterprise_features": {
+        "single_sign_on": {
+          "name": "Login único",
+          "note": "Autenticação perfeita com provedores de SSO"
+        },
+        "rbac": {
+          "name": "Controle de acesso baseado em funções",
+          "note": "Permissões granulares e gerenciamento de usuários"
+        },
+        "federated_search": {
+          "name": "Pesquisa federada/Supercluster",
+          "note": "Distribua consultas em vários clusters"
+        },
+        "query_management": {
+          "name": "Gerenciamento de consultas",
+          "note": "Monitoramento e otimização avançados de consultas"
+        },
+        "workload_management": {
+          "name": "Gerenciamento da carga de trabalho",
+          "note": "Alocação de recursos e QoS com base em prioridades"
+        },
+        "audit_trail": {
+          "name": "Trilha de auditoria",
+          "note": "Registro completo de atividades para fins de conformidade"
+        },
+        "action_scripts": {
+          "name": "Scripts de ação",
+          "note": "Automatize as respostas a eventos e alertas"
+        },
+        "sensitive_data_redaction": {
+          "name": "Redação de dados confidenciais",
+          "note": "Proteja PII e informações confidenciais"
+        },
+        "pipeline_remote_destinations": {
+          "name": "Destinos remotos do pipeline",
+          "note": "Enviar dados para destinos remotos"
+        },
+        "query_optimizer": {
+          "name": "Otimizador de consultas/cache de agregação",
+          "note": "Agregação TopK e otimização de consultas"
+        },
+        "incident_management": {
+          "name": "Gerenciamento de incidentes",
+          "note": "Acompanhe e gerencie incidentes com eficiência"
+        },
+        "sre_agent": {
+          "name": "Agente SRE",
+          "note": "Operações e insights automatizados de SRE"
+        },
+        "ai_assistant": {
+          "name": "Assistente de IA",
+          "note": "Assistência inteligente de consulta e análise"
+        },
+        "anomaly_detection": {
+          "name": "Detecção de anomalias",
+          "note": "Detecte automaticamente anomalias nos dados"
+        },
+        "metrics_auto_downsampling": {
+          "name": "Redução automática da resolução de métricas",
+          "note": "Agregação automática de métricas ao longo do tempo"
+        },
+        "log_patterns": {
+          "name": "Padrões de registro",
+          "note": "Descubra padrões em dados de registro"
+        },
+        "mcp_server": {
+          "name": "Servidor MCP",
+          "note": "Integração do servidor Model Context Protocol"
+        },
+        "rate_limiting": {
+          "name": "Limitação de taxa",
+          "note": "Controle as taxas de consulta e ingestão"
+        },
+        "broadcast_join": {
+          "name": "Broadcast Join",
+          "note": "Operações otimizadas de junção distribuída"
+        },
+        "logs_metrics_traces_correlation": {
+          "name": "Correlação de registros, métricas e traços",
+          "note": "Detecção e correlação automatizadas"
+        },
+        "service_maps": {
+          "name": "Mapas de serviço",
+          "note": "Visualize as dependências do serviço"
+        }
+      },
+      "buttons": {
+        "contact_sales": "Entre em contato com vendas",
+        "learn_more": "Saiba mais"
+      },
+      "tooltip": {
+        "high_availability_mode_only": "Somente no modo de alta disponibilidade"
+      },
+      "error_messages": {
+        "not_authorized_manage_license": "Você não está autorizado a gerenciar a licença."
+      }
+    },
+    "header_button": {
+      "cloud_features": "Características do OpenObserve",
+      "enterprise_edition": "Edição: Enterprise",
+      "get_enterprise_free": "Obtenha o OpenObserve Enterprise (grátis)"
+    }
   },
   "login": {
     "userid": "ID do usuário",
@@ -2383,7 +2582,13 @@
     "deduplicateFields": "Campos de desduplicação",
     "deduplicateFieldTooltip": "Selecione quais mapeamentos de campo usar para desduplicação de impressões digitais",
     "alertDeduplicationMessage": "Alertas com os mesmos valores para esses campos serão desduplicados (por exemplo, mesma impressão digital = mesmos valores de campo)",
-    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação"
+    "atLeastOneDeduplicationField": "É necessário pelo menos um mapeamento de campo para a desduplicação",
+    "scope": "Escopo",
+    "scopeTooltip": "As dimensões do escopo definem os limites ambientais (cluster, região, host) e são concatenadas para formar parte do escopo do FQN: {scope}/{workload}",
+    "stable": "Estável",
+    "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
+    "normalize": "Normalizar",
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",

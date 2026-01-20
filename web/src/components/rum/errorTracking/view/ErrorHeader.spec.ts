@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
+import i18n from "@/locales";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -73,6 +74,7 @@ describe("ErrorHeader Component", () => {
         error: mockError,
       },
       global: {
+        plugins: [i18n],
         stubs: {
           "q-icon": {
             template:
