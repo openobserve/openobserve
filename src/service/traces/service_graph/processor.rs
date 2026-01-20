@@ -53,6 +53,11 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     );
 
     for (org_id, stream_name) in streams {
+        log::info!(
+            "[ServiceGraph] Processing stream {}/{}",
+            org_id,
+            stream_name
+        );
         if let Err(e) = process_stream(&org_id, &stream_name, start_time, now).await {
             log::error!(
                 "[ServiceGraph] Failed to process stream {}/{}: {}",
@@ -76,13 +81,23 @@ async fn get_trace_streams() -> Result<Vec<(String, String)>, anyhow::Error> {
     let orgs = crate::service::db::organization::list(None).await?;
 
     for org in orgs {
-        // Get trace streams for this org
-        let org_streams =
-            crate::service::db::schema::list_streams_from_cache(&org.name, StreamType::Traces)
-                .await;
+        // Get trace streams for this org (using identifier, not name)
+        let org_streams = crate::service::db::schema::list_streams_from_cache(
+            &org.identifier,
+            StreamType::Traces,
+        )
+        .await;
+
+        if org_streams.is_empty() {
+            log::warn!(
+                "[ServiceGraph] No trace streams found for org '{}' (identifier: {})",
+                org.name,
+                org.identifier
+            );
+        }
 
         for stream_name in org_streams {
-            streams.push((org.name.clone(), stream_name));
+            streams.push((org.identifier.clone(), stream_name));
         }
     }
 
@@ -189,87 +204,34 @@ async fn process_stream(
         );
     }
 
-    let span_kinds = if exclude_internal {
-        // Exclude INTERNAL spans (span_kind='1')
-        "('2', '3')"
+    let (server_span_kinds, client_span_kinds) = if exclude_internal {
+        ("('2')", "('3')")
     } else {
-        // Include INTERNAL spans (span_kind='1') - default behavior
-        "('1', '2', '3')"
+        ("('1', '2')", "('1', '3')")
     };
 
-    let sql = if exclude_internal {
-        format!(
-            "WITH edges AS (
-           SELECT
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
-             END as client,
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
-             END as server,
-             end_time - start_time as duration,
-             span_status
-           FROM \"{}\"
-           WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN {}
-         )
-         SELECT
-           {} as start,
-           {} as end,
-           client,
-           server,
-           'standard' as connection_type,
-           COUNT(*) as total_requests,
-           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
-           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
-           approx_median(duration) as p50,
-           approx_percentile_cont(duration, 0.95) as p95,
-           approx_percentile_cont(duration, 0.99) as p99
-         FROM edges
-         WHERE client IS NOT NULL AND server IS NOT NULL
-         GROUP BY client, server",
-            peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
-        )
-    } else {
-        format!(
-            "WITH edges AS (
-           SELECT
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '1' THEN service_name
-             END as client,
-             CASE
-               WHEN CAST(span_kind AS VARCHAR) = '3' THEN {}
-               WHEN CAST(span_kind AS VARCHAR) = '2' THEN service_name
-               WHEN CAST(span_kind AS VARCHAR) = '1' THEN COALESCE({}, 'internal')
-             END as server,
-             end_time - start_time as duration,
-             span_status
-           FROM \"{}\"
-           WHERE _timestamp >= {} AND _timestamp < {}
-             AND CAST(span_kind AS VARCHAR) IN {}
-         )
-         SELECT
-           {} as start,
-           {} as end,
-           client,
-           server,
-           'standard' as connection_type,
-           COUNT(*) as total_requests,
-           COUNT(*) FILTER (WHERE span_status = 'ERROR') as errors,
-           CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) as error_rate,
-           approx_median(duration) as p50,
-           approx_percentile_cont(duration, 0.95) as p95,
-           approx_percentile_cont(duration, 0.99) as p99
-         FROM edges
-         WHERE client IS NOT NULL AND server IS NOT NULL
-         GROUP BY client, server",
-            peer_expr, peer_expr, peer_expr, stream_name, start_time, end_time, span_kinds, start_time, end_time
-        )
-    };
+    let sql = format!(
+        r#"SELECT
+            client.service_name AS client,
+            server.service_name AS server,
+            'standard' AS connection_type,
+            COUNT(*) AS total_requests,
+            COUNT(*) FILTER (WHERE server.span_status = 'ERROR') AS errors,
+            CAST(COUNT(*) FILTER (WHERE server.span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+            CAST(approx_median(server.end_time - server.start_time) AS BIGINT) AS p50,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.95) AS BIGINT) AS p95,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.99) AS BIGINT) AS p99
+        FROM "{stream_name}" AS server
+        LEFT JOIN "{stream_name}" AS client
+            ON server.reference_parent_span_id = client.span_id
+            AND server.trace_id = client.trace_id
+        WHERE client.service_name IS NOT NULL
+            AND server._timestamp >= {start_time} AND server._timestamp < {end_time}
+            AND CAST(server.span_kind AS VARCHAR) IN {server_span_kinds}
+            AND CAST(client.span_kind AS VARCHAR) IN {client_span_kinds}
+            AND client.service_name != server.service_name
+        GROUP BY client.service_name, server.service_name"#,
+    );
 
     // Execute search
     let req = config::meta::search::Request {

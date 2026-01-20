@@ -456,62 +456,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Topology Context -->
+          <!-- Alert Flow Summary -->
           <div
-            v-if="incidentDetails.topology_context"
+            v-if="incidentDetails.topology_context && incidentDetails.topology_context.nodes.length"
             :class="[
-              'tw:rounded-lg tw:border tw:overflow-hidden',
+              'tw:rounded-lg tw:border',
               store.state.theme === 'dark'
-                ? 'tw:border-gray-700'
-                : 'tw:border-gray-200'
+                ? 'tw:border-gray-700 tw:bg-gray-800/30'
+                : 'tw:border-gray-200 tw:bg-gray-50'
             ]"
             style="max-height: 200px;"
           >
-            <!-- Header -->
-            <div
-              :class="[
-                'tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b',
-                store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800 tw:border-gray-700'
-                  : 'tw:bg-gray-100 tw:border-gray-200'
-              ]"
-            >
-              <q-icon name="account_tree" size="16px" class="tw:opacity-80" />
-              <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
-                {{ t("alerts.incidents.topology") }}
-              </span>
-            </div>
-            <!-- Content -->
-            <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3" style="max-height: 150px; overflow-y: auto;">
-              <div class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">Service:</span>
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'" class="tw:ml-1 tw:font-mono">{{ incidentDetails.topology_context.service }}</span>
-              </div>
-              <div v-if="incidentDetails.topology_context.upstream_services.length" class="tw:text-xs tw:mb-2">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.upstreamServices") }}:</span>
-                <span class="tw:ml-1">
-                  <q-badge
-                    v-for="svc in incidentDetails.topology_context.upstream_services"
-                    :key="svc"
-                    color="blue-grey-4"
-                    :label="svc"
-                    class="tw:mr-1 tw:mt-1"
-                    size="xs"
-                  />
+            <div class="tw:p-3">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                <q-icon name="timeline" size="14px" class="tw:opacity-70" />
+                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-medium">
+                  Alert Flow ({{ incidentDetails.topology_context.nodes.length }} unique)
                 </span>
               </div>
-              <div v-if="incidentDetails.topology_context.downstream_services.length" class="tw:text-xs">
-                <span :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:font-medium">{{ t("alerts.incidents.downstreamServices") }}:</span>
-                <span class="tw:ml-1">
-                  <q-badge
-                    v-for="svc in incidentDetails.topology_context.downstream_services"
-                    :key="svc"
-                    color="blue-grey-4"
-                    :label="svc"
-                    class="tw:mr-1 tw:mt-1"
-                    size="xs"
-                  />
-                </span>
+              <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                <q-badge
+                  v-for="(node, index) in incidentDetails.topology_context.nodes"
+                  :key="node.alert_id"
+                  :color="index === 0 ? 'red-5' : 'blue-grey-5'"
+                  :label="`${node.alert_name} (${node.service_name})`"
+                  size="xs"
+                >
+                  <q-tooltip v-if="node.alert_count > 1" class="text-xs">
+                    Fired {{ node.alert_count }} times
+                  </q-tooltip>
+                </q-badge>
               </div>
             </div>
           </div>
@@ -1105,7 +1079,12 @@ export default defineComponent({
       correlationError.value = null;
 
       // Navigate back to incident list
-      router.push({ name: "incidentList" });
+      router.push({
+        name: "incidentList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     };
 
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
