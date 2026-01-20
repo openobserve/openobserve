@@ -1887,6 +1887,13 @@ export default defineComponent({
               formData.value.trigger_condition.operator = '>=';
             }
           }
+
+          // Trigger preview refresh after panel data is loaded
+          // Use nextTick to ensure DOM is updated before refreshing
+          await nextTick();
+          if (previewAlertRef.value?.refreshData) {
+            previewAlertRef.value.refreshData();
+          }
         } catch (error) {
           console.error("Error loading panel data:", error);
           q.notify({
