@@ -655,7 +655,7 @@ export default defineComponent({
                   mappings: [],
                   color: {
                     mode: "palette-classic-by-series",
-                    fixedColor: ["#53ca53"],
+                    fixedColor: ["#FF0000"],
                     seriesBy: "last",
                     colorBySeries: [],
                   },
@@ -699,7 +699,7 @@ export default defineComponent({
                           label: "",
                           alias: "y_axis_1",
                           column: "y_axis_1",
-                          color: "#53ca53",
+                          color: "#FF0000",
                           isDerived: false,
                         },
                       ],
