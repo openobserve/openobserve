@@ -142,6 +142,37 @@ pub(crate) fn get_folder(query: &HashMap<String, String>) -> String {
 #[inline(always)]
 pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
+
+    // Check for x-openobserve-trace-id header first (from browser SDK for RUM correlation)
+    if let Some(oo_trace_id) = headers.get("x-openobserve-trace-id") {
+        if let Ok(trace_id_str) = oo_trace_id.to_str() {
+            // Validate: 32 hex chars, not all zeros
+            if trace_id_str.len() == 32
+                && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
+                && !trace_id_str.chars().all(|c| c == '0')
+            {
+                // Set as parent context if tracing is enabled
+                if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+                    if !span.is_none() {
+                        // Create a synthetic traceparent and set as parent
+                        let traceparent = format!(
+                            "00-{}-{}-01",
+                            trace_id_str,
+                            config::ider::generate_span_id()
+                        );
+                        let mut headers_map = std::collections::HashMap::new();
+                        headers_map.insert("traceparent".to_string(), traceparent);
+                        let parent_ctx =
+                            global::get_text_map_propagator(|prop| prop.extract(&headers_map));
+                        let _ = span.set_parent(parent_ctx);
+                    }
+                }
+                return trace_id_str.to_string();
+            }
+        }
+    }
+
+    // Check for traceparent header (W3C standard)
     if let Some(traceparent) = headers.get("traceparent") {
         if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
             // OpenTelemetry is initialized -> can use propagator to get traceparent
@@ -588,6 +619,100 @@ mod tests {
         // Should generate new trace ID for malformed header
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_openobserve_header_valid() {
+        // Test x-openobserve-trace-id header with valid trace ID
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("4bf92f3577b34da6a3ce929d0e0e4736"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        assert_eq!(trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_openobserve_header_invalid_length() {
+        // Test x-openobserve-trace-id header with invalid length (not 32 chars)
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("4bf92f3577b34da6"), // Only 16 chars
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate new trace ID since the provided one is invalid
+        assert_ne!(trace_id, "4bf92f3577b34da6");
+        assert_eq!(trace_id.len(), 32);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_openobserve_header_all_zeros() {
+        // Test x-openobserve-trace-id header with all zeros (invalid per W3C spec)
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("00000000000000000000000000000000"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate new trace ID when all zeros detected
+        assert_ne!(trace_id, "00000000000000000000000000000000");
+        assert_eq!(trace_id.len(), 32);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_openobserve_header_non_hex() {
+        // Test x-openobserve-trace-id header with non-hex characters
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("4bf92f3577b34da6a3ce929d0e0eZZZZ"), // Contains non-hex
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate new trace ID for invalid characters
+        assert_ne!(trace_id, "4bf92f3577b34da6a3ce929d0e0eZZZZ");
+        assert_eq!(trace_id.len(), 32);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_openobserve_header_priority_over_traceparent() {
+        // Test that x-openobserve-trace-id takes priority over traceparent
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+        );
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("00-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2-00f067aa0ba902b7-01"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // x-openobserve-trace-id should take priority
+        assert_eq!(trace_id, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1");
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_fallback_to_traceparent() {
+        // Test fallback to traceparent when x-openobserve-trace-id is invalid
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("invalid"), // Invalid - too short
+        );
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("00-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2-00f067aa0ba902b7-01"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should fall back to traceparent
+        assert_eq!(trace_id, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2");
     }
 
     #[test]

@@ -81,6 +81,7 @@ pub fn cors_layer() -> CorsLayer {
             header::ACCEPT,
             header::CONTENT_TYPE,
             header::HeaderName::from_lowercase(b"traceparent").unwrap(),
+            header::HeaderName::from_lowercase(b"x-openobserve-trace-id").unwrap(),
         ])
         .allow_origin(AllowOrigin::mirror_request())
         .allow_credentials(true)
