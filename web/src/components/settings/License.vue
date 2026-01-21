@@ -7,9 +7,9 @@
       <q-spinner size="40px" />
       <div class="q-mt-md">Loading license information...</div>
     </div>
-    <div v-else class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start tw:pb-4">
+    <div v-else class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-4 tw:items-start tw:pb-4">
 
-    <div class="tw:col-span-2 tw:min-h-0" >
+    <div class="tw:col-span-1 tw:min-h-0" >
       <div v-if="licenseData.license === null || !licenseData.license">
         <q-card class="q-mb-md">
           <q-card-section>
@@ -177,49 +177,85 @@
     </div>
 
     <div class="tw:col-span-1 tw:self-start">
-            <q-card>
-              <q-card-section>
-                <div class="text-h6 q-mb-md tw:mx-auto">Usage Information</div>
-                <div class="tw:mb-md">
-                  <div class="text-subtitle2 q-mb-sm text-center">Daily Ingestion Usage (GB)</div>
-                  <div v-if="usageDashboardData" class="usage-chart-container" style="height: 300px;">
-                    <RenderDashboardCharts
-                      :key="dashboardRenderKey"
-                      :dashboardData="usageDashboardData"
-                      :currentTimeObj="currentTimeObj"
-                      :viewOnly="true"
-                      :allowAlertCreation="false"
-                      searchType="dashboards"
-                    />
+            <q-card class="futuristic-card">
+              <q-card-section class="tw:p-3">
+                <div class="futuristic-header">
+                  <div class="header-glow"></div>
+                  <div class="text-h6 tw:relative tw:z-10">Usage Information</div>
+                </div>
+
+                <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
+                  <!-- Summary Message -->
+                  <div class="ingestion-summary-compact">
+                    <div class="summary-text-compact text-body2">
+                      <div class="tw:flex tw:items-center tw:gap-2">
+                        <q-icon
+                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 30"
+                          name="warning"
+                          size="18px"
+                          class="text-negative tw:flex-shrink-0"
+                        />
+                        <q-icon
+                          v-else-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0"
+                          name="info"
+                          size="18px"
+                          class="text-warning tw:flex-shrink-0"
+                        />
+                        <q-icon
+                          v-else
+                          name="check_circle"
+                          size="18px"
+                          class="text-positive tw:flex-shrink-0"
+                        />
+                        <span>
+                          Your license allows <strong>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB` : '100 GB' }}</strong> of data ingestion per day
+                          <span v-if="!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.typ"> ({{ licenseData?.license?.limits?.Ingestion?.typ }})</span>.
+                          <span v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0">
+                            Exceeded <strong :class="licenseData?.ingestion_exceeded > 3 ? 'text-negative' : 'text-warning'">{{ licenseData?.ingestion_exceeded }} time{{ licenseData?.ingestion_exceeded > 1 ? 's' : '' }}</strong> this month.
+                            <span v-if="licenseData?.ingestion_exceeded > 3" class="warning-message">
+                              <q-icon name="error" size="14px" class="tw:ml-1" />
+                              Exceeded allowed limit (max 3 times/month)!
+                            </span>
+                            <span v-else class="info-message">
+                              ({{ 3 - licenseData?.ingestion_exceeded }} allowance{{ (3 - licenseData?.ingestion_exceeded) > 1 ? 's' : '' }} remaining)
+                            </span>
+                          </span>
+                          <span v-else class="text-positive">
+                            No limit violations this month.
+                          </span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div class="text-caption text-weight-bold text-center q-mt-sm">
-                    {{ isIngestionUnlimited ? 'Limit: Unlimited' : `Limit: ${!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day'}` }}
-                  </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 q-mt-xs text-center" style="font-size: 10px;">
-                    * Usage shows 0% for unlimited plans
+
+                  <!-- Chart -->
+                  <div v-if="usageDashboardData">
+                    <div class="chart-wrapper">
+                      <div class="usage-chart-container">
+                        <RenderDashboardCharts
+                          :key="dashboardRenderKey"
+                          :dashboardData="usageDashboardData"
+                          :currentTimeObj="currentTimeObj"
+                          :viewOnly="true"
+                          :allowAlertCreation="false"
+                          searchType="dashboards"
+                        />
+                      </div>
+                      <div class="tw:flex tw:items-center tw:justify-between tw:mt-2 tw:px-2">
+                        <div class="limit-badge">
+                          <q-icon name="warning" size="14px" class="tw:mr-1" />
+                          {{ isIngestionUnlimited ? 'Unlimited' : `${!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '100'} GB / day` }}
+                        </div>
+                        <div v-if="!isIngestionUnlimited" class="text-caption tw:opacity-60" style="font-size: 11px;">
+                          Max 3 exceedances allowed per month
+                        </div>
+                      </div>
+                      <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 tw:mt-1 tw:text-center" style="font-size: 10px;">
+                        * Usage shows 0% for unlimited plans
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <q-markup-table flat bordered dense class="q-mt-auto compact-table">
-                  <thead>
-                    <tr>
-                      <th colspan="2" class="text-center text-weight-bold">Ingestion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td class="text-weight-bold">Type</td>
-                      <td>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.typ ? licenseData?.license?.limits?.Ingestion?.typ : 'PerDayCount' }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Value</td>
-                      <td>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB / day` : '100 GB / day' }}</td>
-                    </tr>
-                    <tr>
-                      <td class="text-weight-bold">Limit Exceeded</td>
-                      <td>{{ licenseData?.ingestion_exceeded ? `${licenseData?.ingestion_exceeded} times this month` : '0 times this month' }}</td>
-                    </tr>
-                  </tbody>
-                </q-markup-table>
               </q-card-section>
             </q-card>
     </div>
@@ -518,21 +554,12 @@ export default defineComponent({
       // Build the threshold configuration - using correct format for mark_line
       const thresholds: any[] = [];
       if (ingestionLimit !== null && ingestionLimit > 0) {
-        // Add warning threshold at 80% of limit
-        thresholds.push({
-          type: "yAxis",
-          name: "Warning (80%)",
-          value: ingestionLimit * 0.8,
-          color: "#FFA500", // Orange
-          lineStyle: "dashed",
-          width: 2,
-        });
 
         // Add critical threshold at 100% of limit
         thresholds.push({
           type: "yAxis",
           name: "Limit Exceeded",
-          value: ingestionLimit,
+          value: ingestionLimitGB,
           color: "#FF0000", // Red
           lineStyle: "solid",
           width: 2,
@@ -568,8 +595,8 @@ export default defineComponent({
                 config: {
                   show_legends: false,
                   legends_position: null,
-                  unit: "gbytes",
-                  decimals: 2,
+                  unit: "megabytes",
+                  decimals: 0,
                   line_thickness: 1.5,
                   step_value: "0",
                   top_results_others: false,
@@ -616,7 +643,7 @@ export default defineComponent({
                   mappings: [],
                   color: {
                     mode: "palette-classic-by-series",
-                    fixedColor: ["#53ca53"],
+                    fixedColor: ["#FF0000"],
                     seriesBy: "last",
                     colorBySeries: [],
                   },
@@ -660,7 +687,7 @@ export default defineComponent({
                           label: "Ingestion (GB)",
                           alias: "y_axis_1",
                           column: "y_axis_1",
-                          color: "#53ca53",
+                          color: "#FF0000",
                           isDerived: false,
                         },
                       ],
@@ -782,6 +809,95 @@ export default defineComponent({
   }
 }
 
+.usage-chart-container {
+  width: 100%;
+  overflow: visible;
+  padding: 0;
+  margin: 0 auto;
+  height: 380px;
+  min-height: 380px;
+}
+
+@media (max-width: 1023px) {
+  .usage-chart-container {
+    height: 320px !important;
+    min-height: 320px !important;
+  }
+}
+
+.chart-wrapper {
+  position: relative;
+
+  .chart-title {
+    color: inherit;
+    opacity: 0.9;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+.limit-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f97316;
+  backdrop-filter: blur(10px);
+}
+
+.ingestion-summary-compact {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg, #6366f1 0%, #a855f7 100%);
+    opacity: 0.6;
+  }
+
+  .summary-text-compact {
+    line-height: 1.6;
+    color: inherit;
+    font-size: 13px;
+
+    strong {
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  .warning-message {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+    font-weight: 600;
+  }
+
+  .info-message {
+    font-size: 12px;
+    opacity: 0.8;
+    font-style: italic;
+  }
+}
+
 .modern-info-banner {
   display: flex;
   align-items: center;
@@ -810,6 +926,40 @@ export default defineComponent({
     background: rgba(34, 197, 94, 0.15);
     border: 1px solid rgba(34, 197, 94, 0.3);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .futuristic-card {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+
+    &::before {
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(99, 102, 241, 0.7) 20%,
+        rgba(168, 85, 247, 0.7) 80%,
+        transparent 100%
+      );
+    }
+  }
+
+  .futuristic-header {
+    .header-glow {
+      background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+    }
+  }
+
+  .ingestion-summary-compact {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+
+    &::before {
+      opacity: 0.8;
+    }
+  }
+
+  .limit-badge {
+    background: rgba(249, 115, 22, 0.15);
+    border: 1px solid rgba(249, 115, 22, 0.4);
   }
 }
 </style>
