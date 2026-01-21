@@ -41,7 +41,7 @@ export class CorrelationSettingsPage {
         this.dedupSettingsRefreshBtn = '[data-test="dedup-settings-refresh-btn"]';
         this.organizationDedupEnableCheckbox = '[data-test="organization-deduplication-enable-checkbox"]';
         this.crossAlertEnableCheckbox = '[data-test="organizationdeduplication-enable-cross-alert-checkbox"]';
-        this.defaultWindowInput = '[data-test="orgnaizationdeduplication-default-window-input"]';
+        this.defaultWindowInput = '[data-test="organizationdeduplication-default-window-input"]';
 
         // ==================== Semantic Field Groups Selectors ====================
         this.semanticGroupCategorySelect = '[data-test="semantic-group-category-select"]';
