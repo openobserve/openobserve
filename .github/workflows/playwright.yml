@@ -855,20 +855,31 @@ jobs:
           path: merged-coverage
           merge-multiple: true
 
-      - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
+      - name: Check Downloaded Coverage Files
+        id: check_coverage
+        run: |
+          if [ -d "merged-coverage" ] && [ "$(ls -A merged-coverage 2>/dev/null)" ]; then
+            echo "has_coverage=true" >> $GITHUB_OUTPUT
+            echo "::notice::Coverage data found"
+            ls -R merged-coverage
+          else
+            echo "has_coverage=false" >> $GITHUB_OUTPUT
+            echo "::notice::No coverage data found (tests may have been skipped due to rerun optimization)"
+          fi
 
       - name: Move Coverage Files to .nyc_output
+        if: steps.check_coverage.outputs.has_coverage == 'true'
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          mv merged-coverage/* tests/ui-testing/.nyc_output/
 
       - name: Generate Coverage Report
+        if: steps.check_coverage.outputs.has_coverage == 'true'
         run: cd tests/ui-testing && npm ci && npx nyc report
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
-        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
+        if: steps.check_coverage.outputs.has_coverage == 'true' && hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
