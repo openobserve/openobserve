@@ -84,7 +84,11 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     await scopedVars.addDependency(globalVar, "kubernetes_namespace_name", "=");
 
     // Save the variable - using helper method to handle potential DOM updates
-    await scopedVars.clickSaveButton();
+    // await scopedVars.clickSaveButton();
+
+    const saveBtn = page.locator('[data-test="dashboard-variable-save-btn"]');
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
 
     // Wait for variable to be saved before closing settings
     await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });

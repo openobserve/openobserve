@@ -357,7 +357,7 @@ export default class DashboardVariablesScoped {
         // If clicking option failed, manually set the value with $ prefix
         await autoComplete.clear();
         await autoComplete.fill(`$${dependencyVariableName}`);
-        await this.page.keyboard.press('Escape');
+        // await this.page.keyboard.press('Escape');
       }
     } else {
       // No dropdown appeared, manually set the value with $ prefix

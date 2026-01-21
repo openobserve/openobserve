@@ -58,7 +58,11 @@ test.describe("Dashboard Variables - Null Handling", () => {
 
     const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
     await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_pod_name");
+    await page.keyboard.type("kubernetes_pod_name", { delay: 100 });
+    await page.waitForFunction(
+      () => document.querySelectorAll('[role="option"]').length > 0,
+      { timeout: 10000, polling: 100 }
+    );
     await page.locator('[role="option"]').first().click();
 
     // Add an IMPOSSIBLE filter to force empty results
