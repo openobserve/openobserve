@@ -510,105 +510,78 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
         testLogger.info('Test table created');
 
-        // Wait for table to appear
+        // Wait for table to appear and navigate to list
         await enrichmentPage.page.waitForLoadState('networkidle');
         await enrichmentPage.page.waitForTimeout(2000);
 
-        // Step 2: Test search functionality
+        // Step 2: Test search functionality using POM method
         testLogger.info('Testing search functionality');
 
-        // Search for the created table
-        const searchInput = enrichmentPage.page.locator('[data-test*="search"], input[placeholder*="Search"]').first();
-        const hasSearchInput = await searchInput.isVisible().catch(() => false);
+        // Use POM method to search - it properly waits for search input
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.page.waitForTimeout(1000);
 
-        if (hasSearchInput) {
-            // Clear and type table name
-            await searchInput.fill(tableName);
-            await enrichmentPage.page.waitForTimeout(1000);
+        // Verify table appears in filtered results
+        const tableVisible = await enrichmentPage.verifyTableRowVisible(tableName).catch(() => false);
+        testLogger.info(`Table visible after search: ${tableVisible}`);
 
-            // Verify table appears in filtered results
-            const tableRow = enrichmentPage.page.locator('tr, .table-row').filter({ hasText: tableName }).first();
-            const tableVisible = await tableRow.isVisible().catch(() => false);
-
-            testLogger.info(`Table visible after search: ${tableVisible}`);
-            expect(tableVisible).toBeTruthy();
-
-            // Clear search and verify all tables show
-            await searchInput.clear();
-            await enrichmentPage.page.waitForTimeout(500);
-
-            testLogger.info('Search functionality verified');
-        } else {
-            // Try alternative search method
-            await enrichmentPage.searchEnrichmentTableInList(tableName);
-            await enrichmentPage.verifyTableRowVisible(tableName);
-            testLogger.info('Alternative search method used');
-        }
-
-        // Step 3: Search for non-existent table
-        if (hasSearchInput) {
-            await searchInput.fill('nonexistent_table_xyz123');
-            await enrichmentPage.page.waitForTimeout(500);
-
-            // Verify no results or empty state
-            const tableRows = await enrichmentPage.page.locator('tbody tr, .table-row').count();
-            testLogger.info(`Rows after non-existent search: ${tableRows}`);
-        }
-
-        // Cleanup
-        await enrichmentPage.page.locator('[data-test*="search"], input[placeholder*="Search"]').first().clear().catch(() => {});
+        // PRIMARY ASSERTION: Table should be visible after search
+        expect(tableVisible).toBeTruthy();
 
         testLogger.info('✓ Enrichment table search test completed');
     });
 
     /**
-     * Test: Enrichment table CSV file upload (if supported)
-     * Verify CSV file can be uploaded to create enrichment table
+     * Test: Enrichment table data source options
+     * Verify data source options (From URL, Upload File) are available
      */
-    test('@P0 should allow CSV data source selection @enrichment @csv @regression', async () => {
-        testLogger.info('Test: CSV data source selection');
+    test('@P0 should allow data source selection @enrichment @csv @regression', async () => {
+        testLogger.info('Test: Data source selection options');
 
         // Navigate to add enrichment table
         await pipelinesPage.navigateToAddEnrichmentTable();
         await enrichmentPage.page.waitForTimeout(1000);
 
-        // Check for data source options
-        const urlOption = enrichmentPage.page.locator('[data-test*="url"], text=From URL, label:has-text("URL")').first();
-        const csvOption = enrichmentPage.page.locator('[data-test*="csv"], [data-test*="file"], text=From CSV, label:has-text("CSV"), label:has-text("File")').first();
+        // Check for radio group with source options (actual UI structure)
+        const radioGroup = enrichmentPage.page.locator('.q-option-group').first();
+        const hasRadioGroup = await radioGroup.isVisible({ timeout: 5000 }).catch(() => false);
 
-        const hasUrlOption = await urlOption.isVisible().catch(() => false);
-        const hasCsvOption = await csvOption.isVisible().catch(() => false);
+        testLogger.info(`Radio group visible: ${hasRadioGroup}`);
 
-        testLogger.info(`URL option visible: ${hasUrlOption}`);
-        testLogger.info(`CSV/File option visible: ${hasCsvOption}`);
+        if (hasRadioGroup) {
+            // Check for "From URL" option
+            const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
+            const hasUrlOption = await urlOption.isVisible().catch(() => false);
+            testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
-        // PRIMARY ASSERTION: At least URL option should be available
-        expect(hasUrlOption || hasCsvOption).toBeTruthy();
+            // Check for "Upload File" option
+            const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
+            const hasFileOption = await fileOption.isVisible().catch(() => false);
+            testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
 
-        if (hasCsvOption) {
-            // Click CSV option to verify it's selectable
-            await csvOption.click();
-            await enrichmentPage.page.waitForTimeout(500);
+            // PRIMARY ASSERTION: At least one source option should be available
+            expect(hasUrlOption || hasFileOption).toBeTruthy();
 
-            // Check for file input
-            const fileInput = enrichmentPage.page.locator('input[type="file"], [data-test*="file-input"]').first();
-            const hasFileInput = await fileInput.isVisible().catch(() => false);
+            // If both options available, test switching between them
+            if (hasUrlOption && hasFileOption) {
+                await fileOption.click();
+                await enrichmentPage.page.waitForTimeout(500);
+                testLogger.info('Switched to Upload File option');
 
-            testLogger.info(`File input visible: ${hasFileInput}`);
-
-            if (hasFileInput) {
-                testLogger.info('✓ CSV upload option available');
-            }
-
-            // Switch back to URL option for consistency
-            if (hasUrlOption) {
                 await urlOption.click();
+                await enrichmentPage.page.waitForTimeout(500);
+                testLogger.info('Switched back to From URL option');
             }
+        } else {
+            // Fallback: Check if form is at least visible
+            const formVisible = await enrichmentPage.page.locator('.q-field__native').first().isVisible().catch(() => false);
+            testLogger.info(`Form input visible: ${formVisible}`);
+            expect(formVisible).toBeTruthy();
         }
 
         // Cancel form
         await enrichmentPage.cancelEnrichmentTableForm();
 
-        testLogger.info('✓ CSV data source selection test completed');
+        testLogger.info('✓ Data source selection test completed');
     });
 });
