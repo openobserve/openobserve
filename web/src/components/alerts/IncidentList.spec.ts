@@ -13,6 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Mock config to enable enterprise routes - must be first before any imports
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
+// Mock incidents service
+vi.mock("@/services/incidents", () => ({
+  default: {
+    list: vi.fn(),
+    updateStatus: vi.fn(),
+  },
+}));
+
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
@@ -26,14 +42,6 @@ import router from "@/test/unit/helpers/router";
 
 // Install Quasar globally
 installQuasar({ plugins: [Dialog, Notify] });
-
-// Mock incidents service
-vi.mock("@/services/incidents", () => ({
-  default: {
-    list: vi.fn(),
-    updateStatus: vi.fn(),
-  },
-}));
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
