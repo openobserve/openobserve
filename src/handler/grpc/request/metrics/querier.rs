@@ -55,7 +55,6 @@ impl Metrics for MetricsQuerier {
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
 
-        // Record task in SEARCH_SERVER for streaming queries (Enterprise only)
         #[cfg(feature = "enterprise")]
         let trace_id = req.job.as_ref().unwrap().trace_id.clone();
         #[cfg(feature = "enterprise")]

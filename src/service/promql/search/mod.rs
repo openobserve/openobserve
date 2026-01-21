@@ -79,7 +79,6 @@ pub async fn search(
     timeout: i64,
     is_super_cluster: bool,
 ) -> Result<Value> {
-    // Record task in SEARCH_SERVER for streaming queries (Enterprise only)
     #[cfg(feature = "enterprise")]
     {
         let sql = Some(req.query.clone());
@@ -105,12 +104,17 @@ pub async fn search(
             .await;
     }
 
+    let timeout = if timeout > 0 {
+        timeout as u64
+    } else {
+        get_config().limit.query_timeout
+    };
+
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
-    req.timeout = timeout;
+    req.timeout = timeout as i64;
     req.is_super_cluster = is_super_cluster;
 
-    let timeout = timeout as u64;
     let mut stop_watch = TookWatcher::new();
 
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
@@ -147,9 +151,7 @@ pub async fn search(
         .await
         .is_err()
     {
-        log::info!(
-            "[trace_id {trace_id}] promql->search: search canceled before execution plan"
-        );
+        log::info!("[trace_id {trace_id}] promql->search: search canceled before execution plan");
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] promql->search: search canceled before execution plan"
@@ -174,7 +176,7 @@ pub async fn search(
                 }
             }
         },
-        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout )) => {
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] promql->search: search timeout");
             Err(Error::ErrorCode(ErrorCodes::SearchTimeout("promql->search: search timeout".to_string())))
@@ -214,11 +216,7 @@ async fn search_in_cluster(
     let start_ins = std::time::Instant::now();
     let started_at = now_micros();
     let cfg = get_config();
-    let timeout = if req.timeout > 0 {
-        req.timeout as u64
-    } else {
-        cfg.limit.query_timeout
-    };
+    let timeout = req.timeout as u64;
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
