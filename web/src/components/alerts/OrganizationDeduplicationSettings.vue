@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
         <q-input
-          data-test="orgnaizationdeduplication-default-window-input"
+          data-test="organizationdeduplication-default-window-input"
           v-model.number="localConfig.time_window_minutes"
           type="number"
           dense
