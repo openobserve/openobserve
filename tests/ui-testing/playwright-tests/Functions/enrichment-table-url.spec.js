@@ -438,7 +438,8 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
-        await enrichmentPage.fillUrlInput(DIFFERENT_SCHEMA_CSV_URL);
+        // Use fillNewUrlInput because in edit/append mode the label is "New CSV File URL"
+        await enrichmentPage.fillNewUrlInput(DIFFERENT_SCHEMA_CSV_URL);
         testLogger.info('Added URL with different schema CSV');
 
         // Step 6: Save the changes
