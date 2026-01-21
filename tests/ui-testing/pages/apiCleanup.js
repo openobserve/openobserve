@@ -2612,6 +2612,93 @@ class APICleanup {
     }
 
     /**
+     * ==========================================
+     * CORRELATION SETTINGS CLEANUP METHODS
+     * ==========================================
+     */
+
+    /**
+     * Clean up test semantic groups created by correlation settings tests
+     * Uses the alerts deduplication config API (same as frontend)
+     * Test groups created by ensureSemanticGroupsExist(): k8s-cluster, k8s-namespace, k8s-deployment, service
+     * @param {Array<string>} groupIds - Array of semantic group IDs to delete (default: test group IDs)
+     */
+    async cleanupCorrelationSettings(groupIds = ['k8s-cluster', 'k8s-namespace', 'k8s-deployment', 'service']) {
+        testLogger.info('Starting correlation settings cleanup', { groupIds });
+
+        try {
+            // First, fetch the current deduplication config
+            const getResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!getResponse.ok) {
+                if (getResponse.status === 404) {
+                    testLogger.info('Deduplication config not found (nothing to clean up)');
+                    return;
+                }
+                testLogger.warn('Failed to fetch deduplication config', { status: getResponse.status });
+                return;
+            }
+
+            const config = await getResponse.json();
+            const currentGroups = config.semantic_field_groups || [];
+            testLogger.info('Current semantic groups in dedup config', { count: currentGroups.length });
+
+            if (currentGroups.length === 0) {
+                testLogger.info('No semantic groups to clean up');
+                return;
+            }
+
+            // Filter out the test groups
+            const remainingGroups = currentGroups.filter(g => !groupIds.includes(g.id));
+            const removedCount = currentGroups.length - remainingGroups.length;
+
+            if (removedCount === 0) {
+                testLogger.info('No test semantic groups found to clean up');
+                return;
+            }
+
+            testLogger.info('Removing test semantic groups', {
+                total: currentGroups.length,
+                removing: removedCount,
+                remaining: remainingGroups.length
+            });
+
+            // Update the config with remaining groups
+            const updatePayload = {
+                ...config,
+                semantic_field_groups: remainingGroups,
+                // Also clean up fingerprint groups that reference removed semantic groups
+                alert_fingerprint_groups: (config.alert_fingerprint_groups || [])
+                    .filter(id => !groupIds.includes(id))
+            };
+
+            const updateResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatePayload)
+            });
+
+            if (updateResponse.ok) {
+                testLogger.info('Correlation settings cleanup completed', { removedGroups: removedCount });
+            } else {
+                testLogger.warn('Failed to update deduplication config', { status: updateResponse.status });
+            }
+
+        } catch (error) {
+            testLogger.error('Correlation settings cleanup failed', { error: error.message });
+        }
+    }
+
+    /**
      * Verify stream exists via API
      * @param {string} streamName - Name of the stream to verify
      * @returns {Promise<boolean>} True if stream exists

@@ -1,5 +1,7 @@
 import { expect } from '@playwright/test';
 
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
+
 /**
  * Page Object for Correlation Settings page
  * Route: /web/settings/correlation_settings?org_identifier={orgId}
@@ -56,6 +58,127 @@ export class CorrelationSettingsPage {
         // ==================== Common Selectors ====================
         this.loadingSpinner = '.q-spinner-hourglass';
         this.notification = '.q-notification__message';
+    }
+
+    // ==================== Test Data Setup ====================
+
+    /**
+     * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
+     * Uses PUT /api/{org}/alerts/deduplication/semantic-groups to set semantic groups
+     * The frontend reads semantic groups from this endpoint
+     * @param {string} orgId - Organization identifier
+     * @returns {Promise<boolean>} - True if successful
+     */
+    async ensureSemanticGroupsExist(orgId) {
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const username = process.env["ZO_ROOT_USER_EMAIL"];
+        const password = process.env["ZO_ROOT_USER_PASSWORD"];
+        const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+
+        // Define test semantic groups that cover common use cases
+        const testSemanticGroups = [
+            {
+                id: 'k8s-cluster',
+                display: 'K8s Cluster',
+                group: 'Kubernetes',
+                fields: ['k8s.cluster.name', 'k8s_cluster_name'],
+                normalize: true,
+                is_scope: true,
+                is_stable: true
+            },
+            {
+                id: 'k8s-namespace',
+                display: 'K8s Namespace',
+                group: 'Kubernetes',
+                fields: ['k8s.namespace.name', 'k8s_namespace_name'],
+                normalize: true,
+                is_scope: true,
+                is_stable: true
+            },
+            {
+                id: 'k8s-deployment',
+                display: 'K8s Deployment',
+                group: 'Kubernetes',
+                fields: ['k8s.deployment.name', 'k8s_deployment_name'],
+                normalize: true,
+                is_scope: false,
+                is_stable: true
+            },
+            {
+                id: 'service',
+                display: 'Service',
+                group: 'Common',
+                fields: ['service.name', 'service_name', 'service'],
+                normalize: true,
+                is_scope: false,
+                is_stable: true
+            }
+        ];
+
+        testLogger.info('Setting up test semantic groups via semantic-groups API', { orgId, groupCount: testSemanticGroups.length });
+
+        try {
+            // Step 1: PUT semantic groups
+            const putUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
+            testLogger.info('PUT semantic groups', { url: putUrl });
+
+            const putResponse = await fetch(putUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(testSemanticGroups)
+            });
+
+            const putText = await putResponse.text();
+            testLogger.info('PUT response', {
+                status: putResponse.status,
+                statusText: putResponse.statusText,
+                body: putText.substring(0, 500)
+            });
+
+            // Step 2: Verify by GET semantic-groups
+            const getUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
+            const getResponse = await fetch(getUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const getResult = await getResponse.json().catch(() => []);
+            testLogger.info('GET semantic groups verification', {
+                status: getResponse.status,
+                groupCount: Array.isArray(getResult) ? getResult.length : 'not-array',
+                groupIds: Array.isArray(getResult) ? getResult.map(g => g.id) : 'error'
+            });
+
+            // Step 3: Check deduplication config (this is what frontend loads)
+            const configUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/config`;
+            const configResponse = await fetch(configUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const configResult = await configResponse.json().catch(() => ({}));
+            testLogger.info('GET deduplication config (frontend reads this)', {
+                status: configResponse.status,
+                enabled: configResult.enabled,
+                alertDedupEnabled: configResult.alert_dedup_enabled,
+                semanticGroupCount: configResult.semantic_field_groups?.length || 0,
+                semanticGroupIds: configResult.semantic_field_groups?.map(g => g.id) || []
+            });
+
+            return putResponse.ok;
+        } catch (error) {
+            testLogger.error('Failed to setup semantic groups', { error: error.message, stack: error.stack });
+            return false;
+        }
     }
 
     // ==================== Navigation ====================
@@ -239,6 +362,30 @@ export class CorrelationSettingsPage {
 
     async expectCrossAlertCheckboxHidden() {
         await expect(this.page.locator(this.crossAlertEnableCheckbox)).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Check if the cross-alert deduplication checkbox is currently checked
+     * @returns {Promise<boolean>} True if checkbox is checked
+     */
+    async isCrossAlertCheckboxChecked() {
+        const checkbox = this.page.locator(this.crossAlertEnableCheckbox);
+        // Quasar checkbox uses aria-checked attribute
+        const ariaChecked = await checkbox.getAttribute('aria-checked');
+        if (ariaChecked !== null) {
+            return ariaChecked === 'true';
+        }
+        // Fallback to checking the inner input if visible
+        const input = checkbox.locator('input[type="checkbox"]');
+        if (await input.count() > 0) {
+            return await input.isChecked();
+        }
+        // Last resort - check for checked class
+        const hasCheckedClass = await checkbox.evaluate(el => {
+            return el.classList.contains('q-checkbox--checked') ||
+                   el.closest('.q-checkbox')?.classList.contains('q-checkbox--checked');
+        }).catch(() => false);
+        return hasCheckedClass;
     }
 
     async fillTimeWindowInput(minutes) {
@@ -482,7 +629,8 @@ export class CorrelationSettingsPage {
     async getPriorityDimensionsCount() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        const lists = serviceConfig.locator('.q-list.bordered, .q-list[bordered]');
+        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         // Exclude empty state items (the "No dimensions configured" message)
@@ -496,7 +644,8 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        const lists = serviceConfig.locator('.q-list.bordered, .q-list[bordered]');
+        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
         await expect(item).toBeVisible({ timeout: 5000 });
@@ -508,7 +657,8 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionNotExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        const lists = serviceConfig.locator('.q-list.bordered, .q-list[bordered]');
+        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
         await expect(item).not.toBeVisible({ timeout: 5000 });
@@ -518,9 +668,9 @@ export class CorrelationSettingsPage {
 
     /**
      * Get all fingerprint group checkboxes
-     * @returns {Promise<import('@playwright/test').Locator>}
+     * @returns {import('@playwright/test').Locator}
      */
-    async getFingerprintGroupCheckboxes() {
+    getFingerprintGroupCheckboxes() {
         return this.page.locator('[data-test^="organizationdeduplication-fingerprint-"]');
     }
 
@@ -528,7 +678,7 @@ export class CorrelationSettingsPage {
      * Expect fingerprint groups section to be visible
      */
     async expectFingerprintGroupsVisible() {
-        const checkboxes = await this.getFingerprintGroupCheckboxes();
+        const checkboxes = this.getFingerprintGroupCheckboxes();
         await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
     }
 
@@ -545,7 +695,7 @@ export class CorrelationSettingsPage {
      * @returns {Promise<number>}
      */
     async getFingerprintGroupsCount() {
-        const checkboxes = await this.getFingerprintGroupCheckboxes();
+        const checkboxes = this.getFingerprintGroupCheckboxes();
         return await checkboxes.count();
     }
 
@@ -685,7 +835,8 @@ export class CorrelationSettingsPage {
     async getFirstAvailableDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        const lists = serviceConfig.locator('.q-list.bordered, .q-list[bordered]');
+        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
         const firstItem = rightList.locator('.q-item:not(:has-text("No"))').first();
@@ -708,7 +859,8 @@ export class CorrelationSettingsPage {
     async getFirstPriorityDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        const lists = serviceConfig.locator('.q-list.bordered, .q-list[bordered]');
+        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
+        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         const firstItem = leftList.locator('.q-item:not(:has-text("No"))').first();
