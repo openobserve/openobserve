@@ -261,9 +261,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
 
                 let org_usage_stream = StreamParams::new(&org, USAGE_STREAM, StreamType::Logs);
                 if let Err(e) = ingest_reporting_data(values, org_usage_stream).await {
-                    log::error!(
-                        "[SELF-REPORTING] Error ingesting usage data for org {org}: {e}"
-                    );
+                    log::error!("[SELF-REPORTING] Error ingesting usage data for org {org}: {e}");
                 }
             }
         }

@@ -32,7 +32,6 @@ use once_cell::sync::Lazy;
 /// 1. Each entry is just an org_id string (small memory footprint)
 /// 2. Number of organizations in a deployment is finite
 /// 3. Set is cleared on server restart
-/// This matches the pattern used in triggers_schema.rs.
 static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 
 /// Ensures the usage stream schema is initialized for a given organization.
