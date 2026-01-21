@@ -1888,7 +1888,11 @@
     "destination_type": "Tipo de destino",
     "readonly": "Solo lectura",
     "additional_settings": "Ajustes adicionales",
-    "custom_headers": "Encabezados personalizados (opcional)"
+    "custom_headers": "Encabezados personalizados (opcional)",
+    "preview": "Vista previa",
+    "test": "Prueba",
+    "saved": "El destino se guardó correctamente",
+    "saveError": "No se pudo guardar el destino"
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",

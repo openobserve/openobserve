@@ -1884,7 +1884,11 @@
     "destination_type": "目的地类型",
     "readonly": "只读",
     "additional_settings": "其他设置",
-    "custom_headers": "自定义标题（可选）"
+    "custom_headers": "自定义标题（可选）",
+    "preview": "预览",
+    "test": "测试",
+    "saved": "目的地已成功保存",
+    "saveError": "保存目标失败"
   },
   "metrics": {
     "searchMetric": "搜索指标",
