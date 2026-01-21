@@ -34,7 +34,6 @@ pub struct EnrichTable {
     org_id: String,
     name: String,
     schema: SchemaRef,
-    partitions: usize,
 }
 
 impl EnrichTable {
@@ -44,7 +43,6 @@ impl EnrichTable {
             org_id: org_id.to_string(),
             name: name.to_string(),
             schema,
-            partitions: 1,
         }
     }
 }
@@ -70,10 +68,11 @@ impl TableProvider for EnrichTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(
-            EnrichExec::new(&self.org_id, &self.name, self.schema.clone())
-                .with_partitions(self.partitions),
-        ))
+        Ok(Arc::new(EnrichExec::new(
+            &self.org_id,
+            &self.name,
+            self.schema.clone(),
+        )))
     }
 
     fn supports_filters_pushdown(
