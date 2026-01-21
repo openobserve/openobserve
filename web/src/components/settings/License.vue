@@ -19,6 +19,7 @@
             </div>
             <div class="q-mt-md text-body2" v-html="t('about.contact_admin_license')"></div>
             <q-btn
+              data-test="no-license-get-license-btn"
               color="primary"
               no-caps
               :label="t('about.get_license')"
@@ -34,6 +35,7 @@
           <q-card-section>
             <div class="text-subtitle1 q-mb-md">{{ t('about.enter_license_key') }}</div>
             <q-input
+              data-test="no-license-key-input"
               v-model="licenseKey"
               outlined
               type="textarea"
@@ -48,6 +50,7 @@
               </div>
             </div>
             <q-btn
+              data-test="no-license-update-btn"
               color="primary"
               :label="t('about.update_license')"
               @click="updateLicense"
@@ -105,6 +108,7 @@
                         size="sm"
                         @click="showLicenseKeyModal = true"
                         class="q-ml-sm"
+                        data-test="show-license-key-btn"
                       />
                     </div>
                   </td>
@@ -125,8 +129,10 @@
                 :label="t('about.request_new_license')"
                 class="o2-primary-button"
                 @click="redirectToGetLicense"
+                data-test="request-new-license-btn"
               />
               <q-btn
+                data-test="add-license-key-btn"
                 no-caps
                 class="o2-primary-button"
                 :label="t('about.add_new_license_key')"
@@ -140,6 +146,7 @@
             <q-card-section>
               <div class="text-subtitle1 q-mb-sm">{{ t('about.update_license_key') }}</div>
               <q-input
+                data-test="update-license-key-input"
                 v-model="licenseKey"
                 outlined
                 type="textarea"
@@ -155,12 +162,14 @@
               </div>
               <div class="row q-gutter-sm">
                 <q-btn
+                  data-test="cancel-update-license-btn"
                   no-caps
                   :label="t('common.cancel')"
                   class="o2-secondary-button"
                   @click="showUpdateForm = false; licenseKey = ''"
                 />
                 <q-btn
+                  data-test="confirm-update-license-btn"
                   color="primary"
                   no-caps
                   :label="t('about.update_license')"
@@ -271,6 +280,7 @@
         <q-card-section>
           <div class="text-body2 q-mb-md">{{ t('about.your_complete_license_key') }}</div>
           <q-input
+            data-test="modal-license-key-display"
             v-model="licenseData.key"
             outlined
             readonly
@@ -283,12 +293,14 @@
 
         <q-card-actions align="right" class="q-pt-none">
           <q-btn
+            data-test="license-cancel-btn"
             no-caps
             :label="t('common.cancel')"
             class="o2-secondary-button"
             v-close-popup
               />
           <q-btn
+            data-test="license-copy-key-btn"
             color="primary"
             :label="t('about.copy_key')"
             no-caps
