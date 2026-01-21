@@ -88,7 +88,7 @@ const changeTab = (tab: Tab) => {
     border-bottom: 2px solid var(--o2-primary-btn-bg);
     background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
     color: var(--o2-card-text) !important;
-    border-radius: 0.375rem 0.375rem 0 0;
+    // border-radius: 0.375rem 0.375rem 0 0;
   }
 }
 </style>
