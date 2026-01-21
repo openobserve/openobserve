@@ -21,10 +21,14 @@ message PhysicalPlanNode {
   }
 }
 
+message Uint64List {
+    repeated uint64 values = 1;
+}
+
 message NewEmptyExecNode {
     string                                 name = 1;
     datafusion_common.Schema             schema = 2;
-    repeated uint64                  projection = 3;
+    optional Uint64List              projection = 3;
     repeated datafusion.LogicalExprNode filters = 4;
     optional uint64                       limit = 5;
     bool                         sorted_by_time = 6;
