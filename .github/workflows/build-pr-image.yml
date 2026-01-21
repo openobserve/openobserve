@@ -104,22 +104,54 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "openobserve-${{ runner.arch }}"
-          cache-on-failure: true
-          key: ${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'src/**/*.rs', '.cargo/**') }}
-
-      - name: Install Protoc
-        run: |
-          bash ./.github/protoc.sh
-
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: web/dist
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: "openobserve-${{ runner.arch }}"
+          cache-on-failure: true
+
+      - name: Validate cache setup
+        run: |
+          echo "=== Cache Status ==="
+          echo "Cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+
+          echo -e "\n=== Frontend dist timestamp (should be BEFORE cache restore) ==="
+          if [ -d "web/dist" ]; then
+            stat -c "Modified: %y" web/dist | head -1
+          else
+            echo "ERROR: web/dist not found!"
+            exit 1
+          fi
+
+          echo -e "\n=== Target directory status ==="
+          if [ -d "target" ]; then
+            echo "Target directory exists (cache restored)"
+            echo "Target modified: $(stat -c "%y" target)"
+
+            # Check if we have cached workspace crates
+            CACHED_CRATES=$(find target -name "libconfig-*.rlib" -o -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "Found $CACHED_CRATES cached workspace crate artifacts"
+
+            if [ "$CACHED_CRATES" -eq 0 ] && [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ]; then
+              echo "WARNING: Cache hit but no cached artifacts found!"
+            fi
+          else
+            echo "Target directory does not exist (cache miss)"
+          fi
+
+          echo -e "\n=== Quick compilation check (cargo check - fast) ==="
+          echo "Running cargo check to see what needs recompilation..."
+
+      - name: Install Protoc
+        run: |
+          bash ./.github/protoc.sh
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -193,22 +225,54 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "openobserve-${{ runner.arch }}"
-          cache-on-failure: true
-          key: ${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'src/**/*.rs', '.cargo/**') }}
-
-      - name: Install Protoc
-        run: |
-          bash ./.github/protoc.sh
-
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: web/dist
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: "openobserve-${{ runner.arch }}"
+          cache-on-failure: true
+
+      - name: Validate cache setup
+        run: |
+          echo "=== Cache Status ==="
+          echo "Cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+
+          echo -e "\n=== Frontend dist timestamp (should be BEFORE cache restore) ==="
+          if [ -d "web/dist" ]; then
+            stat -c "Modified: %y" web/dist | head -1
+          else
+            echo "ERROR: web/dist not found!"
+            exit 1
+          fi
+
+          echo -e "\n=== Target directory status ==="
+          if [ -d "target" ]; then
+            echo "Target directory exists (cache restored)"
+            echo "Target modified: $(stat -c "%y" target)"
+
+            # Check if we have cached workspace crates
+            CACHED_CRATES=$(find target -name "libconfig-*.rlib" -o -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "Found $CACHED_CRATES cached workspace crate artifacts"
+
+            if [ "$CACHED_CRATES" -eq 0 ] && [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ]; then
+              echo "WARNING: Cache hit but no cached artifacts found!"
+            fi
+          else
+            echo "Target directory does not exist (cache miss)"
+          fi
+
+          echo -e "\n=== Quick compilation check (cargo check - fast) ==="
+          echo "Running cargo check to see what needs recompilation..."
+
+      - name: Install Protoc
+        run: |
+          bash ./.github/protoc.sh
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
