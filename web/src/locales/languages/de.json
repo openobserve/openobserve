@@ -1888,7 +1888,11 @@
     "destination_type": "Art des Reiseziels",
     "readonly": "Nur lesbar",
     "additional_settings": "Zusätzliche Einstellungen",
-    "custom_headers": "Benutzerdefinierte Header (optional)"
+    "custom_headers": "Benutzerdefinierte Header (optional)",
+    "preview": "Vorschau",
+    "test": "Testen",
+    "saved": "Ziel wurde erfolgreich gespeichert",
+    "saveError": "Ziel konnte nicht gespeichert werden"
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",

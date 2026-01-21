@@ -1888,7 +1888,11 @@
     "destination_type": "목적지 유형",
     "readonly": "읽기 전용",
     "additional_settings": "추가 설정",
-    "custom_headers": "사용자 지정 헤더 (선택 사항)"
+    "custom_headers": "사용자 지정 헤더 (선택 사항)",
+    "preview": "시사",
+    "test": "테스트",
+    "saved": "목적지가 성공적으로 저장되었습니다.",
+    "saveError": "대상 저장 실패"
   },
   "metrics": {
     "searchMetric": "지표 검색",

@@ -1888,7 +1888,11 @@
     "destination_type": "Type de destination",
     "readonly": "En lecture seule",
     "additional_settings": "Réglages supplémentaires",
-    "custom_headers": "En-têtes personnalisés (facultatif)"
+    "custom_headers": "En-têtes personnalisés (facultatif)",
+    "preview": "Aperçu",
+    "test": "Testez",
+    "saved": "Destination enregistrée avec succès",
+    "saveError": "Impossible d'enregistrer la destination"
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
