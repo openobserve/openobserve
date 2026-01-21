@@ -523,24 +523,19 @@ mod tests {
         match &slack.module {
             Module::Alert {
                 destination_type, ..
-            } => {
-                match destination_type {
-                    DestinationType::Http(endpoint) => {
-                        assert!(endpoint.url.contains("slack.com"));
-                        assert_eq!(endpoint.method, HTTPType::POST);
-                        assert_eq!(endpoint.destination_type.as_ref().unwrap(), "slack");
-                    }
-                    _ => panic!("Slack destination should be HTTP type"),
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("slack.com"));
+                    assert_eq!(endpoint.method, HTTPType::POST);
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "slack");
                 }
-            }
+                _ => panic!("Slack destination should be HTTP type"),
+            },
             _ => panic!("Should be Alert module"),
         }
 
         // Check Teams destination
-        let teams = prebuilt
-            .iter()
-            .find(|d| d.name.contains("Teams"))
-            .unwrap();
+        let teams = prebuilt.iter().find(|d| d.name.contains("Teams")).unwrap();
         match &teams.module {
             Module::Alert {
                 destination_type, ..
