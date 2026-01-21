@@ -38,7 +38,7 @@ limitations under the License. -->
             <q-icon
               v-else
               :name="getIconName(type.icon)"
-              size="32px"
+              size="1.5rem"
             />
           </div>
 
@@ -57,7 +57,7 @@ limitations under the License. -->
             v-if="selectedType === type.id"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="20px" color="positive" />
+            <q-icon name="check_circle" size="1.25rem" color="positive" />
           </div>
         </div>
       </div>
@@ -72,7 +72,7 @@ limitations under the License. -->
       >
         <div class="card-content">
           <div class="card-icon">
-            <q-icon name="settings" size="32px" />
+            <q-icon name="settings" size="1.5rem" />
           </div>
           <h3 data-test="destination-type-name" class="card-title">
             {{ t('alerts.customDestination') }}
@@ -84,7 +84,7 @@ limitations under the License. -->
             v-if="selectedType === 'custom'"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="20px" color="positive" />
+            <q-icon name="check_circle" size="1.25rem" color="positive" />
           </div>
         </div>
       </div>
@@ -154,33 +154,33 @@ function getIconName(icon: string): string {
 .destination-selector {
   .selector-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
   }
 
   .destination-card {
     position: relative;
-    padding: 20px 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 12px;
+    padding: 1.25rem 0.75rem;
+    border: 0.125rem solid #e0e0e0;
+    border-radius: 0.75rem;
     background: #ffffff;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-height: 120px;
+    min-height: 7.5rem;
     display: flex;
     flex-direction: column;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+      transform: translateY(-0.125rem);
+      box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.15);
       border-color: #1976d2;
     }
 
     &.selected {
       border-color: #1976d2;
       background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-      box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
+      box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.2);
 
       .card-icon {
         color: #1976d2;
@@ -201,43 +201,43 @@ function getIconName(icon: string): string {
     }
 
     .card-icon {
-      margin-bottom: 8px;
+      margin-bottom: 0.5rem;
       color: #666;
 
       .destination-logo {
-        width: 40px;
-        height: 40px;
+        width: 1.5rem;
+        height: 1.5rem;
         object-fit: contain;
       }
     }
 
     .card-title {
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 500;
-      margin: 4px 0 0 0;
+      margin: 0.25rem 0 0 0;
       color: var(--q-text-primary);
       line-height: 1.3;
       text-align: center;
     }
 
     .card-description {
-      font-size: 11px;
+      font-size: 0.6875rem;
       color: var(--q-text-secondary);
-      margin: 4px 0 0 0;
+      margin: 0.25rem 0 0 0;
       line-height: 1.2;
       flex-grow: 1;
       text-align: center;
       display: none; // Hide description to save space
 
-      @media (min-width: 1200px) {
+      @media (min-width: 75rem) {
         display: block; // Show on larger screens
       }
     }
 
     .check-icon {
       position: absolute;
-      bottom: 8px;
-      right: 8px;
+      bottom: 0.5rem;
+      right: 0.5rem;
     }
   }
 }
@@ -249,14 +249,14 @@ body.body--dark {
     border-color: #424242;
 
     &:hover {
-      box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+      box-shadow: 0 0.25rem 0.75rem rgba(25, 118, 210, 0.3);
       border-color: #1976d2;
     }
 
     &.selected {
       border-color: #1976d2;
       background: linear-gradient(135deg, rgba(25, 118, 210, 0.2) 0%, #1e1e1e 100%);
-      box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
+      box-shadow: 0 0.25rem 1rem rgba(25, 118, 210, 0.3);
     }
   }
 }

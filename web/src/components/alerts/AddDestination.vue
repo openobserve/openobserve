@@ -469,16 +469,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-between q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+    <div class="flex justify-between q-px-lg q-py-lg full-width">
       <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-      <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="flex items-center q-gutter-sm">
+      <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="flex items-center tw:gap-2">
         <q-btn
           data-test="destination-preview-button"
           :label="t('alert_destinations.preview')"
           icon="preview"
           outline
           no-caps
-          class="tw:h-[36px]"
+          class="tw:h-[36px] tw:mr-2"
           @click="showPreview"
         />
         <q-btn
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else></div>
 
       <!-- Right side: Cancel and Save buttons -->
-      <div class="flex items-center q-gutter-sm">
+      <div class="flex items-center tw:gap-2">
         <q-btn
           data-test="add-destination-cancel-btn"
           v-close-popup="true"
