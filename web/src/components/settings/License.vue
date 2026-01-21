@@ -670,7 +670,7 @@ export default defineComponent({
                       stream_type: "logs",
                       x: [
                         {
-                          label: "Timestamp",
+                          label: "",
                           alias: "x_axis_1",
                           column: "x_axis_1",
                           color: null,
@@ -679,7 +679,7 @@ export default defineComponent({
                       ],
                       y: [
                         {
-                          label: "Ingestion (GB)",
+                          label: "",
                           alias: "y_axis_1",
                           column: "y_axis_1",
                           color: "#FF0000",
