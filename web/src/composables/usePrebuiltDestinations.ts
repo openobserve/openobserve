@@ -139,16 +139,23 @@ export function usePrebuiltDestinations() {
     const config = getPrebuiltConfig(type);
     if (!config) return '';
 
-    // Sample alert data for preview
+    // Generate realistic alert URL using current browser context
+    const baseUrl = window.location.origin;
+    const orgId = organizationIdentifier.value;
+    const now = Date.now() * 1000; // microseconds
+    const oneHourAgo = now - (60 * 60 * 1000 * 1000);
+
+    // Sample alert data with realistic context
     const sampleData = {
-      alert_name: 'High CPU Usage',
+      alert_name: 'Test Alert - High CPU Usage',
       stream_name: 'system-metrics',
-      stream_type: 'metrics',
+      stream_type: 'logs',
       alert_count: '15',
       alert_operator: 'greater than',
       alert_threshold: '80%',
       alert_time: new Date().toLocaleString(),
-      alert_url: 'https://openobserve.example.com/alerts/123',
+      // Use actual OpenObserve instance URL instead of fake example
+      alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
       // Add specific fields for different types
       integration_key: 'sample-integration-key',
       severity: 'error',
@@ -481,6 +488,12 @@ export function usePrebuiltDestinations() {
   function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
     if (destination.metadata?.prebuilt_type) {
       return destination.metadata.prebuilt_type;
+    }
+
+    // Check for email type (email destinations are always prebuilt)
+    // Email destinations don't have URL and are created through prebuilt flow
+    if (destination.type === 'email') {
+      return 'email';
     }
 
     // Try to detect based on URL pattern

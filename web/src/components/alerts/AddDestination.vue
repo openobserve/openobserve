@@ -54,35 +54,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Destination Type Display for Edit Mode -->
+        <!-- Destination Type and Name Display for Edit Mode -->
         <div v-if="isAlerts && destination && formData.destination_type" class="col-12 q-pb-md">
-          <div class="text-subtitle2 q-mb-xs">{{ t('alert_destinations.destination_type') }}</div>
-          <div class="flex items-center q-pa-sm el-border el-border-radius" data-test="destination-type-readonly">
-            <q-icon :name="getDestinationTypeIcon(formData.destination_type)" size="20px" class="q-mr-sm" />
-            <span class="text-body2">{{ getDestinationTypeName(formData.destination_type) }}</span>
-            <q-chip size="sm" color="grey-3" text-color="grey-8" class="q-ml-sm">{{ t('alert_destinations.readonly') }}</q-chip>
+          <div class="row q-col-gutter-md">
+            <!-- Destination Type (Read-only) -->
+            <div class="col-6">
+              <div class="text-subtitle2 q-mb-xs">{{ t('alert_destinations.destination_type') }}</div>
+              <div class="flex items-center q-pa-sm el-border el-border-radius" data-test="destination-type-readonly">
+                <q-icon :name="getDestinationTypeIcon(formData.destination_type)" size="20px" class="q-mr-sm" />
+                <span class="text-body2">{{ getDestinationTypeName(formData.destination_type) }}</span>
+                <q-chip size="sm" color="grey-3" text-color="grey-8" class="q-ml-sm">{{ t('alert_destinations.readonly') }}</q-chip>
+              </div>
+            </div>
+            <!-- Destination Name (Read-only) -->
+            <div class="col-6">
+              <q-input
+                data-test="add-destination-name-input"
+                v-model="formData.name"
+                :label="t('alerts.name') + ' *'"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                dense
+                readonly
+                disable
+                :rules="[
+                  (val: any) =>
+                    !!val
+                      ? isValidResourceName(val) ||
+                        `Characters like :, ?, /, #, and spaces are not allowed.`
+                      : t('common.nameRequired'),
+                ]"
+                tabindex="0"
+                hide-bottom-space
+              />
+            </div>
           </div>
         </div>
 
         <!-- Prebuilt Destination Form (for alerts only) -->
-        <div v-if="isAlerts && isPrebuiltDestination" class="col-12">
+        <!-- Show for: create mode with destination_type selected OR edit mode (while loading) -->
+        <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="col-12">
+          <!-- Name Field for Create Mode -->
+          <div v-if="!destination" class="col-12 q-pb-md">
+            <q-input
+              data-test="add-destination-name-input"
+              v-model="formData.name"
+              :label="t('alerts.name') + ' *'"
+              class="showLabelOnTop"
+              stack-label
+              borderless
+              dense
+              :rules="[
+                (val: any) =>
+                  !!val
+                    ? isValidResourceName(val) ||
+                      `Characters like :, ?, /, #, and spaces are not allowed.`
+                    : t('common.nameRequired'),
+              ]"
+              tabindex="0"
+              hide-bottom-space
+            />
+          </div>
+
           <PrebuiltDestinationForm
+            v-if="formData.destination_type && formData.destination_type !== 'custom'"
+            :key="`${formData.destination_type}-${isUpdatingDestination}-${Object.keys(prebuiltCredentials).length}`"
             v-model="prebuiltCredentials"
             :destination-type="formData.destination_type"
-            :is-testing="isTestInProgress"
-            :test-result="lastTestResult"
+            :hide-actions="true"
             data-test="prebuilt-form"
-            @preview="showPreview"
-            @test="handleTestDestination"
           />
-
-          <!-- Test Result Display -->
-          <DestinationTestResult
-            :result="lastTestResult"
-            :is-loading="isTestInProgress"
-            data-test="prebuilt-test-result"
-            @retry="handleTestDestination"
-          />
+          <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
+            <q-spinner color="primary" size="40px" />
+            <div class="q-mt-sm text-grey-7">Loading destination data...</div>
+          </div>
 
           <!-- Additional Settings for Prebuilt Destinations -->
           <div class="col-12 q-mt-md">
@@ -165,6 +211,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
+
+          <!-- Test Result Display -->
+          <DestinationTestResult
+            v-if="lastTestResult"
+            :result="lastTestResult"
+            :is-loading="isTestInProgress"
+            data-test="prebuilt-test-result"
+            @retry="handleTestDestination"
+          />
         </div>
 
         <!-- Legacy tabs for non-alert destinations -->
@@ -194,7 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="createEmailTemplate"
           />
         </div>
+        <!-- Name field for custom destinations or pipelines (not prebuilt) -->
         <div
+          v-if="!isAlerts || (isAlerts && formData.destination_type === 'custom')"
           class="q-py-xs"
           :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
         >
@@ -206,8 +263,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             borderless
             dense
-            v-bind:readonly="isUpdatingDestination"
-            v-bind:disable="isUpdatingDestination"
             :rules="[
               (val: any) =>
                 !!val
@@ -219,7 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             hide-bottom-space
           />
         </div>
-        <div v-if="isAlerts" class="col-6 row q-py-xs">
+        <!-- Template field only for custom alert destinations -->
+        <div v-if="isAlerts && formData.destination_type === 'custom'" class="col-6 row q-py-xs">
           <div class="col-12">
             <q-select
               data-test="add-destination-template-select"
@@ -363,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col-12 q-py-sm">
               <q-toggle
                 data-test="add-destination-skip-tls-verify-toggle"
-                class="o2-toggle-button-lg tw:mr-3 -tw:ml-4"
+                class="o2-toggle-button-lg"
                 size="lg"
                 v-model="formData.skip_tls_verify"
                 :label="t('alert_destinations.skip_tls_verify')"
@@ -413,25 +469,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </div>
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
-      <q-btn
-        data-test="add-destination-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-destination-submit-btn"
-        class="o2-primary-button no-border tw:h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        @click="saveDestination"
-      />
+    <div class="flex justify-between q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+      <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
+      <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="flex items-center q-gutter-sm">
+        <q-btn
+          data-test="destination-preview-button"
+          :label="t('alert_destinations.preview')"
+          icon="preview"
+          outline
+          no-caps
+          class="tw:h-[36px]"
+          @click="showPreview"
+        />
+        <q-btn
+          data-test="destination-test-button"
+          :loading="isTestInProgress"
+          :label="t('alert_destinations.test')"
+          icon="send"
+          outline
+          no-caps
+          class="tw:h-[36px]"
+          @click="handleTestDestination"
+        />
+      </div>
+      <div v-else></div>
+
+      <!-- Right side: Cancel and Save buttons -->
+      <div class="flex items-center q-gutter-sm">
+        <q-btn
+          data-test="add-destination-cancel-btn"
+          v-close-popup="true"
+          class="o2-secondary-button tw:h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-destination-submit-btn"
+          class="o2-primary-button no-border tw:h-[36px]"
+          :label="t('alerts.save')"
+          type="submit"
+          no-caps
+          flat
+          @click="saveDestination"
+        />
+      </div>
     </div>
     </div>
 
@@ -450,6 +533,8 @@ import {
   computed,
   onBeforeMount,
   onActivated,
+  watch,
+  nextTick,
 } from "vue";
 import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
@@ -653,6 +738,18 @@ onBeforeMount(async () => {
   await getActionOptions();
 });
 
+// Watch for destination prop changes (important for edit mode dialog)
+watch(
+  () => props.destination,
+  (newDest) => {
+    if (newDest && newDest.name) {
+      // Only run setup when destination has actual data (name is a good indicator)
+      setupDestinationData();
+    }
+  },
+  { deep: true }
+);
+
 const setupDestinationData = () => {
   if (props.destination) {
     isUpdatingDestination.value = true;
@@ -668,76 +765,116 @@ const setupDestinationData = () => {
     formData.value.action_id = props.destination.action_id || "";
 
     // Set destination_type for prebuilt destinations in edit mode
-    if (props.isAlerts && props.destination.template) {
-      // Extract destination type from template name (e.g., "system-prebuilt-slack" -> "slack")
-      const templateName = props.destination.template;
-      if (templateName.includes('prebuilt')) {
-        const parts = templateName.split('-');
-        const typeId = parts[parts.length - 1]; // Get last part (e.g., "slack", "msteams")
-        formData.value.destination_type = typeId;
+    if (props.destination.template?.includes('prebuilt')) {
+      const parts = props.destination.template.split('-');
+      const typeId = parts[parts.length - 1]; // system-prebuilt-discord -> discord
+      formData.value.destination_type = typeId;
+    } else {
+      // Fallback: Template missing or doesn't include 'prebuilt' - detect from other fields
 
-        // Restore prebuilt credentials from metadata and destination fields
-        const credentials: Record<string, any> = {};
+      // FALLBACK: Detect destination type from URL patterns or metadata
+      let detectedType: string | null = null;
 
-        // Step 1: Parse metadata and remove credential_ prefix
-        if (props.destination.metadata) {
-          try {
-            const metadata = typeof props.destination.metadata === 'string'
-              ? JSON.parse(props.destination.metadata)
-              : props.destination.metadata;
-
-            // Extract credential fields (remove credential_ prefix)
-            Object.entries(metadata).forEach(([key, value]) => {
-              if (key.startsWith('credential_')) {
-                const credentialKey = key.replace('credential_', '');
-                credentials[credentialKey] = value;
-              }
-            });
-          } catch (e) {
-            console.error('Failed to parse destination metadata:', e);
-          }
+      // Check URL patterns
+      if (props.destination.url) {
+        const url = props.destination.url;
+        if (url.includes('hooks.slack.com')) {
+          detectedType = 'slack';
+        } else if (url.includes('discord.com/api/webhooks')) {
+          detectedType = 'discord';
+        } else if (url.includes('outlook.office.com') || url.includes('webhook.office.com')) {
+          detectedType = 'msteams';
+        } else if (url.includes('service-now.com')) {
+          detectedType = 'servicenow';
+        } else if (url.includes('events.pagerduty.com')) {
+          detectedType = 'pagerduty';
+        } else if (url.includes('api.opsgenie.com') || url.includes('api.eu.opsgenie.com')) {
+          detectedType = 'opsgenie';
         }
-
-        // Step 2: Restore sensitive fields from destination properties
-        // webhookUrl is stored in the url field for webhook-based destinations
-        if (props.destination.url) {
-          credentials.webhookUrl = props.destination.url;
-        }
-
-        // For ServiceNow, instanceUrl is the base URL
-        if (typeId === 'servicenow' && props.destination.url) {
-          credentials.instanceUrl = props.destination.url;
-        }
-
-        // For email destinations, recipients are in emails field
-        if (typeId === 'email' && props.destination.emails) {
-          credentials.recipients = Array.isArray(props.destination.emails)
-            ? props.destination.emails.join(', ')
-            : props.destination.emails;
-        }
-
-        // For PagerDuty, integrationKey is in headers (if present)
-        if (typeId === 'pagerduty' && props.destination.headers?.['X-Routing-Key']) {
-          credentials.integrationKey = props.destination.headers['X-Routing-Key'];
-        }
-
-        // For Opsgenie, apiKey is in Authorization header
-        if (typeId === 'opsgenie' && props.destination.headers?.['Authorization']) {
-          const authHeader = props.destination.headers['Authorization'];
-          if (authHeader.startsWith('GenieKey ')) {
-            credentials.apiKey = authHeader.replace('GenieKey ', '');
-          }
-        }
-
-        // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
-        // are automatically restored from metadata via Step 1 (credential_ prefix removal)
-        // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
-
-        prebuiltCredentials.value = credentials;
-      } else {
-        // Custom destination
-        formData.value.destination_type = 'custom';
       }
+
+      // Check for email type
+      if (!detectedType && props.destination.emails && Array.isArray(props.destination.emails) && props.destination.emails.length > 0) {
+        detectedType = 'email';
+      }
+
+      // Check headers for PagerDuty or Opsgenie
+      if (!detectedType && props.destination.headers) {
+        if (props.destination.headers['X-Routing-Key']) {
+          detectedType = 'pagerduty';
+        } else if (props.destination.headers['Authorization']?.startsWith('GenieKey ')) {
+          detectedType = 'opsgenie';
+        }
+      }
+
+      // If we detected a type, set it
+      if (detectedType) {
+        formData.value.destination_type = detectedType;
+      }
+    }
+
+    // Continue with credential restoration if we have a destination_type
+    if (formData.value.destination_type && formData.value.destination_type !== 'custom') {
+      const typeId = formData.value.destination_type;
+
+      // Restore prebuilt credentials from metadata and destination fields
+      const credentials: Record<string, any> = {};
+
+      // Step 1: Parse metadata and remove credential_ prefix
+      if (props.destination.metadata) {
+        try {
+          const metadata = typeof props.destination.metadata === 'string'
+            ? JSON.parse(props.destination.metadata)
+            : props.destination.metadata;
+
+          // Extract credential fields (remove credential_ prefix)
+          Object.entries(metadata).forEach(([key, value]) => {
+            if (key.startsWith('credential_')) {
+              const credentialKey = key.replace('credential_', '');
+              credentials[credentialKey] = value;
+            }
+          });
+        } catch (e) {
+          console.error('Failed to parse destination metadata:', e);
+        }
+      }
+
+      // Step 2: Restore sensitive fields from destination properties
+      // webhookUrl is stored in the url field for webhook-based destinations
+      if (props.destination.url) {
+        credentials.webhookUrl = props.destination.url;
+      }
+
+      // For ServiceNow, instanceUrl is the base URL
+      if (typeId === 'servicenow' && props.destination.url) {
+        credentials.instanceUrl = props.destination.url;
+      }
+
+      // For email destinations, recipients are in emails field
+      if (typeId === 'email' && props.destination.emails) {
+        credentials.recipients = Array.isArray(props.destination.emails)
+          ? props.destination.emails.join(', ')
+          : props.destination.emails;
+      }
+
+      // For PagerDuty, integrationKey is in headers (if present)
+      if (typeId === 'pagerduty' && props.destination.headers?.['X-Routing-Key']) {
+        credentials.integrationKey = props.destination.headers['X-Routing-Key'];
+      }
+
+      // For Opsgenie, apiKey is in Authorization header
+      if (typeId === 'opsgenie' && props.destination.headers?.['Authorization']) {
+        const authHeader = props.destination.headers['Authorization'];
+        if (authHeader.startsWith('GenieKey ')) {
+          credentials.apiKey = authHeader.replace('GenieKey ', '');
+        }
+      }
+
+      // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
+      // are automatically restored from metadata via Step 1 (credential_ prefix removal)
+      // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
+
+      prebuiltCredentials.value = credentials;
     }
 
     if (Object.keys(formData.value?.headers || {}).length) {

@@ -171,9 +171,17 @@ limitations under the License.
           borderless
           dense
           hide-bottom-space
+          emit-value
+          map-options
           :rules="[(val: any) => !!val || 'Severity is required']"
           tabindex="0"
-        />
+        >
+          <template v-slot:hint>
+            <span class="text-caption text-grey-7">
+              Select the default severity for PagerDuty incidents
+            </span>
+          </template>
+        </q-select>
       </div>
     </template>
 
@@ -366,8 +374,16 @@ limitations under the License.
           borderless
           dense
           hide-bottom-space
+          emit-value
+          map-options
           tabindex="0"
-        />
+        >
+          <template v-slot:hint>
+            <span class="text-caption text-grey-7">
+              Select the default priority for Opsgenie alerts
+            </span>
+          </template>
+        </q-select>
       </div>
       <div class="col-12 q-py-xs">
         <q-toggle

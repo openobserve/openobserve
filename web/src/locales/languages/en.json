@@ -2064,7 +2064,11 @@
     "output_format": "Output Format",
     "readonly": "Read-only",
     "additional_settings": "Additional Settings",
-    "custom_headers": "Custom Headers (Optional)"
+    "custom_headers": "Custom Headers (Optional)",
+    "preview": "Preview",
+    "test": "Test",
+    "saved": "Destination saved successfully",
+    "saveError": "Failed to save destination"
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",

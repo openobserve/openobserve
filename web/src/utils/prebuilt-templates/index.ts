@@ -150,6 +150,12 @@ export function generateDestinationHeaders(type: string, credentials: Record<str
 
   // Add dynamic headers based on credentials
   switch (type) {
+    case 'pagerduty':
+      // PagerDuty uses X-Routing-Key header for integration key
+      if (credentials.integrationKey) {
+        headers['X-Routing-Key'] = credentials.integrationKey;
+      }
+      break;
     case 'opsgenie':
       headers['Authorization'] = `GenieKey ${credentials.apiKey}`;
       break;
