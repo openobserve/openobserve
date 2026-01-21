@@ -144,32 +144,27 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
     let cfg = config::get_config();
 
     // Check for x-openobserve-trace-id header first (from browser SDK for RUM correlation)
-    if let Some(oo_trace_id) = headers.get("x-openobserve-trace-id") {
-        if let Ok(trace_id_str) = oo_trace_id.to_str() {
-            // Validate: 32 hex chars, not all zeros
-            if trace_id_str.len() == 32
-                && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
-                && !trace_id_str.chars().all(|c| c == '0')
-            {
-                // Set as parent context if tracing is enabled
-                if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-                    if !span.is_none() {
-                        // Create a synthetic traceparent and set as parent
-                        let traceparent = format!(
-                            "00-{}-{}-01",
-                            trace_id_str,
-                            config::ider::generate_span_id()
-                        );
-                        let mut headers_map = std::collections::HashMap::new();
-                        headers_map.insert("traceparent".to_string(), traceparent);
-                        let parent_ctx =
-                            global::get_text_map_propagator(|prop| prop.extract(&headers_map));
-                        let _ = span.set_parent(parent_ctx);
-                    }
-                }
-                return trace_id_str.to_string();
-            }
+    if let Some(oo_trace_id) = headers.get("x-openobserve-trace-id")
+        && let Ok(trace_id_str) = oo_trace_id.to_str()
+        // Validate: 32 hex chars, not all zeros
+        && trace_id_str.len() == 32
+        && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
+        && !trace_id_str.chars().all(|c| c == '0')
+    {
+        // Set as parent context if tracing is enabled
+        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled) && !span.is_none() {
+            // Create a synthetic traceparent and set as parent
+            let traceparent = format!(
+                "00-{}-{}-01",
+                trace_id_str,
+                config::ider::generate_span_id()
+            );
+            let mut headers_map = std::collections::HashMap::new();
+            headers_map.insert("traceparent".to_string(), traceparent);
+            let parent_ctx = global::get_text_map_propagator(|prop| prop.extract(&headers_map));
+            let _ = span.set_parent(parent_ctx);
         }
+        return trace_id_str.to_string();
     }
 
     // Check for traceparent header (W3C standard)
