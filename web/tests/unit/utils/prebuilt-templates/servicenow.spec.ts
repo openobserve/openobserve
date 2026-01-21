@@ -59,8 +59,9 @@ describe('servicenow template', () => {
     });
 
     it('validates ServiceNow URLs', () => {
-      expect(servicenowConfig.urlValidator('https://dev.service-now.com/api')).toBe(true);
+      expect(servicenowConfig.urlValidator('https://dev.service-now.com/api/now/table/incident')).toBe(true);
       expect(servicenowConfig.urlValidator('https://example.com')).toBe(false);
+      expect(servicenowConfig.urlValidator('https://evil.service-now.com.attacker.com/api/now/table/incident')).toBe(false);
     });
 
     it('has instance URL field', () => {
