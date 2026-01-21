@@ -111,7 +111,15 @@ describe('Prebuilt Templates Types', () => {
         templateBody: '{"text": "test"}',
         headers: { 'Content-Type': 'application/json' },
         method: 'post',
-        urlValidator: (url: string) => url.includes('slack.com'),
+        urlValidator: (url: string) => {
+          try {
+            const parsed = new URL(url);
+            const hostname = parsed.hostname.toLowerCase();
+            return hostname === 'slack.com' || hostname.endsWith('.slack.com');
+          } catch {
+            return false;
+          }
+        },
         credentialFields: [
           {
             key: 'webhookUrl',
