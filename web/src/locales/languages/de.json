@@ -685,7 +685,7 @@
     "license_allows_ingestion": "Ihre Lizenz erlaubt die Datenaufnahme von <strong>{limit} GB</strong> pro Tag.",
     "limit_exceeded_days": "Das Limit wurde am <strong class=\"{colorClass}\">{days} Tag {plural} in diesem Monat</strong> überschritten",
     "limit_exceeded_warning": " (max. 3 Tage erlaubt). Die Anwendungsfunktion wird eingeschränkt",
-    "limit_exceeded_info": " ({restlicher} Freibetrag {plural} übrig von maximal 3)",
+    "limit_exceeded_info": " ({remaining} Freibetrag {plural} übrig von maximal 3)",
     "no_limit_exceedances": "In diesem Monat sind keine Grenzwertüberschreitungen möglich (maximal 3 pro Monat zulässig).",
     "usage_shows_zero_unlimited": "* Die Nutzung zeigt 0% für unbegrenzte Tarife",
     "license_updated_success": "Lizenz wurde erfolgreich aktualisiert",
