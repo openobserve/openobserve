@@ -676,9 +676,8 @@ test.describe("Logs Page testcases", () => {
       await pm.logsPage.selectStream("e2e_automate");
       await page.waitForTimeout(1000);
 
-      // Open saved views dropdown (using POM)
-      await savedViewsBtn.click();
-      await page.waitForTimeout(500);
+      // Open saved views dropdown with search input (using POM)
+      await pm.logsPage.expandSavedViewsDropdown();
 
       // Search for our saved view (using POM)
       await pm.logsPage.fillSavedViewSearchInput(testViewName);
@@ -717,9 +716,7 @@ test.describe("Logs Page testcases", () => {
     } finally {
       // Cleanup: Delete the saved view if possible (using POM)
       try {
-        const savedViewsBtn = pm.logsPage.getSavedViewsButtonLocator();
-        await savedViewsBtn.click().catch(() => {});
-        await page.waitForTimeout(500);
+        await pm.logsPage.expandSavedViewsDropdown().catch(() => {});
 
         // Look for delete option for our view
         await pm.logsPage.clickDeleteSavedViewByName(testViewName).catch(() => {});

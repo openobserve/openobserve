@@ -5057,6 +5057,40 @@ export class LogsPage {
     }
 
     /**
+     * Click the saved views dropdown arrow to expand and show the list
+     * This opens the dropdown panel with search input
+     */
+    async clickSavedViewsDropdownArrow() {
+        const arrow = this.page.locator(this.savedViewArrow);
+        await arrow.waitFor({ state: 'visible', timeout: 10000 });
+        await arrow.click();
+        // Wait for dropdown panel to appear
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Expand the saved views dropdown and wait for search input
+     * Tries arrow click first, then main button if search input doesn't appear
+     */
+    async expandSavedViewsDropdown() {
+        // First try clicking the dropdown arrow
+        try {
+            await this.clickSavedViewsDropdownArrow();
+            const searchInput = this.page.locator(this.savedViewSearchInput);
+            await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+            return;
+        } catch (e) {
+            testLogger.debug('Arrow click did not show search input, trying main button');
+        }
+
+        // Fallback: try clicking the main button
+        const btn = this.getSavedViewsButtonLocator();
+        await btn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
      * Click delete button for a saved view by name
      * Uses dynamic data-test attribute
      * @param {string} name - Saved view name
