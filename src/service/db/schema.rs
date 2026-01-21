@@ -606,26 +606,32 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // Fetch all URL jobs per organization to check completion status
     // This avoids making individual database calls for each enrichment table
+    // Since multiple URL jobs can exist per table, we group by table_name
     let mut url_jobs_by_org: HashMap<
         String,
-        HashMap<String, config::meta::enrichment_table::EnrichmentTableUrlJob>,
+        HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>,
     > = HashMap::new();
     for org_id in org_tables.keys() {
         match db::enrichment_table::list_url_jobs(org_id).await {
             Ok(jobs) => {
-                let jobs_map: HashMap<
+                // Group jobs by table_name since multiple jobs can exist per table
+                let mut jobs_map: HashMap<
                     String,
-                    config::meta::enrichment_table::EnrichmentTableUrlJob,
-                > = jobs
-                    .into_iter()
-                    .map(|job| (job.table_name.clone(), job))
-                    .collect();
-                url_jobs_by_org.insert(org_id.clone(), jobs_map);
+                    Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>,
+                > = HashMap::new();
+                for job in jobs {
+                    jobs_map
+                        .entry(job.table_name.clone())
+                        .or_default()
+                        .push(job);
+                }
                 log::debug!(
-                    "[CACHE] Fetched {} URL jobs for org {}",
-                    url_jobs_by_org.get(org_id).unwrap().len(),
+                    "[CACHE] Fetched {} URL jobs across {} tables for org {}",
+                    jobs_map.values().map(|v| v.len()).sum::<usize>(),
+                    jobs_map.len(),
                     org_id
                 );
+                url_jobs_by_org.insert(org_id.clone(), jobs_map);
             }
             Err(e) => {
                 log::warn!("[CACHE] Failed to fetch URL jobs for org {}: {}", org_id, e);
@@ -634,24 +640,28 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         }
     }
 
-    // Filter out enrichment tables that have incomplete URL jobs
+    // Filter out enrichment tables that have NO completed URL jobs
+    // Only cache tables if:
+    // 1. They are file-based (no URL jobs), OR
+    // 2. They have at least one completed URL job (even if other jobs are incomplete/failed)
     let mut tables_to_cache = Vec::new();
     for (key, tbl) in tables.iter() {
         let should_cache = if let Some(org_jobs) = url_jobs_by_org.get(&tbl.org_id) {
-            if let Some(url_job) = org_jobs.get(&tbl.stream_name) {
-                // This is a URL-based enrichment table
-                // Only cache if status is Completed
-                let is_completed = url_job.status
-                    == config::meta::enrichment_table::EnrichmentTableStatus::Completed;
-                if !is_completed {
+            if let Some(url_jobs) = org_jobs.get(&tbl.stream_name) {
+                // This is a URL-based enrichment table with multiple possible jobs
+                // Only cache if at least ONE job is completed
+                let has_completed_job = url_jobs.iter().any(|job| {
+                    job.status == config::meta::enrichment_table::EnrichmentTableStatus::Completed
+                });
+                if !has_completed_job {
                     log::info!(
-                        "[CACHE] Skipping enrichment table {}/{} - URL job status: {:?}",
+                        "[CACHE] Skipping enrichment table {}/{} - no completed URL jobs (total jobs: {})",
                         tbl.org_id,
                         tbl.stream_name,
-                        url_job.status
+                        url_jobs.len()
                     );
                 }
-                is_completed
+                has_completed_job
             } else {
                 // No URL job found - this is a file-based enrichment table, cache it
                 true
