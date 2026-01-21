@@ -141,19 +141,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 data-test="trace-details-view-logs-btn"
                 v-close-popup="true"
-                class="text-bold traces-view-logs-btn tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="text-bold traces-view-logs-btn tw:border! tw:border-solid! tw:border-[var(--o2-theme-color)]!"
                 :label="
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
                 "
                 padding="sm sm"
-                color="primary"
                 size="sm"
                 no-caps
+                outline
+                color="primary"
+                flat
                 dense
                 icon="search"
                 @click="redirectToLogs"
+              />
+              <q-btn
+                v-if="hasRumSessionId"
+                data-test="trace-details-view-session-replay-btn"
+                v-close-popup="true"
+                class="traces-view-session-replay-btn text-bold q-ml-md tw-text-[16px]! tw:border! tw:border-solid tw:border-[var(--o2-theme-color)]!"
+                :label="t('rum.playSessionReplay')"
+                padding="sm sm"
+                size="sm"
+                no-caps
+                flat
+                color="primary"
+                outline
+                dense
+                :icon="outlinedPlayCircle"
+                @click="redirectToSessionReplay"
               />
             </div>
           </div>
@@ -223,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="routeToTracesList"
             >
               <q-tooltip>
-                {{ t('common.cancel') }}
+                {{ t("common.cancel") }}
               </q-tooltip>
             </q-btn>
           </div>
@@ -436,7 +454,10 @@ import {
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedInfo,
+  outlinedPlayCircle,
+} from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -556,14 +577,27 @@ export default defineComponent({
 
     // Current trace stream name for correlation
     const currentTraceStreamName = computed(() => {
-      return (router.currentRoute.value.query.stream as string) ||
+      return (
+        (router.currentRoute.value.query.stream as string) ||
         searchObj.data.stream.selectedStream.value ||
-        '';
+        ""
+      );
     });
 
     // Check if service streams feature is enabled
     const serviceStreamsEnabled = computed(() => {
       return store.state.zoConfig.service_streams_enabled !== false;
+    });
+
+    // Check if any RUM span has a session_id
+    const hasRumSessionId = computed(() => {
+      return spanList.value.some((span: any) => span.rum_session_id);
+    });
+
+    // Get the first RUM event with session_id for navigation
+    const firstRumSessionData = computed(() => {
+      const rumSpan = spanList.value.find((span: any) => span.rum_session_id);
+      return rumSpan || null;
     });
 
     const showTraceDetails = ref(false);
@@ -811,29 +845,149 @@ export default defineComponent({
       return req;
     };
 
+    /**
+     * Fetch RUM events that have the matching trace_id
+     */
+    const fetchRumEventsForTrace = async (
+      traceId: string,
+      startTime: number,
+      endTime: number,
+    ) => {
+      try {
+        const req = {
+          query: {
+            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+            start_time: startTime - 10000000,
+            end_time: endTime + 10000000,
+            from: 0,
+            size: 100,
+          },
+        };
+
+        const res = await searchService.search(
+          {
+            org_identifier:
+              (router.currentRoute.value.query?.org_identifier as string) ||
+              store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "RUM",
+        );
+
+        return res.data?.hits || [];
+      } catch (error) {
+        console.error("Error fetching RUM events for trace:", error);
+        return [];
+      }
+    };
+
+    /**
+     * Format RUM events as trace spans
+     * This converts RUM event structure to span structure
+     */
+    const formatRumEventsAsSpans = (rumEvents: any[]) => {
+      if (!rumEvents || !rumEvents.length) return [];
+
+      return rumEvents.map((event: any) => {
+        // Calculate start_time and end_time from event timestamp and duration
+        const eventTimestamp = event.date * 1000000; // Convert to nanoseconds
+        const durationNs =
+          event.resource_duration || event.action_duration || 0; // in nanoseconds
+
+        const startTime = eventTimestamp;
+        const endTime = eventTimestamp + durationNs;
+
+        // Determine operation name based on event type
+        let operationName = "Unknown RUM Event";
+        if (event.type === "resource") {
+          operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
+        } else if (event.type === "action") {
+          operationName = `Action: ${event.action_type || "Unknown"} on ${event.action_target_name || "Unknown"}`;
+        } else if (event.type === "view") {
+          operationName = `View: ${event.view_url || "Unknown Page"}`;
+        } else if (event.type === "error") {
+          operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
+        }
+
+        // Generate a unique span_id for the RUM event
+        const spanId =
+          event._oo_span_id ||
+          event[`${event.type}_id`] ||
+          `rum_${event.type}_${event.date}_${Math.random().toString(36).substring(7)}`;
+
+        // Determine parent_span_id from _oo_span_id if available
+        const parentSpanId =
+          event._oo_parent_span_id || event._oo_span_id || "";
+
+        return {
+          [store.state.zoConfig.timestamp_column]:
+            event[store.state.zoConfig.timestamp_column],
+          start_time: startTime,
+          end_time: endTime,
+          duration: durationNs / 1000,
+          span_id: spanId,
+          trace_id: event._oo_trace_id,
+          operation_name: operationName,
+          service_name: "Client Browser",
+          span_status:
+            event.type === "error" ||
+            (event.type === "resource" && event.resource_status_code >= 400)
+              ? "ERROR"
+              : "OK",
+          span_kind: event.type === "resource" ? "3" : "0", // 3 = Client, 0 = Unspecified
+          // Store original RUM event data for reference
+          rum_event_type: event.type,
+          rum_session_id: event.session_id,
+          events: JSON.stringify([event]),
+          rum_date: event.date,
+        };
+      });
+    };
+
     const getTraceDetails = async (data: any) => {
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
         const req = buildTraceSearchQuery(data);
 
-        searchService
-          .search(
-            {
-              org_identifier: router.currentRoute.value.query
-                ?.org_identifier as string,
-              query: req,
-              page_type: "traces",
-            },
-            "ui",
-          )
-          .then((res: any) => {
-            if (!res.data?.hits?.length) {
+        // Fetch trace spans
+        const tracePromise = searchService.search(
+          {
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
+            query: req,
+            page_type: "traces",
+          },
+          "ui",
+        );
+
+        // Fetch RUM events with matching trace_id
+        const rumPromise = fetchRumEventsForTrace(
+          data.trace_id,
+          req.query.start_time,
+          req.query.end_time,
+        );
+
+        // Wait for both requests to complete
+        Promise.all([tracePromise, rumPromise])
+          .then(([traceRes, rumEvents]) => {
+            if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
             }
-            searchObj.data.traceDetails.spanList = res.data?.hits || [];
+
+            // Combine trace spans and RUM events
+            const traceSpans = traceRes.data?.hits || [];
+            const rumSpans = formatRumEventsAsSpans(rumEvents);
+
+            searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             buildTracesTree();
+          })
+          .catch((error) => {
+            console.error("Error fetching trace details:", error);
+            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+            showTraceDetailsError();
           })
           .finally(() => {
             searchObj.data.traceDetails.isLoadingTraceDetails = false;
@@ -906,7 +1060,7 @@ export default defineComponent({
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
-        traceTree.value[0].startTimeUs + (timeRange.value.start * 1000);
+        traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
       for (let i = 0; i <= 4; i++) {
@@ -985,7 +1139,6 @@ export default defineComponent({
           parentSpan.spans.push(span);
         }
       }
-      
 
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
@@ -1146,7 +1299,9 @@ export default defineComponent({
         startTimeMs: convertTimeFromNsToMs(span.start_time),
         endTimeMs: convertTimeFromNsToMs(span.end_time),
         endTimeUs: Math.floor(span.end_time / 1000),
-        durationMs: span?.duration ? Number((span?.duration / 1000).toFixed(4)) : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
+        durationMs: span?.duration
+          ? Number((span?.duration / 1000).toFixed(4))
+          : 0, // This key is standard, we use for calculating width of span block. This should always be in ms
         durationUs: span?.duration ? Number(span?.duration?.toFixed(4)) : 0, // This key is used for displaying duration in span block. We convert this us to ms, s in span block
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
@@ -1377,6 +1532,26 @@ export default defineComponent({
       });
     };
 
+    const redirectToSessionReplay = () => {
+      if (!firstRumSessionData.value.rum_session_id) {
+        return;
+      }
+
+      router.push({
+        name: "SessionViewer",
+        params: {
+          id: firstRumSessionData.value.rum_session_id,
+        },
+        query: {
+          start_time:
+            Math.floor(firstRumSessionData.value.start_time / 1000) - 1000000,
+          end_time:
+            Math.ceil(firstRumSessionData.value.end_time / 1000) + 1000000,
+          event_time: firstRumSessionData.value.rum_date,
+        },
+      });
+    };
+
     const filterStreamFn = (val: any = "") => {
       filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
         return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
@@ -1451,7 +1626,11 @@ export default defineComponent({
       copyTraceId,
       traceDetailsShareURL,
       outlinedInfo,
+      outlinedPlayCircle,
       redirectToLogs,
+      redirectToSessionReplay,
+      hasRumSessionId,
+      firstRumSessionData,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,
@@ -1482,6 +1661,8 @@ export default defineComponent({
       buildTraceChart,
       validateSpan,
       calculateTracePosition,
+      fetchRumEventsForTrace,
+      formatRumEventsAsSpans,
       buildServiceTree,
       // Correlation props
       currentTraceStreamName,
@@ -1741,13 +1922,17 @@ html:has(.trace-details) {
   border-bottom-left-radius: 0 !important;
   border-top-right-radius: 0.5rem !important;
   border-bottom-right-radius: 0.5rem !important;
+}
 
+.traces-view-logs-btn,
+.traces-view-session-replay-btn {
   .q-btn__content {
     span {
       font-size: 12px;
     }
   }
 }
+
 .custom-height {
   height: 30px;
 }

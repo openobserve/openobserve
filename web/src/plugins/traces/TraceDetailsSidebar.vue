@@ -403,7 +403,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <pre
                       style="font-size: 12px; text-wrap: wrap"
                       class="q-mt-xs"
-                      >{{ formatStackTrace(props.row["exception.stacktrace"]) }}</pre
+                      >{{
+                        formatStackTrace(props.row["exception.stacktrace"])
+                      }}</pre
                     >
                   </div>
                 </div>
@@ -432,7 +434,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-links-table"
         >
           <template v-slot:before>
-            <thead class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table">
+            <thead
+              class="thead-sticky text-left tw:bg-[var(--o2-hover-accent)] o2-quasar-table"
+            >
               <tr>
                 <th
                   v-for="(col, index) in linkColumns"
@@ -497,11 +501,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="activeTab = 'tags'"
       />
       <!-- Loading/Empty state when no data -->
-      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+      <div
+        v-else
+        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+      >
         <div class="tw:text-center">
-          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
-          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogs') }}</div>
+          <q-spinner-hourglass
+            v-if="correlationLoading"
+            color="primary"
+            size="3rem"
+            class="tw:mb-4"
+          />
+          <div
+            v-else-if="correlationError"
+            class="tw:text-base tw:text-red-500"
+          >
+            {{ correlationError }}
+          </div>
+          <div v-else class="tw:text-base tw:text-gray-500">
+            {{ t("correlation.clickToLoadLogs") }}
+          </div>
         </div>
       </div>
     </q-tab-panel>
@@ -526,11 +545,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="activeTab = 'tags'"
       />
       <!-- Loading/Empty state when no data -->
-      <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+      <div
+        v-else
+        class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+      >
         <div class="tw:text-center">
-          <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
-          <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-          <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+          <q-spinner-hourglass
+            v-if="correlationLoading"
+            color="primary"
+            size="3rem"
+            class="tw:mb-4"
+          />
+          <div
+            v-else-if="correlationError"
+            class="tw:text-base tw:text-red-500"
+          >
+            {{ correlationError }}
+          </div>
+          <div v-else class="tw:text-base tw:text-gray-500">
+            {{ t("correlation.clickToLoadMetrics") }}
+          </div>
         </div>
       </div>
     </q-tab-panel>
@@ -582,7 +616,13 @@ export default defineComponent({
     LogsHighLighting,
     TelemetryCorrelationDashboard,
   },
-  emits: ["close", "view-logs", "select-span", "open-trace", "show-correlation"],
+  emits: [
+    "close",
+    "view-logs",
+    "select-span",
+    "open-trace",
+    "show-correlation",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -622,11 +662,11 @@ export default defineComponent({
       if (!query) return escapeHtml(text);
       try {
         // Escape special regex characters
-        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`(${escapedQuery})`, "gi");
         return escapeHtml(text).replace(
           regex,
-          (match) => `<span class="highlight">${match}</span>`
+          (match) => `<span class="highlight">${match}</span>`,
         );
       } catch (e) {
         return escapeHtml(text);
@@ -660,8 +700,13 @@ export default defineComponent({
       entries.forEach(([key, value], index) => {
         const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
         const valueHtml = formatValue(value);
-        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
-        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+        const comma =
+          index < entries.length - 1
+            ? '<span style="color: #9ca3af;">,</span>'
+            : "";
+        lines.push(
+          `  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`,
+        );
       });
 
       lines.push('<span style="color: #9ca3af;">}</span>');
@@ -695,8 +740,13 @@ export default defineComponent({
       entries.forEach(([key, value], index) => {
         const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
         const valueHtml = formatValue(value);
-        const comma = index < entries.length - 1 ? '<span style="color: #9ca3af;">,</span>' : '';
-        lines.push(`  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`);
+        const comma =
+          index < entries.length - 1
+            ? '<span style="color: #9ca3af;">,</span>'
+            : "";
+        lines.push(
+          `  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`,
+        );
       });
 
       lines.push('<span style="color: #9ca3af;">}</span>');
@@ -879,11 +929,14 @@ export default defineComponent({
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
+      console.log("Events ----", props.span);
+
       try {
         spanDetails.events = JSON.parse(props.span.events || "[]").map(
           (event: any) => event,
         );
       } catch (_e: any) {
+        console.log(_e);
         spanDetails.events = [];
       }
 
@@ -949,9 +1002,9 @@ export default defineComponent({
     };
 
     const getStartTime = computed(() => {
-      return (
-        formatTimeWithSuffix(convertTimeFromNsToUs(props.span.start_time) -
-        (props.baseTracePosition?.startTimeUs || 0))
+      return formatTimeWithSuffix(
+        convertTimeFromNsToUs(props.span.start_time) -
+          (props.baseTracePosition?.startTimeUs || 0),
       );
     });
 
@@ -971,8 +1024,7 @@ export default defineComponent({
           stream: router.currentRoute.value.query.stream,
           trace_id: link.context.traceId,
           span_id: link.context.spanId,
-          from:
-          convertTimeFromNsToUs(props.span.start_time) - 3600000000,
+          from: convertTimeFromNsToUs(props.span.start_time) - 3600000000,
           to: convertTimeFromNsToUs(props.span.end_time) + 3600000000,
           org_identifier: store.state.selectedOrganization.identifier,
         };
@@ -993,28 +1045,16 @@ export default defineComponent({
 
     const spanLinks = computed(() => {
       try {
-        const parsedLinks = typeof props.span.links === "string"
-          ? JSON.parse(props.span.links)
-          : props.span.links;
+        const parsedLinks =
+          typeof props.span.links === "string"
+            ? JSON.parse(props.span.links)
+            : props.span.links;
 
-        return parsedLinks;
+        return parsedLinks || [];
       } catch (e) {
         console.log("Error parsing span links:", e);
         // Return sample data even on error for testing
-        return [
-          {
-            context: {
-              traceId: "sample-trace-id-1",
-              spanId: "sample-span-id-1",
-            },
-          },
-          {
-            context: {
-              traceId: "sample-trace-id-2",
-              spanId: "sample-span-id-2",
-            },
-          },
-        ];
+        return [];
       }
     });
 
@@ -1033,47 +1073,47 @@ export default defineComponent({
 
       // Direct service name
       if (span.service_name) {
-        dimensions['service-name'] = span.service_name;
+        dimensions["service-name"] = span.service_name;
       }
 
       // Common trace attributes that map to dimensions
       const attributeMappings: Record<string, string> = {
         // Kubernetes attributes
-        'k8s_namespace_name': 'k8s-namespace',
-        'k8s.namespace.name': 'k8s-namespace',
-        'k8s_deployment_name': 'k8s-deployment',
-        'k8s.deployment.name': 'k8s-deployment',
-        'k8s_pod_name': 'k8s-pod',
-        'k8s.pod.name': 'k8s-pod',
-        'k8s_container_name': 'k8s-container',
-        'k8s.container.name': 'k8s-container',
-        'k8s_statefulset_name': 'k8s-statefulset',
-        'k8s.statefulset.name': 'k8s-statefulset',
-        'k8s_daemonset_name': 'k8s-daemonset',
-        'k8s.daemonset.name': 'k8s-daemonset',
-        'k8s_replicaset_name': 'k8s-replicaset',
-        'k8s.replicaset.name': 'k8s-replicaset',
-        'k8s_job_name': 'k8s-job',
-        'k8s.job.name': 'k8s-job',
-        'k8s_cronjob_name': 'k8s-cronjob',
-        'k8s.cronjob.name': 'k8s-cronjob',
-        'k8s_node_name': 'k8s-node',
-        'k8s.node.name': 'k8s-node',
-        'k8s_cluster_name': 'k8s-cluster',
-        'k8s.cluster.name': 'k8s-cluster',
+        k8s_namespace_name: "k8s-namespace",
+        "k8s.namespace.name": "k8s-namespace",
+        k8s_deployment_name: "k8s-deployment",
+        "k8s.deployment.name": "k8s-deployment",
+        k8s_pod_name: "k8s-pod",
+        "k8s.pod.name": "k8s-pod",
+        k8s_container_name: "k8s-container",
+        "k8s.container.name": "k8s-container",
+        k8s_statefulset_name: "k8s-statefulset",
+        "k8s.statefulset.name": "k8s-statefulset",
+        k8s_daemonset_name: "k8s-daemonset",
+        "k8s.daemonset.name": "k8s-daemonset",
+        k8s_replicaset_name: "k8s-replicaset",
+        "k8s.replicaset.name": "k8s-replicaset",
+        k8s_job_name: "k8s-job",
+        "k8s.job.name": "k8s-job",
+        k8s_cronjob_name: "k8s-cronjob",
+        "k8s.cronjob.name": "k8s-cronjob",
+        k8s_node_name: "k8s-node",
+        "k8s.node.name": "k8s-node",
+        k8s_cluster_name: "k8s-cluster",
+        "k8s.cluster.name": "k8s-cluster",
         // Host attributes
-        'host_name': 'host-name',
-        'host.name': 'host-name',
+        host_name: "host-name",
+        "host.name": "host-name",
         // Cloud attributes
-        'cloud_region': 'cloud-region',
-        'cloud.region': 'cloud-region',
-        'cloud_availability_zone': 'cloud-availability-zone',
-        'cloud.availability_zone': 'cloud-availability-zone',
+        cloud_region: "cloud-region",
+        "cloud.region": "cloud-region",
+        cloud_availability_zone: "cloud-availability-zone",
+        "cloud.availability_zone": "cloud-availability-zone",
         // Container attributes
-        'container_name': 'container-name',
-        'container.name': 'container-name',
-        'container_id': 'container-id',
-        'container.id': 'container-id',
+        container_name: "container-name",
+        "container.name": "container-name",
+        container_id: "container-id",
+        "container.id": "container-id",
       };
 
       // Check all span attributes
@@ -1097,13 +1137,18 @@ export default defineComponent({
 
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
-        console.log("[TraceDetailsSidebar] Correlation feature requires enterprise license");
-        correlationError.value = "Correlation feature requires enterprise license";
+        console.log(
+          "[TraceDetailsSidebar] Correlation feature requires enterprise license",
+        );
+        correlationError.value =
+          "Correlation feature requires enterprise license";
         return;
       }
 
       if (!props.span || !props.streamName) {
-        console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
+        console.warn(
+          "[TraceDetailsSidebar] Cannot load correlation: missing span or stream name",
+        );
         correlationError.value = "Missing span or stream name";
         return;
       }
@@ -1135,7 +1180,7 @@ export default defineComponent({
           context,
           "traces",
           5, // 5 minute time window
-          props.streamName
+          props.streamName,
         );
 
         if (result && result.correlationData) {
@@ -1151,33 +1196,36 @@ export default defineComponent({
           // Filter to only include string values that are correlation-relevant
           const rawSpanDimensions: Record<string, string> = {};
           for (const [key, value] of Object.entries(props.span)) {
-            if (typeof value !== 'string' || !value) continue;
-            if (key.startsWith('_')) continue; // Skip internal fields
+            if (typeof value !== "string" || !value) continue;
+            if (key.startsWith("_")) continue; // Skip internal fields
 
             // Include known correlation-relevant dimensions
             const isRelevant =
-              key.startsWith('k8s_') ||
-              key.startsWith('k8s.') ||
-              key.startsWith('host') ||
-              key.startsWith('container') ||
-              key.startsWith('pod') ||
-              key.startsWith('namespace') ||
-              key.startsWith('deployment') ||
-              key.startsWith('service') ||
-              key.startsWith('node') ||
-              key.startsWith('os_') ||
-              key === 'version' ||
-              key === 'region' ||
-              key === 'cluster' ||
-              key === 'environment' ||
-              key === 'env';
+              key.startsWith("k8s_") ||
+              key.startsWith("k8s.") ||
+              key.startsWith("host") ||
+              key.startsWith("container") ||
+              key.startsWith("pod") ||
+              key.startsWith("namespace") ||
+              key.startsWith("deployment") ||
+              key.startsWith("service") ||
+              key.startsWith("node") ||
+              key.startsWith("os_") ||
+              key === "version" ||
+              key === "region" ||
+              key === "cluster" ||
+              key === "environment" ||
+              key === "env";
 
             if (isRelevant) {
               rawSpanDimensions[key] = value;
             }
           }
 
-          console.log("[TraceDetailsSidebar] Raw span dimensions for log queries:", rawSpanDimensions);
+          console.log(
+            "[TraceDetailsSidebar] Raw span dimensions for log queries:",
+            rawSpanDimensions,
+          );
 
           correlationProps.value = {
             serviceName: correlationData.service_name,
@@ -1197,23 +1245,32 @@ export default defineComponent({
             },
           };
 
-          console.log("[TraceDetailsSidebar] Correlation successful:", correlationProps.value);
+          console.log(
+            "[TraceDetailsSidebar] Correlation successful:",
+            correlationProps.value,
+          );
         } else {
-          correlationError.value = "No related services found for this trace span";
+          correlationError.value =
+            "No related services found for this trace span";
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
-        correlationError.value = err.message || "Failed to load correlation data";
+        correlationError.value =
+          err.message || "Failed to load correlation data";
       } finally {
         correlationLoading.value = false;
       }
     };
 
     // Clear correlation when span changes
-    watch(() => props.span, () => {
-      correlationProps.value = null;
-      correlationError.value = null;
-    }, { deep: true });
+    watch(
+      () => props.span,
+      () => {
+        correlationProps.value = null;
+        correlationError.value = null;
+      },
+      { deep: true },
+    );
 
     // Load correlation data when user clicks on correlation tabs
     watch(activeTab, (newTab) => {

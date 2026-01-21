@@ -51,8 +51,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon name="sentiment_very_dissatisfied" size="0.875rem" class="q-pr-xs" style="color: #fb923c;" data-test="frustration-summary-icon" />
-          <span class="tw:font-semibold" style="color: #fb923c;" data-test="frustration-summary-text">{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? 's' : '' }}</span>
+          <q-icon
+            name="sentiment_very_dissatisfied"
+            size="0.875rem"
+            class="q-pr-xs"
+            style="color: #fb923c"
+            data-test="frustration-summary-icon"
+          />
+          <span
+            class="tw:font-semibold"
+            style="color: #fb923c"
+            data-test="frustration-summary-text"
+            >{{ frustrationCount }} Frustration{{
+              frustrationCount > 1 ? "s" : ""
+            }}</span
+          >
         </div>
       </div>
     </div>
@@ -92,7 +105,7 @@ import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import EventDetailDrawer from "@/components/rum/EventDetailDrawer.vue";
 import { cloneDeep } from "lodash-es";
-import { computed, onActivated, onBeforeMount, ref } from "vue";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
@@ -135,6 +148,28 @@ const session_end_time = 1692884769270;
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
 
+// Read event_time query parameter
+const eventTime = computed(() => {
+  return router.currentRoute.value.query.event_time as string | undefined;
+});
+
+// Calculate relative time from session start
+const forwardToEventTime = computed(() => {
+  if (!eventTime.value || !sessionState.data.selectedSession?.start_time) {
+    return null;
+  }
+
+  // event_time is in milliseconds, session start_time is also in milliseconds
+  const eventTimestamp = Number(eventTime.value);
+  const sessionStartTime = Number(sessionState.data.selectedSession.start_time);
+
+  // Relative time in milliseconds from session start
+  const relativeTime = formatTimeDifference(eventTimestamp, sessionStartTime);
+
+  // Only return valid positive relative times
+  return relativeTime;
+});
+
 const sessionDetails = ref({
   date: "",
   browser: "",
@@ -147,8 +182,9 @@ const sessionDetails = ref({
 });
 
 const frustrationCount = computed(() => {
-  return segmentEvents.value.filter((event: any) =>
-    event.frustration_types && event.frustration_types.length > 0
+  return segmentEvents.value.filter(
+    (event: any) =>
+      event.frustration_types && event.frustration_types.length > 0,
   ).length;
 });
 
@@ -164,6 +200,54 @@ onBeforeMount(async () => {
   getSessionSegments();
   getSessionEvents();
 });
+
+// Track if we've already seeked to prevent multiple seeks
+const hasAutoSeeked = ref(false);
+let seekTimer: number | null = null;
+
+// Watch for when all data is loaded and seek to event_time if provided
+watch(
+  [
+    videoPlayerRef,
+    () => segments.value.length,
+    () => segmentEvents.value.length,
+    forwardToEventTime,
+  ],
+  ([playerRef, segmentsCount, eventsCount, relativeTime]) => {
+    // Only seek once when all conditions are met and we haven't seeked yet
+    if (
+      !hasAutoSeeked.value &&
+      playerRef &&
+      segmentsCount > 0 &&
+      eventsCount > 0 &&
+      relativeTime &&
+      relativeTime[0] > 0
+    ) {
+      // Clear any existing timer
+      if (seekTimer !== null) {
+        // eslint-disable-next-line no-undef
+        clearTimeout(seekTimer);
+      }
+
+      // Use setTimeout to give video player time to fully initialize
+      // eslint-disable-next-line no-undef
+      seekTimer = setTimeout(() => {
+        if (videoPlayerRef.value) {
+          try {
+            videoPlayerRef.value.goto(
+              relativeTime[0],
+              false, // Don't auto-play
+            );
+            hasAutoSeeked.value = true; // Mark as seeked
+          } catch {
+            // Player might not be ready yet, silently fail
+          }
+        }
+      }, 1000) as unknown as number; // 1 second delay for player initialization
+    }
+  },
+  { immediate: false },
+);
 
 const getSessionDetails = () => {
   sessionDetails.value = {
@@ -434,7 +518,8 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name =
+    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {
