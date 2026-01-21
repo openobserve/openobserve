@@ -65,7 +65,8 @@ export class CorrelationSettingsPage {
     /**
      * Ensure semantic groups exist in the backend for testing fingerprint checkboxes
      * Uses PUT /api/{org}/alerts/deduplication/semantic-groups to set semantic groups
-     * The frontend reads semantic groups from this endpoint
+     * AND POST /api/{org}/alerts/deduplication/config to include them in the config
+     * The frontend reads semantic groups from the config endpoint first
      * @param {string} orgId - Organization identifier
      * @returns {Promise<boolean>} - True if successful
      */
@@ -115,10 +116,10 @@ export class CorrelationSettingsPage {
             }
         ];
 
-        testLogger.info('Setting up test semantic groups via semantic-groups API', { orgId, groupCount: testSemanticGroups.length });
+        testLogger.info('Setting up test semantic groups via API', { orgId, groupCount: testSemanticGroups.length });
 
         try {
-            // Step 1: PUT semantic groups
+            // Step 1: PUT semantic groups to the semantic-groups endpoint
             const putUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
             testLogger.info('PUT semantic groups', { url: putUrl });
 
@@ -132,32 +133,42 @@ export class CorrelationSettingsPage {
             });
 
             const putText = await putResponse.text();
-            testLogger.info('PUT response', {
+            testLogger.info('PUT semantic-groups response', {
                 status: putResponse.status,
                 statusText: putResponse.statusText,
                 body: putText.substring(0, 500)
             });
 
-            // Step 2: Verify by GET semantic-groups
-            const getUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/semantic-groups`;
-            const getResponse = await fetch(getUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const getResult = await getResponse.json().catch(() => []);
-            testLogger.info('GET semantic groups verification', {
-                status: getResponse.status,
-                groupCount: Array.isArray(getResult) ? getResult.length : 'not-array',
-                groupIds: Array.isArray(getResult) ? getResult.map(g => g.id) : 'error'
-            });
-
-            // Step 3: Check deduplication config (this is what frontend loads)
+            // Step 2: POST to config endpoint with semantic_field_groups included
+            // This is critical because the frontend reads from /config first, not /semantic-groups
             const configUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/config`;
-            const configResponse = await fetch(configUrl, {
+            const configPayload = {
+                enabled: true,
+                alert_dedup_enabled: false, // Don't enable cross-alert by default, let tests control this
+                alert_fingerprint_groups: [],
+                semantic_field_groups: testSemanticGroups
+            };
+
+            testLogger.info('POST deduplication config with semantic groups', { url: configUrl });
+
+            const configPostResponse = await fetch(configUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(configPayload)
+            });
+
+            const configPostText = await configPostResponse.text();
+            testLogger.info('POST config response', {
+                status: configPostResponse.status,
+                statusText: configPostResponse.statusText,
+                body: configPostText.substring(0, 500)
+            });
+
+            // Step 3: Verify by GET config (this is what frontend loads)
+            const configGetResponse = await fetch(configUrl, {
                 method: 'GET',
                 headers: {
                     'Authorization': authHeader,
@@ -165,16 +176,17 @@ export class CorrelationSettingsPage {
                 }
             });
 
-            const configResult = await configResponse.json().catch(() => ({}));
-            testLogger.info('GET deduplication config (frontend reads this)', {
-                status: configResponse.status,
+            const configResult = await configGetResponse.json().catch(() => ({}));
+            testLogger.info('GET deduplication config verification', {
+                status: configGetResponse.status,
                 enabled: configResult.enabled,
                 alertDedupEnabled: configResult.alert_dedup_enabled,
                 semanticGroupCount: configResult.semantic_field_groups?.length || 0,
                 semanticGroupIds: configResult.semantic_field_groups?.map(g => g.id) || []
             });
 
-            return putResponse.ok;
+            // Success if both PUT and POST succeeded
+            return putResponse.ok && configPostResponse.ok;
         } catch (error) {
             testLogger.error('Failed to setup semantic groups', { error: error.message, stack: error.stack });
             return false;
