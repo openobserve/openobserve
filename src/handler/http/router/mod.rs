@@ -653,7 +653,7 @@ pub fn service_routes() -> Router {
         // Enrichment tables
         .route("/{org_id}/enrichment_tables/{table_name}", post(enrichment_table::save_enrichment_table))
         .route("/{org_id}/enrichment_tables/{table_name}/url", post(enrichment_table::save_enrichment_table_from_url))
-        .route("/{org_id}/enrichment_tables", get(enrichment_table::get_all_enrichment_table_statuses))
+        .route("/{org_id}/enrichment_tables/status", get(enrichment_table::get_all_enrichment_table_statuses))
 
         // Authz/FGA
         .route("/{org_id}/roles", get(authz::fga::get_roles).post(authz::fga::create_role))
