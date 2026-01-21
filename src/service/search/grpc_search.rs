@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -64,6 +64,7 @@ pub async fn grpc_search(
     let org_id = org_id.to_string();
     let stream_type = stream_type.as_str();
     let in_req = in_req.clone();
+    let timeout = in_req.timeout as u64;
     let task = tokio::task::spawn(
         async move {
             let req = bytes::Bytes::from(json::to_string(&in_req)?).to_vec();
@@ -75,7 +76,8 @@ pub async fn grpc_search(
                 request: req,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+            let mut client =
+                make_grpc_search_client(&trace_id, &mut request, &node, timeout).await?;
             let response = match client.search(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -147,7 +149,9 @@ pub async fn grpc_search_multi(
                 request: req,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+            let timeout = in_req.timeout as u64;
+            let mut client =
+                make_grpc_search_client(&trace_id, &mut request, &node, timeout).await?;
             let response = match client.search_multi(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -218,7 +222,7 @@ pub async fn grpc_search_partition(
                 skip_max_query_range,
             });
             let node = Arc::new(node) as _;
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
             let response = match client.search_partition(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
