@@ -105,6 +105,7 @@ pub async fn make_grpc_search_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
+    timeout: u64,
 ) -> Result<
     SearchClient<
         InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
@@ -112,7 +113,12 @@ pub async fn make_grpc_search_client<T>(
     Error,
 > {
     let cfg = get_config();
-    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+    let timeout = if timeout > 0 {
+        timeout
+    } else {
+        cfg.limit.query_timeout
+    };
+    request.set_timeout(std::time::Duration::from_secs(timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.inject_context(
@@ -157,6 +163,7 @@ pub async fn make_grpc_metrics_client<T>(
     org_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
+    timeout: u64,
 ) -> Result<
     MetricsClient<
         InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
@@ -167,7 +174,12 @@ pub async fn make_grpc_metrics_client<T>(
     let org_id: MetadataValue<_> = org_id
         .parse()
         .map_err(|_| Error::Message(format!("invalid org_id: {org_id}")))?;
-    request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+    let timeout = if timeout > 0 {
+        timeout
+    } else {
+        cfg.limit.query_timeout
+    };
+    request.set_timeout(std::time::Duration::from_secs(timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.inject_context(

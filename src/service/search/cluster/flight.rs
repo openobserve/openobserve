@@ -314,7 +314,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         }
     };
 
-    // release source
+    // release lock
     drop(_lock);
 
     // 9. get data from datafusion

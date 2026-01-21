@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,14 +38,16 @@ use infra::{
     client::grpc::make_grpc_metrics_client,
     cluster::get_cached_online_querier_nodes,
     errors::{Error, ErrorCodes, Result},
+    runtime::DATAFUSION_RUNTIME,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::{TaskStatus, WorkGroup};
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
-
 #[cfg(feature = "enterprise")]
-use crate::service::search::SEARCH_SERVER;
+use {
+    crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup,
+};
+
 use crate::service::{
     promql::{
         DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
@@ -77,11 +79,130 @@ pub async fn search(
     timeout: i64,
     is_super_cluster: bool,
 ) -> Result<Value> {
+    // Record task in SEARCH_SERVER for streaming queries (Enterprise only)
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(req.query.clone());
+        let start_time = Some(req.start);
+        let end_time = Some(req.end);
+
+        SEARCH_SERVER
+            .insert(
+                trace_id.to_string(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    Some(user_email.to_string()),
+                    Some(org_id.to_string()),
+                    Some(StreamType::Metrics.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    None,
+                    None,
+                ),
+            )
+            .await;
+    }
+
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.timeout = timeout;
     req.is_super_cluster = is_super_cluster;
-    search_in_cluster(trace_id, req, user_email).await
+
+    let timeout = timeout as u64;
+    let mut stop_watch = TookWatcher::new();
+
+    // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
+    #[cfg(not(feature = "enterprise"))]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        timeout,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+    // Enterprise: Always use Short workgroup for metrics queries
+    #[cfg(feature = "enterprise")]
+    let _lock = crate::service::search::work_group::check_work_group(
+        trace_id,
+        &req.org_id,
+        Some(user_email),
+        timeout,
+        WorkGroup::Short,
+        &mut stop_watch,
+        "metrics",
+    )
+    .await
+    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender, true)
+        .await
+        .is_err()
+    {
+        log::info!(
+            "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
+        );
+        return Err(Error::ErrorCode(
+            infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
+            )),
+        ));
+    }
+
+    let trace_id_move = trace_id.to_string();
+    let user_email_move = user_email.to_string();
+    let query_task = DATAFUSION_RUNTIME
+        .spawn(async move { search_in_cluster(&trace_id_move, req, &user_email_move).await });
+    tokio::pin!(query_task);
+
+    // run search in cluster
+    let task = tokio::select! {
+        ret = &mut query_task => {
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] promql->search: search execute error: {err}");
+                    Err(Error::Message(err.to_string()))
+                }
+            }
+        },
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout )) => {
+            query_task.abort();
+            log::error!("[trace_id {trace_id}] promql->search: search timeout");
+            Err(Error::ErrorCode(ErrorCodes::SearchTimeout("promql->search: search timeout".to_string())))
+        },
+        _ = async {
+            #[cfg(feature = "enterprise")]
+            let _ = abort_receiver.await;
+            #[cfg(not(feature = "enterprise"))]
+            futures::future::pending::<()>().await;
+        } => {
+            query_task.abort();
+            log::info!("[trace_id {trace_id}] promql->search: search canceled");
+            Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("promql->search: search canceled".to_string())))
+        }
+    };
+
+    // release lock
+    drop(_lock);
+
+    // Clean up task record before returning
+    #[cfg(feature = "enterprise")]
+    SEARCH_SERVER.remove(trace_id, false).await;
+
+    match task {
+        Ok(Ok(ret)) => Ok(ret),
+        Ok(Err(err)) => Err(err),
+        Err(err) => Err(err),
+    }
 }
 
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
@@ -90,7 +211,7 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
 ) -> Result<Value> {
-    let mut stop_watch = TookWatcher::new();
+    let start_ins = std::time::Instant::now();
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = if req.timeout > 0 {
@@ -124,58 +245,6 @@ async fn search_in_cluster(
         query,
     );
 
-    // Register query in query manager for tracking and cancellation (Enterprise only)
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER
-        .insert(
-            trace_id.to_string(),
-            TaskStatus::new_leader(
-                vec![],
-                true,
-                Some(user_email.to_string()),
-                Some(req.org_id.clone()),
-                Some("metrics".to_string()),
-                Some(query.clone()),
-                Some(start),
-                Some(end),
-                None, // search_type
-                None, // search_event_context
-            ),
-        )
-        .await;
-
-    // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
-    #[cfg(not(feature = "enterprise"))]
-    let _lock = crate::service::search::work_group::check_work_group(
-        trace_id,
-        &req.org_id,
-        timeout,
-        &mut stop_watch,
-        "metrics",
-    )
-    .await
-    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-
-    // Enterprise: Always use Short workgroup for metrics queries
-    #[cfg(feature = "enterprise")]
-    let _lock = crate::service::search::work_group::check_work_group(
-        trace_id,
-        &req.org_id,
-        Some(user_email),
-        timeout,
-        WorkGroup::Short,
-        &mut stop_watch,
-        "metrics",
-    )
-    .await
-    .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-
-    // Track work group assignment (Enterprise only)
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER
-        .add_work_group(trace_id, Some(WorkGroup::Short))
-        .await;
-
     // get querier nodes from cluster
     let mut nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -186,8 +255,6 @@ async fn search_in_cluster(
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
     if nodes.is_empty() {
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
             "no querier node found".to_string(),
         )));
@@ -235,10 +302,6 @@ async fn search_in_cluster(
             merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
-        // Remove query from query manager on early return (Enterprise only)
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(trace_id, false).await;
-
         return Ok(values);
     }
 
@@ -248,8 +311,6 @@ async fn search_in_cluster(
         DEFAULT_MAX_POINTS_PER_SERIES
     };
     if (end - start) / step > max_points as i64 {
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
             "too many points per series must be returned on the given, you can change the limit by ZO_METRICS_MAX_POINTS_PER_SERIES".to_string(),
         )));
@@ -268,20 +329,6 @@ async fn search_in_cluster(
         stage: 0,
         partition: 0,
     };
-
-    // Create abort sender/receiver for cancellation support (Enterprise only)
-    #[cfg(feature = "enterprise")]
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel::<()>();
-    #[cfg(feature = "enterprise")]
-    if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, true)
-        .await
-        .is_err()
-    {
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] promql->search: query cancelled before execution"
-        ))));
-    }
 
     // make cluster request
     let mut tasks = Vec::with_capacity(nodes.len());
@@ -323,7 +370,7 @@ async fn search_in_cluster(
                 let node = Arc::new(node) as _;
                 let org_id = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
-                let mut client = make_grpc_metrics_client(&trace_id, &org_id, &mut request, &node)
+                let mut client = make_grpc_metrics_client(&trace_id, &org_id, &mut request, &node, timeout)
                     .await?;
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
@@ -355,53 +402,6 @@ async fn search_in_cluster(
     }
 
     let mut results = Vec::with_capacity(tasks.len());
-
-    // Execute tasks with cancellation and timeout support (Enterprise)
-    #[cfg(feature = "enterprise")]
-    let task_results = {
-        // Wrap all tasks in a single spawned task so we can abort it
-        let query_task = tokio::spawn(async move { try_join_all(tasks).await });
-        tokio::pin!(query_task);
-
-        tokio::select! {
-            ret = &mut query_task => {
-                match ret {
-                    Ok(Ok(res)) => res,
-                    Ok(Err(err)) => {
-                        SEARCH_SERVER.remove(trace_id, false).await;
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            err.to_string(),
-                        )));
-                    }
-                    Err(err) => {
-                        SEARCH_SERVER.remove(trace_id, false).await;
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            format!("task join error: {err}"),
-                        )));
-                    }
-                }
-            },
-            _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
-                query_task.abort();
-                log::error!("[trace_id {trace_id}] promql->search: query timeout after {timeout}s");
-                SEARCH_SERVER.remove(trace_id, false).await;
-                return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(
-                    format!("[trace_id {trace_id}] promql->search: query timeout"),
-                )));
-            },
-            _ = abort_receiver => {
-                query_task.abort();
-                log::info!("[trace_id {trace_id}] promql->search: query cancelled");
-                SEARCH_SERVER.remove(trace_id, false).await;
-                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(
-                    format!("[trace_id {trace_id}] promql->search: query cancelled"),
-                )));
-            }
-        }
-    };
-
-    // Execute tasks without cancellation support (OSS)
-    #[cfg(not(feature = "enterprise"))]
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
@@ -410,13 +410,10 @@ async fn search_in_cluster(
             )));
         }
     };
-
     for res in task_results {
         match res {
             Ok(response) => results.push(response),
             Err(err) => {
-                #[cfg(feature = "enterprise")]
-                SEARCH_SERVER.remove(trace_id, false).await;
                 return Err(err);
             }
         }
@@ -457,24 +454,21 @@ async fn search_in_cluster(
     } else if result_type == "exemplars" {
         merge_exemplars_query(&series_data, &req.org_id).await?
     } else {
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.remove(trace_id, false).await;
         return Err(server_internal_error(format!(
             "invalid result type: {result_type}"
         )));
     };
-    let result_time = stop_watch.record_split("result").as_secs_f64();
+    let took = start_ins.elapsed().as_millis() as f64;
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} mb, took: {} ms",
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} mb, took: {took} ms",
         scan_stats.files,
         scan_stats.original_size,
-        (result_time * 1000.0) as u64,
     );
 
     let req_stats = RequestStats {
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
-        response_time: result_time,
+        response_time: start_ins.elapsed().as_secs_f64(),
         request_body: Some(query.to_string()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),
@@ -512,14 +506,8 @@ async fn search_in_cluster(
         log::error!("[trace_id {trace_id}] promql->search->cache: set cache err: {err:?}");
     }
 
-    log::info!(
-        "[trace_id {trace_id}] promql->search search finished {}",
-        stop_watch.get_summary()
-    );
-
-    // Remove query from query manager on successful completion (Enterprise only)
-    #[cfg(feature = "enterprise")]
-    SEARCH_SERVER.remove(trace_id, false).await;
+    let took = start_ins.elapsed().as_millis() as f64;
+    log::info!("[trace_id {trace_id}] promql->search search finished took: {took} ms",);
 
     Ok(values)
 }
