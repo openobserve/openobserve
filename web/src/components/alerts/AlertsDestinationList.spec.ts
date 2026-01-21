@@ -703,8 +703,4 @@ describe("AlertsDestinationList", () => {
 
   });
 
-
-
-
-
 });
