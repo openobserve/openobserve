@@ -368,10 +368,7 @@ fn load_builtin_destinations() -> Vec<Destination> {
                     method: HTTPType::POST,
                     skip_tls_verify: false,
                     headers: Some(HashMap::from([
-                        (
-                            "Content-Type".to_string(),
-                            "application/json".to_string(),
-                        ),
+                        ("Content-Type".to_string(), "application/json".to_string()),
                         (
                             "Authorization".to_string(),
                             "GenieKey YOUR_API_KEY".to_string(),
@@ -401,10 +398,7 @@ fn load_builtin_destinations() -> Vec<Destination> {
                     method: HTTPType::POST,
                     skip_tls_verify: false,
                     headers: Some(HashMap::from([
-                        (
-                            "Content-Type".to_string(),
-                            "application/json".to_string(),
-                        ),
+                        ("Content-Type".to_string(), "application/json".to_string()),
                         (
                             "Authorization".to_string(),
                             "Basic YOUR_AUTH_TOKEN".to_string(),
@@ -463,7 +457,12 @@ mod tests {
         let has_teams = names.iter().any(|n| n.contains("Teams"));
         let has_pagerduty = names.iter().any(|n| n.contains("PagerDuty"));
         let has_discord = names.iter().any(|n| n.contains("Discord"));
-        let has_webhook = names.iter().any(|n| n.contains("Webhook") && !n.contains("Slack") && !n.contains("Discord") && !n.contains("Teams"));
+        let has_webhook = names.iter().any(|n| {
+            n.contains("Webhook")
+                && !n.contains("Slack")
+                && !n.contains("Discord")
+                && !n.contains("Teams")
+        });
         let has_opsgenie = names.iter().any(|n| n.contains("Opsgenie"));
         let has_servicenow = names.iter().any(|n| n.contains("ServiceNow"));
         let has_email = names.iter().any(|n| n.contains("Email"));
