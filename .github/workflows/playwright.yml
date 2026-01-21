@@ -276,31 +276,31 @@ jobs:
                   "dashboard-variables-tab-level.spec.js",
                   "dashboard-variables-panel-level.spec.js",
                 ]
-              - testfolder: "Dashboards-Variables-Dependency"
-                browser: "chrome"
-                run_files:
-                  [
-                    "dashboard-variables-dependency.spec.js",
-                  ]
-              - testfolder: "Dashboards-Variables-Refresh"
-                browser: "chrome"
-                run_files:
-                  [
-                    "dashboard-variables-refresh.spec.js",
-                  ]
-              - testfolder: "Dashboards-Variables-URL"
-                browser: "chrome"
-                run_files:
-                  [
-                    "dashboard-variables-url-sync.spec.js",
-                  ]
-              - testfolder: "Dashboards-Variables-Creation"
-                browser: "chrome"
-                run_files:
-                  [
-                    "dashboard-variables-creation-scopes.spec.js",
-                    "dashboard-variables-null-handling.spec.js",
-                  ]
+            - testfolder: "Dashboards-Variables-Dependency"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-dependency.spec.js",
+                ]
+            - testfolder: "Dashboards-Variables-Refresh"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-refresh.spec.js",
+                ]
+            - testfolder: "Dashboards-Variables-URL"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-url-sync.spec.js",
+                ]
+            - testfolder: "Dashboards-Variables-Creation"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-creation-scopes.spec.js",
+                  "dashboard-variables-null-handling.spec.js",
+                ]
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
