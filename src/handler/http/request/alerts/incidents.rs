@@ -515,7 +515,7 @@ pub async fn get_incident(_path: Path<(String, String)>) -> Response {
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
-    put,
+    patch,
     path = "/v2/{org_id}/alerts/incidents/{incident_id}/status",
     context_path = "/api",
     tag = "Incidents",

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1185,7 +1185,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             async move {
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -1321,7 +1321,7 @@ pub async fn cancel_query(
                     trace_id: trace_id.clone(),
                 });
                 let node = Arc::new(node) as _;
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
                 let response: cluster_rpc::CancelQueryResponse = match client
                     .cancel_query(request)
                     .await
