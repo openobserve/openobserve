@@ -14,7 +14,7 @@ limitations under the License.
 -->
 
 <template>
-  <q-dialog v-model="isOpen" data-test="destination-preview-dialog" maximized>
+  <q-dialog v-model="isOpen" data-test="destination-preview-dialog">
     <q-card data-test="destination-preview-card" class="preview-card">
       <q-card-section class="row items-center no-wrap">
         <div class="text-h6" data-test="preview-title">
@@ -254,7 +254,7 @@ limitations under the License.
         </div>
       </q-card-section>
 
-      <q-card-actions align="right">
+      <q-card-actions align="center">
         <q-btn
           data-test="preview-copy-button"
           label="Copy Template"
@@ -342,14 +342,16 @@ const copyTemplate = () => {
 
 <style lang="scss" scoped>
 .preview-card {
+  width: 700px;
   max-width: 90vw;
-  max-height: 90vh;
 }
 
 .preview-container {
-  max-height: 70vh;
   overflow-y: auto;
   padding: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 // Slack Preview Styles
@@ -434,6 +436,12 @@ const copyTemplate = () => {
   font-size: 0.875rem;
 }
 
+.slack-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
 .slack-button {
   background: #007a5a;
   color: white;
@@ -498,13 +506,18 @@ const copyTemplate = () => {
   }
 }
 
+.teams-actions {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
 .teams-button {
   background: #6264a7;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
-  margin: 1rem;
   cursor: pointer;
 
   &:hover {
@@ -596,8 +609,9 @@ const copyTemplate = () => {
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 4px;
-  margin-top: 1rem;
+  margin: 1rem auto 0;
   cursor: pointer;
+  display: block;
 
   &:hover {
     background: #0056b3;
@@ -650,10 +664,15 @@ const copyTemplate = () => {
     color: #4a5568;
   }
 
-  .pagerduty-link a {
-    color: #06ac38;
-    text-decoration: none;
-    font-weight: bold;
+  .pagerduty-link {
+    text-align: center;
+    margin-top: 1rem;
+
+    a {
+      color: #06ac38;
+      text-decoration: none;
+      font-weight: bold;
+    }
   }
 }
 
@@ -751,17 +770,22 @@ const copyTemplate = () => {
     color: #4a5568;
   }
 
-  .opsgenie-actions button {
-    background: #172b4d;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+  .opsgenie-actions {
+    display: flex;
+    justify-content: center;
     margin-top: 1rem;
-    cursor: pointer;
 
-    &:hover {
-      background: #0f1c2e;
+    button {
+      background: #172b4d;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+
+      &:hover {
+        background: #0f1c2e;
+      }
     }
   }
 }
