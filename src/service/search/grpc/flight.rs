@@ -468,8 +468,12 @@ pub async fn search(
         )
     );
 
+    if cfg.common.feature_pushdown_filter_enabled {
+        let pushdown_filter = FilterPushdown::new();
+        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+    }
+
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
-        // pushdown filter
         let pushdown_filter = FilterPushdown::new_post_optimization();
         physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
     }

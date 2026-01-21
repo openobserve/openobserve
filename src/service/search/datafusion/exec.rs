@@ -403,7 +403,10 @@ pub fn create_session_config(
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     // based on data distributing, it only works for the data on a few records
-    // config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
+    config = config.set_bool(
+        "datafusion.execution.parquet.pushdown_filters",
+        cfg.common.feature_pushdown_filter_enabled,
+    );
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
     if cfg.common.bloom_filter_enabled {
