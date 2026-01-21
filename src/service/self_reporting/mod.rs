@@ -46,6 +46,7 @@ mod ingestion;
 mod queues;
 pub mod search;
 mod triggers_schema;
+mod usage_schema;
 
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;

@@ -184,13 +184,14 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     }
 
     if usage_reporting_mode != "remote" {
-        let report_data = report_data
+        let report_data: Vec<json::Value> = report_data
             .into_iter()
             .map(|usage| json::to_value(usage).unwrap_or_default())
-            .collect::<Vec<_>>();
-        // report usage data
+            .collect();
+
+        // report usage data to _meta org
         let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
-        if let Err(e) = ingest_reporting_data(report_data, usage_stream).await {
+        if let Err(e) = ingest_reporting_data(report_data.clone(), usage_stream).await {
             log::error!(
                 "[SELF-REPORTING] Error in ingesting usage data to internal ingestion: {e}"
             );
@@ -208,6 +209,56 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                         }
                     }
                 });
+            }
+        }
+
+        // Distribute usage to individual orgs if usage_stream_enabled is set
+        if cfg.common.usage_report_to_own_org {
+            let mut per_org_map: HashMap<String, Vec<json::Value>> = HashMap::new();
+
+            for usage in &report_data {
+                if let Some(org_id) = usage.get("org_id").and_then(|v| v.as_str()) {
+                    // Skip meta org (already handled above)
+                    if org_id == META_ORG_ID {
+                        continue;
+                    }
+
+                    // Check if org has usage stream enabled
+                    match crate::service::db::organization::get_org_setting_usage_stream_enabled(
+                        org_id,
+                    )
+                    .await
+                    {
+                        Ok(true) => {
+                            per_org_map
+                                .entry(org_id.to_string())
+                                .or_default()
+                                .push(usage.clone());
+                        }
+                        Ok(false) => continue,
+                        Err(e) => {
+                            log::debug!(
+                                "[SELF-REPORTING] Could not check usage_stream_enabled for {org_id}: {e}"
+                            );
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            for (org, values) in per_org_map {
+                if let Err(e) = super::usage_schema::ensure_usage_stream_initialized(&org).await {
+                    log::warn!(
+                        "[SELF-REPORTING] Failed to ensure usage stream initialized for {org}: {e}"
+                    );
+                }
+
+                let org_usage_stream = StreamParams::new(&org, USAGE_STREAM, StreamType::Logs);
+                if let Err(e) = ingest_reporting_data(values, org_usage_stream).await {
+                    log::error!(
+                        "[SELF-REPORTING] Error ingesting usage data for org {org}: {e}"
+                    );
+                }
             }
         }
     }
