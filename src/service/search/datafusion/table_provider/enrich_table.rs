@@ -16,6 +16,7 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
@@ -26,7 +27,9 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::service::search::datafusion::distributed_plan::enrich_exec::EnrichExec;
+use crate::service::search::datafusion::{
+    distributed_plan::enrich_exec::EnrichExec, table_provider::helpers::apply_combined_filter,
+};
 
 /// An enrich table that is used for loading enrichment data from database.
 #[derive(Debug, Clone)]
@@ -34,15 +37,17 @@ pub struct EnrichTable {
     org_id: String,
     name: String,
     schema: SchemaRef,
+    time_range: (i64, i64),
 }
 
 impl EnrichTable {
     /// Initialize a new `EnrichTable` from a schema.
-    pub fn new(org_id: &str, name: &str, schema: SchemaRef) -> Self {
+    pub fn new(org_id: &str, name: &str, schema: SchemaRef, time_range: (i64, i64)) -> Self {
         Self {
             org_id: org_id.to_string(),
             name: name.to_string(),
             schema,
+            time_range,
         }
     }
 }
@@ -64,15 +69,52 @@ impl TableProvider for EnrichTable {
     async fn scan(
         &self,
         _state: &dyn Session,
-        _projection: Option<&Vec<usize>>,
+        projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(EnrichExec::new(
+        let filter_projection = {
+            // add _timestamp column if timestamp_filter is present
+            let mut filter_projection = Vec::new();
+            if let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME) {
+                filter_projection.push(timestamp_idx);
+            }
+
+            // add requested projection columns
+            if let Some(v) = projection.as_ref() {
+                filter_projection.extend(v.iter().copied());
+            }
+            filter_projection.sort();
+            filter_projection.dedup();
+
+            // regenerate the projection with the filter_projection
+            let projection = projection.as_ref().map(|p| {
+                p.iter()
+                    .filter_map(|i| filter_projection.iter().position(|f| f == i))
+                    .collect::<Vec<_>>()
+            });
+            (Some(filter_projection), projection)
+        };
+        let filter_projection = filter_projection.0.as_ref();
+
+        // Create the base execution plan
+        let enrich_exec = Arc::new(EnrichExec::new(
             &self.org_id,
             &self.name,
             self.schema.clone(),
-        )))
+        ));
+
+        // Apply timestamp filter only (no index condition for enrich tables)
+        let filter_exec = apply_combined_filter(
+            None,
+            Some(self.time_range),
+            &enrich_exec.schema(),
+            &[],
+            enrich_exec,
+            filter_projection,
+        )?;
+
+        Ok(filter_exec)
     }
 
     fn supports_filters_pushdown(

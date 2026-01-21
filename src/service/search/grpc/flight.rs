@@ -409,7 +409,12 @@ pub async fn search(
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
         // get the enrichment table from db
-        let enrichment_table = EnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        let enrichment_table = EnrichTable::new(
+            &org_id,
+            &stream_name,
+            empty_exec.full_schema().clone(),
+            query_params.time_range,
+        );
         // add the enrichment table to the tables
         tables.push(Arc::new(enrichment_table) as _);
     }

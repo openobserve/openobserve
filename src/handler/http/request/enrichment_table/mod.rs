@@ -145,65 +145,68 @@ async fn extract_multipart_axum(
     let mut records = Vec::new();
     let mut headers_set = HashSet::new();
 
-    while let Ok(Some(field)) = payload.next_field().await {
-        let file_name = match field.file_name() {
-            Some(name) => name.to_string(),
-            None => continue,
-        };
+    while let Ok(Some(mut field)) = payload.next_field().await {
+        if field.file_name().is_none() {
+            continue;
+        }
 
-        let data = match field.bytes().await {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                return Err(format!("Failed to read multipart field: {}", e));
+        let mut data = bytes::Bytes::new();
+        while let Some(chunk) = field
+            .chunk()
+            .await
+            .map_err(|e| format!("Failed to read chunk: {}", e))?
+        {
+            // Reconstruct entire data bytes here to prevent fragmentation of values.
+            data = bytes::Bytes::from([data.as_ref(), chunk.as_ref()].concat());
+        }
+
+        let mut rdr = csv::Reader::from_reader(data.as_ref());
+        let headers: csv::StringRecord = rdr
+            .headers()
+            .map_err(|e| format!("Failed to read CSV headers: {}", e))?
+            .iter()
+            .map(|x| {
+                let mut x = x.trim().to_string();
+                config::utils::flatten::format_key(&mut x);
+                headers_set.insert(x.clone());
+                x
+            })
+            .collect::<Vec<_>>()
+            .into();
+
+        for result in rdr.records() {
+            // The iterator yields Result<StringRecord, Error>, so we check the
+            // error here.
+            let record = result.map_err(|e| format!("Failed to read CSV record: {}", e))?;
+            // Transform the record to a JSON value
+            let mut json_record = config::utils::json::Map::new();
+
+            for (header, field) in headers.iter().zip(record.iter()) {
+                json_record.insert(
+                    header.into(),
+                    config::utils::json::Value::String(field.into()),
+                );
             }
-        };
 
-        // Determine file type and parse accordingly
-        if file_name.ends_with(".csv") {
-            let data_vec = data.to_vec();
-            let mut rdr = csv::Reader::from_reader(data_vec.as_slice());
-            let headers: Vec<String> = rdr
-                .headers()
-                .map_err(|e| format!("Failed to read CSV headers: {}", e))?
-                .iter()
-                .map(|h| h.to_lowercase())
-                .collect();
-
-            for result in rdr.records() {
-                let record = result.map_err(|e| format!("Failed to read CSV record: {}", e))?;
-                let mut map = config::utils::json::Map::new();
-                for (i, value) in record.iter().enumerate() {
-                    if let Some(header) = headers.get(i) {
-                        // Skip duplicate headers if append_data is false
-                        if !append_data && headers_set.contains(header) {
-                            continue;
-                        }
-                        headers_set.insert(header.clone());
-                        map.insert(
-                            header.clone(),
-                            config::utils::json::Value::String(value.to_string()),
-                        );
-                    }
-                }
-                if !map.is_empty() {
-                    records.push(map);
-                }
+            if !json_record.is_empty() {
+                records.push(json_record);
             }
-        } else if file_name.ends_with(".json") {
-            let json_data: Vec<config::utils::json::Map<String, config::utils::json::Value>> =
-                config::utils::json::from_slice(&data)
-                    .map_err(|e| format!("Failed to parse JSON: {}", e))?;
-            records.extend(json_data);
-        } else {
-            return Err(format!(
-                "Unsupported file type: {}. Only .csv and .json files are supported.",
-                file_name
-            ));
         }
     }
 
-    if records.is_empty() {
-        return Err("No valid records found in the uploaded file".to_string());
+    if records.is_empty() && !headers_set.is_empty() && !append_data {
+        // If the records are empty, that means user has uploaded only headers, not the data
+        // So, we can assume that the user wants to upload an enrichment table with no row data.
+        // The headers are the columns of the enrichment table. Lets push a json
+        // with the headers as the keys and empty strings as the values.
+
+        // This way we will still have the headers in the enrichment table.
+        // And the enrichment table will not be deleted.
+        let mut json_record = config::utils::json::Map::new();
+        for header in headers_set {
+            json_record.insert(header, config::utils::json::Value::String("".to_string()));
+        }
+        records.push(json_record);
     }
 
     Ok(records)
