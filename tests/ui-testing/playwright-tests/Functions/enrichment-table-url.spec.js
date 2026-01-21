@@ -521,12 +521,10 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.page.waitForTimeout(1000);
 
-        // Verify table appears in filtered results
-        const tableVisible = await enrichmentPage.verifyTableRowVisible(tableName).catch(() => false);
-        testLogger.info(`Table visible after search: ${tableVisible}`);
-
         // PRIMARY ASSERTION: Table should be visible after search
-        expect(tableVisible).toBeTruthy();
+        // verifyTableRowVisible uses expect() internally - throws if not visible
+        await enrichmentPage.verifyTableRowVisible(tableName);
+        testLogger.info('Table visible after search: verified');
 
         testLogger.info('✓ Enrichment table search test completed');
     });
