@@ -160,8 +160,17 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         }
 
         // Extract user token from cookie/header for per-user MCP auth
+        // Unwrap Session:: wrapper if present, otherwise use token as-is
         let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
-        let user_token = auth_str.strip_prefix("Basic ").map(|s| s.to_string());
+        let user_token = if auth_str.starts_with("Session::") {
+            // Session format: "Session::{session_id}::{actual_token}"
+            // Extract actual token (already has Bearer/Basic prefix)
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
 
         // Create agent client
         let zo_config = get_config();
@@ -443,8 +452,17 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         };
 
         // Extract user token from cookie/header for per-user MCP auth
+        // Unwrap Session:: wrapper if present, otherwise use token as-is
         let auth_str = crate::common::utils::auth::extract_auth_str_from_parts(&parts).await;
-        let user_token = auth_str.strip_prefix("Basic ").map(|s| s.to_string());
+        let user_token = if auth_str.starts_with("Session::") {
+            // Session format: "Session::{session_id}::{actual_token}"
+            // Extract actual token (already has Bearer/Basic prefix)
+            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
+        } else if !auth_str.is_empty() {
+            Some(auth_str)
+        } else {
+            None
+        };
 
         // Transform PromptRequest -> QueryRequest
         let last_user_message = prompt_body
