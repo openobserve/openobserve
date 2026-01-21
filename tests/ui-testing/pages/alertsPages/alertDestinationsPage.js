@@ -1035,21 +1035,15 @@ export class AlertDestinationsPage {
         const destinationRow = this.page.locator(`tr:has-text("${name}")`);
         await expect(destinationRow).toBeVisible({ timeout: 10000 });
 
-        // Click the delete button (actions column)
-        const deleteBtn = destinationRow.locator('button:has-text("Delete"), button[data-test*="delete"]').first();
-        if (await deleteBtn.isVisible()) {
-            await deleteBtn.click();
-        } else {
-            // Try clicking actions menu first
-            const actionsBtn = destinationRow.locator('button:has-text("Actions"), .q-btn--dropdown').first();
-            await actionsBtn.click();
-            await this.page.waitForTimeout(1000);
-            await this.page.locator('button:has-text("Delete")').click();
-        }
+        // Click the delete button using the data-test attribute
+        const deleteBtn = this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
 
-        // Confirm deletion in dialog
+        // Confirm deletion in dialog - wait for dialog to be visible
         await this.page.waitForTimeout(1000);
         const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
         // Wait for success notification
