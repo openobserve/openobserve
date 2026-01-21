@@ -148,11 +148,11 @@ pub async fn search(
         .is_err()
     {
         log::info!(
-            "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
+            "[trace_id {trace_id}] promql->search: search canceled before execution plan"
         );
         return Err(Error::ErrorCode(
             infra::errors::ErrorCodes::SearchCancelQuery(format!(
-                "[trace_id {trace_id}] super cluster leader: search canceled before execution plan"
+                "[trace_id {trace_id}] promql->search: search canceled before execution plan"
             )),
         ));
     }
