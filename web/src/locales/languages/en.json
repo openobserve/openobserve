@@ -498,7 +498,7 @@
     "copy_key": "Copy Key",
     "usage_information": "Usage Information",
     "license_allows_ingestion": "Your license allows <strong>{limit} GB</strong> of data ingestion per day.",
-    "limit_exceeded_days": "Limit exceeded on <strong class=\"{colorClass}\">{days} day{plural}</strong> this month",
+    "limit_exceeded_days": "Limit exceeded on <strong class=\"{colorClass}\">{days} days</strong> this month",
     "limit_exceeded_warning": " (max 3 days allowed). Application feature will be restricted",
     "limit_exceeded_info": " ({remaining} allowance{plural} left of 3 max)",
     "no_limit_exceedances": "No limit exceedances this month (max 3 allowed per month).",
