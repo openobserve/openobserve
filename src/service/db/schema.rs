@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, atomic::Ordering};
+use std::{
+    sync::{Arc, atomic::Ordering},
+    time::Duration,
+};
 
 use arrow_schema::{Field, Schema};
 use bytes::Bytes;
@@ -479,6 +482,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     log::error!("[Schema:watch] delete local enrichment file error: {e}");
                 }
+
+                // flush cache for the stream
+                let org_id = org_id.to_string();
+                let stream_name = stream_name.to_string();
+                tokio::task::spawn(async move {
+                    match flush_cache_for_stream(&org_id, stream_type, &stream_name).await {
+                        Ok(()) => {
+                            log::info!(
+                                "[Schema:watch] flushed cache for stream {org_id}/{stream_type}/{stream_name}"
+                            );
+                        }
+                        Err(e) => {
+                            log::error!("[Schema:watch] flush cache for stream error: {e}");
+                        }
+                    }
+                });
             }
             db::Event::Empty => {}
         }
@@ -563,6 +582,84 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
     }
     log::info!("Stream schemas Cached {keys_num} streams");
+    Ok(())
+}
+
+async fn flush_cache_for_stream(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<(), anyhow::Error> {
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+    // flush all memtables and persist to disk also delete parquet files from wal on ingester
+    if config::cluster::LOCAL_NODE.is_ingester() {
+        // get current max memtable id
+        let max_memtable_id = ingester::get_max_writer_seq_id().await;
+        // flush all writers
+        ingester::flush_all().await?;
+        let ttl = get_config().limit.mem_persist_interval;
+        // wait for max memtable id to be updated, skip it after retry 10 times
+        for _ in 0..10 {
+            let new_max_id = ingester::get_max_writer_seq_id().await;
+            if new_max_id > max_memtable_id {
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(ttl)).await;
+        }
+        // wait for persist done, skip it after retry 10 times
+        for _ in 0..10 {
+            if ingester::check_persist_done(max_memtable_id).await {
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(ttl)).await;
+        }
+        // delete parquet files from wal
+        let wal_dir = &get_config().common.data_wal_dir;
+        let stream_dir = format!("{wal_dir}files/{stream_key}");
+        if let Err(e) = tokio::fs::remove_dir_all(&stream_dir).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to delete parquet files from wal: {stream_dir}, error: {e}"
+            ));
+        }
+    }
+
+    // remove result cache / agg cache / files cache for the stream on querier
+    // also try to remove the cache from ingester, some test case will query from ingester directly
+    if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
+        let cache_dir = &get_config().common.data_cache_dir;
+        // remove result cache
+        let result_cache_dir = format!("{cache_dir}results/{stream_key}");
+        if let Err(e) = tokio::fs::remove_dir_all(&result_cache_dir).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to delete result cache: {result_cache_dir}, error: {e}"
+            ));
+        }
+        // remove agg cache
+        let agg_cache_dir = format!("{cache_dir}aggregations/{stream_key}");
+        if let Err(e) = tokio::fs::remove_dir_all(&agg_cache_dir).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to delete agg cache: {agg_cache_dir}, error: {e}"
+            ));
+        }
+        // remove parquet cache
+        let parquet_cache_dir = format!("{cache_dir}files/{stream_key}");
+        if let Err(e) = tokio::fs::remove_dir_all(&parquet_cache_dir).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to delete parquet cache: {parquet_cache_dir}, error: {e}"
+            ));
+        }
+        // remove metrics cache
+        // !!! we can't remove metrics cache, because metrics cache doesn't persist with stream name
+    }
+
     Ok(())
 }
 
