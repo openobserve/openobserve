@@ -777,19 +777,25 @@ const setupDestinationData = () => {
 
       // Check URL patterns
       if (props.destination.url) {
-        const url = props.destination.url;
-        if (url.includes('hooks.slack.com')) {
-          detectedType = 'slack';
-        } else if (url.includes('discord.com/api/webhooks')) {
-          detectedType = 'discord';
-        } else if (url.includes('outlook.office.com') || url.includes('webhook.office.com')) {
-          detectedType = 'msteams';
-        } else if (url.includes('service-now.com')) {
-          detectedType = 'servicenow';
-        } else if (url.includes('events.pagerduty.com')) {
-          detectedType = 'pagerduty';
-        } else if (url.includes('api.opsgenie.com') || url.includes('api.eu.opsgenie.com')) {
-          detectedType = 'opsgenie';
+        try {
+          const parsedUrl = new URL(props.destination.url);
+          const hostname = parsedUrl.hostname.toLowerCase();
+
+          if (hostname === 'hooks.slack.com' || hostname.endsWith('.hooks.slack.com')) {
+            detectedType = 'slack';
+          } else if ((hostname === 'discord.com' || hostname.endsWith('.discord.com')) && parsedUrl.pathname.startsWith('/api/webhooks')) {
+            detectedType = 'discord';
+          } else if (hostname === 'outlook.office.com' || hostname.endsWith('.outlook.office.com') || hostname === 'webhook.office.com' || hostname.endsWith('.webhook.office.com')) {
+            detectedType = 'msteams';
+          } else if (hostname === 'service-now.com' || (hostname.endsWith('.service-now.com') && hostname.split('.').slice(-3, -1).join('.') === 'service-now')) {
+            detectedType = 'servicenow';
+          } else if (hostname === 'events.pagerduty.com' || hostname.endsWith('.events.pagerduty.com')) {
+            detectedType = 'pagerduty';
+          } else if (hostname === 'api.opsgenie.com' || hostname === 'api.eu.opsgenie.com') {
+            detectedType = 'opsgenie';
+          }
+        } catch {
+          // Invalid URL, detectedType remains null
         }
       }
 
