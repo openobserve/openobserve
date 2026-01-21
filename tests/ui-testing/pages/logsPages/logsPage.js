@@ -2411,7 +2411,21 @@ export class LogsPage {
     }
 
     async clickLiveMode5Sec() {
-        return await this.page.locator(this.liveMode5SecBtn).click();
+        // Wait for button to be enabled before clicking (button starts disabled)
+        const button = this.page.locator(this.liveMode5SecBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for button to become enabled
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        return await button.click();
+    }
+
+    async isLiveMode5SecEnabled() {
+        const button = this.page.locator(this.liveMode5SecBtn);
+        return await button.isEnabled({ timeout: 5000 }).catch(() => false);
+    }
+
+    async getPageContent() {
+        return await this.page.locator('body').innerText().catch(() => '');
     }
 
     async clickVrlToggle() {
@@ -3041,8 +3055,24 @@ export class LogsPage {
 
     // Field management methods for add/remove fields to table
     async hoverOnFieldExpandButton(fieldName) {
-        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
-        await this.page.waitForTimeout(300);
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+
+        // Check primary selector first
+        if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            await expandBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        }
+
+        // Try alternate selector
+        const altBtn = this.page.locator(`[data-test*="expand-${fieldName}"]`).first();
+        if (await altBtn.isVisible().catch(() => false)) {
+            await altBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        }
+
+        throw new Error(`Field expand button not found for: ${fieldName}`);
     }
 
     async clickAddFieldToTableButton(fieldName) {
@@ -3831,7 +3861,11 @@ export class LogsPage {
     }
 
     async clickResultErrorDetailsButton() {
-        return await this.page.locator(this.resultErrorDetailsBtn).click();
+        // Wait for element to be stable before clicking (avoids detached DOM issues)
+        const button = this.page.locator(this.resultErrorDetailsBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(500); // Allow DOM to stabilize
+        return await button.click({ timeout: 15000 });
     }
 
     async expectSearchDetailErrorMessageVisible() {
@@ -4778,5 +4812,82 @@ export class LogsPage {
     async getLogsTableContent() {
         const table = this.page.locator(this.logsTable);
         return await table.textContent().catch(() => '');
+    }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect refresh button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectRefreshButtonVisible() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('Refresh button is visible');
+    }
+
+    /**
+     * Expect refresh button to be enabled
+     * Bug #9533 - Loading states
+     */
+    async expectRefreshButtonEnabled() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        testLogger.info('Refresh button is enabled');
+    }
+
+    /**
+     * Expect stream selector to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectStreamSelectorVisible() {
+        const selector = this.page.locator(this.indexDropDown);
+        await expect(selector).toBeVisible({ timeout: 10000 });
+        testLogger.info('Stream selector is visible');
+    }
+
+    /**
+     * Expect DateTime button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectDateTimeButtonVisible() {
+        const button = this.page.locator(this.dateTimeButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('DateTime button is visible');
+    }
+
+    /**
+     * Enable histogram if not already enabled
+     * Bug #8928 - Histogram rendering
+     */
+    async enableHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
+        if (isPressed === 'false') {
+            await histogramToggle.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Histogram enabled');
+        }
+    }
+
+    /**
+     * Toggle histogram on/off
+     * Bug #8928 - Histogram rendering
+     */
+    async toggleHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        await histogramToggle.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Histogram toggled');
+    }
+
+    /**
+     * Expect histogram to be visible
+     * Bug #8928 - Histogram rendering
+     */
+    async expectHistogramVisible() {
+        const histogramCanvas = this.page.locator(this.barChartCanvas);
+        await expect(histogramCanvas).toBeVisible({ timeout: 10000 });
+        testLogger.info('Histogram is visible');
     }
 }
