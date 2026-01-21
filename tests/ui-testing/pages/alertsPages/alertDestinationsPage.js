@@ -72,8 +72,13 @@ export class AlertDestinationsPage {
     async createDestination(destinationName, url, templateName) {
         await this.navigateToDestinations();
         await this.page.waitForTimeout(2000); // Wait for page to load
-        
+
         await this.page.locator(this.addDestinationButton).click();
+
+        // Select 'custom' destination type (required by prebuilt destinations feature)
+        await this.selectDestinationType('custom');
+        await this.page.waitForTimeout(1000); // Wait for name input to appear
+
         await this.page.locator(this.destinationNameInput).click();
         await this.page.locator(this.destinationNameInput).fill(destinationName);
         await this.page.waitForTimeout(1000);
@@ -407,6 +412,11 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(2000);
 
         await this.page.locator(this.addDestinationButton).click();
+
+        // Select 'custom' destination type (required by prebuilt destinations feature)
+        await this.selectDestinationType('custom');
+        await this.page.waitForTimeout(1000); // Wait for name input to appear
+
         await this.page.locator(this.destinationNameInput).click();
         await this.page.locator(this.destinationNameInput).fill(destinationName);
         await this.page.waitForTimeout(1000);
@@ -442,6 +452,11 @@ export class AlertDestinationsPage {
 
                     // Re-open the add destination form
                     await this.page.locator(this.addDestinationButton).click();
+
+                    // Select 'custom' destination type again
+                    await this.selectDestinationType('custom');
+                    await this.page.waitForTimeout(1000);
+
                     await this.page.locator(this.destinationNameInput).click();
                     await this.page.locator(this.destinationNameInput).fill(destinationName);
                     await this.page.waitForTimeout(1000);
