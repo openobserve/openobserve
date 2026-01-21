@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,6 +23,8 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+#[cfg(feature = "enterprise")]
+use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
 
 use crate::{
     handler::grpc::{
@@ -52,6 +54,18 @@ impl Metrics for MetricsQuerier {
         let req: &MetricsQueryRequest = req.get_ref();
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
+
+        #[cfg(feature = "enterprise")]
+        let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+        #[cfg(feature = "enterprise")]
+        if !SEARCH_SERVER.contain_key(&trace_id).await {
+            SEARCH_SERVER
+                .insert(
+                    trace_id.to_string(),
+                    TaskStatus::new_follower(vec![], false),
+                )
+                .await;
+        }
         let result = SearchService::grpc::search(req).await.map_err(|err| {
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
@@ -75,6 +89,12 @@ impl Metrics for MetricsQuerier {
         metrics::GRPC_INCOMING_REQUESTS
             .with_label_values(&["/metrics/query", "200", org_id, stream_type, "", ""])
             .inc();
+
+        // Clean up task record before returning
+        #[cfg(feature = "enterprise")]
+        if !SEARCH_SERVER.is_leader(&trace_id).await {
+            SEARCH_SERVER.remove(&trace_id, false).await;
+        }
 
         Ok(Response::new(result))
     }
