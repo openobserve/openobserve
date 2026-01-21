@@ -626,7 +626,8 @@ async fn flush_cache_for_stream(
     }
 
     // remove result cache / agg cache / files cache for the stream on querier
-    if config::cluster::LOCAL_NODE.is_querier() {
+    // also try to remove the cache from ingester, some test case will query from ingester directly
+    if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
         let cache_dir = &get_config().common.data_cache_dir;
         // remove result cache
         let result_cache_dir = format!("{cache_dir}results/{stream_key}");
