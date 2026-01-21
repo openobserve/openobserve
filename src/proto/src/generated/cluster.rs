@@ -2756,14 +2756,19 @@ pub mod physical_plan_node {
         EnrichmentExec(super::EnrichmentExecNode),
     }
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Uint64List {
+    #[prost(uint64, repeated, tag = "1")]
+    pub values: ::prost::alloc::vec::Vec<u64>,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEmptyExecNode {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
     pub schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
-    #[prost(uint64, repeated, tag = "3")]
-    pub projection: ::prost::alloc::vec::Vec<u64>,
+    #[prost(message, optional, tag = "3")]
+    pub projection: ::core::option::Option<Uint64List>,
     #[prost(message, repeated, tag = "4")]
     pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
     #[prost(uint64, optional, tag = "5")]

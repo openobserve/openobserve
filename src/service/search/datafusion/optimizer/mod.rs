@@ -57,8 +57,8 @@ use crate::service::search::{
         analyze::remove_index_fields::RemoveIndexFieldsRule,
         context::PhysicalOptimizerContext,
         logical_optimizer::{
-            add_sort_and_limit::AddSortAndLimitRule, add_timestamp::AddTimestampRule,
-            limit_join_right_side::LimitJoinRightSide, rewrite_histogram::RewriteHistogram,
+            add_sort_and_limit::AddSortAndLimitRule, limit_join_right_side::LimitJoinRightSide,
+            rewrite_histogram::RewriteHistogram,
         },
         physical_optimizer::{
             distribute_analyze::optimize_distribute_analyze,
@@ -134,7 +134,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
-    rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
     #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherCall::new()));
     #[cfg(feature = "enterprise")]

@@ -16,7 +16,7 @@
 use std::{any::Any, sync::Arc};
 
 use arrow_schema::SchemaRef;
-use config::get_config;
+use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider, memory::DataSourceExec},
     common::Result,
@@ -34,7 +34,7 @@ use rayon::prelude::*;
 use tonic::async_trait;
 
 use crate::service::search::{
-    datafusion::table_provider::helpers::{apply_filter, generate_access_plan},
+    datafusion::table_provider::helpers::{apply_combined_filter, generate_access_plan},
     index::IndexCondition,
 };
 
@@ -44,6 +44,7 @@ pub struct ListingTableAdapter {
     trace_id: String,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    timestamp_filter: Option<(i64, i64)>,
 }
 
 impl ListingTableAdapter {
@@ -52,6 +53,7 @@ impl ListingTableAdapter {
         trace_id: String,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
+        timestamp_filter: Option<(i64, i64)>,
     ) -> Result<Self> {
         let listing_table = ListingTable::try_new(config)?;
         Ok(Self {
@@ -59,6 +61,7 @@ impl ListingTableAdapter {
             trace_id,
             index_condition,
             fst_fields,
+            timestamp_filter,
         })
     }
 
@@ -90,15 +93,29 @@ impl TableProvider for ListingTableAdapter {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let (parquet_projection, filter_projection) =
-            if let Some(index_condition) = self.index_condition.as_ref() {
+            if self.index_condition.is_some() || self.timestamp_filter.is_some() {
                 // get the projection for the filter
-                let mut filter_projection =
-                    index_condition.get_schema_projection(self.schema(), &self.fst_fields);
+                let mut filter_projection = self
+                    .index_condition
+                    .as_ref()
+                    .map(|ic| ic.get_schema_projection(self.schema(), &self.fst_fields))
+                    .unwrap_or_default();
+
+                // add _timestamp column if timestamp_filter is present
+                if self.timestamp_filter.is_some()
+                    && let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME)
+                    && !filter_projection.contains(&timestamp_idx)
+                {
+                    filter_projection.push(timestamp_idx);
+                }
+
+                // add requested projection columns
                 if let Some(v) = projection.as_ref() {
                     filter_projection.extend(v.iter().copied());
                 }
                 filter_projection.sort();
                 filter_projection.dedup();
+
                 // regenerate the projection with the filter_projection
                 let projection = projection.as_ref().map(|p| {
                     p.iter()
@@ -128,18 +145,20 @@ impl TableProvider for ListingTableAdapter {
             .as_ref()
             .map(|v| v.can_remove_filter())
             .unwrap_or(true);
-        let plan =
+        let index_condition =
             if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
-                apply_filter(
-                    self.index_condition.as_ref(),
-                    &parquet_exec.schema(),
-                    &self.fst_fields,
-                    parquet_exec,
-                    filter_projection,
-                )?
+                self.index_condition.as_ref()
             } else {
-                parquet_exec
+                None
             };
+        let plan = apply_combined_filter(
+            index_condition,
+            self.timestamp_filter,
+            &parquet_exec.schema(),
+            &self.fst_fields,
+            parquet_exec,
+            filter_projection,
+        )?;
 
         if reverse {
             log::info!(

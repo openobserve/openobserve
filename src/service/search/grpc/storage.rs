@@ -52,7 +52,6 @@ use tracing::Instrument;
 use crate::service::{
     file_list,
     search::{
-        datafusion::exec::TableBuilder,
         grpc::{
             tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
@@ -80,26 +79,30 @@ pub async fn search(
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
-    let trace_id = &query.trace_id;
+    let super::QueryParams {
+        trace_id,
+        org_id,
+        stream_type,
+        stream_name,
+        use_inverted_index,
+        work_group,
+        ..
+    } = query.as_ref();
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
-    // get file list
     let mut files = file_list.to_vec();
     if files.is_empty() {
         return Ok((vec![], ScanStats::default(), HashSet::new()));
     }
     let original_files_len = files.len();
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
-        query.org_id,
-        query.stream_type,
-        query.stream_name,
+        "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, load file_list num {}",
         files.len(),
     );
 
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
-    if query.use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
+    if *use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
@@ -112,10 +115,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {idx_took} ms",
-                    query.org_id,
-                    query.stream_type,
-                    query.stream_name,
+                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -150,10 +150,7 @@ pub async fn search(
     };
 
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
-        query.org_id,
-        query.stream_type,
-        query.stream_name,
+        "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, load files {}, scan_size {}, compressed_size {}",
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size
@@ -186,10 +183,10 @@ pub async fn search(
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
+        .with_label_values(&[org_id.as_str(), stream_type.as_str(), "parquet"])
         .inc_by(cache_hits);
     metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "parquet"])
+        .with_label_values(&[org_id.as_str(), stream_type.as_str(), "parquet"])
         .inc_by(cache_misses);
 
     scan_stats.idx_took = idx_took as i64;
@@ -207,10 +204,7 @@ pub async fn search(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
-                query.org_id,
-                query.stream_type,
-                query.stream_name,
+                "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 scan_stats.querier_files,
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
@@ -236,7 +230,7 @@ pub async fn search(
 
     if scan_stats.querier_files > 0 {
         QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
             .observe(cached_ratio);
     }
 
@@ -247,28 +241,28 @@ pub async fn search(
         cfg.limit.cpu_num
     };
 
-    let start = std::time::Instant::now();
+    log::debug!("search->storage: session target_partitions: {target_partitions}");
 
     let session = config::meta::search::Session {
         id: format!("{trace_id}-storage"),
         storage_type: StorageType::Memory,
-        work_group: query.work_group.clone(),
+        work_group: work_group.clone(),
         target_partitions,
     };
 
-    log::debug!("search->storage: session target_partitions: {target_partitions}");
-
-    let table = TableBuilder::new()
-        .sorted_by_time(sorted_by_time)
-        .file_stat_cache(file_stat_cache.clone())
-        .index_condition(index_condition.clone())
-        .fst_fields(fst_fields.clone())
-        .build(
-            session,
-            files,
-            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
-        )
-        .await?;
+    let start = std::time::Instant::now();
+    let tables = super::create_tables_from_files(
+        files,
+        session,
+        query.clone(),
+        schema,
+        sorted_by_time,
+        file_stat_cache,
+        index_condition,
+        fst_fields,
+        || {},
+    )
+    .await?;
 
     log::info!(
         "{}",
@@ -285,7 +279,7 @@ pub async fn search(
                 .build()
         )
     );
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -525,7 +519,7 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
-    let time_range = query.time_range.unwrap_or_default();
+    let time_range = query.time_range;
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);

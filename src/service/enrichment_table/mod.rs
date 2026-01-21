@@ -367,18 +367,19 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     let mut headers_set = HashSet::new();
-    while let Ok(Some(mut field)) = payload.next_field().await {
-        let Some(file_name) = field.file_name() else {
-            continue;
-        };
-        let _file_name = file_name.to_string();
 
-        let mut data = bytes::Bytes::new();
-        while let Some(chunk) = field.chunk().await.transpose() {
-            let chunked_data = chunk.unwrap();
-            // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-            data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+    while let Ok(Some(mut field)) = payload.next_field().await {
+        if field.file_name().is_none() {
+            continue;
         }
+
+        let mut data = Bytes::new();
+        while let Some(chunk) = field.chunk().await.transpose() {
+            let chunk = chunk.unwrap();
+            // Reconstruct entire data bytes here to prevent fragmentation of values.
+            data = Bytes::from([data.as_ref(), chunk.as_ref()].concat());
+        }
+
         let mut rdr = csv::Reader::from_reader(data.as_ref());
         let headers: csv::StringRecord = rdr
             .headers()?
