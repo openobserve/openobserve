@@ -26,7 +26,13 @@ use infra;
 use once_cell::sync::Lazy;
 
 /// Tracks which organizations have had their usage stream schema initialized.
-/// Uses a lock-free DashSet for better concurrency and bounded memory usage.
+/// Uses a lock-free DashSet for better concurrency.
+///
+/// Note: This set grows with unique org_ids but is bounded in practice because:
+/// 1. Each entry is just an org_id string (small memory footprint)
+/// 2. Number of organizations in a deployment is finite
+/// 3. Set is cleared on server restart
+/// This matches the pattern used in triggers_schema.rs.
 static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 
 /// Ensures the usage stream schema is initialized for a given organization.
@@ -53,29 +59,25 @@ pub async fn ensure_usage_stream_initialized(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    // Check if already initialized (lock-free read)
-    if INITIALIZED_ORGS.contains(org_id) {
+    // Atomically check-and-insert: insert() returns true only if the value was newly inserted.
+    // This prevents race conditions where multiple threads could pass a contains() check
+    // and all attempt initialization simultaneously.
+    if !INITIALIZED_ORGS.insert(org_id.to_string()) {
+        // Already initialized by another thread
         return Ok(());
     }
 
-    // Attempt initialization
-    match initialize_usage_stream_schema(org_id).await {
-        Ok(_) => {
-            // Mark as initialized (lock-free insert)
-            INITIALIZED_ORGS.insert(org_id.to_string());
-            Ok(())
-        }
-        Err(e) => {
-            log::warn!(
-                "[SELF-REPORTING] Failed to initialize usage stream schema for org {org_id}: {e}. Continuing anyway."
-            );
-            // Mark as initialized even on failure to prevent retry storms.
-            // Schema will be created naturally on first actual usage ingestion through
-            // OpenObserve's auto-schema evolution.
-            INITIALIZED_ORGS.insert(org_id.to_string());
-            Ok(())
-        }
+    // We are the first thread to insert this org_id, so we perform initialization.
+    // Even if initialization fails, we keep the org in INITIALIZED_ORGS to prevent
+    // retry storms. Schema will be created naturally on first actual usage ingestion
+    // through OpenObserve's auto-schema evolution.
+    if let Err(e) = initialize_usage_stream_schema(org_id).await {
+        log::warn!(
+            "[SELF-REPORTING] Failed to initialize usage stream schema for org {org_id}: {e}. Continuing anyway."
+        );
     }
+
+    Ok(())
 }
 
 /// Internal function that performs the actual schema initialization.

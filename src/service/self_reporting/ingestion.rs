@@ -186,7 +186,13 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if usage_reporting_mode != "remote" {
         let report_data: Vec<json::Value> = report_data
             .into_iter()
-            .map(|usage| json::to_value(usage).unwrap_or_default())
+            .filter_map(|usage| match json::to_value(&usage) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    log::error!("[SELF-REPORTING] Failed to serialize usage data: {e}");
+                    None
+                }
+            })
             .collect();
 
         // report usage data to _meta org
