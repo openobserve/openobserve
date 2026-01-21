@@ -2420,8 +2420,12 @@ export class LogsPage {
     }
 
     async isLiveMode5SecEnabled() {
+        const testLogger = require('../../playwright-tests/utils/test-logger.js');
         const button = this.page.locator(this.liveMode5SecBtn);
-        return await button.isEnabled({ timeout: 5000 }).catch(() => false);
+        return await button.isEnabled({ timeout: 5000 }).catch((error) => {
+            testLogger.warn(`isLiveMode5SecEnabled check failed: ${error.message}`);
+            return false;
+        });
     }
 
     async getPageContent() {

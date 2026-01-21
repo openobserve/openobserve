@@ -443,8 +443,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.openPipelineMenu();
     // Use domcontentloaded instead of networkidle to avoid timeout issues
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
-      testLogger.info('Network idle timeout - continuing with test');
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch((error) => {
+      testLogger.warn(`Network idle timeout after 15s - continuing with test. Error: ${error.message}. Page may still have pending requests.`);
     });
     await page.waitForTimeout(2000);
 
