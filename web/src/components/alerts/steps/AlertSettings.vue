@@ -892,6 +892,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+
+        <!-- Template Override -->
+        <div class="flex items-start q-mr-sm alert-settings-row">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+            {{ t("alerts.template") }}
+            <q-icon
+              name="info"
+              size="17px"
+              class="q-ml-xs cursor-pointer"
+              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            >
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">
+                  Optional: Select a template to use for all destinations in this alert.
+                  This overrides any templates configured on individual destinations.
+                  If not selected, each destination will use its own configured template.
+                </span>
+              </q-tooltip>
+            </q-icon>
+          </div>
+          <div>
+            <div class="flex items-center">
+              <q-select
+                ref="templateFieldRef"
+                v-model="localTemplate"
+                :options="filteredTemplates"
+                class="no-case q-py-none"
+                borderless
+                dense
+                use-input
+                fill-input
+                clearable
+                emit-value
+                :input-debounce="400"
+                hide-bottom-space
+                @filter="filterTemplates"
+                @update:model-value="emitTemplateUpdate"
+                style="width: 180px; max-width: 300px"
+                placeholder="Use destination templates"
+              >
+                <template v-slot:no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">No templates available</q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <q-btn
+                icon="refresh"
+                class="iconHoverBtn q-ml-xs"
+                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+                padding="xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                title="Refresh latest Templates"
+                @click="$emit('refresh:templates')"
+                style="min-width: auto"
+              />
+            </div>
+          </div>
+        </div>
       </template>
       </q-form>
     </div>
@@ -937,6 +999,14 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
+    template: {
+      type: String,
+      default: "",
+    },
+    templates: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: [
     "update:trigger",
@@ -945,6 +1015,8 @@ export default defineComponent({
     "update:destinations",
     "refresh:destinations",
     "update:promqlCondition",
+    "update:template",
+    "refresh:templates",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -959,6 +1031,7 @@ export default defineComponent({
     const thresholdFieldRef = ref(null);
     const silenceFieldRef = ref(null);
     const destinationsFieldRef = ref(null);
+    const templateFieldRef = ref(null);
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
@@ -967,6 +1040,7 @@ export default defineComponent({
       queryType.value === "custom" && props.isAggregationEnabled
     );
     const localDestinations = ref(props.destinations);
+    const localTemplate = ref(props.template);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -1148,6 +1222,13 @@ export default defineComponent({
       (newVal) => {
         // Only enable aggregation if query type is "custom"
         localIsAggregationEnabled.value = queryType.value === "custom" && newVal;
+      }
+    );
+
+     watch(
+      () => props.template,
+      (newVal) => {
+        localTemplate.value = newVal;
       }
     );
 
@@ -1351,6 +1432,30 @@ export default defineComponent({
       });
     };
 
+       // Filtered templates
+    const formattedTemplates = computed(() => props.templates.map((t: any) => t.name));
+    const filteredTemplates = ref<string[]>([]);
+    const filterTemplates = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          filteredTemplates.value = [...formattedTemplates.value];
+        } else {
+          const needle = val.toLowerCase();
+          filteredTemplates.value = formattedTemplates.value.filter(
+            (v: string) => v.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
+    };
+    // Watch for templates prop changes
+    watch(
+      () => props.templates,
+      () => {
+        filteredTemplates.value = [...formattedTemplates.value];
+      },
+      { immediate: true }
+    );
+
     // Timezone filter function
     const timezoneFilterFn = (val: string, update: any) => {
       update(() => {
@@ -1526,6 +1631,10 @@ export default defineComponent({
 
     const emitDestinationsUpdate = () => {
       emit("update:destinations", localDestinations.value);
+    };
+
+    const emitTemplateUpdate = () => {
+      emit("update:template", localTemplate.value || "");
     };
 
     const emitPromqlConditionUpdate = () => {
@@ -1715,7 +1824,12 @@ export default defineComponent({
       showHavingContext,
       groupByFieldsText,
       havingFieldsText,
+      emitTemplateUpdate,
       emitPromqlConditionUpdate,
+      localTemplate,
+      filteredTemplates,
+      filterTemplates,
+      templateFieldRef,
     };
   },
 });
