@@ -1831,7 +1831,26 @@
         "havingConditions": "조건 있음:"
       }
     },
-    "template": "템플릿 오버라이드"
+    "template": "템플릿 오버라이드",
+    "alertDetails": {
+      "alertName": "경고 이름",
+      "sqlQuery": "SQL 쿼리",
+      "conditions": "조건",
+      "copy": "복사",
+      "noCondition": "조건 없음",
+      "noDescription": "설명 없음",
+      "evaluationHistory": "평가 기록",
+      "loadingHistory": "기록 로드 중...",
+      "noHistoryAvailable": "이 알림에 대한 평가 기록이 없습니다.",
+      "results": "결과"
+    },
+    "historyTable": {
+      "timestamp": "타임스탬프",
+      "status": "상태",
+      "evaluationTime": "평가 (들)",
+      "queryTime": "쿼리 (밀리초)",
+      "error": "오류"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2511,7 +2530,8 @@
     "showLegends": "쇼 레전드"
   },
   "alert_list": {
-    "alert_details": "경고 세부 정보"
+    "alert_details": "경고 세부 정보",
+    "alert_history": "알림 기록"
   },
   "latencyInsights": {
     "title": "인사이트",

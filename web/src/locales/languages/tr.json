@@ -1831,7 +1831,26 @@
         "havingConditions": "SAHIP olma koşulları:"
       }
     },
-    "template": "Şablon Geçersiz Kılma"
+    "template": "Şablon Geçersiz Kılma",
+    "alertDetails": {
+      "alertName": "Uyarı Adı",
+      "sqlQuery": "SQL Sorgu",
+      "conditions": "Koşullar",
+      "copy": "Kopyalama",
+      "noCondition": "Koşulsuz",
+      "noDescription": "Açıklama yok",
+      "evaluationHistory": "Değerlendirme Geçmişi",
+      "loadingHistory": "Geçmiş yükleniyor...",
+      "noHistoryAvailable": "Bu uyarı için değerlendirme geçmişi mevcut değil",
+      "results": "Sonuçlar"
+    },
+    "historyTable": {
+      "timestamp": "Zaman damgası",
+      "status": "Durum",
+      "evaluationTime": "Değerlendirme (lar)",
+      "queryTime": "Sorgu (ms)",
+      "error": "Hata"
+    }
   },
   "alert_templates": {
     "header": "Şablonlar",
@@ -2511,7 +2530,8 @@
     "showLegends": "Efsaneleri Göster"
   },
   "alert_list": {
-    "alert_details": "Uyarı Ayrıntıları"
+    "alert_details": "Uyarı Ayrıntıları",
+    "alert_history": "Uyarı Geçmişi"
   },
   "latencyInsights": {
     "title": "İçgörüler",

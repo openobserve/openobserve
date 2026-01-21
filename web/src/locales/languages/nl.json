@@ -1831,7 +1831,26 @@
         "havingConditions": "De voorwaarden met betrekking tot:"
       }
     },
-    "template": "Sjabloon overschrijven"
+    "template": "Sjabloon overschrijven",
+    "alertDetails": {
+      "alertName": "Naam van de waarschuwing",
+      "sqlQuery": "SQL-zoekopdracht",
+      "conditions": "Voorwaarden",
+      "copy": "Kopiëren",
+      "noCondition": "Geen voorwaarde",
+      "noDescription": "Geen beschrijving",
+      "evaluationHistory": "Geschiedenis van de evaluatie",
+      "loadingHistory": "Geschiedenis wordt geladen...",
+      "noHistoryAvailable": "Geen evaluatiegeschiedenis beschikbaar voor deze waarschuwing",
+      "results": "Resultaten"
+    },
+    "historyTable": {
+      "timestamp": "Tijdstempel",
+      "status": "Status",
+      "evaluationTime": "Evaluatie (s)",
+      "queryTime": "Zoekopdracht (ms)",
+      "error": "Fout"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2511,7 +2530,8 @@
     "showLegends": "Legendes weergeven"
   },
   "alert_list": {
-    "alert_details": "Details van de waarschuwing"
+    "alert_details": "Details van de waarschuwing",
+    "alert_history": "Waarschuwingsgeschiedenis"
   },
   "latencyInsights": {
     "title": "Inzichten",

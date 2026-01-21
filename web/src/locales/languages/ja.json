@@ -1841,7 +1841,26 @@
         "havingConditions": "条件がある:"
       }
     },
-    "template": "テンプレートオーバーライド"
+    "template": "テンプレートオーバーライド",
+    "alertDetails": {
+      "alertName": "アラート名",
+      "sqlQuery": "SQL クエリー",
+      "conditions": "条件",
+      "copy": "[コピー]",
+      "noCondition": "条件なし",
+      "noDescription": "説明なし",
+      "evaluationHistory": "評価履歴",
+      "loadingHistory": "履歴をロード中...",
+      "noHistoryAvailable": "このアラートの評価履歴はありません",
+      "results": "結果"
+    },
+    "historyTable": {
+      "timestamp": "タイムスタンプ",
+      "status": "ステータス",
+      "evaluationTime": "評価 (s)",
+      "queryTime": "クエリ (ミリ秒)",
+      "error": "[エラー]"
+    }
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2504,7 +2523,8 @@
     "showLegends": "レジェンドを表示"
   },
   "alert_list": {
-    "alert_details": "アラートの詳細"
+    "alert_details": "アラートの詳細",
+    "alert_history": "アラート履歴"
   },
   "latencyInsights": {
     "title": "インサイト",

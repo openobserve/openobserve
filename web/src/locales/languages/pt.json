@@ -1831,7 +1831,26 @@
         "havingConditions": "TENDO condições:"
       }
     },
-    "template": "Substituição de modelo"
+    "template": "Substituição de modelo",
+    "alertDetails": {
+      "alertName": "Nome do alerta",
+      "sqlQuery": "Consulta SQL",
+      "conditions": "Condições",
+      "copy": "Copiar",
+      "noCondition": "Sem condição",
+      "noDescription": "Sem descrição",
+      "evaluationHistory": "Histórico de avaliação",
+      "loadingHistory": "Carregando histórico...",
+      "noHistoryAvailable": "Não há histórico de avaliação disponível para este alerta",
+      "results": "Resultados"
+    },
+    "historyTable": {
+      "timestamp": "Carimbo de data/hora",
+      "status": "Status",
+      "evaluationTime": "Avaliação (ões)",
+      "queryTime": "Consulta (ms)",
+      "error": "Erro"
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2511,7 +2530,8 @@
     "showLegends": "Mostrar lendas"
   },
   "alert_list": {
-    "alert_details": "Detalhes do alerta"
+    "alert_details": "Detalhes do alerta",
+    "alert_history": "Histórico de alertas"
   },
   "latencyInsights": {
     "title": "Percepções",

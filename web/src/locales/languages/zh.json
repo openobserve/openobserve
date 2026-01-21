@@ -1827,7 +1827,26 @@
         "havingConditions": "有条件："
       }
     },
-    "template": "模板"
+    "template": "模板",
+    "alertDetails": {
+      "alertName": "警报名称",
+      "sqlQuery": "SQL 查询",
+      "conditions": "条件",
+      "copy": "复制",
+      "noCondition": "无条件",
+      "noDescription": "没有描述",
+      "evaluationHistory": "评估历史",
+      "loadingHistory": "正在加载历史记录...",
+      "noHistoryAvailable": "此警报没有评估历史记录",
+      "results": "结果"
+    },
+    "historyTable": {
+      "timestamp": "时间戳",
+      "status": "状态",
+      "evaluationTime": "评估",
+      "queryTime": "查询 (ms)",
+      "error": "错误"
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -2507,7 +2526,8 @@
     "showLegends": "显示图例"
   },
   "alert_list": {
-    "alert_details": "告警详情"
+    "alert_details": "告警详情",
+    "alert_history": "警报历史"
   },
   "latencyInsights": {
     "title": "标题",

@@ -1831,7 +1831,26 @@
         "havingConditions": "CONDITIONS D'UTILISATION :"
       }
     },
-    "template": "Remplacer le modèle"
+    "template": "Remplacer le modèle",
+    "alertDetails": {
+      "alertName": "Nom de l'alerte",
+      "sqlQuery": "Requête SQL",
+      "conditions": "Conditions",
+      "copy": "Copier",
+      "noCondition": "Aucune condition",
+      "noDescription": "Aucune description",
+      "evaluationHistory": "Historique de l'évaluation",
+      "loadingHistory": "Historique de chargement...",
+      "noHistoryAvailable": "Aucun historique d'évaluation disponible pour cette alerte",
+      "results": "Résultats"
+    },
+    "historyTable": {
+      "timestamp": "Horodatage",
+      "status": "État",
+      "evaluationTime": "Évaluation (s)",
+      "queryTime": "Requête (ms)",
+      "error": "Erreur"
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2511,7 +2530,8 @@
     "showLegends": "Afficher les légendes"
   },
   "alert_list": {
-    "alert_details": "Détails de l'alerte"
+    "alert_details": "Détails de l'alerte",
+    "alert_history": "Historique des alertes"
   },
   "latencyInsights": {
     "title": "Perspectives",
