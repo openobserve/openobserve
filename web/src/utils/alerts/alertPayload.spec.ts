@@ -43,7 +43,12 @@ describe('alertPayload', () => {
       };
 
       const context = {
-        store: { state: { selectedOrganization: { identifier: 'test-org' } } },
+        store: {
+          state: {
+            selectedOrganization: { identifier: 'test-org' },
+            userInfo: { email: 'test@example.com' }
+          }
+        },
         isAggregationEnabled: { value: false },
         getSelectedTab: { value: 'sql' },
         beingUpdated: false
@@ -72,7 +77,12 @@ describe('alertPayload', () => {
       };
 
       const context = {
-        store: { state: { selectedOrganization: { identifier: 'test-org' } } },
+        store: {
+          state: {
+            selectedOrganization: { identifier: 'test-org' },
+            userInfo: { email: 'test@example.com' }
+          }
+        },
         isAggregationEnabled: { value: true },
         getSelectedTab: { value: 'promql' },
         beingUpdated: false

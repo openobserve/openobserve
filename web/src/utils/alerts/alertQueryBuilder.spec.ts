@@ -13,54 +13,75 @@
 // limitations under the License.
 
 import { describe, it, expect } from 'vitest';
-import { buildQueryFromConditions } from './alertQueryBuilder';
+import { getFormattedCondition, generateSqlQuery } from './alertQueryBuilder';
 
 describe('alertQueryBuilder', () => {
-  describe('buildQueryFromConditions', () => {
-    it('should build query from simple condition', () => {
-      const conditions = [
-        {
-          column: 'status',
-          operator: '=',
-          value: '200'
-        }
-      ];
-
-      const query = buildQueryFromConditions(conditions);
-
-      expect(query).toBeDefined();
-      expect(typeof query).toBe('string');
-      expect(query).toContain('status');
+  describe('getFormattedCondition', () => {
+    it('should format equality condition', () => {
+      const condition = getFormattedCondition('status', '=', '200');
+      expect(condition).toBe('status = 200');
     });
 
-    it('should build query from multiple conditions', () => {
-      const conditions = [
-        {
-          column: 'status',
-          operator: '=',
-          value: '200'
-        },
-        {
-          column: 'method',
-          operator: '=',
-          value: 'GET',
-          logicalOperator: 'AND'
-        }
-      ];
-
-      const query = buildQueryFromConditions(conditions);
-
-      expect(query).toBeDefined();
-      expect(query).toContain('status');
-      expect(query).toContain('method');
+    it('should format contains condition', () => {
+      const condition = getFormattedCondition('message', 'contains', 'error');
+      expect(condition).toBe("message LIKE '%error%'");
     });
 
-    it('should handle empty conditions', () => {
-      const conditions: any[] = [];
+    it('should format not_contains condition', () => {
+      const condition = getFormattedCondition('message', 'not_contains', 'debug');
+      expect(condition).toBe("message NOT LIKE '%debug%'");
+    });
 
-      const query = buildQueryFromConditions(conditions);
+    it('should format comparison operators', () => {
+      expect(getFormattedCondition('count', '>', 100)).toBe('count > 100');
+      expect(getFormattedCondition('count', '<=', 50)).toBe('count <= 50');
+    });
+  });
 
-      expect(query).toBeDefined();
+  describe('generateSqlQuery', () => {
+    it('should generate basic SQL query without aggregation', () => {
+      const formData = {
+        stream_name: 'test_stream',
+        query_condition: {
+          conditions: { filterType: 'AND', conditions: [] },
+          sql: '',
+          promql: '',
+          type: 'sql',
+          aggregation: null,
+          promql_condition: null,
+          vrl_function: null,
+          multi_time_range: []
+        }
+      };
+
+      const query = generateSqlQuery(formData, {}, false);
+      expect(query).toContain('SELECT histogram(_timestamp)');
+      expect(query).toContain('FROM "test_stream"');
+      expect(query).toContain('COUNT(*)');
+    });
+
+    it('should generate SQL query with aggregation', () => {
+      const formData = {
+        stream_name: 'test_stream',
+        query_condition: {
+          conditions: { filterType: 'AND', conditions: [] },
+          sql: '',
+          promql: '',
+          type: 'sql',
+          aggregation: {
+            group_by: [],
+            function: 'avg',
+            having: { column: 'response_time', operator: '>', value: 100 }
+          },
+          promql_condition: null,
+          vrl_function: null,
+          multi_time_range: []
+        }
+      };
+
+      const query = generateSqlQuery(formData, {}, true);
+      expect(query).toContain('avg(response_time)');
+      expect(query).toContain('zo_sql_val');
     });
   });
 });
