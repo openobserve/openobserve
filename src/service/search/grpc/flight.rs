@@ -196,9 +196,10 @@ pub async fn search(
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
+        stream,
         stream_type,
         stream_name: stream_name.to_string(),
-        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
+        time_range: (req.search_info.start_time, req.search_info.end_time),
         work_group: work_group.clone(),
         use_inverted_index: index_condition.is_some()
             && cfg.common.inverted_index_enabled
@@ -207,10 +208,8 @@ pub async fn search(
     });
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: use_inverted_index: {}, index_condition: {:?}, index_optimizer_rule: {:?}",
-        query_params.use_inverted_index,
-        index_condition,
-        idx_optimize_rule
+        "[trace_id {trace_id}] flight->search: use_inverted_index: {}, index_condition: {index_condition:?}, index_optimizer_rule: {idx_optimize_rule:?}",
+        query_params.use_inverted_index
     );
 
     // search in object storage
@@ -221,7 +220,7 @@ pub async fn search(
             &org_id,
             stream_type,
             &stream_name,
-            query_params.time_range,
+            Some(query_params.time_range),
             &search_partition_keys,
             &req.search_info.file_id_list,
         )
@@ -277,7 +276,7 @@ pub async fn search(
             o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files(
                 &mut file_list,
                 sampling_config,
-                query_params.time_range,
+                Some(query_params.time_range),
                 req.search_info.histogram_interval,
                 &trace_id,
             );
@@ -410,7 +409,12 @@ pub async fn search(
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
         // get the enrichment table from db
-        let enrichment_table = EnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        let enrichment_table = EnrichTable::new(
+            &org_id,
+            &stream_name,
+            empty_exec.full_schema().clone(),
+            query_params.time_range,
+        );
         // add the enrichment table to the tables
         tables.push(Arc::new(enrichment_table) as _);
     }
@@ -469,8 +473,12 @@ pub async fn search(
         )
     );
 
+    if cfg.common.feature_pushdown_filter_enabled {
+        let pushdown_filter = FilterPushdown::new();
+        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
+    }
+
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
-        // pushdown filter
         let pushdown_filter = FilterPushdown::new_post_optimization();
         physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
     }
