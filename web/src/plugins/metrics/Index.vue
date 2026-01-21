@@ -214,6 +214,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           fullTimePrefix="Last Refreshed At: "
                         />
                       </span>
+                      <PanelErrorButtons
+                        :error="errorMessage"
+                        :maxQueryRangeWarning="maxQueryRangeWarning"
+                        :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                        :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                        :isPartialData="isPartialData"
+                        :isPanelLoading="isPanelLoading"
+                      />
                     </div>
                     <div class="col tw:relative" >
                       <div
@@ -241,6 +249,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @show-legends="showLegendsDialog = true"
                           ref="panelSchemaRendererRef"
                           searchType="ui"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
+                          @limit-number-of-series-warning-message-update="
+                            handleLimitNumberOfSeriesWarningMessage
+                          "
                         />
                       </div>
                       <div
@@ -406,6 +422,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <template #after>
+                        <div class="flex justify-end q-mr-sm">
+                          <PanelErrorButtons
+                            :error="errorMessage"
+                            :maxQueryRangeWarning="maxQueryRangeWarning"
+                            :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                            :isPartialData="isPartialData"
+                            :isPanelLoading="isPanelLoading"
+                          />
+                        </div>
                         <PanelSchemaRenderer
                           v-if="chartData"
                           @metadata-update="metaDataValue"
@@ -423,6 +449,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @series-data-update="seriesDataUpdate"
                           @show-legends="showLegendsDialog = true"
                           searchType="ui"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
+                          @limit-number-of-series-warning-message-update="
+                            handleLimitNumberOfSeriesWarningMessage
+                          "
                         />
                       </template>
                     </q-splitter>
@@ -512,6 +546,9 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
@@ -563,6 +600,7 @@ export default defineComponent({
     AutoRefreshInterval,
     CustomChartEditor,
     ShowLegendsPopup,
+    PanelErrorButtons,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -1176,6 +1214,31 @@ export default defineComponent({
 
     // [END] cancel running queries
 
+    const maxQueryRangeWarning = ref("");
+    const limitNumberOfSeriesWarningMessage = ref("");
+    const errorMessage = computed(() => {
+        return errorData.errors.join("\n");
+      });
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
+    const handleLimitNumberOfSeriesWarningMessage = (data: string) => {
+      limitNumberOfSeriesWarningMessage.value = data;
+    };
+
     const currentPanelData = computed(() => {
       const rendererData = panelSchemaRendererRef.value?.panelData || {};
       return {
@@ -1222,6 +1285,16 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      handleLimitNumberOfSeriesWarningMessage,
+      maxQueryRangeWarning,
+      limitNumberOfSeriesWarningMessage,
+      errorMessage,
+      isPartialData,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
     };
   },
 });

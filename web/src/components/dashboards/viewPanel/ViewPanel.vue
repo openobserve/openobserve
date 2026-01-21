@@ -134,63 +134,14 @@
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->
-                  <q-btn
-                    v-if="errorMessage"
-                    :icon="outlinedWarning"
-                    flat
-                    size="xs"
-                    padding="2px"
-                    data-test="viewpanel-error-data"
-                    class="warning q-mr-xs"
-                  >
-                    <q-tooltip
-                      anchor="bottom right"
-                      self="top right"
-                      max-width="220px"
-                    >
-                      <div style="white-space: pre-wrap">
-                        {{ errorMessage }}
-                      </div>
-                    </q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="maxQueryRangeWarning"
-                    :icon="outlinedWarning"
-                    flat
-                    size="xs"
-                    padding="2px"
-                    data-test="viewpanel-max-duration-warning"
-                    class="warning q-mr-xs"
-                  >
-                    <q-tooltip
-                      anchor="bottom right"
-                      self="top right"
-                      max-width="220px"
-                    >
-                      <div style="white-space: pre-wrap">
-                        {{ maxQueryRangeWarning }}
-                      </div>
-                    </q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="limitNumberOfSeriesWarningMessage"
-                    :icon="symOutlinedDataInfoAlert"
-                    flat
-                    size="xs"
-                    padding="2px"
-                    data-test="viewpanel-series-limit-warning"
-                    class="warning q-mr-xs"
-                  >
-                    <q-tooltip
-                      anchor="bottom right"
-                      self="top right"
-                      max-width="220px"
-                    >
-                      <div style="white-space: pre-wrap">
-                        {{ limitNumberOfSeriesWarningMessage }}
-                      </div>
-                    </q-tooltip>
-                  </q-btn>
+                  <PanelErrorButtons
+                      :error="errorMessage"
+                      :maxQueryRangeWarning="maxQueryRangeWarning"
+                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                      :isPartialData="isPartialData"
+                      :isPanelLoading="isPanelLoading"
+                  />
                   <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                     <span class="lastRefreshedAtIcon">🕑</span
                     ><RelativeTime
@@ -220,6 +171,11 @@
                   @result-metadata-update="handleResultMetadataUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
+                  "
+                  @is-partial-data-update="handleIsPartialDataUpdate"
+                  @loading-state-change="handleLoadingStateChange"
+                  @is-cached-data-differ-with-current-time-range-update="
+                    handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                   "
                   @show-legends="showLegendsDialog = true"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
@@ -291,6 +247,9 @@ import { defineAsyncComponent } from "vue";
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
 });
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 
 export default defineComponent({
   name: "ViewPanel",
@@ -303,6 +262,7 @@ export default defineComponent({
     HistogramIntervalDropDown,
     RelativeTime,
     ShowLegendsPopup,
+    PanelErrorButtons,
   },
   props: {
     panelId: {
@@ -414,6 +374,21 @@ export default defineComponent({
     const maxQueryRangeWarning = ref("");
     const limitNumberOfSeriesWarningMessage = ref("");
     const errorMessage = ref("");
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
 
     onBeforeMount(async () => {
       await importSqlParser();
@@ -896,6 +871,12 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      isPartialData,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     };
   },
 });

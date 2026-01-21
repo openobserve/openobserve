@@ -357,64 +357,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <div class="tw:flex tw:justify-end tw:mr-2 tw:items-center">
-                      <!-- Error/Warning tooltips moved here -->
-                      <q-btn
-                        v-if="errorMessage"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-error-data-inline"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ errorMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="maxQueryRangeWarning"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-max-duration-warning-inline"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ maxQueryRangeWarning }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="limitNumberOfSeriesWarningMessage"
-                        :icon="symOutlinedDataInfoAlert"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-series-limit-warning-inline"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ limitNumberOfSeriesWarningMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
+                        <PanelErrorButtons
+                          :error="errorMessage"
+                          :maxQueryRangeWarning="maxQueryRangeWarning"
+                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                          :isPartialData="isPartialData"
+                          :isPanelLoading="isPanelLoading"
+                        />
                       <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                         <span class="lastRefreshedAtIcon">🕑</span
                         ><RelativeTime
@@ -450,6 +400,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchType="dashboards"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @is-partial-data-update="handleIsPartialDataUpdate"
+                        @loading-state-change="handleLoadingStateChange"
+                        @is-cached-data-differ-with-current-time-range-update="
+                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                        "
                         ref="panelSchemaRendererRef"
                       />
                       <q-dialog v-model="showViewPanel">
@@ -721,11 +676,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           searchType="dashboards"
                           @series-data-update="seriesDataUpdate"
+                          @is-partial-data-update="handleIsPartialDataUpdate"
+                          @loading-state-change="handleLoadingStateChange"
+                          @is-cached-data-differ-with-current-time-range-update="
+                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                          "
                         />
                       </template>
                     </q-splitter>
                   </div>
-                  <div class="col-auto" style="flex-shrink: 0">
+                  <div class="col-auto" style="flex-shrink: 0; display: flex; align-items: center;">
+                    <PanelErrorButtons
+                      :error="errorMessage"
+                      :maxQueryRangeWarning="maxQueryRangeWarning"
+                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                      :isPartialData="isPartialData"
+                      :isPanelLoading="isPanelLoading"
+                    />
                     <DashboardErrorsComponent
                       :errors="errorData"
                       class="col-auto"
@@ -798,6 +766,9 @@ import {
 } from "vue";
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
 import CustomChartTypeSelector from "../../../components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue";
 
@@ -891,6 +862,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
     CustomChartEditor,
+    PanelErrorButtons,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
@@ -2599,6 +2571,22 @@ export default defineComponent({
       // the new variables from the manager through their computed properties
     };
 
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
     return {
       t,
       updateDateTime,
@@ -2671,8 +2659,15 @@ export default defineComponent({
       handleOpenAddVariable,
       handleCloseAddVariable,
       handleSaveVariable,
+      handleSaveVariable,
       currentTabId,
       currentPanelId,
+      isPartialData,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     };
   },
   methods: {

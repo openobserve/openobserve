@@ -177,6 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @is-partial-data-update="handleIsPartialDataUpdate"
+                        @loading-state-change="handleLoadingStateChange"
+                        @is-cached-data-differ-with-current-time-range-update="
+                          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                        "
                         ref="panelSchemaRendererRef"
                       />
                     </div>
@@ -185,63 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="position: absolute; top: 0px; right: -13px"
                     >
                       <!-- Error/Warning tooltips -->
-                      <q-btn
-                        v-if="errorMessage"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-error-data"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ errorMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="maxQueryRangeWarning"
-                        :icon="outlinedWarning"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-max-duration-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ maxQueryRangeWarning }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        v-if="limitNumberOfSeriesWarningMessage"
-                        :icon="symOutlinedDataInfoAlert"
-                        flat
-                        size="xs"
-                        padding="2px"
-                        data-test="dashboard-panel-limit-number-of-series-warning"
-                        class="warning q-mr-xs"
-                      >
-                        <q-tooltip
-                          anchor="bottom right"
-                          self="top right"
-                          max-width="220px"
-                        >
-                          <div style="white-space: pre-wrap">
-                            {{ limitNumberOfSeriesWarningMessage }}
-                          </div>
-                        </q-tooltip>
-                      </q-btn>
+                      <PanelErrorButtons
+                          :error="errorMessage"
+                          :maxQueryRangeWarning="maxQueryRangeWarning"
+                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                          :isPartialData="isPartialData"
+                          :isPanelLoading="isPanelLoading"
+                      />
                       <q-btn
                         size="md"
                         class="no-border"
@@ -514,6 +470,9 @@ const AddToDashboard = defineAsyncComponent(() => {
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
 });
+const PanelErrorButtons = defineAsyncComponent(() => {
+  return import("@/components/dashboards/PanelErrorButtons.vue");
+});
 
 export default defineComponent({
   name: "VisualizeLogsQuery",
@@ -554,6 +513,7 @@ export default defineComponent({
     AddToDashboard,
     CustomChartEditor,
     ShowLegendsPopup,
+    PanelErrorButtons,
   },
   emits: ["handleChartApiError"],
   setup(props, { emit }) {
@@ -966,6 +926,22 @@ export default defineComponent({
       };
     });
 
+    const isPartialData = ref(false);
+    const isPanelLoading = ref(false);
+    const isCachedDataDifferWithCurrentTimeRange = ref(false);
+
+    const handleIsPartialDataUpdate = (data: boolean) => {
+      isPartialData.value = data;
+    };
+
+    const handleLoadingStateChange = (data: boolean) => {
+      isPanelLoading.value = data;
+    };
+
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
+      isCachedDataDifferWithCurrentTimeRange.value = data;
+    };
+
     return {
       t,
       layoutSplitterUpdated,
@@ -1003,6 +979,12 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      isPartialData,
+      isPanelLoading,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsPartialDataUpdate,
+      handleLoadingStateChange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     };
   },
 });
