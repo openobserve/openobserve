@@ -191,6 +191,14 @@ class EnrichmentPage {
     }
 
     /**
+     * Check if "From URL" option is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isFromUrlOptionVisible() {
+        return this.page.getByText('From URL', { exact: true }).isVisible().catch(() => false);
+    }
+
+    /**
      * Click the "Upload File" option in the data source selector
      */
     async clickUploadFileOption() {
@@ -198,6 +206,14 @@ class EnrichmentPage {
         await this.page.getByText('Upload File', { exact: true }).click();
         await this.page.waitForLoadState('domcontentloaded');
         testLogger.debug('Upload File option clicked');
+    }
+
+    /**
+     * Check if "Upload File" option is visible
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isUploadFileOptionVisible() {
+        return this.page.getByText('Upload File', { exact: true }).isVisible().catch(() => false);
     }
 
     /**

@@ -1779,7 +1779,9 @@ export class LogsPage {
     }
 
     async fillSavedViewSearchInput(text) {
-        return await this.fillInputField(this.savedViewSearchInput, text);
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+        return await searchInput.fill(text);
     }
 
     async clickSavedViewByTitle(title) {
@@ -2430,6 +2432,14 @@ export class LogsPage {
             testLogger.warn(`isLiveMode5SecEnabled check failed: ${error.message}`);
             return false;
         }
+    }
+
+    /**
+     * Get the Live Mode 5 second button locator
+     * @returns {import('@playwright/test').Locator} The 5-second live mode button locator
+     */
+    getLiveMode5SecButton() {
+        return this.page.locator(this.liveMode5SecBtn);
     }
 
     async getPageContent() {
