@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </span>
 
-        <!-- Compact Status, Severity, Alerts badges -->
-        <div v-if="incidentDetails" class="tw:flex tw:items-center tw:gap-2">
+        <!-- Compact Status, Severity, Alerts badges (only show on Incident Analysis tab) -->
+        <div v-if="incidentDetails && activeTab === 'incidentAnalysis'" class="tw:flex tw:items-center tw:gap-2">
           <!-- Status Badge -->
           <q-badge
             :color="getStatusColor(incidentDetails.status)"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Incident Details -->
       <div class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col" :class="store.state.theme === 'dark' ? 'tw:border-r tw:border-gray-700' : 'tw:border-r tw:border-gray-200'"  style="order: 1;">
 
-        <!-- Top Section (45% height) - Table of Contents -->
+        <!-- Top Section (45% height) - Table of Contents OR Overview -->
         <div
           style="height: 45%"
           class="tw:border-b tw:p-4 tw:flex tw:flex-col"
@@ -209,17 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-100 tw:border-gray-200'
               ]"
             >
-              <q-icon name="format_list_bulleted" size="16px" class="tw:opacity-80" />
+              <q-icon :name="activeTab === 'incidentAnalysis' ? 'format_list_bulleted' : 'dashboard'" size="16px" class="tw:opacity-80" />
               <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
-                Table of Contents
+                {{ activeTab === 'incidentAnalysis' ? 'Table of Contents' : 'Overview' }}
               </span>
             </div>
             <!-- Content -->
             <div :class="store.state.theme === 'dark' ? 'tw:bg-gray-800/30' : 'tw:bg-white'" class="tw:p-3 tw:flex-1 tw:overflow-auto">
-              <div v-if="tableOfContents.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
-                No sections available
-              </div>
-              <div v-else class="tw:space-y-1">
+
+              <!-- Table of Contents (Incident Analysis Tab) -->
+              <template v-if="activeTab === 'incidentAnalysis'">
+                <div v-if="tableOfContents.length === 0" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
+                  No sections available
+                </div>
+                <div v-else class="tw:space-y-1">
                 <!-- TOC Items -->
                 <template v-for="item in tableOfContents" :key="item.id">
                   <div>
@@ -330,6 +333,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </div>
+              </template>
+
+              <!-- Overview Section (Other Tabs) -->
+              <template v-else>
+                <div v-if="incidentDetails" class="tw:flex tw:flex-col tw:gap-3 tw:h-full">
+                  <!-- Status Card -->
+                  <div
+                    :class="[
+                      'tw:flex tw:items-center tw:justify-between tw:p-4 tw:rounded-lg tw:border tw:transition-all tw:cursor-default tw:flex-1',
+                      store.state.theme === 'dark'
+                        ? 'tw:bg-gradient-to-r tw:from-blue-900/30 tw:to-blue-800/20 tw:border-blue-700/50 hover:tw:border-blue-600/70'
+                        : 'tw:bg-gradient-to-r tw:from-blue-50 tw:to-blue-100 tw:border-blue-200 hover:tw:border-blue-300'
+                    ]"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-2.5">
+                      <q-icon
+                        name="info"
+                        size="20px"
+                        :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'"
+                      />
+                      <span
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+                        class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide"
+                      >
+                        Status
+                      </span>
+                    </div>
+                    <span
+                      :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                      class="tw:text-base tw:font-bold"
+                    >
+                      {{ getStatusLabel(incidentDetails.status) }}
+                    </span>
+                  </div>
+
+                  <!-- Severity Card -->
+                  <div
+                    :class="[
+                      'tw:flex tw:items-center tw:justify-between tw:p-4 tw:rounded-lg tw:border tw:transition-all tw:cursor-default tw:flex-1',
+                      store.state.theme === 'dark'
+                        ? 'tw:bg-gradient-to-r tw:from-orange-900/30 tw:to-orange-800/20 tw:border-orange-700/50 hover:tw:border-orange-600/70'
+                        : 'tw:bg-gradient-to-r tw:from-orange-50 tw:to-orange-100 tw:border-orange-200 hover:tw:border-orange-300'
+                    ]"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-2.5">
+                      <q-icon
+                        name="warning"
+                        size="20px"
+                        :style="{ color: getSeverityColorHex(incidentDetails.severity) }"
+                      />
+                      <span
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+                        class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide"
+                      >
+                        Severity
+                      </span>
+                    </div>
+                    <span
+                      :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                      class="tw:text-base tw:font-bold"
+                    >
+                      {{ incidentDetails.severity }}
+                    </span>
+                  </div>
+
+                  <!-- Alerts Card -->
+                  <div
+                    :class="[
+                      'tw:flex tw:items-center tw:justify-between tw:p-4 tw:rounded-lg tw:border tw:transition-all tw:cursor-default tw:flex-1',
+                      store.state.theme === 'dark'
+                        ? 'tw:bg-gradient-to-r tw:from-purple-900/30 tw:to-purple-800/20 tw:border-purple-700/50 hover:tw:border-purple-600/70'
+                        : 'tw:bg-gradient-to-r tw:from-purple-50 tw:to-purple-100 tw:border-purple-200 hover:tw:border-purple-300'
+                    ]"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-2.5">
+                      <q-icon
+                        name="notifications_active"
+                        size="20px"
+                        :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'"
+                      />
+                      <span
+                        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+                        class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide"
+                      >
+                        Alerts
+                      </span>
+                    </div>
+                    <span
+                      :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                      class="tw:text-base tw:font-bold"
+                    >
+                      {{ incidentDetails.alert_count }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+
             </div>
           </div>
         </div>
