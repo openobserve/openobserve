@@ -25,8 +25,12 @@ const isValidServiceNowIncidentUrl = (url: string): boolean => {
 
     const hostname = parsed.hostname.toLowerCase();
     // Require a host within the service-now.com domain
-    if (hostname !== 'service-now.com' && !hostname.endsWith('.service-now.com')) {
-      return false;
+    // Split hostname and verify the last two parts are exactly "service-now.com"
+    if (hostname !== 'service-now.com') {
+      const parts = hostname.split('.');
+      if (parts.length < 3 || parts[parts.length - 2] !== 'service-now' || parts[parts.length - 1] !== 'com') {
+        return false;
+      }
     }
 
     // Require the incident table API path
