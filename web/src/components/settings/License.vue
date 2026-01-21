@@ -188,16 +188,29 @@
                   <!-- Summary Message -->
                   <div class="ingestion-summary-compact">
                     <div class="summary-text-compact text-body2">
+                      <!-- Line 1: License Info -->
+                      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                        <q-icon
+                          name="info"
+                          size="18px"
+                          class="tw:flex-shrink-0"
+                        />
+                        <span>
+                          Your license allows <strong>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB` : '100 GB' }}</strong> of data ingestion per day.
+                        </span>
+                      </div>
+
+                      <!-- Line 2: Exceeded Status -->
                       <div class="tw:flex tw:items-center tw:gap-2">
                         <q-icon
-                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 30"
+                          v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 3"
                           name="warning"
                           size="18px"
                           class="text-negative tw:flex-shrink-0"
                         />
                         <q-icon
                           v-else-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0"
-                          name="info"
+                          name="check_circle"
                           size="18px"
                           class="text-warning tw:flex-shrink-0"
                         />
@@ -208,20 +221,11 @@
                           class="text-positive tw:flex-shrink-0"
                         />
                         <span>
-                          Your license allows <strong>{{ !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? `${licenseData?.license?.limits?.Ingestion?.value} GB` : '100 GB' }}</strong> of data ingestion per day
-                          <span v-if="!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.typ"> ({{ licenseData?.license?.limits?.Ingestion?.typ }})</span>.
-                          <span v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0">
-                            Exceeded <strong :class="licenseData?.ingestion_exceeded > 3 ? 'text-negative' : 'text-warning'">{{ licenseData?.ingestion_exceeded }} time{{ licenseData?.ingestion_exceeded > 1 ? 's' : '' }}</strong> this month.
-                            <span v-if="licenseData?.ingestion_exceeded > 3" class="warning-message">
-                              <q-icon name="error" size="14px" class="tw:ml-1" />
-                              Exceeded allowed limit (max 3 times/month)!
-                            </span>
-                            <span v-else class="info-message">
-                              ({{ 3 - licenseData?.ingestion_exceeded }} allowance{{ (3 - licenseData?.ingestion_exceeded) > 1 ? 's' : '' }} remaining)
-                            </span>
+                          <span v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 3">
+                            Limit exceeded on <strong :class="licenseData?.ingestion_exceeded > 30 ? 'text-negative' : 'text-warning'">{{ licenseData?.ingestion_exceeded }} day{{ licenseData?.ingestion_exceeded > 1 ? 's' : '' }}</strong> this month<span v-if="licenseData?.ingestion_exceeded > 3" class="warning-message"> (max 3 days allowed). Application feature will be restricted</span><span v-else class="info-message"> ({{ 3 - licenseData?.ingestion_exceeded }} allowance{{ (3 - licenseData?.ingestion_exceeded) > 1 ? 's' : '' }} left of 3 max)</span>.
                           </span>
-                          <span v-else class="text-positive">
-                            No limit violations this month.
+                          <span v-else>
+                            No limit exceedances this month (max 3 allowed per month).
                           </span>
                         </span>
                       </div>
@@ -240,15 +244,6 @@
                           :allowAlertCreation="false"
                           searchType="dashboards"
                         />
-                      </div>
-                      <div class="tw:flex tw:items-center tw:justify-between tw:mt-2 tw:px-2">
-                        <div class="limit-badge">
-                          <q-icon name="warning" size="14px" class="tw:mr-1" />
-                          {{ isIngestionUnlimited ? 'Unlimited' : `${!licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '100'} GB / day` }}
-                        </div>
-                        <div v-if="!isIngestionUnlimited" class="text-caption tw:opacity-60" style="font-size: 11px;">
-                          Max 3 exceedances allowed per month
-                        </div>
                       </div>
                       <div v-if="isIngestionUnlimited" class="text-caption text-grey-6 tw:mt-1 tw:text-center" style="font-size: 10px;">
                         * Usage shows 0% for unlimited plans
@@ -814,8 +809,10 @@ export default defineComponent({
   overflow: visible;
   padding: 0;
   margin: 0 auto;
-  height: 380px;
-  min-height: 380px;
+
+  .grid-stack-item-content {
+    border: 0px !important; 
+  }
 }
 
 @media (max-width: 1023px) {
@@ -851,7 +848,6 @@ export default defineComponent({
 }
 
 .ingestion-summary-compact {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
   border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: 8px;
   padding: 12px 14px;
@@ -866,7 +862,7 @@ export default defineComponent({
     left: 0;
     width: 3px;
     height: 100%;
-    background: linear-gradient(180deg, #6366f1 0%, #a855f7 100%);
+    background: linear-gradient(180deg, var(--o2-menu-color) 0%, var(--o2-menu-color) 100%);
     opacity: 0.6;
   }
 
@@ -877,7 +873,7 @@ export default defineComponent({
 
     strong {
       font-weight: 700;
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      background: linear-gradient(135deg, var(--o2-menu-color) 0%, var(--o2-menu-color) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
