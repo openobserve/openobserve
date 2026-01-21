@@ -542,7 +542,8 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Check for radio group with source options (actual UI structure)
         const radioGroup = enrichmentPage.page.locator('.q-option-group').first();
-        const hasRadioGroup = await radioGroup.isVisible({ timeout: 5000 }).catch(() => false);
+        // Use waitFor since isVisible() doesn't support timeout parameter
+        const hasRadioGroup = await radioGroup.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
 
         testLogger.info(`Radio group visible: ${hasRadioGroup}`);
 

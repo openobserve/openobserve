@@ -176,9 +176,9 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     const isFunctionVisible = await functionNode.isVisible().catch(() => false);
     testLogger.info(`Function node visible: ${isFunctionVisible}`);
 
-    // Add destination node
+    // Add destination node (use same naming as other tests for consistency)
     await pageManager.pipelinesPage.selectAndDragSecondStream();
-    await pageManager.pipelinesPage.fillDestinationStreamName("vrl-destination");
+    await pageManager.pipelinesPage.fillDestinationStreamName("destination_node");
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     await page.waitForTimeout(2000);
 
@@ -194,9 +194,14 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await page.waitForTimeout(2000);
 
     // Cleanup - navigate to pipeline list and delete
-    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('vrl_destination');
-    await pageManager.pipelinesPage.searchPipeline(pipelineName);
-    await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+    try {
+      await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('destination_node');
+      await pageManager.pipelinesPage.searchPipeline(pipelineName);
+      await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+      testLogger.info('Pipeline cleanup completed');
+    } catch (cleanupError) {
+      testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
+    }
 
     testLogger.info('✓ Pipeline with VRL function node test passed');
   });
