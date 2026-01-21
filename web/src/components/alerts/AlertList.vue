@@ -719,6 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :alert-details="selectedAlertDetails"
           :alert-id="selectedAlertDetails?.alert_id || ''"
           @close="showAlertDetailsDrawer = false"
+          @edit="editAlertFromDrawer"
         />
       </q-dialog>
     </template>

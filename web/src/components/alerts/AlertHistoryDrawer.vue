@@ -51,6 +51,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto tw:flex tw:items-center">
           <q-btn
+            data-test="alert-details-edit-btn"
+            flat
+            round
+            dense
+            icon="edit"
+            @click="editAlertFromDrawer"
+          >
+            <q-tooltip>{{ t('alerts.edit') }}</q-tooltip>
+          </q-btn>
+          <q-btn
             data-test="alert-details-refresh-btn"
             class=""
             flat
@@ -80,15 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <div class="tw:mx-2 q-py-md alert-details-content" v-if="alertDetails">
-      <!-- SQL Query / Conditions -->
+      <!-- SQL Query / PromQL Query / Conditions -->
       <div class="tw:mb-3">
         <div class="tw:flex tw:items-center tw:justify-between tw:mb-1">
           <div class="section-label">
-            {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : t('alerts.alertDetails.conditions') }}
+            {{ alertDetails.type == "sql" ? t('alerts.alertDetails.sqlQuery') : alertDetails.type == "promql" ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions') }}
           </div>
           <q-btn
             v-if="alertDetails.conditions != '' && alertDetails.conditions != '--'"
-            @click="copyToClipboard(alertDetails.conditions, t('alerts.alertDetails.conditions'))"
+            @click="copyToClipboard(alertDetails.conditions, alertDetails.type == 'sql' ? t('alerts.alertDetails.sqlQuery') : alertDetails.type == 'promql' ? t('alerts.alertDetails.promqlQuery') : t('alerts.alertDetails.conditions'))"
             size="sm"
             flat
             dense
@@ -104,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="white-space: pre-wrap"
         >{{
           alertDetails.conditions != "" && alertDetails.conditions != "--"
-            ? (alertDetails.type == 'sql' ? alertDetails.conditions : alertDetails.conditions.length != 2 ? `if ${alertDetails.conditions}` : t('alerts.alertDetails.noCondition'))
+            ? (alertDetails.type == 'sql' || alertDetails.type == 'promql' ? alertDetails.conditions : alertDetails.conditions.length != 2 ? `if ${alertDetails.conditions}` : t('alerts.alertDetails.noCondition'))
             : t('alerts.alertDetails.noCondition')
         }}</pre>
       </div>
@@ -224,8 +234,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Emit is not used since v-close-popup handles closing
-// const emit = defineEmits(["close"]);
+const emit = defineEmits(["edit"]);
 
 const resultTotal = ref(0);
 
@@ -431,6 +440,11 @@ const refreshHistory = async () => {
     await fetchAlertHistory(props.alertId);
     isLoadingHistory.value = false;
   }
+};
+
+const editAlertFromDrawer = () => {
+  if (!props.alertDetails) return;
+  emit("edit", props.alertDetails);
 };
 
 const copyToClipboard = (text: string, type: string) => {

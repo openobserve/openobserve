@@ -2011,6 +2011,7 @@
     "alertDetails": {
       "alertName": "Alert Name",
       "sqlQuery": "SQL Query",
+      "promqlQuery": "PromQL Query",
       "conditions": "Conditions",
       "copy": "Copy",
       "noCondition": "No condition",
