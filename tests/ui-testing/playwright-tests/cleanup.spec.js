@@ -310,6 +310,11 @@ test.describe("Pre-Test Cleanup", () => {
     // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
     // The cleanup patterns above will clean up old test streams via regex matching
 
+    // Clean up test semantic groups created by correlation settings tests
+    // Groups: k8s-cluster, k8s-namespace, k8s-deployment, service
+    // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
+    await pm.apiCleanup.cleanupCorrelationSettings();
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });

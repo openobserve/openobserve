@@ -11,16 +11,20 @@ const PageManager = require('../../pages/page-manager.js');
  * - Alert Correlation: Configure deduplication settings
  *
  * Related Issue: #9790
- * Related PR: #9910
+ * Related PR: #9910, #10124
  *
  * Rule 7 Compliance: Each tab has independent tests.
  * A failure in one tab's tests won't block other tabs from being tested.
  *
- * Tests: 17 total (13 active, 4 skipped pending investigation)
+ * Tests: 13 total (all active)
  * - P0 Navigation: 2 tests (page load, tab switching)
- * - P1 Service Identity: 6 tests (UI elements, search, add/remove dimensions, save, reset) - 4 skipped
+ * - P1 Service Identity: 2 tests (UI elements, search)
  * - P1 Discovered Services: 2 tests (content + refresh, loading state)
  * - P1 Alert Correlation: 7 tests (elements, interactions, cross-alert, fingerprint groups, save persistence)
+ *
+ * Archived Tests: 4 dimension management tests moved to:
+ * tests/ui-testing/MD_Files/correlation-settings-skipped-tests.md
+ * (Pending investigation of Vue component dimension selection mechanism)
  */
 test.describe("Correlation Settings Tests", () => {
     let pm;
@@ -29,6 +33,10 @@ test.describe("Correlation Settings Tests", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+
+        // Ensure semantic groups exist for fingerprint checkbox tests
+        const orgId = process.env["ORGNAME"];
+        await pm.correlationSettingsPage.ensureSemanticGroupsExist(orgId);
 
         await page.waitForLoadState('domcontentloaded');
         testLogger.info('Correlation Settings test setup completed');
@@ -174,239 +182,9 @@ test.describe("Correlation Settings Tests", () => {
             testLogger.info('Search clear verified - list restored to original count');
         });
 
-        test.skip("should add dimension to priority list using backward button", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity', '@dimensionManagement']
-        }, async () => {
-            // TODO: Fix dimension list selection mechanism - requires investigation of Vue component interaction
-            const orgId = process.env["ORGNAME"];
-            testLogger.info('Testing add dimension to priority list functionality');
-
-            await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
-            await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
-
-            // Get initial counts
-            const initialPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            const initialAvailableCount = await pm.correlationSettingsPage.getAvailableDimensionsCount();
-            testLogger.info(`Initial priority count: ${initialPriorityCount}, available count: ${initialAvailableCount}`);
-
-            // Skip test if no available dimensions
-            if (initialAvailableCount === 0) {
-                testLogger.info('No available dimensions to add - skipping test');
-                return;
-            }
-
-            // Get first available dimension name
-            const dimensionName = await pm.correlationSettingsPage.getFirstAvailableDimensionName();
-            testLogger.info(`Selecting available dimension: ${dimensionName}`);
-
-            // Select an available dimension (right list) by clicking on the item
-            await pm.correlationSettingsPage.selectAvailableDimension(dimensionName.trim());
-
-            // Wait a moment for selection to register
-            await pm.correlationSettingsPage.waitForUIStabilization();
-
-            // Check if button became enabled
-            const isEnabled = await pm.correlationSettingsPage.isAddButtonEnabled();
-            testLogger.info(`Add button enabled after selection: ${isEnabled}`);
-
-            if (!isEnabled) {
-                // Try clicking directly on the list item again
-                testLogger.info('Button still disabled - trying direct item click');
-                const rightList = pm.page.locator('.q-list').nth(1);
-                await rightList.locator('.q-item').first().click();
-                await pm.correlationSettingsPage.waitForQuickUpdate();
-            }
-
-            // Click backward button to add to priority list (force click even if disabled to test behavior)
-            testLogger.info('Clicking backward button to add dimension to priority list');
-            await pm.correlationSettingsPage.clickAddDimensionButton();
-
-            // Wait for UI update
-            await pm.correlationSettingsPage.waitForUIStabilization();
-
-            // Verify counts changed
-            const newPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            const newAvailableCount = await pm.correlationSettingsPage.getAvailableDimensionsCount();
-            testLogger.info(`New priority count: ${newPriorityCount}, available count: ${newAvailableCount}`);
-
-            // Check if operation had any effect
-            if (newPriorityCount === initialPriorityCount && newAvailableCount === initialAvailableCount) {
-                testLogger.info('Dimension add did not change counts - selection mechanism may differ');
-                // Verify backward button is at least visible (basic functionality check)
-                await pm.correlationSettingsPage.expectBackwardButtonVisible();
-                testLogger.info('Backward button is visible - basic test passed');
-            } else {
-                // Priority list should have one more item
-                expect(newPriorityCount).toBe(initialPriorityCount + 1);
-                // Available list should have one less item
-                expect(newAvailableCount).toBe(initialAvailableCount - 1);
-                testLogger.info('Dimension successfully added to priority list');
-            }
-        });
-
-        test.skip("should remove dimension from priority list using forward button", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity', '@dimensionManagement']
-        }, async () => {
-            // TODO: Fix dimension list selection mechanism - requires investigation of Vue component interaction
-            const orgId = process.env["ORGNAME"];
-            testLogger.info('Testing remove dimension from priority list functionality');
-
-            await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
-            await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
-
-            // Get initial counts
-            const initialPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            const initialAvailableCount = await pm.correlationSettingsPage.getAvailableDimensionsCount();
-            testLogger.info(`Initial priority count: ${initialPriorityCount}, available count: ${initialAvailableCount}`);
-
-            // Skip test if no priority dimensions to remove
-            if (initialPriorityCount === 0) {
-                testLogger.info('No priority dimensions to remove - skipping test');
-                return;
-            }
-
-            // Get first priority dimension name
-            const dimensionName = await pm.correlationSettingsPage.getFirstPriorityDimensionName();
-            testLogger.info(`Selecting priority dimension: ${dimensionName}`);
-
-            // Select a priority dimension (left list)
-            await pm.correlationSettingsPage.selectPriorityDimension(dimensionName.trim());
-
-            // Wait a moment for selection to register
-            await pm.correlationSettingsPage.waitForUIStabilization();
-
-            // Check if button became enabled
-            const isEnabled = await pm.correlationSettingsPage.isRemoveButtonEnabled();
-            testLogger.info(`Remove button enabled after selection: ${isEnabled}`);
-
-            if (!isEnabled) {
-                // Try clicking directly on the list item again
-                testLogger.info('Button still disabled - trying direct item click');
-                const leftList = pm.page.locator('.q-list').first();
-                await leftList.locator('.q-item').first().click();
-                await pm.correlationSettingsPage.waitForQuickUpdate();
-            }
-
-            // Click forward button to remove from priority list
-            testLogger.info('Clicking forward button to remove dimension from priority list');
-            await pm.correlationSettingsPage.clickRemoveDimensionButton();
-
-            // Wait for UI update
-            await pm.correlationSettingsPage.waitForUIStabilization();
-
-            // Verify counts changed
-            const newPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            const newAvailableCount = await pm.correlationSettingsPage.getAvailableDimensionsCount();
-            testLogger.info(`New priority count: ${newPriorityCount}, available count: ${newAvailableCount}`);
-
-            // Check if operation had any effect
-            if (newPriorityCount === initialPriorityCount && newAvailableCount === initialAvailableCount) {
-                testLogger.info('Dimension remove did not change counts - selection mechanism may differ');
-                // Verify forward button is at least visible (basic functionality check)
-                await pm.correlationSettingsPage.expectForwardButtonVisible();
-                testLogger.info('Forward button is visible - basic test passed');
-            } else {
-                // Priority list should have one less item
-                expect(newPriorityCount).toBe(initialPriorityCount - 1);
-                // Available list should have one more item
-                expect(newAvailableCount).toBe(initialAvailableCount + 1);
-                testLogger.info('Dimension successfully removed from priority list');
-            }
-        });
-
-        test.skip("should save FQN priority dimensions and persist after refresh", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity', '@featureTest']
-        }, async () => {
-            // TODO: Fix - requires dimension list selection to work properly
-            const orgId = process.env["ORGNAME"];
-            testLogger.info('Testing FQN priority dimensions save and persistence');
-
-            await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
-            await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
-
-            // Get initial priority count
-            const initialPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            testLogger.info(`Initial priority count: ${initialPriorityCount}`);
-
-            // Note: We'll test save without attempting dimension modifications
-            // since the dimension selection mechanism may vary by implementation
-            testLogger.info('Testing save button functionality');
-
-            // Click save button (even without changes - should work)
-            testLogger.info('Saving FQN priority dimensions');
-            await pm.correlationSettingsPage.clickSaveServiceIdentity();
-
-            // Wait for notification (success or info that nothing changed)
-            try {
-                await pm.correlationSettingsPage.expectSuccessNotificationVisible();
-                testLogger.info('Save notification received');
-            } catch (e) {
-                // Some implementations may not show notification if nothing changed
-                testLogger.info('No notification shown - save may have succeeded silently');
-            }
-
-            // Wait for notification to disappear
-            await pm.correlationSettingsPage.waitForNotificationToDisappear();
-
-            // Get current priority count before refresh
-            const countBeforeRefresh = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-
-            // Refresh page to verify persistence
-            testLogger.info('Refreshing page to verify persistence');
-            await pm.correlationSettingsPage.refreshPage();
-            await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
-
-            // Verify count persisted (should be same as before refresh)
-            const countAfterRefresh = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            testLogger.info(`Count before refresh: ${countBeforeRefresh}, after refresh: ${countAfterRefresh}`);
-
-            // Count should remain consistent across refresh
-            expect(countAfterRefresh).toBe(countBeforeRefresh);
-            testLogger.info('FQN priority dimensions persisted correctly after refresh');
-        });
-
-        test.skip("should reset to defaults restoring original dimension configuration", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity', '@featureTest']
-        }, async () => {
-            // TODO: Fix - requires dimension list to be properly identified
-            const orgId = process.env["ORGNAME"];
-            testLogger.info('Testing reset to defaults functionality');
-
-            await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
-            await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
-
-            // Get initial count
-            const initialPriorityCount = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            testLogger.info(`Initial priority count: ${initialPriorityCount}`);
-
-            // Verify reset button is visible
-            await pm.correlationSettingsPage.expectResetButtonVisible();
-            testLogger.info('Reset button is visible');
-
-            // Click reset to defaults button
-            testLogger.info('Clicking reset to defaults button');
-            await pm.correlationSettingsPage.clickResetToDefaults();
-
-            // Confirm dialog if present
-            await pm.correlationSettingsPage.confirmResetDialog();
-
-            // Wait for reset to complete
-            await pm.correlationSettingsPage.page.waitForTimeout(1000);
-
-            // Verify count after reset
-            const countAfterReset = await pm.correlationSettingsPage.getPriorityDimensionsCount();
-            testLogger.info(`Count after reset: ${countAfterReset}`);
-
-            // Reset should restore to backend defaults (count may change or stay same)
-            // Just verify the operation completed without error
-            expect(countAfterReset).toBeGreaterThanOrEqual(0);
-            testLogger.info('Reset to defaults completed successfully');
-        });
+        // NOTE: 4 dimension management tests were archived to:
+        // tests/ui-testing/MD_Files/correlation-settings-skipped-tests.md
+        // They require investigation of Vue component dimension selection mechanism
     });
 
     test.describe("P1 - Discovered Services Tab", () => {
@@ -538,24 +316,45 @@ test.describe("Correlation Settings Tests", () => {
             await pm.correlationSettingsPage.clickAlertCorrelationTab();
             await pm.correlationSettingsPage.expectAlertCorrelationContentVisible();
 
-            // Enable deduplication to reveal cross-alert checkbox
-            testLogger.info('Enabling deduplication to reveal cross-alert checkbox');
-            await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
+            // Check initial deduplication state
+            const initialDedupState = await pm.correlationSettingsPage.isDedupCheckboxChecked();
+            testLogger.info(`Initial dedup state: ${initialDedupState}`);
+
+            // If dedup is already enabled, cross-alert should be visible
+            // If not, enable dedup and verify cross-alert becomes visible
+            if (!initialDedupState) {
+                testLogger.info('Enabling deduplication to reveal cross-alert checkbox');
+                await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
+            } else {
+                testLogger.info('Deduplication already enabled');
+            }
 
             // Verify cross-alert checkbox becomes visible
             testLogger.info('Verifying cross-alert checkbox is now visible');
             await pm.correlationSettingsPage.expectCrossAlertCheckboxVisible();
 
             // Toggle cross-alert checkbox
+            const initialCrossAlertState = await pm.correlationSettingsPage.isCrossAlertCheckboxChecked();
+            testLogger.info(`Initial cross-alert state: ${initialCrossAlertState}`);
             testLogger.info('Testing cross-alert checkbox toggle');
             await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
             testLogger.info('Toggled cross-alert checkbox');
 
-            // Disable deduplication - cross-alert should be hidden
+            // Now disable deduplication - cross-alert should be hidden
             testLogger.info('Disabling deduplication');
             await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
             await pm.correlationSettingsPage.expectCrossAlertCheckboxHidden();
             testLogger.info('Cross-alert checkbox hidden when deduplication disabled');
+
+            // Cleanup: restore original state
+            if (initialDedupState) {
+                // Re-enable dedup since we disabled it
+                await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
+                // Restore cross-alert state if it was enabled
+                if (initialCrossAlertState) {
+                    await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+                }
+            }
 
             testLogger.info('Cross-alert checkbox conditional visibility works correctly');
         });
@@ -585,27 +384,34 @@ test.describe("Correlation Settings Tests", () => {
             // Verify cross-alert checkbox is visible
             await pm.correlationSettingsPage.expectCrossAlertCheckboxVisible();
 
-            // Enable cross-alert deduplication
-            testLogger.info('Enabling cross-alert deduplication');
-            await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            // Check if cross-alert is already enabled (could be from previous test or API setup)
+            const isCrossAlertEnabled = await pm.correlationSettingsPage.isCrossAlertCheckboxChecked();
+            testLogger.info(`Initial cross-alert state: ${isCrossAlertEnabled}`);
+
+            // Enable cross-alert deduplication if not already enabled
+            if (!isCrossAlertEnabled) {
+                testLogger.info('Enabling cross-alert deduplication');
+                await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            } else {
+                testLogger.info('Cross-alert already enabled');
+            }
 
             // Wait for fingerprint groups to load
             await pm.correlationSettingsPage.page.waitForTimeout(1000);
 
             // Verify fingerprint groups section is now visible
+            // Note: ensureSemanticGroupsExist() is called in beforeEach so groups should always be present
             testLogger.info('Verifying fingerprint groups are visible');
-            try {
-                await pm.correlationSettingsPage.expectFingerprintGroupsVisible();
-                const count = await pm.correlationSettingsPage.getFingerprintGroupsCount();
-                testLogger.info(`Found ${count} fingerprint group checkboxes`);
-                expect(count).toBeGreaterThan(0);
-            } catch (e) {
-                // Fingerprint groups may not be available in all environments
-                testLogger.info('Fingerprint groups not visible - may require semantic groups configuration');
-            }
+            await pm.correlationSettingsPage.expectFingerprintGroupsVisible();
+            const count = await pm.correlationSettingsPage.getFingerprintGroupsCount();
+            testLogger.info(`Found ${count} fingerprint group checkboxes`);
+            expect(count).toBeGreaterThan(0);
 
-            // Cleanup: disable cross-alert and deduplication
-            await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            // Cleanup: restore original states
+            // Only toggle cross-alert if we changed it
+            if (!isCrossAlertEnabled) {
+                await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            }
             if (!isDedupEnabled) {
                 await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
             }
@@ -634,38 +440,43 @@ test.describe("Correlation Settings Tests", () => {
                 await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
             }
 
-            // Enable cross-alert deduplication
-            testLogger.info('Enabling cross-alert deduplication');
+            // Check if cross-alert is already enabled
             await pm.correlationSettingsPage.expectCrossAlertCheckboxVisible();
-            await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            const initialCrossAlertState = await pm.correlationSettingsPage.isCrossAlertCheckboxChecked();
+            testLogger.info(`Initial cross-alert state: ${initialCrossAlertState}`);
+
+            // Enable cross-alert deduplication if not already enabled
+            if (!initialCrossAlertState) {
+                testLogger.info('Enabling cross-alert deduplication');
+                await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
+            } else {
+                testLogger.info('Cross-alert already enabled');
+            }
 
             // Wait for fingerprint groups to load
             await pm.correlationSettingsPage.page.waitForTimeout(1000);
 
-            // Try to interact with fingerprint groups
-            try {
-                const checkboxes = await pm.correlationSettingsPage.getFingerprintGroupCheckboxes();
-                const count = await checkboxes.count();
+            // Interact with fingerprint groups
+            // Note: ensureSemanticGroupsExist() is called in beforeEach so groups should always be present
+            const checkboxes = pm.correlationSettingsPage.getFingerprintGroupCheckboxes();
+            const count = await checkboxes.count();
+            testLogger.info(`Found ${count} fingerprint groups`);
+            expect(count).toBeGreaterThan(0);
 
-                if (count > 0) {
-                    testLogger.info(`Found ${count} fingerprint groups - testing toggle`);
+            testLogger.info('Testing fingerprint checkbox toggle');
 
-                    // Click the first fingerprint checkbox
-                    await checkboxes.first().click();
-                    testLogger.info('Toggled first fingerprint group checkbox');
+            // Click the first fingerprint checkbox
+            await checkboxes.first().click();
+            testLogger.info('Toggled first fingerprint group checkbox');
 
-                    // Click again to toggle back
-                    await checkboxes.first().click();
-                    testLogger.info('Toggled back first fingerprint group checkbox');
-                } else {
-                    testLogger.info('No fingerprint groups available to toggle');
-                }
-            } catch (e) {
-                testLogger.info('Fingerprint groups not available in this environment');
+            // Click again to toggle back
+            await checkboxes.first().click();
+            testLogger.info('Toggled back first fingerprint group checkbox');
+
+            // Cleanup - restore original states
+            if (!initialCrossAlertState) {
+                await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
             }
-
-            // Cleanup
-            await pm.correlationSettingsPage.clickEnableCrossAlertCheckbox();
             if (!initialDedupState) {
                 await pm.correlationSettingsPage.clickEnableDeduplicationCheckbox();
             }
@@ -776,11 +587,9 @@ test.describe("Correlation Settings Tests", () => {
             const persistedValue = await pm.correlationSettingsPage.getTimeWindowValue();
             testLogger.info(`Persisted time window value: ${persistedValue}`);
 
-            // The value should persist (may be empty string if backend returns undefined)
-            // Accept either the exact value or similar numeric representation
-            const persistedNumeric = parseInt(persistedValue) || 0;
-            const expectedNumeric = parseInt(testTimeWindow);
-            expect(persistedNumeric).toBe(expectedNumeric);
+            // Validate the persisted value is not empty
+            expect(persistedValue).toBeTruthy();
+            expect(persistedValue).toBe(testTimeWindow);
             testLogger.info('Time window value persisted correctly after refresh');
 
             // Cleanup: restore original state
