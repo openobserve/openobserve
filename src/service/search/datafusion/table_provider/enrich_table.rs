@@ -20,7 +20,7 @@ use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
-    common::Result,
+    common::{Result, project_schema},
     datasource::{TableProvider, TableType},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
@@ -73,7 +73,7 @@ impl TableProvider for EnrichTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let filter_projection = {
+        let (enrich_projection, filter_projection) = {
             // add _timestamp column if timestamp_filter is present
             let mut filter_projection = Vec::new();
             if let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME) {
@@ -95,14 +95,13 @@ impl TableProvider for EnrichTable {
             });
             (Some(filter_projection), projection)
         };
-        let filter_projection = filter_projection.0.as_ref();
+
+        let enrich_projection = enrich_projection.as_ref();
+        let filter_projection = filter_projection.as_ref();
 
         // Create the base execution plan
-        let enrich_exec = Arc::new(EnrichExec::new(
-            &self.org_id,
-            &self.name,
-            self.schema.clone(),
-        ));
+        let schema = project_schema(&self.schema, enrich_projection)?;
+        let enrich_exec = Arc::new(EnrichExec::new(&self.org_id, &self.name, schema));
 
         // Apply timestamp filter only (no index condition for enrich tables)
         let filter_exec = apply_combined_filter(

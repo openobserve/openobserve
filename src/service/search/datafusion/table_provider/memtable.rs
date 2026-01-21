@@ -55,7 +55,7 @@ impl NewMemTable {
         fst_fields: Vec<String>,
         timestamp_filter: (i64, i64),
     ) -> Result<Self> {
-        // this schema is the full schema of the table, from empty_exec.full_schema() 
+        // this schema is the full schema of the table, from empty_exec.full_schema()
         let mem = MemTable::try_new(schema, partitions)?;
         Ok(Self {
             mem_table: mem,
