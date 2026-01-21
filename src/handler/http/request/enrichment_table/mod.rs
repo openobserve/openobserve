@@ -26,7 +26,7 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::save_enrichment_data,
+    service::enrichment_table::{extract_multipart, save_enrichment_data},
 };
 
 /// CreateEnrichmentTable
@@ -59,7 +59,7 @@ pub async fn save_enrichment_table(
     Path((org_id, table_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
     headers: HeaderMap,
-    mut payload: Multipart,
+    payload: Multipart,
 ) -> Response {
     let bad_req_msg = if org_id.trim().is_empty() {
         Some("Organization cannot be empty")
@@ -112,7 +112,7 @@ pub async fn save_enrichment_table(
                 };
 
                 // Extract multipart data using axum's Multipart
-                match extract_multipart_axum(&mut payload, append_data).await {
+                match extract_multipart(payload, append_data).await {
                     Ok(json_record) => {
                         match save_enrichment_data(&org_id, &table_name, json_record, append_data)
                             .await
@@ -133,83 +133,6 @@ pub async fn save_enrichment_table(
             MetaHttpResponse::bad_request("Bad Request, content-type must be multipart/form-data")
         }
     }
-}
-
-/// Extract multipart data using axum's Multipart extractor
-async fn extract_multipart_axum(
-    payload: &mut Multipart,
-    append_data: bool,
-) -> Result<Vec<config::utils::json::Map<String, config::utils::json::Value>>, String> {
-    use hashbrown::HashSet;
-
-    let mut records = Vec::new();
-    let mut headers_set = HashSet::new();
-
-    while let Ok(Some(mut field)) = payload.next_field().await {
-        if field.file_name().is_none() {
-            continue;
-        }
-
-        let mut data = bytes::Bytes::new();
-        while let Some(chunk) = field
-            .chunk()
-            .await
-            .map_err(|e| format!("Failed to read chunk: {}", e))?
-        {
-            // Reconstruct entire data bytes here to prevent fragmentation of values.
-            data = bytes::Bytes::from([data.as_ref(), chunk.as_ref()].concat());
-        }
-
-        let mut rdr = csv::Reader::from_reader(data.as_ref());
-        let headers: csv::StringRecord = rdr
-            .headers()
-            .map_err(|e| format!("Failed to read CSV headers: {}", e))?
-            .iter()
-            .map(|x| {
-                let mut x = x.trim().to_string();
-                config::utils::flatten::format_key(&mut x);
-                headers_set.insert(x.clone());
-                x
-            })
-            .collect::<Vec<_>>()
-            .into();
-
-        for result in rdr.records() {
-            // The iterator yields Result<StringRecord, Error>, so we check the
-            // error here.
-            let record = result.map_err(|e| format!("Failed to read CSV record: {}", e))?;
-            // Transform the record to a JSON value
-            let mut json_record = config::utils::json::Map::new();
-
-            for (header, field) in headers.iter().zip(record.iter()) {
-                json_record.insert(
-                    header.into(),
-                    config::utils::json::Value::String(field.into()),
-                );
-            }
-
-            if !json_record.is_empty() {
-                records.push(json_record);
-            }
-        }
-    }
-
-    if records.is_empty() && !headers_set.is_empty() && !append_data {
-        // If the records are empty, that means user has uploaded only headers, not the data
-        // So, we can assume that the user wants to upload an enrichment table with no row data.
-        // The headers are the columns of the enrichment table. Lets push a json
-        // with the headers as the keys and empty strings as the values.
-
-        // This way we will still have the headers in the enrichment table.
-        // And the enrichment table will not be deleted.
-        let mut json_record = config::utils::json::Map::new();
-        for header in headers_set {
-            json_record.insert(header, config::utils::json::Value::String("".to_string()));
-        }
-        records.push(json_record);
-    }
-
-    Ok(records)
 }
 
 // ============================================================================
