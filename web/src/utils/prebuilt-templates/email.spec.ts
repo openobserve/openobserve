@@ -71,10 +71,26 @@ describe('email template', () => {
       const validator = recipientsField?.validator;
 
       if (validator) {
+        // Valid email addresses
         expect(validator('test@example.com')).toBe(true);
-        expect(validator('invalid-email')).not.toBe(true);
         expect(validator('test@example.com,user@domain.com')).toBe(true);
+        expect(validator('user@company.co.uk')).toBe(true);
+        expect(validator('test.user+tag@example.com')).toBe(true);
+
+        // Invalid email addresses
+        expect(validator('invalid-email')).not.toBe(true);
+        expect(validator('missing@domain')).not.toBe(true);
+        expect(validator('@example.com')).not.toBe(true);
+        expect(validator('test@')).not.toBe(true);
+        expect(validator('test@example.com,invalid-email')).not.toBe(true);
       }
+    });
+
+    it('URL validator always returns false for email type', () => {
+      // Email type doesn't use URLs - should always return false
+      expect(emailConfig.urlValidator('https://example.com')).toBe(false);
+      expect(emailConfig.urlValidator('invalid')).toBe(false);
+      expect(emailConfig.urlValidator('')).toBe(false);
     });
   });
 

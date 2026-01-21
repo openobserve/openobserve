@@ -66,10 +66,27 @@ describe('pagerduty template', () => {
     it('validates PagerDuty URLs', () => {
       expect(pagerdutyConfig.urlValidator('https://events.pagerduty.com/v2/enqueue')).toBe(true);
       expect(pagerdutyConfig.urlValidator('https://example.com')).toBe(false);
+      expect(pagerdutyConfig.urlValidator('https://events.pagerduty.com/v2/other')).toBe(false);
+      expect(pagerdutyConfig.urlValidator('invalid-url')).toBe(false);
+    });
+
+    it('integration key validator validates key length', () => {
+      const integrationKeyField = pagerdutyConfig.credentialFields.find(f => f.key === 'integrationKey');
+      const validator = integrationKeyField?.validator;
+      expect(typeof validator).toBe('function');
+
+      if (validator) {
+        // Valid key (32 characters)
+        expect(validator('12345678901234567890123456789012')).toBe(true);
+
+        // Invalid keys
+        expect(validator('short')).not.toBe(true);
+        expect(validator('123456789012345678901234567890')).not.toBe(true);
+      }
     });
 
     it('has routing key field', () => {
-      const routingKeyField = pagerdutyConfig.credentialFields.find(f => f.key === 'routingKey');
+      const routingKeyField = pagerdutyConfig.credentialFields.find(f => f.key === 'integrationKey');
       expect(routingKeyField).toBeDefined();
       expect(routingKeyField?.required).toBe(true);
       expect(routingKeyField?.type).toBe('password');

@@ -61,7 +61,26 @@ describe('opsgenie template', () => {
 
     it('validates Opsgenie URLs', () => {
       expect(opsgenieConfig.urlValidator('https://api.opsgenie.com/v2/alerts')).toBe(true);
+      expect(opsgenieConfig.urlValidator('https://api.eu.opsgenie.com/v2/alerts')).toBe(true);
       expect(opsgenieConfig.urlValidator('https://example.com')).toBe(false);
+      expect(opsgenieConfig.urlValidator('https://api.opsgenie.com/v2/other')).toBe(false);
+      expect(opsgenieConfig.urlValidator('invalid-url')).toBe(false);
+    });
+
+    it('API key validator validates key length', () => {
+      const apiKeyField = opsgenieConfig.credentialFields.find(f => f.key === 'apiKey');
+      const validator = apiKeyField?.validator;
+      expect(typeof validator).toBe('function');
+
+      if (validator) {
+        // Valid key (> 30 characters)
+        expect(validator('1234567890123456789012345678901')).toBe(true);
+        expect(validator('12345678901234567890123456789012345')).toBe(true);
+
+        // Invalid keys
+        expect(validator('short')).not.toBe(true);
+        expect(validator('123456789012345678901234567890')).not.toBe(true);
+      }
     });
 
     it('has API key field', () => {

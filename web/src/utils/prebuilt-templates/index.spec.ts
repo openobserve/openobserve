@@ -28,9 +28,9 @@ import {
 describe('Prebuilt Templates Index', () => {
   describe('PREBUILT_DESTINATION_TYPES', () => {
     it('should contain all expected destination types', () => {
-      const expectedTypes = ['slack', 'msteams', 'pagerduty', 'servicenow', 'email', 'opsgenie'];
+      const expectedTypes = ['slack', 'discord', 'msteams', 'pagerduty', 'servicenow', 'email', 'opsgenie'];
 
-      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(6);
+      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(7);
 
       const actualTypes = PREBUILT_DESTINATION_TYPES.map(type => type.id);
       expectedTypes.forEach(expectedType => {
@@ -149,9 +149,19 @@ describe('Prebuilt Templates Index', () => {
       expect(detectPrebuiltTypeFromUrl(opsgenieEuUrl)).toBe('opsgenie');
     });
 
+    it('should detect Discord URLs', () => {
+      const discordUrl = 'https://discord.com/api/webhooks/123456789/abcdef';
+      expect(detectPrebuiltTypeFromUrl(discordUrl)).toBe('discord');
+    });
+
     it('should return null for custom URLs', () => {
       const customUrl = 'https://custom-webhook.example.com/webhook';
       expect(detectPrebuiltTypeFromUrl(customUrl)).toBeNull();
+    });
+
+    it('should return null for invalid URLs', () => {
+      expect(detectPrebuiltTypeFromUrl('not-a-url')).toBeNull();
+      expect(detectPrebuiltTypeFromUrl('')).toBeNull();
     });
   });
 
@@ -177,6 +187,17 @@ describe('Prebuilt Templates Index', () => {
     it('should return empty string for unknown types', () => {
       expect(generateDestinationUrl('unknown', {})).toBe('');
     });
+
+    it('should handle null credentials gracefully', () => {
+      // @ts-ignore - testing error handling
+      expect(generateDestinationUrl('slack', null)).toBe('');
+    });
+
+    it('should generate URLs for all webhook types', () => {
+      expect(generateDestinationUrl('discord', { webhookUrl: 'https://discord.com/api/webhooks/123/abc' })).toBe('https://discord.com/api/webhooks/123/abc');
+      expect(generateDestinationUrl('msteams', { webhookUrl: 'https://outlook.office.com/webhook/xxx' })).toBe('https://outlook.office.com/webhook/xxx');
+      expect(generateDestinationUrl('servicenow', { instanceUrl: 'https://dev.service-now.com/api/now/table/incident' })).toBe('https://dev.service-now.com/api/now/table/incident');
+    });
   });
 
   describe('generateDestinationHeaders', () => {
@@ -193,8 +214,18 @@ describe('Prebuilt Templates Index', () => {
       const credentials = { username: 'admin', password: 'secret' };
       const headers = generateDestinationHeaders('servicenow', credentials);
 
-      expect(headers).toHaveProperty('Authorization');
-      expect(headers.Authorization).toContain('Basic ');
+      // ServiceNow credentials are passed separately to backend for secure handling
+      // Frontend should not encode credentials
+      expect(headers['Content-Type']).toBe('application/json');
+      expect(headers['Accept']).toBe('application/json');
+    });
+
+    it('should generate headers for PagerDuty', () => {
+      const credentials = { integrationKey: 'test-integration-key-12345678' };
+      const headers = generateDestinationHeaders('pagerduty', credentials);
+
+      expect(headers).toHaveProperty('X-Routing-Key');
+      expect(headers['X-Routing-Key']).toBe('test-integration-key-12345678');
       expect(headers['Content-Type']).toBe('application/json');
     });
 
@@ -203,6 +234,19 @@ describe('Prebuilt Templates Index', () => {
       const slackHeaders = generateDestinationHeaders('slack', credentials);
 
       expect(slackHeaders['Content-Type']).toBe('application/json');
+    });
+
+    it('should return empty object for unknown types', () => {
+      const headers = generateDestinationHeaders('unknown', {});
+      expect(headers).toEqual({});
+    });
+
+    it('should not mutate original config headers', () => {
+      const credentials = { apiKey: 'test-key' };
+      const headers1 = generateDestinationHeaders('opsgenie', credentials);
+      const headers2 = generateDestinationHeaders('opsgenie', { apiKey: 'different-key' });
+
+      expect(headers1.Authorization).not.toBe(headers2.Authorization);
     });
   });
 
@@ -220,8 +264,9 @@ describe('Prebuilt Templates Index', () => {
       const popularTypes = getPopularPrebuiltTypes();
       const popularIds = popularTypes.map(type => type.id);
 
-      // Slack, Teams, Email should be popular
+      // Slack, Discord, Teams, Email should be popular
       expect(popularIds).toContain('slack');
+      expect(popularIds).toContain('discord');
       expect(popularIds).toContain('msteams');
       expect(popularIds).toContain('email');
       expect(popularIds).toContain('pagerduty');
@@ -251,6 +296,7 @@ describe('Prebuilt Templates Index', () => {
       const emailIds = typesByCategory.email.map(t => t.id);
 
       expect(messagingIds).toContain('slack');
+      expect(messagingIds).toContain('discord');
       expect(messagingIds).toContain('msteams');
       expect(incidentIds).toContain('pagerduty');
       expect(incidentIds).toContain('opsgenie');

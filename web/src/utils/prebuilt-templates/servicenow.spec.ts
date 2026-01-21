@@ -64,6 +64,22 @@ describe('servicenow template', () => {
       expect(servicenowConfig.urlValidator('https://evil.service-now.com.attacker.com/api/now/table/incident')).toBe(false);
     });
 
+    it('validates instanceUrl credential field', () => {
+      const instanceField = servicenowConfig.credentialFields.find(f => f.key === 'instanceUrl');
+      expect(instanceField?.validator).toBeDefined();
+
+      if (instanceField?.validator) {
+        // Valid URLs
+        expect(instanceField.validator('https://dev.service-now.com/api/now/table/incident')).toBe(true);
+        expect(instanceField.validator('https://company.service-now.com/api/now/table/incident')).toBe(true);
+
+        // Invalid URLs
+        expect(instanceField.validator('https://example.com')).not.toBe(true);
+        expect(instanceField.validator('https://evil.service-now.com.attacker.com/api/now/table/incident')).not.toBe(true);
+        expect(instanceField.validator('https://service-now.com/wrong/path')).not.toBe(true);
+      }
+    });
+
     it('has instance URL field', () => {
       const instanceField = servicenowConfig.credentialFields.find(f => f.key === 'instanceUrl');
       expect(instanceField).toBeDefined();

@@ -69,7 +69,16 @@ export const slackConfig: PrebuiltConfig = {
     'Content-Type': 'application/json'
   },
   method: 'post',
-  urlValidator: (url: string) => url.startsWith('https://hooks.slack.com/'),
+  urlValidator: (url: string) => {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      return parsed.protocol === 'https:' &&
+             (hostname === 'hooks.slack.com' || hostname.endsWith('.hooks.slack.com'));
+    } catch {
+      return false;
+    }
+  },
   credentialFields: [
     {
       key: 'webhookUrl',
@@ -77,8 +86,17 @@ export const slackConfig: PrebuiltConfig = {
       type: 'text',
       required: true,
       hint: 'Get your webhook URL from Slack App settings',
-      validator: (url: string) =>
-        url.startsWith('https://hooks.slack.com/') || 'Invalid Slack webhook URL'
+      validator: (url: string) => {
+        try {
+          const parsed = new URL(url);
+          const hostname = parsed.hostname.toLowerCase();
+          return (parsed.protocol === 'https:' &&
+                  (hostname === 'hooks.slack.com' || hostname.endsWith('.hooks.slack.com'))) ||
+                 'Invalid Slack webhook URL';
+        } catch {
+          return 'Invalid Slack webhook URL';
+        }
+      }
     },
     {
       key: 'channel',

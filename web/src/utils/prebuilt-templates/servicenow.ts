@@ -93,14 +93,16 @@ export const servicenowConfig: PrebuiltConfig = {
       label: 'Username',
       type: 'text',
       required: true,
-      hint: 'ServiceNow username with incident creation permissions'
+      hint: 'ServiceNow username with incident creation permissions',
+      validator: (value: string) => value.trim().length > 0 || 'Username is required'
     },
     {
       key: 'password',
       label: 'Password',
       type: 'password',
       required: true,
-      hint: 'ServiceNow password or API token'
+      hint: 'ServiceNow password or API token',
+      validator: (value: string) => value.trim().length > 0 || 'Password is required'
     },
     {
       key: 'assignmentGroup',

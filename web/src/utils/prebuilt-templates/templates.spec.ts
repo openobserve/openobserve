@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { slackTemplate, slackConfig, slackDestinationType } from '@/utils/prebuilt-templates/slack';
+import { discordTemplate, discordConfig, discordDestinationType } from '@/utils/prebuilt-templates/discord';
 import { emailTemplate, emailConfig, emailDestinationType } from '@/utils/prebuilt-templates/email';
 import { msteamsTemplate, msteamsConfig, msteamsDestinationType } from '@/utils/prebuilt-templates/msteams';
 import { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from '@/utils/prebuilt-templates/pagerduty';
@@ -107,7 +108,7 @@ describe('PagerDuty template', () => {
   });
 
   it('has routing key credential field', () => {
-    const routingKeyField = pagerdutyConfig.credentialFields.find(f => f.key === 'routingKey');
+    const routingKeyField = pagerdutyConfig.credentialFields.find(f => f.key === 'integrationKey');
     expect(routingKeyField).toBeDefined();
     expect(routingKeyField?.required).toBe(true);
   });
@@ -134,7 +135,7 @@ describe('ServiceNow template', () => {
   });
 
   it('validates ServiceNow URLs', () => {
-    expect(servicenowConfig.urlValidator('https://dev.service-now.com/api')).toBe(true);
+    expect(servicenowConfig.urlValidator('https://dev.service-now.com/api/now/table/incident')).toBe(true);
     expect(servicenowConfig.urlValidator('https://example.com')).toBe(false);
   });
 
@@ -172,7 +173,7 @@ describe('Opsgenie template', () => {
 describe('Template consistency', () => {
   const templates = [
     { name: 'slack', template: slackTemplate, config: slackConfig, type: slackDestinationType },
-    { name: 'discord', config: { templateName: 'system-prebuilt-discord' } },
+    { name: 'discord', template: discordTemplate, config: discordConfig, type: discordDestinationType },
     { name: 'email', template: emailTemplate, config: emailConfig, type: emailDestinationType },
     { name: 'msteams', template: msteamsTemplate, config: msteamsConfig, type: msteamsDestinationType },
     { name: 'pagerduty', template: pagerdutyTemplate, config: pagerdutyConfig, type: pagerdutyDestinationType },

@@ -59,13 +59,32 @@ describe('msteams template', () => {
     });
 
     it('URL validator accepts valid MS Teams webhook URLs', () => {
-      const validUrl = 'https://outlook.office.com/webhook/xxx';
-      expect(msteamsConfig.urlValidator(validUrl)).toBe(true);
+      expect(msteamsConfig.urlValidator('https://outlook.office.com/webhook/xxx')).toBe(true);
+      expect(msteamsConfig.urlValidator('https://webhook.office.com/webhookb2/xxx')).toBe(true);
     });
 
     it('URL validator rejects invalid URLs', () => {
-      const invalidUrl = 'https://example.com/webhook';
-      expect(msteamsConfig.urlValidator(invalidUrl)).toBe(false);
+      expect(msteamsConfig.urlValidator('https://example.com/webhook')).toBe(false);
+      expect(msteamsConfig.urlValidator('http://outlook.office.com/webhook/xxx')).toBe(false);
+      expect(msteamsConfig.urlValidator('https://evil.com?outlook.office.com=fake')).toBe(false);
+      expect(msteamsConfig.urlValidator('invalid-url')).toBe(false);
+    });
+
+    it('webhook URL validator validates MS Teams URLs', () => {
+      const webhookField = msteamsConfig.credentialFields.find(f => f.key === 'webhookUrl');
+      const validator = webhookField?.validator;
+      expect(typeof validator).toBe('function');
+
+      if (validator) {
+        // Valid URLs
+        expect(validator('https://outlook.office.com/webhook/xxx')).toBe(true);
+        expect(validator('https://webhook.office.com/webhookb2/xxx')).toBe(true);
+
+        // Invalid URLs
+        expect(validator('https://example.com')).not.toBe(true);
+        expect(validator('http://outlook.office.com/webhook/xxx')).not.toBe(true);
+        expect(validator('invalid-url')).not.toBe(true);
+      }
     });
 
     it('has credential fields', () => {

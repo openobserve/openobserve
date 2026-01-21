@@ -79,7 +79,16 @@ export const discordConfig: PrebuiltConfig = {
     'Content-Type': 'application/json'
   },
   method: 'post',
-  urlValidator: (url: string) => url.includes('discord.com/api/webhooks/'),
+  urlValidator: (url: string) => {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      return (hostname === 'discord.com' || hostname.endsWith('.discord.com')) &&
+             parsed.pathname.startsWith('/api/webhooks/');
+    } catch {
+      return false;
+    }
+  },
   credentialFields: [
     {
       key: 'webhookUrl',
@@ -87,8 +96,17 @@ export const discordConfig: PrebuiltConfig = {
       type: 'text',
       required: true,
       hint: 'Get your webhook URL from Discord channel settings',
-      validator: (url: string) =>
-        url.includes('discord.com/api/webhooks/') || 'Invalid Discord webhook URL'
+      validator: (url: string) => {
+        try {
+          const parsed = new URL(url);
+          const hostname = parsed.hostname.toLowerCase();
+          return ((hostname === 'discord.com' || hostname.endsWith('.discord.com')) &&
+                  parsed.pathname.startsWith('/api/webhooks/')) ||
+                 'Invalid Discord webhook URL';
+        } catch {
+          return 'Invalid Discord webhook URL';
+        }
+      }
     },
     {
       key: 'username',

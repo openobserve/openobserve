@@ -85,13 +85,15 @@ describe('discord template', () => {
     });
 
     it('URL validator accepts valid Discord webhook URLs', () => {
-      const validUrl = 'https://discord.com/api/webhooks/123456789/abcdef';
-      expect(discordConfig.urlValidator(validUrl)).toBe(true);
+      expect(discordConfig.urlValidator('https://discord.com/api/webhooks/123456789/abcdef')).toBe(true);
+      expect(discordConfig.urlValidator('https://discord.com/api/webhooks/123/abc')).toBe(true);
     });
 
     it('URL validator rejects invalid URLs', () => {
-      const invalidUrl = 'https://example.com/webhook';
-      expect(discordConfig.urlValidator(invalidUrl)).toBe(false);
+      expect(discordConfig.urlValidator('https://example.com/webhook')).toBe(false);
+      expect(discordConfig.urlValidator('https://discord.com/api/other')).toBe(false);
+      expect(discordConfig.urlValidator('https://evil.com?discord.com=fake')).toBe(false);
+      expect(discordConfig.urlValidator('invalid-url')).toBe(false);
     });
 
     it('has credential fields', () => {
@@ -118,8 +120,15 @@ describe('discord template', () => {
       expect(typeof validator).toBe('function');
 
       if (validator) {
+        // Valid URLs
         expect(validator('https://discord.com/api/webhooks/123/abc')).toBe(true);
+        expect(validator('https://discord.com/api/webhooks/123456789/abcdef')).toBe(true);
+
+        // Invalid URLs
         expect(validator('https://example.com')).not.toBe(true);
+        expect(validator('https://discord.com/api/other')).not.toBe(true);
+        expect(validator('https://evil.com?discord.com=fake')).not.toBe(true);
+        expect(validator('invalid-url')).not.toBe(true);
       }
     });
   });

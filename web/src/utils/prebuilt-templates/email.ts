@@ -100,7 +100,7 @@ export const emailConfig: PrebuiltConfig = {
     'Content-Type': 'text/html'
   },
   method: 'post',
-  urlValidator: (url: string) => true, // Email doesn't use URL, handled by backend
+  urlValidator: (url: string) => false, // Email doesn't use URLs - always return false
   credentialFields: [
     {
       key: 'recipients',
