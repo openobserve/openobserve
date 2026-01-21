@@ -515,25 +515,27 @@ export default defineComponent({
     const generateUsageDashboard = () => {
       const ingestionLimit = ingestionLimitGB.value;
 
-      // Build the threshold configuration
+      // Build the threshold configuration - using correct format for mark_line
       const thresholds: any[] = [];
-      if (ingestionLimit !== null) {
+      if (ingestionLimit !== null && ingestionLimit > 0) {
         // Add warning threshold at 80% of limit
         thresholds.push({
+          type: "yAxis",
+          name: "Warning (80%)",
           value: ingestionLimit * 0.8,
           color: "#FFA500", // Orange
-          colorMode: "line",
-          operator: ">=",
-          label: "Warning (80%)",
+          lineStyle: "dashed",
+          width: 2,
         });
 
         // Add critical threshold at 100% of limit
         thresholds.push({
+          type: "yAxis",
+          name: "Limit Exceeded",
           value: ingestionLimit,
           color: "#FF0000", // Red
-          colorMode: "line",
-          operator: ">=",
-          label: "Limit Exceeded",
+          lineStyle: "solid",
+          width: 2,
         });
       }
 
