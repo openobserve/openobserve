@@ -854,67 +854,6 @@ export default defineComponent({
     const showMoveAlertDialog = ref(false);
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
-    const expandedAlertHistory: Ref<any[]> = ref([]);
-    const isLoadingHistory = ref(false);
-
-    const historyTableColumns = [
-      {
-        name: 'timestamp',
-        label: 'Timestamp',
-        field: 'timestamp',
-        align: 'left',
-        sortable: true,
-        format: (val: any) => convertUnixToQuasarFormat(val)
-      },
-      {
-        name: 'status',
-        label: 'Status',
-        field: 'status',
-        align: 'center',
-        sortable: true
-      },
-      {
-        name: 'evaluation_time',
-        label: 'Evaluation (s)',
-        field: 'evaluation_took_in_secs',
-        align: 'center',
-        sortable: true,
-        format: (val: any) => val ? val.toFixed(3) : '-'
-      },
-      {
-        name: 'query_time',
-        label: 'Query (ms)',
-        field: 'query_took',
-        align: 'center',
-        sortable: true,
-        format: (val: any) => val || '-'
-      },
-    ];
-
-    const fetchAlertHistory = async (alertId: string) => {
-      isLoadingHistory.value = true;
-      try {
-        // Get history for last 30 days
-        const endTime = Date.now() * 1000; // Convert to microseconds
-        const startTime = endTime - (30 * 24 * 60 * 60 * 1000000); // 30 days ago in microseconds
-
-        const response = await alertsService.getHistory(
-          store?.state?.selectedOrganization?.identifier,
-          {
-            alert_id: alertId,
-            size: 50, // Get last 50 evaluations
-            start_time: startTime,
-            end_time: endTime
-          }
-        );
-        expandedAlertHistory.value = response.data?.hits || [];
-      } catch (error) {
-        console.error("Failed to fetch alert history:", error);
-        expandedAlertHistory.value = [];
-      } finally {
-        isLoadingHistory.value = false;
-      }
-    };
 
     const triggerExpand = (props: any) => {
       // Open drawer instead of inline expansion
@@ -965,8 +904,6 @@ export default defineComponent({
       };
 
       showAlertDetailsDrawer.value = true;
-      // Fetch history for this alert
-        fetchAlertHistory(props.row.alert_id);
     };
 
     // Handle ESC key and click outside to close drawer
@@ -2613,9 +2550,6 @@ export default defineComponent({
       triggerExpand,
       showAlertDetailsDrawer,
       selectedAlertDetails,
-      expandedAlertHistory,
-      isLoadingHistory,
-      historyTableColumns,
       allSelectedAlerts,
       copyToClipboard,
       openMenu,
