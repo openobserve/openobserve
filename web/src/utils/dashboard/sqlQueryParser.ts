@@ -1078,13 +1078,28 @@ export class SQLQueryParser {
     }
 
     if (onClause.type === "binary_expr" && onClause.operator === "=") {
+      // Extract column names - handle both string and object formats
+      let leftColumn = "";
+      if (typeof onClause.left.column === "string") {
+        leftColumn = onClause.left.column;
+      } else if (onClause.left.column?.expr?.value) {
+        leftColumn = onClause.left.column.expr.value;
+      }
+
+      let rightColumn = "";
+      if (typeof onClause.right.column === "string") {
+        rightColumn = onClause.right.column;
+      } else if (onClause.right.column?.expr?.value) {
+        rightColumn = onClause.right.column.expr.value;
+      }
+
       conditions.push({
         leftField: {
-          field: onClause.left.column,
+          field: leftColumn,
           streamAlias: onClause.left.table || undefined,
         },
         rightField: {
-          field: onClause.right.column,
+          field: rightColumn,
           streamAlias: onClause.right.table || undefined,
         },
         operation: "=",
