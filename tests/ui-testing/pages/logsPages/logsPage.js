@@ -3065,11 +3065,14 @@ export class LogsPage {
     async hoverOnFieldExpandButton(fieldName) {
         const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
 
-        // Check primary selector first
-        if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        // Check primary selector first (use waitFor since isVisible doesn't support timeout)
+        try {
+            await expandBtn.waitFor({ state: 'visible', timeout: 5000 });
             await expandBtn.hover();
             await this.page.waitForTimeout(300);
             return;
+        } catch {
+            // Primary selector not found, try alternate
         }
 
         // Try alternate selector
