@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             copyCellContent(props.value, props.rowIndex, props.col.name)
           "
         >
+        
         </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
