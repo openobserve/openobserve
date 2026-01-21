@@ -1057,14 +1057,11 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickLiveModeButton();
     await page.waitForTimeout(500);
 
-    // Check if the 5-second auto-refresh button is enabled using POM method
-    const isEnabled = await pm.logsPage.isLiveMode5SecEnabled();
-
-    if (!isEnabled) {
-      testLogger.info('Auto-refresh 5-second button is disabled - skipping test (may require specific environment config)');
-      test.skip(true, 'Auto-refresh button is disabled in this environment');
-      return;
-    }
+    // Wait for the 5-second auto-refresh button to be enabled (Rule 5: no graceful skipping)
+    // The button must be enabled for this test to validate Bug #9877
+    // Using correct selector from POM: logs-search-bar-refresh-time-5
+    const liveMode5SecBtn = page.locator('[data-test="logs-search-bar-refresh-time-5"]');
+    await expect(liveMode5SecBtn).toBeEnabled({ timeout: 15000 });
 
     await pm.logsPage.clickLiveMode5Sec();
     await page.waitForTimeout(1000);

@@ -171,9 +171,8 @@ test.describe("Core Pipeline Tests", { tag: ['@all', '@pipelines', '@pipelinesCo
     await pageManager.pipelinesPage.saveFunction();
     await page.waitForTimeout(2000);
 
-    // Verify function node was added
-    const functionNode = page.locator(`text=${funcName}`).first();
-    const isFunctionVisible = await functionNode.isVisible().catch(() => false);
+    // Verify function node was added (using POM)
+    const isFunctionVisible = await pageManager.pipelinesPage.isFunctionNodeVisible(funcName);
     testLogger.info(`Function node visible: ${isFunctionVisible}`);
 
     // Add destination node (use same naming as other tests for consistency)

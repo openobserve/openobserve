@@ -537,17 +537,16 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Test: Verify VRL fields do not show include/exclude icon (Bug #9550)');
 
     try {
-      // Step 1: Enable VRL toggle
+      // Step 1: Enable VRL toggle (using POM)
       testLogger.info('Step 1: Enabling VRL function toggle');
-      const vrlToggle = page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
-      await vrlToggle.click().catch(() => {
+      await pageManager.logsPage.clickVrlToggleButton().catch(() => {
         testLogger.warn('VRL toggle may already be enabled or not visible');
       });
       await page.waitForTimeout(1000);
 
-      // Step 2: Enter a VRL function that creates a computed field
+      // Step 2: Enter a VRL function that creates a computed field (using POM)
       testLogger.info('Step 2: Entering VRL function');
-      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor').first();
+      const vrlEditor = pageManager.logsPage.getVrlEditor().first();
 
       if (await vrlEditor.isVisible().catch(() => false)) {
         await vrlEditor.click();
@@ -570,8 +569,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await pageManager.logsPage.fillIndexFieldSearchInput('computed_field');
       await page.waitForTimeout(500);
 
-      // Check if the computed field appears
-      const computedFieldBtn = page.locator('[data-test*="computed_field"]').first();
+      // Check if the computed field appears (using POM)
+      const computedFieldBtn = pageManager.logsPage.getComputedFieldButton().first();
       const hasComputedField = await computedFieldBtn.isVisible().catch(() => false);
 
       if (hasComputedField) {
@@ -582,12 +581,12 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
         // Step 5: Check if include/exclude icon is present (it shouldn't be for VRL fields)
         testLogger.info('Step 5: Checking for include/exclude icon');
 
-        // Look for the = (include/exclude) icon near the VRL field
-        const includeExcludeIcon = page.locator('[data-test*="computed_field"] [data-test*="include-exclude"], [data-test*="computed_field"] .include-exclude-btn');
+        // Look for the = (include/exclude) icon near the VRL field (using POM)
+        const includeExcludeIcon = pageManager.logsPage.getIncludeExcludeIcon();
         const hasIncludeExcludeIcon = await includeExcludeIcon.isVisible().catch(() => false);
 
-        // Also check for the general equal sign icon that might appear
-        const equalsIcon = page.locator('[data-test*="computed_field"]').locator('..').locator('[class*="equal"], [class*="include"]').first();
+        // Also check for the general equal sign icon that might appear (using POM)
+        const equalsIcon = pageManager.logsPage.getEqualsIcon();
         const hasEqualsIcon = await equalsIcon.isVisible().catch(() => false);
 
         testLogger.info(`Include/Exclude icon visible: ${hasIncludeExcludeIcon}`);
@@ -605,8 +604,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
         testLogger.info('Computed field not found in field list - VRL may not have been applied');
         testLogger.info('Checking for any VRL-related fields in the table');
 
-        // Alternative check: Look at table headers for VRL fields
-        const tableHeaders = await page.locator('thead th').allTextContents();
+        // Alternative check: Look at table headers for VRL fields (using POM)
+        const tableHeaders = await pageManager.logsPage.getTableHeaders().allTextContents();
         testLogger.info(`Table headers: ${tableHeaders.join(', ')}`);
       }
 
@@ -617,13 +616,13 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await pageManager.logsPage.fillIndexFieldSearchInput('kubernetes_pod_name');
       await page.waitForTimeout(500);
 
-      const regularFieldBtn = page.locator('[data-test*="kubernetes_pod_name"]').first();
+      const regularFieldBtn = pageManager.logsPage.getFieldButton('kubernetes_pod_name').first();
       if (await regularFieldBtn.isVisible().catch(() => false)) {
         await regularFieldBtn.hover();
         await page.waitForTimeout(300);
 
-        // Regular fields SHOULD still have include/exclude functionality
-        const regularIncludeBtn = page.locator('[data-test*="include"]').first();
+        // Regular fields SHOULD still have include/exclude functionality (using POM)
+        const regularIncludeBtn = pageManager.logsPage.getIncludeButton().first();
         const hasRegularInclude = await regularIncludeBtn.isVisible().catch(() => false);
         testLogger.info(`Regular field has include button: ${hasRegularInclude}`);
       }

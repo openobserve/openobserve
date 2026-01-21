@@ -158,6 +158,56 @@ class EnrichmentPage {
         return await openApiMenuItem.isVisible().catch(() => false);
     }
 
+    /**
+     * Expect OpenAPI menu item to be visible (fails test if not visible)
+     * Rule 5 compliant - no graceful skipping
+     * @param {Object} options - Options object
+     * @param {number} options.timeout - Timeout in milliseconds (default 10000)
+     */
+    async expectOpenApiMenuItemVisible(options = {}) {
+        const timeout = options.timeout || 10000;
+        testLogger.info('Verifying OpenAPI menu item is visible');
+        const openApiMenuItem = this.page.locator(this.openApiMenuItem).first();
+        await expect(openApiMenuItem).toBeVisible({ timeout });
+        testLogger.info('OpenAPI menu item verified visible');
+    }
+
+    /**
+     * Get the data source radio group locator
+     * @returns {import('@playwright/test').Locator} Radio group locator
+     */
+    getDataSourceRadioGroup() {
+        return this.page.locator(this.sourceRadioGroup);
+    }
+
+    /**
+     * Click the "From URL" option in the data source selector
+     */
+    async clickFromUrlOption() {
+        testLogger.debug('Clicking From URL option');
+        await this.page.getByText('From URL', { exact: true }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('From URL option clicked');
+    }
+
+    /**
+     * Click the "Upload File" option in the data source selector
+     */
+    async clickUploadFileOption() {
+        testLogger.debug('Clicking Upload File option');
+        await this.page.getByText('Upload File', { exact: true }).click();
+        await this.page.waitForLoadState('domcontentloaded');
+        testLogger.debug('Upload File option clicked');
+    }
+
+    /**
+     * Get the form input locator (first native input field)
+     * @returns {import('@playwright/test').Locator} Form input locator
+     */
+    getFormInput() {
+        return this.page.locator('.q-field__native').first();
+    }
+
     // Navigation Methods
     async navigateToEnrichmentTable() {
         await this.page.locator(this.pipelineMenuItem).click();

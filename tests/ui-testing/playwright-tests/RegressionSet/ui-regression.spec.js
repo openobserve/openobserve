@@ -69,15 +69,9 @@ test.describe("UI Regression Bugs", () => {
 
     testLogger.info('Help menu opened');
 
-    // Look for OpenAPI menu item - using POM method
-    const openApiVisible = await pm.enrichmentPage.isOpenApiMenuItemVisible();
-
-    // STRONG ASSERTION: Test requires OpenAPI menu item to be visible
-    if (!openApiVisible) {
-      testLogger.info('OpenAPI menu item not visible - skipping test (feature may be disabled in cloud version)');
-      test.skip(true, 'OpenAPI menu item not available in this deployment');
-      return;
-    }
+    // Wait for OpenAPI menu item to be visible (Rule 5: no graceful skipping)
+    // This test MUST validate Bug #9308 - if OpenAPI is not available, test should fail
+    await pm.enrichmentPage.expectOpenApiMenuItemVisible({ timeout: 10000 });
 
     testLogger.info('OpenAPI menu item found');
 

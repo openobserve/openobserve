@@ -2109,4 +2109,60 @@ export class PipelinesPage {
         }
         return { found: false };
     }
+
+    // ============================================================================
+    // POM COMPLIANCE METHODS - Rule 3 Fixes
+    // Extract raw locators from spec files into POM
+    // ============================================================================
+
+    /**
+     * Get function node locator by name
+     * Used in pipeline-core.spec.js
+     * @param {string} funcName - Function name
+     * @returns {import('@playwright/test').Locator} Function node locator
+     */
+    getFunctionNodeByName(funcName) {
+        return this.page.locator(`text=${funcName}`);
+    }
+
+    /**
+     * Check if function node is visible by name
+     * @param {string} funcName - Function name
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isFunctionNodeVisible(funcName) {
+        const funcNode = this.getFunctionNodeByName(funcName);
+        return await funcNode.isVisible().catch(() => false);
+    }
+
+    /**
+     * Get pipeline row locator by name
+     * Used in pipelines.spec.js
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Pipeline row locator
+     */
+    getPipelineRowByName(pipelineName) {
+        return this.page.locator('tr').filter({ hasText: pipelineName });
+    }
+
+    /**
+     * Get pipeline toggle locator for a specific pipeline
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Toggle locator
+     */
+    getPipelineToggle(pipelineName) {
+        const pipelineRow = this.getPipelineRowByName(pipelineName);
+        return pipelineRow.locator('[data-test*="toggle"]');
+    }
+
+    /**
+     * Toggle pipeline enabled/disabled state
+     * @param {string} pipelineName - Pipeline name
+     */
+    async togglePipeline(pipelineName) {
+        const toggle = this.getPipelineToggle(pipelineName);
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        await toggle.click();
+        testLogger.info(`Toggled pipeline: ${pipelineName}`);
+    }
 }

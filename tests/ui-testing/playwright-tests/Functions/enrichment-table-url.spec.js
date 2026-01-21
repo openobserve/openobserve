@@ -540,20 +540,20 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await pipelinesPage.navigateToAddEnrichmentTable();
         await enrichmentPage.page.waitForTimeout(1000);
 
-        // Check for radio group with source options (actual UI structure)
-        const radioGroup = enrichmentPage.page.locator('.q-option-group').first();
+        // Check for radio group with source options (using POM)
+        const radioGroup = enrichmentPage.getDataSourceRadioGroup().first();
         // Use waitFor since isVisible() doesn't support timeout parameter
         const hasRadioGroup = await radioGroup.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
 
         testLogger.info(`Radio group visible: ${hasRadioGroup}`);
 
         if (hasRadioGroup) {
-            // Check for "From URL" option
+            // Check for "From URL" option (using POM)
             const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
             const hasUrlOption = await urlOption.isVisible().catch(() => false);
             testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
-            // Check for "Upload File" option
+            // Check for "Upload File" option (using POM)
             const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
             const hasFileOption = await fileOption.isVisible().catch(() => false);
             testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
@@ -561,19 +561,17 @@ test.describe('Enrichment Table URL Feature Tests', () => {
             // PRIMARY ASSERTION: At least one source option should be available
             expect(hasUrlOption || hasFileOption).toBeTruthy();
 
-            // If both options available, test switching between them
+            // If both options available, test switching between them (using POM)
             if (hasUrlOption && hasFileOption) {
-                await fileOption.click();
-                await enrichmentPage.page.waitForTimeout(500);
+                await enrichmentPage.clickUploadFileOption();
                 testLogger.info('Switched to Upload File option');
 
-                await urlOption.click();
-                await enrichmentPage.page.waitForTimeout(500);
+                await enrichmentPage.clickFromUrlOption();
                 testLogger.info('Switched back to From URL option');
             }
         } else {
-            // Fallback: Check if form is at least visible
-            const formVisible = await enrichmentPage.page.locator('.q-field__native').first().isVisible().catch(() => false);
+            // Fallback: Check if form is at least visible (using POM)
+            const formVisible = await enrichmentPage.getFormInput().isVisible().catch(() => false);
             testLogger.info(`Form input visible: ${formVisible}`);
             expect(formVisible).toBeTruthy();
         }

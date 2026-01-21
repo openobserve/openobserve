@@ -609,17 +609,16 @@ test.describe("Logs Page testcases", () => {
     const vrlFunction = '.test_field = "bug9690_test"';
 
     try {
-      // Step 1: Enable VRL toggle
+      // Step 1: Enable VRL toggle (using POM)
       testLogger.info('Step 1: Enabling VRL function toggle');
-      const vrlToggle = page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
-      await vrlToggle.click().catch(() => {
+      await pm.logsPage.clickVrlToggleButton().catch(() => {
         testLogger.warn('VRL toggle click failed, trying alternative');
       });
       await page.waitForTimeout(1000);
 
-      // Step 2: Enter VRL function in the editor
+      // Step 2: Enter VRL function in the editor (using POM)
       testLogger.info('Step 2: Entering VRL function');
-      const vrlEditor = page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor').first();
+      const vrlEditor = pm.logsPage.getVrlEditor().first();
 
       if (await vrlEditor.isVisible().catch(() => false)) {
         await vrlEditor.click();
@@ -629,24 +628,16 @@ test.describe("Logs Page testcases", () => {
         testLogger.warn('VRL editor not visible, skipping VRL entry');
       }
 
-      // Step 3: Save the function (optional - depends on UI flow)
-      const saveTransformBtn = page.locator('[data-test="logs-search-bar-save-transform-btn"]');
-      if (await saveTransformBtn.isVisible().catch(() => false)) {
-        await saveTransformBtn.click();
+      // Step 3: Save the function (using POM)
+      try {
+        await pm.logsPage.clickSaveTransformButton();
         await page.waitForTimeout(500);
-
-        // Fill function name
-        const funcNameInput = page.locator('[data-test="saved-function-name-input"]');
-        if (await funcNameInput.isVisible().catch(() => false)) {
-          await funcNameInput.fill(testFunctionName);
-          // Click save
-          const confirmSave = page.locator('[data-test="confirm-button"]');
-          if (await confirmSave.isVisible().catch(() => false)) {
-            await confirmSave.click();
-            await page.waitForTimeout(1000);
-            testLogger.info(`Function saved: ${testFunctionName}`);
-          }
-        }
+        await pm.logsPage.fillSavedFunctionNameInput(testFunctionName);
+        await pm.logsPage.clickConfirmButton();
+        await page.waitForTimeout(1000);
+        testLogger.info(`Function saved: ${testFunctionName}`);
+      } catch (saveError) {
+        testLogger.warn('Save function step skipped - UI flow may differ');
       }
 
       // Step 4: Run query to have results
@@ -654,29 +645,22 @@ test.describe("Logs Page testcases", () => {
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
-      // Step 5: Save the view
+      // Step 5: Save the view (using POM)
       testLogger.info('Step 5: Saving current view');
-      const savedViewsBtn = page.locator('[data-test="logs-search-saved-views-btn"]');
+      const savedViewsBtn = pm.logsPage.getSavedViewsButtonLocator();
       await savedViewsBtn.click();
       await page.waitForTimeout(500);
 
-      // Click "Save View" option
-      const saveViewOption = page.getByText('Save View', { exact: false });
-      if (await saveViewOption.isVisible().catch(() => false)) {
-        await saveViewOption.click();
+      // Click "Save View" option and fill view details
+      try {
+        await pm.logsPage.clickSaveViewOption();
         await page.waitForTimeout(500);
-
-        // Fill view name
-        const viewNameInput = page.locator('[data-test="add-alert-name-input"]');
-        if (await viewNameInput.isVisible().catch(() => false)) {
-          await viewNameInput.fill(testViewName);
-
-          // Click save button
-          const saveBtn = page.locator('[data-test="saved-view-dialog-save-btn"]');
-          await saveBtn.click();
-          await page.waitForTimeout(1000);
-          testLogger.info(`View saved: ${testViewName}`);
-        }
+        await pm.logsPage.fillViewNameInput(testViewName);
+        await pm.logsPage.clickSaveViewDialogSaveButton();
+        await page.waitForTimeout(1000);
+        testLogger.info(`View saved: ${testViewName}`);
+      } catch (saveViewError) {
+        testLogger.warn('Save view step encountered issue - continuing');
       }
 
       // Step 6: Reload the page to simulate fresh load
@@ -692,71 +676,55 @@ test.describe("Logs Page testcases", () => {
       await pm.logsPage.selectStream("e2e_automate");
       await page.waitForTimeout(1000);
 
-      // Open saved views dropdown
+      // Open saved views dropdown (using POM)
       await savedViewsBtn.click();
       await page.waitForTimeout(500);
 
-      // Search for our saved view
-      const searchInput = page.locator('[data-test="log-search-saved-view-field-search-input"]');
-      if (await searchInput.isVisible().catch(() => false)) {
-        await searchInput.fill(testViewName);
-        await page.waitForTimeout(500);
+      // Search for our saved view (using POM)
+      await pm.logsPage.fillSavedViewSearchInput(testViewName);
+      await page.waitForTimeout(500);
+
+      // Click on the saved view - MUST be visible (Rule 5: no graceful skipping)
+      await pm.logsPage.expectSavedViewVisible(testViewName, { timeout: 10000 });
+      await pm.logsPage.clickSavedViewByName(testViewName);
+      await page.waitForTimeout(2000);
+
+      // Step 8: Verify VRL function is loaded (using POM)
+      testLogger.info('Step 8: Verifying VRL function loaded');
+
+      // Check if VRL editor has content
+      const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
+      testLogger.info(`VRL editor content after load: ${vrlEditorContent.substring(0, 100)}`);
+
+      // Check if function dropdown shows selection
+      const dropdownText = await pm.logsPage.getFunctionDropdownText();
+      testLogger.info(`Function dropdown text: ${dropdownText}`);
+
+      // PRIMARY ASSERTION: VRL content should be present (not empty)
+      // Either the editor has content OR the function is selected in dropdown
+      const hasVrlContent = vrlEditorContent.length > 0 || dropdownText.includes(testFunctionName);
+
+      if (!hasVrlContent) {
+        testLogger.warn('⚠ VRL function did not load - Bug #9690 may still be present');
       }
 
-      // Click on the saved view
-      const savedViewItem = page.getByText(testViewName, { exact: false });
-      if (await savedViewItem.isVisible().catch(() => false)) {
-        await savedViewItem.click();
-        await page.waitForTimeout(2000);
-
-        // Step 8: Verify VRL function is loaded
-        testLogger.info('Step 8: Verifying VRL function loaded');
-
-        // Check if VRL editor has content
-        const vrlEditorContent = await page.locator('[data-test="logs-vrl-function-editor"], #fnEditor').textContent().catch(() => '');
-        testLogger.info(`VRL editor content after load: ${vrlEditorContent.substring(0, 100)}`);
-
-        // Check if function dropdown shows selection
-        const functionDropdown = page.locator('[data-test="logs-search-bar-function-dropdown"]');
-        const dropdownText = await functionDropdown.textContent().catch(() => '');
-        testLogger.info(`Function dropdown text: ${dropdownText}`);
-
-        // PRIMARY ASSERTION: VRL content should be present (not empty)
-        // Either the editor has content OR the function is selected in dropdown
-        const hasVrlContent = vrlEditorContent.length > 0 || dropdownText.includes(testFunctionName);
-
-        if (!hasVrlContent) {
-          testLogger.warn('⚠ VRL function did not load - Bug #9690 may still be present');
-        }
-
-        expect(hasVrlContent).toBeTruthy();
-        testLogger.info('✓ PRIMARY CHECK PASSED: VRL function loaded in saved view');
-      } else {
-        testLogger.warn('Saved view not found, test may have been run before or view creation failed');
-        // Still mark as pass if we couldn't test due to UI limitations
-        expect(true).toBeTruthy();
-      }
+      expect(hasVrlContent).toBeTruthy();
+      testLogger.info('✓ PRIMARY CHECK PASSED: VRL function loaded in saved view');
 
     } catch (error) {
       testLogger.error(`Test error: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete the saved view if possible
+      // Cleanup: Delete the saved view if possible (using POM)
       try {
-        const savedViewsBtn = page.locator('[data-test="logs-search-saved-views-btn"]');
+        const savedViewsBtn = pm.logsPage.getSavedViewsButtonLocator();
         await savedViewsBtn.click().catch(() => {});
         await page.waitForTimeout(500);
 
         // Look for delete option for our view
-        const deleteBtn = page.locator(`[data-test*="delete"][data-test*="${testViewName}"]`);
-        if (await deleteBtn.isVisible().catch(() => false)) {
-          await deleteBtn.click();
-          const confirmBtn = page.locator('[data-test="confirm-button"]');
-          if (await confirmBtn.isVisible().catch(() => false)) {
-            await confirmBtn.click();
-            testLogger.info(`Cleaned up test view: ${testViewName}`);
-          }
-        }
+        await pm.logsPage.clickDeleteSavedViewByName(testViewName).catch(() => {});
+        await pm.logsPage.clickConfirmButton().catch(() => {});
+        testLogger.info(`Cleaned up test view: ${testViewName}`);
       } catch (cleanupError) {
         testLogger.debug('Cleanup skipped or failed gracefully');
       }

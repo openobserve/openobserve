@@ -554,9 +554,9 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
 
-    // Find the toggle switch for this pipeline
-    const pipelineRow = page.locator('tr').filter({ hasText: pipelineName }).first();
-    const toggleSwitch = pipelineRow.locator('[data-test*="toggle"], .q-toggle, input[type="checkbox"]').first();
+    // Find the toggle switch for this pipeline (using POM)
+    const pipelineRow = pipelinePage.getPipelineRowByName(pipelineName).first();
+    const toggleSwitch = pipelinePage.getPipelineToggle(pipelineName).first();
 
     if (await toggleSwitch.isVisible().catch(() => false)) {
       // Get initial state
