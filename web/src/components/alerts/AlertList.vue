@@ -600,121 +600,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <!-- Alert Details Drawer -->
-    <q-drawer
-      v-model="showAlertDetailsDrawer"
-      side="right"
-      :width="600"
-      bordered
-      overlay
-      behavior="mobile"
-      class="alert-details-drawer"
-    >
-      <div class="tw:h-full tw:flex tw:flex-col">
-        <!-- Drawer Header -->
-        <div class="tw:px-6 tw:py-4 tw:border-b tw:flex tw:items-center tw:justify-between">
-          <div class="tw:flex tw:items-center">
-            <q-icon name="info" size="24px" class="tw:mr-2" />
-            <h6 class="tw:text-lg tw:font-semibold tw:m-0">{{ t('alert_list.alert_details') }}</h6>
-          </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-btn
-              flat
-              round
-              dense
-              icon="edit"
-              @click="editAlertFromDrawer"
-              data-test="alert-details-drawer-edit-btn"
-            >
-              <q-tooltip>{{ t('alerts.edit') }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              flat
-              round
-              dense
-              icon="close"
-              @click="showAlertDetailsDrawer = false"
-            />
-          </div>
-        </div>
-
-        <!-- Drawer Content -->
-        <div class="tw:flex-1 tw:overflow-y-auto tw:px-6 tw:py-4" v-if="selectedAlertDetails">
-          <!-- Alert Name -->
-          <div class="tw:mb-6">
-            <div class="tw:text-sm tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Alert Name</div>
-            <div class="tw:text-base">{{ selectedAlertDetails.name }}</div>
-          </div>
-
-          <!-- SQL Query / Conditions -->
-          <div class="tw:mb-6">
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-              <div class="tw:text-sm tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
-                {{ selectedAlertDetails.type == "sql" ? "SQL Query" : "Conditions" }}
-              </div>
-              <q-btn
-                v-if="selectedAlertDetails.conditions != '' && selectedAlertDetails.conditions != '--'"
-                @click="copyToClipboard(selectedAlertDetails.conditions, 'Conditions')"
-                size="sm"
-                flat
-                dense
-                icon="content_copy"
-                class="tw:ml-2"
-              >
-                <q-tooltip>Copy</q-tooltip>
-              </q-btn>
-            </div>
-            <pre :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-900'" class="tw:p-3 tw:rounded tw:text-sm tw:overflow-x-auto" style="white-space: pre-wrap">{{
-              selectedAlertDetails.conditions != "" && selectedAlertDetails.conditions != "--"
-                ? (selectedAlertDetails.type == 'sql' ? selectedAlertDetails.conditions : selectedAlertDetails.conditions.length != 2 ? `if ${selectedAlertDetails.conditions}` : 'No condition')
-                : "No condition"
-            }}</pre>
-          </div>
-
-          <!-- Description -->
-          <div class="tw:mb-6">
-            <div class="tw:text-sm tw:font-semibold tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Description</div>
-            <pre :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-900'" class="tw:p-3 tw:rounded tw:text-sm" style="white-space: pre-wrap">{{ selectedAlertDetails.description || "No description" }}</pre>
-          </div>
-
-          <!-- Alert History Table -->
-          <div class="tw:mb-6">
-            <div class="tw:text-sm tw:font-semibold tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Evaluation History</div>
-
-            <div v-if="isLoadingHistory" class="tw:text-center tw:py-8">
-              <q-spinner size="32px" color="primary" />
-              <div class="tw:text-sm tw:mt-3" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">Loading history...</div>
-            </div>
-
-            <div v-else-if="expandedAlertHistory.length === 0" class="tw:text-center tw:py-8" :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'">
-              <q-icon name="history" size="48px" class="tw:mb-2 tw:opacity-30" />
-              <div class="tw:text-sm">No evaluation history available for this alert</div>
-            </div>
-
-            <q-table
-              v-else
-              :rows="expandedAlertHistory"
-              :columns="historyTableColumns"
-              row-key="timestamp"
-              flat
-              dense
-              :pagination="{ rowsPerPage: 10 }"
-              class="tw:shadow-sm"
-            >
-              <template v-slot:body-cell-status="props">
-                <q-td :props="props">
-                  <q-badge
-                    :color="props.row.status?.toLowerCase() === 'firing' || props.row.status?.toLowerCase() === 'error' ? 'negative' : 'positive'"
-                    :label="props.row.status || 'Unknown'"
-                  />
-                </q-td>
-              </template>
-            </q-table>
-          </div>
-        </div>
-      </div>
-    </q-drawer>
-
     <template>
       <q-dialog class="q-pa-md" v-model="showForm" persistent>
         <q-card class="clone-alert-popup">
@@ -822,12 +707,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-dialog>
 
-      <!-- Alert History Drawer -->
-      <AlertHistoryDrawer
-        v-model="showHistoryDrawer"
-        :alert-id="selectedHistoryAlertId"
-        :alert-name="selectedHistoryAlertName"
-      />
+             <!-- Alert Details Dialog -->
+      <q-dialog
+        v-model="showAlertDetailsDrawer"
+        position="right"
+        full-height
+        maximized
+        data-test="alert-details-dialog"
+      >
+        <AlertHistoryDrawer
+          :alert-details="selectedAlertDetails"
+          :alert-id="selectedAlertDetails?.alert_id || ''"
+          @close="showAlertDetailsDrawer = false"
+        />
+      </q-dialog>
     </template>
   </div>
 </template>

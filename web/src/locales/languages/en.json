@@ -2007,6 +2007,25 @@
       "rcaCompleted": "Root cause analysis completed",
       "noRcaYet": "No root cause analysis available. Click 'Analyze' to start.",
       "sreChat": "Ask SRE Assistant"
+    },
+    "alertDetails": {
+      "alertName": "Alert Name",
+      "sqlQuery": "SQL Query",
+      "conditions": "Conditions",
+      "copy": "Copy",
+      "noCondition": "No condition",
+      "noDescription": "No description",
+      "evaluationHistory": "Evaluation History",
+      "loadingHistory": "Loading history...",
+      "noHistoryAvailable": "No evaluation history available for this alert",
+      "results":"Results"
+    },
+    "historyTable": {
+      "timestamp": "Timestamp",
+      "status": "Status",
+      "evaluationTime": "Evaluation (s)",
+      "queryTime": "Query (ms)",
+      "error":"Error"
     }
   },
   "alert_templates": {
@@ -2617,7 +2636,8 @@
     "showLegends": "Show Legends"
   },
   "alert_list":{
-    "alert_details":"Alert Details"
+    "alert_details":"Alert Details",
+    "alert_history":"Alert History"
   },
   "sreChat": {
     "emptyMessage": "Ask me anything about your alerts and incidents",
