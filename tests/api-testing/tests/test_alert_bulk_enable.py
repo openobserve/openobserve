@@ -17,7 +17,7 @@ class TestAlertBulkEnable:
     """Test class for Alert Bulk Enable/Disable API endpoints."""
 
     ORG_ID = "default"
-    STREAM_NAME = "e2e_automate"
+    STREAM_NAME = "stream_pytest_data"
 
     @pytest.fixture(autouse=True)
     def setup(self, create_session, base_url):
