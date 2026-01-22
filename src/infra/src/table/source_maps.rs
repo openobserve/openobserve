@@ -38,6 +38,7 @@ pub struct SourceMap {
     pub source_map_file_name: String,
     pub file_store_id: String,
     pub file_type: FileType,
+    pub created_at: i64,
     pub is_local: bool,
 }
 
@@ -54,6 +55,7 @@ impl From<Model> for SourceMap {
             file_store_id: value.file_store_id,
             file_type: value.file_type.into(),
             is_local: value.is_local,
+            created_at: value.created_at,
         }
     }
 }
@@ -88,6 +90,7 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
             file_store_id: Set(entry.file_store_id),
             file_type: Set(entry.file_type.into()),
             is_local: Set(entry.is_local),
+            created_at: Set(entry.created_at),
             ..Default::default()
         })
         .collect::<Vec<_>>();
@@ -131,14 +134,20 @@ pub async fn delete_group(
 
     if let Some(s) = service {
         stmt = stmt.filter(Column::Service.eq(s));
+    } else {
+        stmt = stmt.filter(Column::Service.is_null());
     }
 
     if let Some(e) = env {
         stmt = stmt.filter(Column::Env.eq(e));
+    } else {
+        stmt = stmt.filter(Column::Env.is_null());
     }
 
     if let Some(v) = version {
         stmt = stmt.filter(Column::Version.eq(v));
+    } else {
+        stmt = stmt.filter(Column::Version.is_null());
     }
 
     stmt.exec(client).await?;

@@ -73,6 +73,8 @@ pub async fn process_zip(
     let mut source_maps = Vec::with_capacity(map_pairs.len());
     let mut source_map_paths = Vec::with_capacity(map_pairs.len());
 
+    let now = chrono::Utc::now().timestamp_micros();
+
     // finally, for each minified-sourcemap pair -
     // first store the sourcemap file with a uuid in storage
     // then bulk insert all file entries in the db
@@ -104,6 +106,7 @@ pub async fn process_zip(
             file_store_id: storage_name,
             file_type: FileType::SourceMap,
             is_local: true,
+            created_at: now,
         };
         source_maps.push(sourcemap);
     }
@@ -122,4 +125,13 @@ pub async fn process_zip(
     Ok(())
 }
 
-pub async fn translate_stacktrace() {}
+// TODO: implement
+pub async fn translate_stacktrace(
+    org_id: &str,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+    stacktrace: String,
+) -> Result<String, anyhow::Error> {
+    Ok(stacktrace)
+}

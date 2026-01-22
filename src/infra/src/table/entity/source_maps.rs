@@ -15,6 +15,7 @@ pub struct Model {
     pub source_map_file_name: String,
     pub file_store_id: String,
     pub file_type: i32,
+    pub created_at: i64,
     pub is_local: bool,
 }
 

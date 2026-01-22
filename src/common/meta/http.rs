@@ -121,6 +121,16 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send a normal response in json format and associate the
+    /// provided message as `message` field.
+    pub fn created(msg: impl ToString) -> Response {
+        (
+            StatusCode::CREATED,
+            Json(Self::message(StatusCode::CREATED, msg.to_string())),
+        )
+            .into_response()
+    }
+
     /// Send a BadRequest response in json format and associate the
     /// provided error as `error` field.
     pub fn bad_request(error: impl ToString) -> Response {
