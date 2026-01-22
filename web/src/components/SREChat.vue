@@ -278,6 +278,7 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { marked } from 'marked';
 import { MarkedOptions } from 'marked';
+import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
@@ -1261,8 +1262,8 @@ export default defineComponent({
           }
           
           const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? hljs.highlight(codeText, { language: token.lang }).value
-            : hljs.highlightAuto(codeText).value;
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
             type: 'code',
@@ -1353,9 +1354,11 @@ export default defineComponent({
     };
 
     const processHtmlBlock = (content: string) => {
+      // Sanitize HTML to prevent XSS attacks
+      const sanitized = DOMPurify.sanitize(content);
       // Replace pre tags with span and add our custom class
-      return content.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-                   .replace(/<\/pre>/g, '</span>');
+      return sanitized.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
+                     .replace(/<\/pre>/g, '</span>');
     };
 
     const formatTime = (timestamp: string) => {
