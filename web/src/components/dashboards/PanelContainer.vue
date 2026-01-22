@@ -88,19 +88,9 @@ self="top right" max-width="220px">
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
+          :lastTriggeredAt="lastTriggeredAt"
+          :viewOnly="viewOnly"
         />
-        <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
-          <span class="lastRefreshedAtIcon"
-            >🕑
-            <q-tooltip anchor="bottom right" self="top right">
-              Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
-            </q-tooltip>
-          </span>
-          <RelativeTime
-            :timestamp="lastTriggeredAt"
-            fullTimePrefix="Last Refreshed At: "
-          />
-        </span>
         <q-btn
           v-if="!viewOnly && !simplifiedPanelView"
           icon="refresh"

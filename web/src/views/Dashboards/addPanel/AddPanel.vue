@@ -364,14 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                           :isPartialData="isPartialData"
                           :isPanelLoading="isPanelLoading"
+                          :lastTriggeredAt="lastTriggeredAt"
+                          :viewOnly="false"
                         />
-                      <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                        <span class="lastRefreshedAtIcon">🕑</span
-                        ><RelativeTime
-                          :timestamp="lastTriggeredAt"
-                          fullTimePrefix="Last Refreshed At: "
-                        />
-                      </span>
                     </div>
                     <div class="tw:h-[calc(100vh-500px)] tw:min-h-[140px]">
                       <PanelSchemaRenderer

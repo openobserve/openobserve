@@ -77,11 +77,26 @@
         </div>
       </q-tooltip>
     </q-btn>
+
+    <!-- Universal Last Refreshed Clock Icon and Time -->
+    <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
+      <span class="lastRefreshedAtIcon">
+        🕑
+        <q-tooltip anchor="bottom right" self="top right">
+          Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
+        </q-tooltip>
+      </span>
+      <RelativeTime
+        :timestamp="lastTriggeredAt"
+        fullTimePrefix="Last Refreshed At: "
+      />
+    </span>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import {
   outlinedWarning,
   outlinedRunningWithErrors,
@@ -92,6 +107,7 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 export default defineComponent({
   name: "PanelErrorButtons",
+  components: { RelativeTime },
   props: {
     error: {
       type: String,
@@ -117,6 +133,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    lastTriggeredAt: {
+      type: [String, Number, Date, null],
+      default: null,
+    },
+    viewOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup() {
     return {
@@ -132,5 +156,16 @@ export default defineComponent({
 <style scoped>
 .warning {
   color: var(--q-warning);
+}
+.lastRefreshedAt {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 13px;
+}
+.lastRefreshedAtIcon {
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
 }
 </style>

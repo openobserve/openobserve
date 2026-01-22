@@ -141,14 +141,9 @@
                       :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                       :isPartialData="isPartialData"
                       :isPanelLoading="isPanelLoading"
+                      :lastTriggeredAt="lastTriggeredAt"
+                      :viewOnly="false"
                   />
-                  <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                    <span class="lastRefreshedAtIcon">🕑</span
-                    ><RelativeTime
-                      :timestamp="lastTriggeredAt"
-                      fullTimePrefix="Last Refreshed At: "
-                    />
-                  </span>
                 </div>
                 <PanelSchemaRenderer
                   v-if="chartData"
