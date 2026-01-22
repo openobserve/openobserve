@@ -490,6 +490,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", () => {
     // Add two variables
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(var1, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(var2, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
     // Wait for variables to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${var1}"]`).waitFor({ state: "visible", timeout: 10000 });
@@ -643,6 +644,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", () => {
     // Add global and tab variables using default tab
     await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
+    await pm.dashboardSetting.openSetting();
     await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_container_name", { scope: "tabs", assignedTabs: ["default"] });
     // Wait for variables to be saved
     await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
