@@ -278,6 +278,7 @@ import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { inject, provide, computed } from "vue";
+import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
@@ -433,52 +434,13 @@ export default defineComponent({
         }
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
-          const ast: any = parser.astify(query?.query);
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
 
-          // Iterate over the columns to check if the column is histogram
-          ast.columns.forEach((column: any) => {
-            // check if the column is histogram
-            if (
-              column.expr.type === "function" &&
-              column?.expr?.name?.name[0]?.value === "histogram"
-            ) {
-              const histogramExpr = column.expr;
-              if (
-                histogramExpr.args &&
-                histogramExpr.args.type === "expr_list"
-              ) {
-                // if selected histogramInterval is null then remove interval argument
-                if (!histogramInterval.value) {
-                  histogramExpr.args.value = histogramExpr.args.value.slice(
-                    0,
-                    1,
-                  );
-                }
-
-                // else update interval argument
-                else {
-                  // check if there is existing interval value
-                  // if have then simply update
-                  // else insert new arg
-                  if (histogramExpr.args.value[1]) {
-                    // Update existing interval value
-                    histogramExpr.args.value[1] = {
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value}`,
-                    };
-                  } else {
-                    // create new arg for interval
-                    histogramExpr.args.value.push({
-                      type: "single_quote_string",
-                      value: `${histogramInterval.value}`,
-                    });
-                  }
-                }
-              }
-            }
-            const sql = parser.sqlify(ast);
-            query.query = sql.replace(/`/g, '"');
-          });
+          // Only update if the query actually changed
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
         });
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
