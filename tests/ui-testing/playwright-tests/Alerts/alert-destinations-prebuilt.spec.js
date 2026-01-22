@@ -1,11 +1,12 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
-const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 
 // Test timeout constants (in milliseconds)
 const DEFAULT_TIMEOUT_MS = 60000;
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
+const UI_STABILIZATION_WAIT_MS = 2000;
+const EXTENDED_TIMEOUT_MS = 180000; // 3 minutes for consolidated tests
 
 /**
  * Prebuilt Alert Destinations E2E Tests
@@ -16,28 +17,34 @@ const NETWORK_IDLE_TIMEOUT_MS = 30000;
  * - Form validation and credential input
  * - Testing destination connectivity
  * - Creating, editing, and deleting destinations
- * - Support for all prebuilt types: Slack, Teams, Email, PagerDuty, Opsgenie, ServiceNow
+ * - Support for all prebuilt types: Slack, Discord, Teams, PagerDuty, Opsgenie, ServiceNow
+ *
+ * Naming Convention: Uses 'auto_dest_' prefix for cleanup compatibility
+ * Cleanup: Handled by cleanup.spec.js via 'auto_' prefix patterns
  */
 test.describe("Prebuilt Alert Destinations E2E", () => {
   let pm;
-  let randomSuffix;
+  let sharedRandomValue;
 
   /**
    * Setup for each test
+   * - Generates shared random suffix for unique destination names
    * - Navigates to Alert Destinations page
-   * - Generates unique suffix for destination names
    */
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
 
-    // Generate random suffix for unique destination names
-    randomSuffix = Date.now().toString().slice(-6);
-    testLogger.info('Generated random suffix', { randomSuffix });
+    // Generate shared random value if not already generated (lowercase for API compatibility)
+    if (!sharedRandomValue) {
+      sharedRandomValue = Date.now().toString().slice(-6);
+      testLogger.info('Generated shared random suffix for this run', { sharedRandomValue });
+    }
 
     // Navigate directly to alert destinations page
     await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
 
     testLogger.info('Navigated to Alert Destinations page');
   });
@@ -47,745 +54,400 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
   });
 
   // ============================================================================
-  // P0 - Critical Smoke Tests
+  // P0 - Critical Smoke Tests: UI Elements & Navigation
   // ============================================================================
 
-  test("Verify New Destination button is enabled without templates", {
+  test("P0: Smoke - Verify destination selector UI and stepper navigation", {
     tag: ['@prebuiltDestinations', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing New Destination button state');
+    testLogger.info('===== P0 SMOKE TEST: UI Elements & Navigation =====');
 
+    // ----- PART 1: Verify New Destination button states -----
+    testLogger.info('Part 1: Testing New Destination button state');
     await pm.alertDestinationsPage.expectNewDestinationButtonVisible();
     await pm.alertDestinationsPage.expectNewDestinationButtonEnabled();
+    testLogger.info('✓ New Destination button is visible and enabled');
 
-    testLogger.info('✓ New Destination button is enabled');
-  });
-
-  test("Navigate through stepper - Step 1: Choose Type", {
-    tag: ['@prebuiltDestinations', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing stepper Step 1 - Choose Type');
-
+    // ----- PART 2: Verify Step 1 - Choose Type with all cards -----
+    testLogger.info('Part 2: Testing stepper Step 1 - Choose Type');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.expectStep1Visible();
     await pm.alertDestinationsPage.expectDestinationSelectorVisible();
     await pm.alertDestinationsPage.expectDestinationCardsVisible(8); // 7 prebuilt + 1 custom
+    testLogger.info('✓ Step 1 displays correctly with 8 destination type cards');
 
-    testLogger.info('✓ Step 1 displays correctly with destination types');
-  });
-
-  // ============================================================================
-  // P1 - Slack Destination Tests
-  // ============================================================================
-
-  test("Create Slack destination - Complete flow", {
-    tag: ['@prebuiltDestinations', '@slack', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Slack destination creation flow');
-
-    const destinationName = `test_slack_${randomSuffix}`;
-    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-
-    // Complete flow: Create Slack destination
-    await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
-
-    // Verify destination appears in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Slack destination created successfully');
-
-    // Cleanup: Delete the destination
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Validate Slack webhook URL format", {
-    tag: ['@prebuiltDestinations', '@slack', '@validation', '@P1']
-  }, async ({ page }) => {
-    testLogger.info('Testing Slack webhook URL validation');
-
-    await pm.alertDestinationsPage.clickNewDestination();
+    // ----- PART 3: Verify type selection shows indicator -----
+    testLogger.info('Part 3: Testing selected destination indicator');
     await pm.alertDestinationsPage.selectDestinationType('slack');
-
-    // Test invalid webhook URL
-    await pm.alertDestinationsPage.fillWebhookUrl('https://invalid-url.com');
-
-    // Verify validation error appears
-    await pm.alertDestinationsPage.expectValidationError();
-
-    testLogger.info('✓ Slack webhook validation working');
+    await pm.alertDestinationsPage.expectConnectionStepVisible();
+    await pm.alertDestinationsPage.expectSelectedIndicatorVisible('Slack');
+    await pm.alertDestinationsPage.expectCheckmarkVisible();
+    testLogger.info('✓ Selected destination indicator displays correctly with checkmark');
 
     // Close the form
     await pm.alertDestinationsPage.clickCancel();
+
+    testLogger.info('===== P0 SMOKE TEST COMPLETED =====');
   });
 
-  test("Test Slack destination connectivity", {
-    tag: ['@prebuiltDestinations', '@slack', '@test', '@P1']
+  // ============================================================================
+  // P1 - Slack Complete Flow: Create, Validate, Test, Edit
+  // ============================================================================
+
+  test("P1: Slack - Complete CRUD flow with validation and connectivity test", {
+    tag: ['@prebuiltDestinations', '@slack', '@P1', '@all'],
+    timeout: EXTENDED_TIMEOUT_MS
   }, async ({ page }) => {
-    testLogger.info('Testing Slack destination Test button');
+    testLogger.info('===== P1 SLACK TEST: Complete CRUD Flow =====');
 
+    const destinationName = `auto_dest_slack_${sharedRandomValue}`;
     const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
+    const updatedWebhookUrl = 'https://hooks.slack.com/services/T11111111/B11111111/YYYYYYYYYYYYYYYYYYYY';
 
+    // ----- PART 1: Webhook URL Validation -----
+    testLogger.info('Part 1: Testing Slack webhook URL validation');
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('slack');
+    await pm.alertDestinationsPage.fillWebhookUrl('https://invalid-url.com');
+    await pm.alertDestinationsPage.expectValidationError();
+    testLogger.info('✓ Invalid webhook URL shows validation error');
+    await pm.alertDestinationsPage.clickCancel();
+
+    // ----- PART 2: Test Button Functionality -----
+    testLogger.info('Part 2: Testing Slack destination Test button');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('slack');
     await pm.alertDestinationsPage.fillWebhookUrl(webhookUrl);
-
-    // Click Test button
     await pm.alertDestinationsPage.expectTestButtonEnabled();
     await pm.alertDestinationsPage.clickTest();
-
-    // Verify test result is displayed
     await pm.alertDestinationsPage.expectTestResultVisible();
-
     testLogger.info('✓ Test button functionality working');
-
-    // Close the form
     await pm.alertDestinationsPage.clickCancel();
-  });
 
-  // ============================================================================
-  // P1 - Discord Destination Tests
-  // ============================================================================
-
-  test("Create Discord destination - Complete flow", {
-    tag: ['@prebuiltDestinations', '@discord', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Discord destination creation flow');
-
-    const destinationName = `test_discord_${randomSuffix}`;
-    const webhookUrl = 'https://discord.com/api/webhooks/1234567890/AbCdEfGhIjKlMnOpQrStUvWxYz1234567890AbCdEfGhIjKlMnOpQrStUvWxYz';
-
-    // Complete flow: Create Discord destination
-    await pm.alertDestinationsPage.createDiscordDestination(destinationName, webhookUrl);
-
-    // Verify destination appears in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Discord destination created successfully');
-
-    // Cleanup: Delete the destination
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // ============================================================================
-  // P1 - Microsoft Teams Destination Tests
-  // ============================================================================
-
-  test("Create Microsoft Teams destination", {
-    tag: ['@prebuiltDestinations', '@teams', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Microsoft Teams destination creation');
-
-    const destinationName = `test_teams_${randomSuffix}`;
-    const webhookUrl = 'https://outlook.office.com/webhook/00000000-0000-0000-0000-000000000000@00000000-0000-0000-0000-000000000000/IncomingWebhook/00000000000000000000000000000000/00000000-0000-0000-0000-000000000000';
-
-    // Create Teams destination
-    await pm.alertDestinationsPage.createTeamsDestination(destinationName, webhookUrl);
-
-    // Verify in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Microsoft Teams destination created successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // ============================================================================
-  // P1 - Email Destination Tests
-  // ============================================================================
-
-  test.skip("Create Email destination with multiple recipients", {
-    tag: ['@prebuiltDestinations', '@email', '@P1', '@all']
-  }, async ({ page }) => {
-    // SKIPPED: SMTP not configured in test environment
-    testLogger.info('Testing Email destination creation');
-
-    const destinationName = `test_email_${randomSuffix}`;
-    const recipients = process.env["ZO_ROOT_USER_EMAIL"]; // Use actual test user email
-
-    // Create Email destination
-    await pm.alertDestinationsPage.createEmailDestination(destinationName, recipients);
-
-    // Verify in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Email destination created successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test.skip("Validate email address format", {
-    tag: ['@prebuiltDestinations', '@email', '@validation', '@P1']
-  }, async ({ page }) => {
-    // SKIPPED: SMTP not configured in test environment
-    testLogger.info('Testing email validation');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('email');
-
-    // Test invalid email
-    await pm.alertDestinationsPage.fillEmailRecipients('invalid-email-format');
-
-    // Verify validation error
-    await pm.alertDestinationsPage.expectValidationError();
-
-    testLogger.info('✓ Email validation working');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-  });
-
-  // ============================================================================
-  // P2 - PagerDuty Destination Tests
-  // ============================================================================
-
-  test("Create PagerDuty destination with severity", {
-    tag: ['@prebuiltDestinations', '@pagerduty', '@P2']
-  }, async ({ page }) => {
-    testLogger.info('Testing PagerDuty destination creation');
-
-    const destinationName = `test_pagerduty_${randomSuffix}`;
-    const integrationKey = 'R01234ABCDEFGHIJKLMNOPQR01234567'; // 32 characters
-
-    // Create PagerDuty destination
-    await pm.alertDestinationsPage.createPagerDutyDestination(destinationName, integrationKey, 'Error');
-
-    // Verify in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ PagerDuty destination created successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // ============================================================================
-  // P2 - Stepper Navigation Tests
-  // ============================================================================
-
-  // REMOVED: Test Back button navigation - obsolete (UI no longer uses stepper)
-  // UI redesign removed stepper navigation, all destination types show on single screen
-
-  test("Verify Custom Destination option still works", {
-    tag: ['@prebuiltDestinations', '@custom', '@P2', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Custom Destination option');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('custom');
-
-    // Verify custom form fields appear
-    await page.waitForTimeout(2000);
-    await pm.alertDestinationsPage.expectUrlInputVisible();
-
-    testLogger.info('✓ Custom destination option working');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-  });
-
-  // ============================================================================
-  // P2 - Required Field Validation Tests
-  // ============================================================================
-
-  test("Verify Save button validation for missing fields", {
-    tag: ['@prebuiltDestinations', '@validation', '@P2']
-  }, async ({ page }) => {
-    testLogger.info('Testing required field validation');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('slack');
-
-    // Try to save without filling required fields
-    await pm.alertDestinationsPage.clickSave();
-
-    // Verify validation error appears
-    await pm.alertDestinationsPage.expectValidationError();
-
-    testLogger.info('✓ Required field validation working');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-  });
-
-  // ============================================================================
-  // P3 - Delete Destination Tests
-  // ============================================================================
-
-  test("Delete prebuilt destination", {
-    tag: ['@prebuiltDestinations', '@delete', '@P3']
-  }, async ({ page }) => {
-    testLogger.info('Testing destination deletion');
-
-    const destinationName = `test_delete_${randomSuffix}`;
-    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-
-    // First, create a destination
+    // ----- PART 3: Create Slack Destination -----
+    testLogger.info('Part 3: Creating Slack destination');
     await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
+    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    testLogger.info('✓ Slack destination created and verified in list', { destinationName });
 
-    // Now delete it
-    testLogger.info('Deleting destination');
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-
-    // Verify it's gone from the list
-    await pm.alertDestinationsPage.expectDestinationNotInList(destinationName);
-
-    testLogger.info('✓ Destination deleted successfully');
-  });
-
-  // ============================================================================
-  // P1 - Stepper UI Verification Tests
-  // ============================================================================
-
-  test("Verify selected destination indicator with Slack", {
-    tag: ['@prebuiltDestinations', '@slack', '@stepperUI', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing selected destination indicator');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('slack');
-
-    // Verify Step 2 is displayed
-    await pm.alertDestinationsPage.expectConnectionStepVisible();
-
-    // Verify selected destination indicator
-    await pm.alertDestinationsPage.expectSelectedIndicatorVisible('Slack');
-
-    // Verify green checkmark
-    await pm.alertDestinationsPage.expectCheckmarkVisible();
-
-    testLogger.info('✓ Selected destination indicator displays correctly');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-  });
-
-  // ============================================================================
-  // P1 - EDIT MODE Tests for Prebuilt Destinations
-  // ============================================================================
-
-  test("Edit Slack destination - verify form loads with existing webhook URL", {
-    tag: ['@prebuiltDestinations', '@slack', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Slack destination edit form loading');
-
-    const destinationName = `test_slack_edit_load_${randomSuffix}`;
-    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-
-    // Create destination first
-    await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
-
-    // Click Edit button
+    // ----- PART 4: Edit Mode - Verify Form Loading -----
+    testLogger.info('Part 4: Testing edit mode form loading');
     await pm.alertDestinationsPage.clickEditDestination(destinationName);
-
-    // Verify edit form loads with existing data
     await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Verify Step 1 is skipped and we're on Step 2
     await pm.alertDestinationsPage.expectStep1Skipped();
-
-    // Verify destination type indicator shows "Slack"
     await pm.alertDestinationsPage.expectDestinationTypeInEditMode('Slack');
-
-    // Verify webhook URL is populated
     await pm.alertDestinationsPage.expectWebhookUrlPopulated();
-
-    testLogger.info('✓ Slack edit form loaded correctly with existing data');
-
-    // Close the form
+    testLogger.info('✓ Edit form loads correctly with existing data');
     await pm.alertDestinationsPage.clickCancel();
 
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit Slack destination - change webhook URL and save", {
-    tag: ['@prebuiltDestinations', '@slack', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Slack destination webhook URL update');
-
-    const destinationName = `test_slack_edit_update_${randomSuffix}`;
-    const originalWebhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-    const newWebhookUrl = 'https://hooks.slack.com/services/T11111111/B11111111/YYYYYYYYYYYYYYYYYYYY';
-
-    // Create destination first
-    await pm.alertDestinationsPage.createSlackDestination(destinationName, originalWebhookUrl);
-
-    // Edit and update webhook URL
-    await pm.alertDestinationsPage.editSlackDestination(destinationName, newWebhookUrl);
-
-    // Verify destination still exists in list
+    // ----- PART 5: Edit Mode - Update Webhook URL -----
+    testLogger.info('Part 5: Updating Slack webhook URL');
+    await pm.alertDestinationsPage.editSlackDestination(destinationName, updatedWebhookUrl);
     await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
     testLogger.info('✓ Slack destination webhook URL updated successfully');
 
-    // Cleanup
+    // ----- CLEANUP -----
+    testLogger.info('Cleanup: Deleting Slack destination');
     await pm.alertDestinationsPage.deleteDestination(destinationName);
+
+    testLogger.info('===== P1 SLACK TEST COMPLETED =====');
   });
 
-  test("Edit Discord destination - update webhook URL", {
-    tag: ['@prebuiltDestinations', '@discord', '@edit', '@P1', '@all']
+  // ============================================================================
+  // P1 - Other Prebuilt Types: Discord, Teams, PagerDuty, Opsgenie, ServiceNow
+  // ============================================================================
+
+  test("P1: Prebuilt Types - Create and Edit for Discord, Teams, PagerDuty, Opsgenie, ServiceNow", {
+    tag: ['@prebuiltDestinations', '@discord', '@teams', '@pagerduty', '@opsgenie', '@servicenow', '@P1', '@all'],
+    timeout: EXTENDED_TIMEOUT_MS
   }, async ({ page }) => {
-    testLogger.info('Testing Discord destination edit');
+    test.slow(); // Mark as slow due to multiple destination types
+    testLogger.info('===== P1 PREBUILT TYPES TEST: Discord, Teams, PagerDuty, Opsgenie, ServiceNow =====');
 
-    const destinationName = `test_discord_edit_${randomSuffix}`;
-    const originalWebhookUrl = 'https://discord.com/api/webhooks/1234567890/AbCdEfGhIjKlMnOpQrStUvWxYz1234567890AbCdEfGhIjKlMnOpQrStUvWxYz';
-    const newWebhookUrl = 'https://discord.com/api/webhooks/9876543210/ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210ZyXwVuTsRqPoNmLkJiHgFeDcBa';
+    // ----- DISCORD -----
+    testLogger.info('===== Testing Discord Destination =====');
+    const discordName = `auto_dest_discord_${sharedRandomValue}`;
+    const discordWebhook = 'https://discord.com/api/webhooks/1234567890/AbCdEfGhIjKlMnOpQrStUvWxYz1234567890AbCdEfGhIjKlMnOpQrStUvWxYz';
+    const discordWebhookUpdated = 'https://discord.com/api/webhooks/9876543210/ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210ZyXwVuTsRqPoNmLkJiHgFeDcBa';
 
-    // Create destination first
-    await pm.alertDestinationsPage.createDiscordDestination(destinationName, originalWebhookUrl);
+    await pm.alertDestinationsPage.createDiscordDestination(discordName, discordWebhook);
+    await pm.alertDestinationsPage.expectDestinationInList(discordName);
+    testLogger.info('✓ Discord destination created', { discordName });
 
-    // Edit and update webhook URL
-    await pm.alertDestinationsPage.editDiscordDestination(destinationName, newWebhookUrl);
+    await pm.alertDestinationsPage.editDiscordDestination(discordName, discordWebhookUpdated);
+    await pm.alertDestinationsPage.expectDestinationInList(discordName);
+    testLogger.info('✓ Discord destination updated');
 
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    await pm.alertDestinationsPage.deleteDestination(discordName);
+    testLogger.info('✓ Discord destination deleted');
 
-    testLogger.info('✓ Discord destination updated successfully');
+    // ----- MICROSOFT TEAMS -----
+    testLogger.info('===== Testing Microsoft Teams Destination =====');
+    const teamsName = `auto_dest_teams_${sharedRandomValue}`;
+    const teamsWebhook = 'https://outlook.office.com/webhook/00000000-0000-0000-0000-000000000000@00000000-0000-0000-0000-000000000000/IncomingWebhook/00000000000000000000000000000000/00000000-0000-0000-0000-000000000000';
+    const teamsWebhookUpdated = 'https://outlook.office.com/webhook/11111111-1111-1111-1111-111111111111@11111111-1111-1111-1111-111111111111/IncomingWebhook/11111111111111111111111111111111/11111111-1111-1111-1111-111111111111';
 
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
+    await pm.alertDestinationsPage.createTeamsDestination(teamsName, teamsWebhook);
+    await pm.alertDestinationsPage.expectDestinationInList(teamsName);
+    testLogger.info('✓ Teams destination created', { teamsName });
 
-  test("Edit Microsoft Teams destination - update webhook URL", {
-    tag: ['@prebuiltDestinations', '@teams', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Microsoft Teams destination edit');
+    await pm.alertDestinationsPage.editTeamsDestination(teamsName, teamsWebhookUpdated);
+    await pm.alertDestinationsPage.expectDestinationInList(teamsName);
+    testLogger.info('✓ Teams destination updated');
 
-    const destinationName = `test_teams_edit_${randomSuffix}`;
-    const originalWebhookUrl = 'https://outlook.office.com/webhook/00000000-0000-0000-0000-000000000000@00000000-0000-0000-0000-000000000000/IncomingWebhook/00000000000000000000000000000000/00000000-0000-0000-0000-000000000000';
-    const newWebhookUrl = 'https://outlook.office.com/webhook/11111111-1111-1111-1111-111111111111@11111111-1111-1111-1111-111111111111/IncomingWebhook/11111111111111111111111111111111/11111111-1111-1111-1111-111111111111';
+    await pm.alertDestinationsPage.deleteDestination(teamsName);
+    testLogger.info('✓ Teams destination deleted');
 
-    // Create destination first
-    await pm.alertDestinationsPage.createTeamsDestination(destinationName, originalWebhookUrl);
-
-    // Edit and update webhook URL
-    await pm.alertDestinationsPage.editTeamsDestination(destinationName, newWebhookUrl);
-
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Teams destination updated successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test.skip("Edit Email destination - add/remove recipients", {
-    tag: ['@prebuiltDestinations', '@email', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    // SKIPPED: SMTP not configured in test environment
-    testLogger.info('Testing Email destination recipients update');
-
-    const destinationName = `test_email_edit_${randomSuffix}`;
-    const originalRecipients = process.env["ZO_ROOT_USER_EMAIL"];
-    const newRecipients = `${process.env["ZO_ROOT_USER_EMAIL"]}, test@example.com`;
-
-    // Create destination first
-    await pm.alertDestinationsPage.createEmailDestination(destinationName, originalRecipients);
-
-    // Edit and update recipients
-    await pm.alertDestinationsPage.editEmailDestination(destinationName, newRecipients);
-
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Email destination recipients updated successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit PagerDuty destination - change severity level", {
-    tag: ['@prebuiltDestinations', '@pagerduty', '@edit', '@P1']
-  }, async ({ page }) => {
-    testLogger.info('Testing PagerDuty destination severity update');
-
-    const destinationName = `test_pagerduty_edit_${randomSuffix}`;
+    // ----- PAGERDUTY -----
+    testLogger.info('===== Testing PagerDuty Destination =====');
+    const pagerdutyName = `auto_dest_pagerduty_${sharedRandomValue}`;
     const integrationKey = 'R01234ABCDEFGHIJKLMNOPQR01234567'; // 32 characters
 
-    // Create destination with 'Error' severity
-    await pm.alertDestinationsPage.createPagerDutyDestination(destinationName, integrationKey, 'Error');
+    await pm.alertDestinationsPage.createPagerDutyDestination(pagerdutyName, integrationKey, 'Error');
+    await pm.alertDestinationsPage.expectDestinationInList(pagerdutyName);
+    testLogger.info('✓ PagerDuty destination created with Error severity', { pagerdutyName });
 
-    // Edit and change severity to 'Warning' (must re-provide integration key as password fields are cleared in edit mode)
-    await pm.alertDestinationsPage.editPagerDutyDestination(destinationName, integrationKey, 'Warning');
+    // Edit and change severity (must re-provide integration key as password fields are cleared)
+    await pm.alertDestinationsPage.editPagerDutyDestination(pagerdutyName, integrationKey, 'Warning');
+    await pm.alertDestinationsPage.expectDestinationInList(pagerdutyName);
+    testLogger.info('✓ PagerDuty destination severity updated to Warning');
 
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    await pm.alertDestinationsPage.deleteDestination(pagerdutyName);
+    testLogger.info('✓ PagerDuty destination deleted');
 
-    testLogger.info('✓ PagerDuty destination severity updated successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit destination - verify Step 1 is skipped and goes directly to Step 2", {
-    tag: ['@prebuiltDestinations', '@edit', '@stepperUI', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Step 1 is skipped in edit mode');
-
-    const destinationName = `test_step_skip_${randomSuffix}`;
-    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-
-    // Create destination first
-    await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
-
-    // Click Edit button
-    await pm.alertDestinationsPage.clickEditDestination(destinationName);
-
-    // Verify edit form loads
-    await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Verify Step 1 is skipped - we should be directly on Step 2
-    await pm.alertDestinationsPage.expectStep1Skipped();
-    await pm.alertDestinationsPage.expectConnectionStepVisible();
-
-    testLogger.info('✓ Step 1 correctly skipped in edit mode');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit destination - verify credentials are properly restored from metadata", {
-    tag: ['@prebuiltDestinations', '@edit', '@credentials', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing credentials restoration in edit mode');
-
-    const destinationName = `test_credentials_restore_${randomSuffix}`;
-    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
-
-    // Create Slack destination
-    await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
-
-    // Click Edit button
-    await pm.alertDestinationsPage.clickEditDestination(destinationName);
-
-    // Verify edit form loads
-    await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Verify webhook URL is restored (credentials from metadata)
-    await pm.alertDestinationsPage.expectWebhookUrlPopulated();
-
-    testLogger.info('✓ Credentials properly restored from metadata');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // REMOVED: Test "Edit destination - change destination name" - obsolete (name is now read-only)
-  // Destination names cannot be changed in edit mode
-
-  // REMOVED: Test "Edit destination - cancel without saving" - obsolete (depends on name editing)
-  // Test used updateDestinationName which tries to edit read-only name field
-
-  test.skip("Edit Email destination - verify multiple recipients are preserved", {
-    tag: ['@prebuiltDestinations', '@email', '@edit', '@P2']
-  }, async ({ page }) => {
-    // SKIPPED: SMTP not configured in test environment
-    testLogger.info('Testing Email destination multiple recipients preservation');
-
-    const destinationName = `test_email_multi_recipients_${randomSuffix}`;
-    const recipients = `${process.env["ZO_ROOT_USER_EMAIL"]}, test1@example.com, test2@example.com`;
-
-    // Create destination with multiple recipients
-    await pm.alertDestinationsPage.createEmailDestination(destinationName, recipients);
-
-    // Click Edit button
-    await pm.alertDestinationsPage.clickEditDestination(destinationName);
-
-    // Verify edit form loads
-    await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Verify all recipients are populated
-    await pm.alertDestinationsPage.expectEmailRecipientsPopulated();
-
-    testLogger.info('✓ Multiple email recipients preserved in edit mode');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit destination - verify destination type indicator is persistent", {
-    tag: ['@prebuiltDestinations', '@edit', '@stepperUI', '@P2']
-  }, async ({ page }) => {
-    testLogger.info('Testing destination type indicator persistence in edit mode');
-
-    const destinationName = `test_type_indicator_${randomSuffix}`;
-    const webhookUrl = 'https://outlook.office.com/webhook/00000000-0000-0000-0000-000000000000@00000000-0000-0000-0000-000000000000/IncomingWebhook/00000000000000000000000000000000/00000000-0000-0000-0000-000000000000';
-
-    // Create Teams destination
-    await pm.alertDestinationsPage.createTeamsDestination(destinationName, webhookUrl);
-
-    // Click Edit button
-    await pm.alertDestinationsPage.clickEditDestination(destinationName);
-
-    // Verify edit form loads
-    await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Verify destination type indicator shows "Microsoft Teams" with checkmark
-    await pm.alertDestinationsPage.expectDestinationTypeInEditMode('Microsoft Teams');
-    await pm.alertDestinationsPage.expectCheckmarkVisible();
-
-    testLogger.info('✓ Destination type indicator persists correctly in edit mode');
-
-    // Close the form
-    await pm.alertDestinationsPage.clickCancel();
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // ============================================================================
-  // P1 - Opsgenie Destination Tests (Create + Edit)
-  // ============================================================================
-
-  test("Create Opsgenie destination with priority", {
-    tag: ['@prebuiltDestinations', '@opsgenie', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Opsgenie destination creation');
-
-    const destinationName = `test_opsgenie_${randomSuffix}`;
+    // ----- OPSGENIE -----
+    testLogger.info('===== Testing Opsgenie Destination =====');
+    const opsgenieName = `auto_dest_opsgenie_${sharedRandomValue}`;
     const apiKey = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx1234'; // 40 characters (>30)
 
-    // Create Opsgenie destination
-    await pm.alertDestinationsPage.createOpsgenieDestination(destinationName, apiKey, 'P2');
+    await pm.alertDestinationsPage.createOpsgenieDestination(opsgenieName, apiKey, 'P2');
+    await pm.alertDestinationsPage.expectDestinationInList(opsgenieName);
+    testLogger.info('✓ Opsgenie destination created with P2 priority', { opsgenieName });
 
-    // Verify in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    // Edit and change priority (must re-provide API key as password fields are cleared)
+    await pm.alertDestinationsPage.editOpsgenieDestination(opsgenieName, apiKey, 'P1');
+    await pm.alertDestinationsPage.expectDestinationInList(opsgenieName);
+    testLogger.info('✓ Opsgenie destination priority updated to P1');
 
-    testLogger.info('✓ Opsgenie destination created successfully');
+    await pm.alertDestinationsPage.deleteDestination(opsgenieName);
+    testLogger.info('✓ Opsgenie destination deleted');
 
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit Opsgenie destination - change priority", {
-    tag: ['@prebuiltDestinations', '@opsgenie', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing Opsgenie destination priority update');
-
-    const destinationName = `test_opsgenie_edit_${randomSuffix}`;
-    const apiKey = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx1234'; // 40 characters (>30)
-
-    // Create destination with 'P2' priority
-    await pm.alertDestinationsPage.createOpsgenieDestination(destinationName, apiKey, 'P2');
-
-    // Edit and change priority to 'P1' (must re-provide API key as password fields are cleared in edit mode)
-    await pm.alertDestinationsPage.editOpsgenieDestination(destinationName, apiKey, 'P1');
-
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ Opsgenie destination priority updated successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  // ============================================================================
-  // P1 - ServiceNow Destination Tests (Create + Edit)
-  // ============================================================================
-
-  test("Create ServiceNow destination", {
-    tag: ['@prebuiltDestinations', '@servicenow', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing ServiceNow destination creation');
-
-    const destinationName = `test_servicenow_${randomSuffix}`;
+    // ----- SERVICENOW -----
+    testLogger.info('===== Testing ServiceNow Destination =====');
+    const servicenowName = `auto_dest_servicenow_${sharedRandomValue}`;
     const instanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
+    const instanceUrlUpdated = 'https://dev67890.service-now.com/api/now/table/incident';
     const username = 'test_user';
     const password = 'test_password';
 
-    // Create ServiceNow destination
-    await pm.alertDestinationsPage.createServiceNowDestination(destinationName, instanceUrl, username, password);
+    await pm.alertDestinationsPage.createServiceNowDestination(servicenowName, instanceUrl, username, password);
+    await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
+    testLogger.info('✓ ServiceNow destination created', { servicenowName });
 
-    // Verify in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated);
+    await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
+    testLogger.info('✓ ServiceNow destination instance URL updated');
 
-    testLogger.info('✓ ServiceNow destination created successfully');
+    await pm.alertDestinationsPage.deleteDestination(servicenowName);
+    testLogger.info('✓ ServiceNow destination deleted');
 
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-  });
-
-  test("Edit ServiceNow destination - update instance URL", {
-    tag: ['@prebuiltDestinations', '@servicenow', '@edit', '@P1', '@all']
-  }, async ({ page }) => {
-    testLogger.info('Testing ServiceNow destination instance URL update');
-
-    const destinationName = `test_servicenow_edit_${randomSuffix}`;
-    const originalInstanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
-    const newInstanceUrl = 'https://dev67890.service-now.com/api/now/table/incident';
-    const username = 'test_user';
-    const password = 'test_password';
-
-    // Create destination first
-    await pm.alertDestinationsPage.createServiceNowDestination(destinationName, originalInstanceUrl, username, password);
-
-    // Edit and update instance URL
-    await pm.alertDestinationsPage.editServiceNowDestination(destinationName, newInstanceUrl);
-
-    // Verify destination still exists in list
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-
-    testLogger.info('✓ ServiceNow destination updated successfully');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
+    testLogger.info('===== P1 PREBUILT TYPES TEST COMPLETED =====');
   });
 
   // ============================================================================
-  // P2 - Custom Destination Edit Test
+  // P1 - Custom Destination Flow: Create and Edit
   // ============================================================================
 
-  test("Edit Custom destination - change URL", {
-    tag: ['@prebuiltDestinations', '@custom', '@edit', '@P2', '@all']
+  test("P1: Custom Destination - Create and Edit flow", {
+    tag: ['@prebuiltDestinations', '@custom', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing Custom destination edit');
+    testLogger.info('===== P1 CUSTOM DESTINATION TEST =====');
 
-    const destinationName = `test_custom_edit_${randomSuffix}`;
+    const destinationName = `auto_dest_custom_${sharedRandomValue}`;
     const originalUrl = 'https://webhook.example.com/original';
-    const newUrl = 'https://webhook.example.com/updated';
+    const updatedUrl = 'https://webhook.example.com/updated';
 
-    // Create custom destination first
+    // ----- PART 1: Verify Custom option still works -----
+    testLogger.info('Part 1: Verifying Custom destination option');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('custom');
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    await pm.alertDestinationsPage.expectUrlInputVisible();
+    testLogger.info('✓ Custom destination form displays correctly');
+    await pm.alertDestinationsPage.clickCancel();
 
-    // Fill custom destination details
+    // ----- PART 2: Create Custom Destination -----
+    testLogger.info('Part 2: Creating custom destination');
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('custom');
     await pm.alertDestinationsPage.fillDestinationName(destinationName);
-    await pm.alertDestinationsPage.selectTemplate(); // Select first available template (required!)
+    await pm.alertDestinationsPage.selectTemplate(); // Select first available template
     await pm.alertDestinationsPage.fillCustomUrl(originalUrl);
     await pm.alertDestinationsPage.selectHttpMethod('POST');
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    testLogger.info('✓ Custom destination created', { destinationName });
 
-    // Edit and update URL
+    // ----- PART 3: Edit Custom Destination URL -----
+    testLogger.info('Part 3: Editing custom destination URL');
     await pm.alertDestinationsPage.clickEditDestination(destinationName);
     await pm.alertDestinationsPage.expectEditFormLoaded(destinationName);
-
-    // Update URL
-    await pm.alertDestinationsPage.updateCustomUrl(newUrl);
+    await pm.alertDestinationsPage.updateCustomUrl(updatedUrl);
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(3000);
-
-    // Verify destination still exists in list
+    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    testLogger.info('✓ Custom destination URL updated successfully');
 
-    testLogger.info('✓ Custom destination updated successfully');
+    // ----- CLEANUP -----
+    await pm.alertDestinationsPage.deleteDestination(destinationName);
+    testLogger.info('✓ Custom destination deleted');
+
+    testLogger.info('===== P1 CUSTOM DESTINATION TEST COMPLETED =====');
+  });
+
+  // ============================================================================
+  // P2 - Validation & Edge Cases
+  // ============================================================================
+
+  test("P2: Validation - Required fields and stepper behavior", {
+    tag: ['@prebuiltDestinations', '@validation', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('===== P2 VALIDATION TEST =====');
+
+    // ----- PART 1: Required Field Validation -----
+    testLogger.info('Part 1: Testing required field validation');
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('slack');
+    await pm.alertDestinationsPage.clickSave();
+    await pm.alertDestinationsPage.expectValidationError();
+    testLogger.info('✓ Required field validation working - Save blocked without webhook URL');
+    await pm.alertDestinationsPage.clickCancel();
+
+    // ----- PART 2: Edit Mode - Step 1 Skipped -----
+    testLogger.info('Part 2: Verifying Step 1 is skipped in edit mode');
+    const tempDestName = `auto_dest_edit_test_${sharedRandomValue}`;
+    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
+
+    await pm.alertDestinationsPage.createSlackDestination(tempDestName, webhookUrl);
+    await pm.alertDestinationsPage.clickEditDestination(tempDestName);
+    await pm.alertDestinationsPage.expectEditFormLoaded(tempDestName);
+    await pm.alertDestinationsPage.expectStep1Skipped();
+    await pm.alertDestinationsPage.expectConnectionStepVisible();
+    testLogger.info('✓ Step 1 correctly skipped in edit mode');
+    await pm.alertDestinationsPage.clickCancel();
+
+    // ----- PART 3: Credentials Restoration -----
+    testLogger.info('Part 3: Verifying credentials restoration from metadata');
+    await pm.alertDestinationsPage.clickEditDestination(tempDestName);
+    await pm.alertDestinationsPage.expectEditFormLoaded(tempDestName);
+    await pm.alertDestinationsPage.expectWebhookUrlPopulated();
+    testLogger.info('✓ Credentials properly restored from metadata in edit mode');
+    await pm.alertDestinationsPage.clickCancel();
+
+    // ----- PART 4: Type Indicator Persistence in Edit Mode -----
+    testLogger.info('Part 4: Verifying destination type indicator persistence');
+    await pm.alertDestinationsPage.clickEditDestination(tempDestName);
+    await pm.alertDestinationsPage.expectDestinationTypeInEditMode('Slack');
+    await pm.alertDestinationsPage.expectCheckmarkVisible();
+    testLogger.info('✓ Destination type indicator persists correctly in edit mode');
+    await pm.alertDestinationsPage.clickCancel();
+
+    // ----- CLEANUP -----
+    await pm.alertDestinationsPage.deleteDestination(tempDestName);
+    testLogger.info('✓ Temporary destination deleted');
+
+    testLogger.info('===== P2 VALIDATION TEST COMPLETED =====');
+  });
+
+  // ============================================================================
+  // P3 - Delete Flow
+  // ============================================================================
+
+  test("P3: Delete - Create and delete destination with verification", {
+    tag: ['@prebuiltDestinations', '@delete', '@P3', '@all']
+  }, async ({ page }) => {
+    testLogger.info('===== P3 DELETE TEST =====');
+
+    const destinationName = `auto_dest_delete_${sharedRandomValue}`;
+    const webhookUrl = 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX';
+
+    // Create destination
+    testLogger.info('Creating destination for deletion test');
+    await pm.alertDestinationsPage.createSlackDestination(destinationName, webhookUrl);
+    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    testLogger.info('✓ Destination created', { destinationName });
+
+    // Delete destination
+    testLogger.info('Deleting destination');
+    await pm.alertDestinationsPage.deleteDestination(destinationName);
+
+    // Verify deletion
+    await pm.alertDestinationsPage.expectDestinationNotInList(destinationName);
+    testLogger.info('✓ Destination deleted and verified not in list');
+
+    testLogger.info('===== P3 DELETE TEST COMPLETED =====');
+  });
+
+  // ============================================================================
+  // SKIPPED - Email Destination Tests
+  // ============================================================================
+
+  /**
+   * Email Destination Tests - SKIPPED
+   *
+   * NOTE: These tests are currently skipped because:
+   * 1. SMTP is not configured in the test environment
+   * 2. Email destinations require a working mail server to validate
+   * 3. The test environment does not have email infrastructure set up
+   *
+   * To enable these tests:
+   * - Configure SMTP settings in the test environment
+   * - Set up a test email server or use a mock SMTP service
+   * - Update environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
+   *
+   * Test coverage when enabled:
+   * - Create email destination with single recipient
+   * - Create email destination with multiple recipients
+   * - Edit email destination - add/remove recipients
+   * - Validate email address format
+   * - Verify multiple recipients are preserved in edit mode
+   */
+  test.skip("Email - Create and edit destination (SMTP not configured)", {
+    tag: ['@prebuiltDestinations', '@email', '@P1', '@skip']
+  }, async ({ page }) => {
+    testLogger.info('===== EMAIL TEST: SKIPPED - SMTP not configured =====');
+
+    const destinationName = `auto_dest_email_${sharedRandomValue}`;
+    const recipients = process.env["ZO_ROOT_USER_EMAIL"];
+    const additionalRecipients = `${process.env["ZO_ROOT_USER_EMAIL"]}, test@example.com`;
+
+    // Create Email destination
+    await pm.alertDestinationsPage.createEmailDestination(destinationName, recipients);
+    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    testLogger.info('✓ Email destination created');
+
+    // Edit and add recipients
+    await pm.alertDestinationsPage.editEmailDestination(destinationName, additionalRecipients);
+    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
+    testLogger.info('✓ Email destination recipients updated');
 
     // Cleanup
     await pm.alertDestinationsPage.deleteDestination(destinationName);
+    testLogger.info('✓ Email destination deleted');
+  });
+
+  test.skip("Email - Validate email address format (SMTP not configured)", {
+    tag: ['@prebuiltDestinations', '@email', '@validation', '@P1', '@skip']
+  }, async ({ page }) => {
+    testLogger.info('===== EMAIL VALIDATION TEST: SKIPPED - SMTP not configured =====');
+
+    await pm.alertDestinationsPage.clickNewDestination();
+    await pm.alertDestinationsPage.selectDestinationType('email');
+    await pm.alertDestinationsPage.fillEmailRecipients('invalid-email-format');
+    await pm.alertDestinationsPage.expectValidationError();
+    testLogger.info('✓ Email validation working');
+    await pm.alertDestinationsPage.clickCancel();
   });
 });
