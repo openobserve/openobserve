@@ -83,9 +83,9 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
 pub async fn get_sourcemap_file(
     org: &str,
     source_file: &str,
-    service: Option<String>,
-    env: Option<String>,
-    version: Option<String>,
+    service: &Option<String>,
+    env: &Option<String>,
+    version: &Option<String>,
 ) -> Result<Option<String>, anyhow::Error> {
     let ret =
         infra::table::source_maps::get_sourcemap_file_name(org, source_file, service, env, version)

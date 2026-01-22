@@ -192,6 +192,7 @@ tokio-rustls.workspace = true
 roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
+sourcemap = "9.3.2"
 
 [dev-dependencies]
 expect-test.workspace = true

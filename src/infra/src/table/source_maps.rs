@@ -157,9 +157,9 @@ pub async fn delete_group(
 pub async fn get_sourcemap_file_name(
     org: &str,
     source_file: &str,
-    service: Option<String>,
-    env: Option<String>,
-    version: Option<String>,
+    service: &Option<String>,
+    env: &Option<String>,
+    version: &Option<String>,
 ) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;
@@ -168,15 +168,15 @@ pub async fn get_sourcemap_file_name(
         .filter(Column::Org.eq(org))
         .filter(Column::SourceFileName.eq(source_file));
 
-    if let Some(s) = service {
+    if let Some(s) = service.as_ref() {
         stmt = stmt.filter(Column::Service.eq(s));
     }
 
-    if let Some(e) = env {
+    if let Some(e) = env.as_ref() {
         stmt = stmt.filter(Column::Env.eq(e));
     }
 
-    if let Some(v) = version {
+    if let Some(v) = version.as_ref() {
         stmt = stmt.filter(Column::Version.eq(v));
     }
 
