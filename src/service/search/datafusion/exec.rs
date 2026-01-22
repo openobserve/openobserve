@@ -324,7 +324,7 @@ pub async fn register_metrics_table(
         .build(session.target_partitions)
         .await?;
 
-    let table = TableBuilder::new()
+    let tables = TableBuilder::new()
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .build(session.clone(), files, schema.clone())
         .await?;
@@ -535,8 +535,8 @@ impl TableBuilder {
         let mut table = ListingTableAdapter::try_new(
             config,
             session.id.clone(),
-            self.index_condition,
-            self.fst_fields,
+            self.index_condition.clone(),
+            self.fst_fields.clone(),
             self.timestamp_filter,
         )?;
         if self.file_stat_cache.is_some() {

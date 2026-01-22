@@ -35,7 +35,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, SchemaRef};
-use config::{PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
+use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME, meta::bitvec::BitVec};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
@@ -138,6 +138,20 @@ fn generate_parquet_access_plan(
         file.path().as_ref()
     );
     Some(Arc::new(access_plan))
+}
+
+fn generate_vortex_access_plan(
+    row_ids: Arc<BitVec>,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+    let indices: Vec<u64> = row_ids
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, bit)| if *bit { Some(idx as u64) } else { None })
+        .collect();
+
+    let buffer = Buffer::from(indices);
+    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(buffer));
+    Some(Arc::new(selection))
 }
 
 pub fn apply_projection(
