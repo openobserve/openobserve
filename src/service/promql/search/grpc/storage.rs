@@ -27,6 +27,7 @@ use config::{
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
+    sql::TableReference,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -43,7 +44,7 @@ use crate::service::{
     db, file_list,
     promql::search::grpc::Context,
     search::{
-        datafusion::exec::register_table,
+        datafusion::exec::register_metrics_table,
         grpc::{
             QueryParams,
             storage::{cache_files, tantivy_search},
@@ -213,9 +214,10 @@ pub(crate) async fn create_context(
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.to_string(),
+        stream: TableReference::from(stream_name),
         stream_type: StreamType::Metrics,
         stream_name: stream_name.to_string(),
-        time_range: Some(time_range),
+        time_range,
         work_group: None,
         use_inverted_index: true,
     });
@@ -248,7 +250,7 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    let ctx = register_table(&session, schema.clone(), stream_name, files, &[]).await?;
+    let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
 
     Ok(Some((
         ctx,

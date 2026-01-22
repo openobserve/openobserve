@@ -34,16 +34,21 @@
 
 use std::sync::Arc;
 
-use arrow_schema::{DataType, Schema, SchemaRef};
-use config::PARQUET_MAX_ROW_GROUP_SIZE;
+use arrow_schema::{DataType, SchemaRef};
+use config::{PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
+    logical_expr::Operator,
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
+    physical_expr::conjunction,
     physical_plan::{
-        ExecutionPlan, PhysicalExpr, expressions::CastExpr, filter::FilterExec,
+        ExecutionPlan, PhysicalExpr,
+        expressions::{BinaryExpr, CastExpr, Column, Literal},
+        filter::FilterExec,
         projection::ProjectionExec,
     },
+    scalar::ScalarValue,
 };
 use hashbrown::HashMap;
 
@@ -124,22 +129,6 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     Some(Arc::new(access_plan))
 }
 
-fn wrap_filter(
-    index_condition: &IndexCondition,
-    schema: &Schema,
-    fst_fields: &[String],
-    exec: Arc<dyn ExecutionPlan>,
-    projection: Option<&Vec<usize>>,
-) -> Result<Arc<dyn ExecutionPlan>> {
-    let expr = index_condition
-        .to_physical_expr(schema, fst_fields)
-        .map_err(|e| DataFusionError::External(e.into()))?;
-
-    Ok(Arc::new(
-        FilterExec::try_new(expr, exec)?.with_projection(projection.cloned())?,
-    ))
-}
-
 pub fn apply_projection(
     schema: &SchemaRef,
     diff_rules: &HashMap<String, DataType>,
@@ -166,16 +155,54 @@ pub fn apply_projection(
     Ok(Arc::new(ProjectionExec::try_new(exprs, memory_exec)?))
 }
 
-pub fn apply_filter(
+pub fn apply_combined_filter(
     index_condition: Option<&IndexCondition>,
-    schema: &Schema,
+    timestamp_filter: Option<(i64, i64)>,
+    schema: &arrow_schema::Schema,
     fst_fields: &[String],
     exec_plan: Arc<dyn ExecutionPlan>,
     filter_projection: Option<&Vec<usize>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    if let Some(condition) = index_condition {
-        wrap_filter(condition, schema, fst_fields, exec_plan, filter_projection)
-    } else {
-        Ok(exec_plan)
+    if index_condition.is_none() && timestamp_filter.is_none() {
+        return Ok(exec_plan);
     }
+
+    let mut filter_exprs = Vec::new();
+
+    // add index condition filter if present
+    if let Some(condition) = index_condition {
+        let expr = condition
+            .to_physical_expr(schema, fst_fields)
+            .map_err(|e| DataFusionError::External(e.into()))?;
+        filter_exprs.push(expr);
+    }
+
+    // add timestamp filter if present
+    if let Some((start_time, end_time)) = timestamp_filter {
+        let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
+        let timestamp_col = Arc::new(Column::new(TIMESTAMP_COL_NAME, timestamp_idx));
+
+        // create filter: _timestamp >= start_time AND _timestamp < end_time
+        let ge_expr = Arc::new(BinaryExpr::new(
+            timestamp_col.clone(),
+            Operator::GtEq,
+            Arc::new(Literal::new(ScalarValue::Int64(Some(start_time)))),
+        ));
+        let le_expr = Arc::new(BinaryExpr::new(
+            timestamp_col,
+            Operator::Lt,
+            Arc::new(Literal::new(ScalarValue::Int64(Some(end_time)))),
+        ));
+        let timestamp_expr: Arc<dyn PhysicalExpr> =
+            Arc::new(BinaryExpr::new(ge_expr, Operator::And, le_expr));
+        filter_exprs.push(timestamp_expr);
+    }
+
+    // combine all filters with AND
+    let combined_expr = conjunction(filter_exprs);
+
+    Ok(Arc::new(
+        FilterExec::try_new(combined_expr, exec_plan)?
+            .with_projection(filter_projection.cloned())?,
+    ))
 }

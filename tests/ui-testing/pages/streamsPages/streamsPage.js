@@ -840,4 +840,65 @@ export class StreamsPage {
             return 500;
         }
     }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect streams page to be visible
+     * Bug #9354 - FTS auto-add
+     */
+    async expectStreamsPageVisible() {
+        const streamsTable = this.page.locator('[data-test="log-stream-table"], [data-test*="streams"]').first();
+        await expect(streamsTable).toBeVisible({ timeout: 15000 });
+        testLogger.info('Streams page is visible');
+    }
+
+    /**
+     * Check if stream is visible
+     * Bug #9354 - FTS auto-add
+     */
+    async isStreamVisible(streamName) {
+        const streamRow = this.page.locator('tr').filter({ hasText: streamName }).first();
+        return await streamRow.isVisible().catch(() => false);
+    }
+
+    /**
+     * Click on stream schema/details button in the actions column
+     * Bug #9354 - FTS auto-add
+     * Note: In OpenObserve streams table, you need to click the schema icon (list_alt) to view details
+     */
+    async clickStream(streamName) {
+        const streamRow = this.page.locator('tr').filter({ hasText: streamName }).first();
+        // Find the schema button (list_alt icon) in the actions column
+        const schemaButton = streamRow.locator('button:has(.q-icon), [role="button"]').filter({ has: this.page.locator('.material-icons:text("list_alt"), .q-icon:text("list_alt")') }).first();
+
+        // If schema button not found, try alternative selectors
+        const schemaButtonAlt = streamRow.locator('button[title*="Schema"], button[title*="schema"], button .material-icons').nth(1);
+
+        if (await schemaButton.isVisible().catch(() => false)) {
+            await schemaButton.click();
+            testLogger.info(`Clicked schema button for stream: ${streamName}`);
+        } else if (await schemaButtonAlt.isVisible().catch(() => false)) {
+            await schemaButtonAlt.click();
+            testLogger.info(`Clicked schema button (alt) for stream: ${streamName}`);
+        } else {
+            // Fallback: click on the row itself, which may expand it
+            await streamRow.click();
+            testLogger.info(`Clicked stream row: ${streamName}`);
+        }
+        await this.page.waitForTimeout(1500);
+    }
+
+    /**
+     * Expect stream schema dialog to be visible
+     * Bug #9354 - FTS auto-add
+     * The schema opens in a right-side dialog with SchemaIndex component
+     */
+    async expectStreamDetailsVisible() {
+        // The schema dialog opens on the right side with maximized prop
+        // Try multiple selectors: the dialog itself, the schema table, or the drawer
+        const detailsPanel = this.page.locator('.q-dialog--maximized, [data-test="schema-log-stream-field-mapping-table"], .schema-container').first();
+        await expect(detailsPanel).toBeVisible({ timeout: 15000 });
+        testLogger.info('Stream schema/details dialog is visible');
+    }
 }
