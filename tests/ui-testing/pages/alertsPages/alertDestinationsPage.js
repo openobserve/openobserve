@@ -901,8 +901,8 @@ export class AlertDestinationsPage {
             if (retries === 0) {
                 testLogger.error('Destination not found after all attempts', { name });
                 // Take screenshot for debugging
-                await this.page.screenshot({ path: `/tmp/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                throw new Error(`Destination "${name}" not found in list after multiple attempts and selectors. Screenshot saved to /tmp/destination-not-found-${name}.png`);
+                await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+                throw new Error(`Destination "${name}" not found in list after multiple attempts and selectors. Screenshot saved to test-results/destination-not-found-${name}.png`);
             }
             testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
             await this.page.waitForTimeout(2000);
@@ -1107,16 +1107,20 @@ export class AlertDestinationsPage {
             try {
                 await editBtn.waitFor({ state: 'visible', timeout: 5000 });
 
-                // Listen for console errors before clicking
+                // Listen for console errors before clicking (use once() to avoid memory leak)
                 const consoleErrors = [];
-                this.page.on('console', msg => {
+                const consoleHandler = msg => {
                     if (msg.type() === 'error') {
                         consoleErrors.push(msg.text());
                     }
-                });
+                };
+                this.page.on('console', consoleHandler);
 
                 await editBtn.click();
                 await this.page.waitForTimeout(3000);
+
+                // Remove listener to prevent memory leak
+                this.page.off('console', consoleHandler);
 
                 // Log any console errors that occurred
                 if (consoleErrors.length > 0) {
@@ -1129,8 +1133,8 @@ export class AlertDestinationsPage {
                 retries--;
                 if (retries === 0) {
                     testLogger.error('Edit button not found', { name });
-                    await this.page.screenshot({ path: `/tmp/edit-button-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                    throw new Error(`Edit button for destination "${name}" not found after multiple attempts. Screenshot: /tmp/edit-button-not-found-${name}.png`);
+                    await this.page.screenshot({ path: `test-results/edit-button-not-found-${name}.png`, fullPage: true }).catch(() => {});
+                    throw new Error(`Edit button for destination "${name}" not found after multiple attempts. Screenshot: test-results/edit-button-not-found-${name}.png`);
                 }
                 testLogger.debug(`Edit button not found, retrying... (${retries} attempts left)`);
                 await this.page.waitForTimeout(2000);
@@ -1177,7 +1181,7 @@ export class AlertDestinationsPage {
             } catch (e) {
                 testLogger.warn('Loading message still visible after timeout', { name });
                 // Take screenshot to debug
-                await this.page.screenshot({ path: `/tmp/edit-form-loading-stuck-${name}.png`, fullPage: true }).catch(() => {});
+                await this.page.screenshot({ path: `test-results/edit-form-loading-stuck-${name}.png`, fullPage: true }).catch(() => {});
             }
         } else {
             testLogger.debug('No loading state detected, form should be ready');
@@ -1207,11 +1211,11 @@ export class AlertDestinationsPage {
             await nameInput.waitFor({ state: 'visible', timeout: 30000 });
         } catch (e) {
             // Take screenshot for debugging before failing
-            await this.page.screenshot({ path: `/tmp/edit-form-debug-${name}.png`, fullPage: true }).catch(() => {});
+            await this.page.screenshot({ path: `test-results/edit-form-debug-${name}.png`, fullPage: true }).catch(() => {});
             testLogger.error('Name input not visible in edit form', {
                 name,
                 inputCount: nameInputCount,
-                screenshot: `/tmp/edit-form-debug-${name}.png`
+                screenshot: `test-results/edit-form-debug-${name}.png`
             });
 
             // Check if still loading
@@ -1415,9 +1419,9 @@ export class AlertDestinationsPage {
 
         if (!updated) {
             // Take screenshot before throwing error
-            await this.page.screenshot({ path: `/tmp/webhook-update-failed.png`, fullPage: true }).catch(() => {});
+            await this.page.screenshot({ path: `test-results/webhook-update-failed.png`, fullPage: true }).catch(() => {});
             testLogger.error('Webhook URL input not found for update');
-            throw new Error('Webhook URL input not found for update. Screenshot saved to /tmp/webhook-update-failed.png');
+            throw new Error('Webhook URL input not found for update. Screenshot saved to test-results/webhook-update-failed.png');
         }
     }
 
