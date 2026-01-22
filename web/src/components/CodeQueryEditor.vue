@@ -37,8 +37,17 @@ import {
   computed,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+// Lazy load Monaco Editor - only loaded when this component is rendered
+// This reduces initial bundle size by ~3.1MB
+let monaco: any = null;
+const loadMonaco = async () => {
+  if (!monaco) {
+    await import("monaco-editor/esm/vs/editor/editor.all.js");
+    monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+  }
+  return monaco;
+};
+
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -96,25 +105,34 @@ export default defineComponent({
     let editorObj: any = null;
     const { searchObj } = useLogs();
 
-    let provider: Ref<monaco.IDisposable | null> = ref(null);
+    let provider: Ref<any | null> = ref(null);
 
-    const CompletionKind: any = {
-      Keyword: monaco.languages.CompletionItemKind.Keyword,
-      Operator: monaco.languages.CompletionItemKind.Operator,
-      Text: monaco.languages.CompletionItemKind.Text,
-      Value: monaco.languages.CompletionItemKind.Value,
-      Method: monaco.languages.CompletionItemKind.Method,
-      Function: monaco.languages.CompletionItemKind.Function,
-      Constructor: monaco.languages.CompletionItemKind.Constructor,
-      Field: monaco.languages.CompletionItemKind.Field,
-      Variable: monaco.languages.CompletionItemKind.Variable,
-    };
-    const insertTextRules: any = {
-      InsertAsSnippet:
-        monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      KeepWhitespace:
-        monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-      None: monaco.languages.CompletionItemInsertTextRule.None,
+    // These will be initialized when Monaco loads
+    let CompletionKind: any = null;
+    let insertTextRules: any = null;
+
+    const initializeMonacoConstants = () => {
+      if (!monaco || CompletionKind) return;
+
+      CompletionKind = {
+        Keyword: monaco.languages.CompletionItemKind.Keyword,
+        Operator: monaco.languages.CompletionItemKind.Operator,
+        Text: monaco.languages.CompletionItemKind.Text,
+        Value: monaco.languages.CompletionItemKind.Value,
+        Method: monaco.languages.CompletionItemKind.Method,
+        Function: monaco.languages.CompletionItemKind.Function,
+        Constructor: monaco.languages.CompletionItemKind.Constructor,
+        Field: monaco.languages.CompletionItemKind.Field,
+        Variable: monaco.languages.CompletionItemKind.Variable,
+      };
+
+      insertTextRules = {
+        InsertAsSnippet:
+          monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        KeepWhitespace:
+          monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
+        None: monaco.languages.CompletionItemInsertTextRule.None,
+      };
     };
 
     const defaultKeywords = [
@@ -305,6 +323,13 @@ export default defineComponent({
     };
 
     const setupEditor = async () => {
+      // Lazy load Monaco Editor on first use
+      const monacoModule = await loadMonaco();
+      monaco = monacoModule;
+
+      // Initialize Monaco constants after loading
+      initializeMonacoConstants();
+
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
