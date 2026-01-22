@@ -98,7 +98,9 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let start = Instant::now();
-        let timestamp = Local::now().format("[%d/%b/%YT%H:%M:%S%.3f %z]").to_string();
+        let timestamp = Local::now()
+            .format("[%d/%b/%YT%H:%M:%S%.3f %z]")
+            .to_string();
 
         // Extract request info before moving req
         let remote_addr = req
