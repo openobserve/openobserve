@@ -32,15 +32,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-section>
 
     <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
-      <!-- Show "Add Source" for active integrations, "Documentation" for others -->
+      <!-- Add Source Button -->
       <q-btn
+        v-if="hasCloudFormation"
         color="primary"
-        :label="integration.cloudFormationTemplate ? 'Add Source' : 'Documentation'"
-        @click="integration.cloudFormationTemplate ? handleAddSource() : handleDocumentation()"
+        label="Add Source"
+        @click="handleAddSource()"
         unelevated
         class="tw:flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
       />
+      <!-- Documentation Button -->
+      <q-btn
+        v-if="integration.documentationUrl"
+        :color="hasCloudFormation ? 'grey-7' : 'primary'"
+        :outline="hasCloudFormation"
+        :unelevated="!hasCloudFormation"
+        icon="description"
+        label="Docs"
+        @click="handleDocumentation()"
+        class="tw:flex-1"
+        :data-test="`aws-${integration.id}-documentation-btn`"
+      />
+      <!-- Dashboard Button -->
       <q-btn
         outline
         color="primary"
@@ -52,18 +66,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`aws-${integration.id}-dashboard-btn`"
       />
     </q-card-actions>
+
+    <!-- Unified Integration Method Selection Dialog -->
+    <q-dialog v-model="showTemplateDialog">
+      <q-card style="min-width: 400px">
+        <q-card-section>
+          <div class="text-h6">Choose Integration Method</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <div class="text-subtitle2 q-mb-md">
+            Select how you want to integrate {{ integration.displayName }}:
+          </div>
+          <q-list>
+            <!-- CloudFormation Templates -->
+            <q-item
+              v-for="(template, index) in integration.cloudFormationTemplates"
+              :key="`cf-${index}`"
+              clickable
+              v-ripple
+              @click="handleTemplateSelection(template)"
+              class="q-mb-sm rounded-borders"
+              style="border: 1px solid rgba(0,0,0,0.12)"
+            >
+              <q-item-section>
+                <q-item-label class="text-weight-medium">
+                  {{ template.name }}
+                </q-item-label>
+                <q-item-label caption class="q-mt-xs">
+                  {{ template.description }}
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-icon name="chevron_right" color="primary" />
+              </q-item-section>
+            </q-item>
+
+            <!-- Component Options -->
+            <q-item
+              v-for="(option, index) in integration.componentOptions"
+              :key="`comp-${index}`"
+              clickable
+              v-ripple
+              @click="handleComponentSelection(option)"
+              class="q-mb-sm rounded-borders"
+              style="border: 1px solid rgba(0,0,0,0.12)"
+            >
+              <q-item-section>
+                <q-item-label class="text-weight-medium">
+                  {{ option.name }}
+                </q-item-label>
+                <q-item-label caption class="q-mt-xs">
+                  {{ option.description }}
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-icon name="chevron_right" color="primary" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- Component Display Dialog -->
+    <q-dialog v-model="showComponentContent" full-width>
+      <q-card>
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">{{ selectedComponentTitle }}</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section>
+          <component
+            :is="selectedComponent"
+            :currOrgIdentifier="organizationId"
+            :currUserEmail="userEmail"
+          />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-card>
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from "vue";
+import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-import type { AWSIntegration } from "@/utils/awsIntegrations";
+import type { AWSIntegration, CloudFormationTemplate, ComponentOption } from "@/utils/awsIntegrations";
 import { generateCloudFormationURL, generateDashboardURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
+import WindowsConfig from "./WindowsConfig.vue";
+import LinuxConfig from "./LinuxConfig.vue";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
@@ -77,6 +178,29 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router = useRouter();
+    const showTemplateDialog = ref(false);
+    const showComponentContent = ref(false);
+    const selectedComponent = shallowRef<any>(null);
+    const selectedComponentTitle = ref("");
+
+    // Map component names to actual components
+    const componentMap: Record<string, any> = {
+      WindowsConfig,
+      LinuxConfig,
+    };
+
+    // Get organization and user details
+    const organizationId = computed(() => store.state?.selectedOrganization?.identifier || '');
+    const userEmail = computed(() => store.state?.userInfo?.email || '');
+
+    // Check if integration has CloudFormation template(s) or component options
+    const hasCloudFormation = computed(() => {
+      return !!(props.integration.cloudFormationTemplate ||
+                (props.integration.cloudFormationTemplates &&
+                 props.integration.cloudFormationTemplates.length > 0) ||
+                (props.integration.componentOptions &&
+                 props.integration.componentOptions.length > 0));
+    });
 
     // Get endpoint information during setup (not inside click handler)
     let endpoint: any = null;
@@ -88,6 +212,56 @@ export default defineComponent({
     }
 
     const handleAddSource = () => {
+      const hasTemplates = props.integration.cloudFormationTemplates && props.integration.cloudFormationTemplates.length > 0;
+      const hasComponents = props.integration.componentOptions && props.integration.componentOptions.length > 0;
+      const templateCount = hasTemplates ? props.integration.cloudFormationTemplates!.length : 0;
+      const componentCount = hasComponents ? props.integration.componentOptions!.length : 0;
+      const totalOptions = templateCount + componentCount;
+
+      // If both templates and components exist, or multiple of one type, show dialog
+      if (totalOptions > 1) {
+        showTemplateDialog.value = true;
+        return;
+      }
+
+      // Single component option
+      if (hasComponents && componentCount === 1) {
+        handleComponentSelection(props.integration.componentOptions![0]);
+        return;
+      }
+
+      // Single template option
+      if (hasTemplates && templateCount === 1) {
+        openCloudFormationURL(props.integration.cloudFormationTemplates![0].url);
+        return;
+      }
+
+      // Otherwise use the single cloudFormationTemplate string
+      if (props.integration.cloudFormationTemplate) {
+        openCloudFormationURL(props.integration.cloudFormationTemplate);
+      }
+    };
+
+    const handleComponentSelection = (option: ComponentOption) => {
+      showTemplateDialog.value = false;
+      selectedComponent.value = componentMap[option.component];
+      selectedComponentTitle.value = `${props.integration.displayName} - ${option.name}`;
+      showComponentContent.value = true;
+
+      // Track analytics
+      segment.track("AWS Component Config Opened", {
+        service: props.integration.name,
+        platform: option.name,
+        integration_id: props.integration.id,
+      });
+    };
+
+    const handleTemplateSelection = (template: CloudFormationTemplate) => {
+      showTemplateDialog.value = false;
+      openCloudFormationURL(template.url);
+    };
+
+    const openCloudFormationURL = (templateUrl: string) => {
       try {
         // Validate endpoint
         if (!endpoint?.url) {
@@ -119,9 +293,12 @@ export default defineComponent({
         // Generate base64 encoded access key
         const accessKey = btoa(`${email}:${passcode}`);
 
+        // Create a temporary integration object with the selected template
+        const tempIntegration = { ...props.integration, cloudFormationTemplate: templateUrl };
+
         // Generate CloudFormation URL
         const cloudFormationURL = generateCloudFormationURL(
-          props.integration,
+          tempIntegration,
           organizationId,
           `${endpoint.url}/aws/${organizationId}/default/_kinesis_firehose`,
           accessKey
@@ -217,6 +394,15 @@ export default defineComponent({
       handleAddSource,
       handleDashboard,
       handleDocumentation,
+      handleTemplateSelection,
+      handleComponentSelection,
+      showTemplateDialog,
+      showComponentContent,
+      selectedComponent,
+      selectedComponentTitle,
+      organizationId,
+      userEmail,
+      hasCloudFormation,
     };
   },
 });
