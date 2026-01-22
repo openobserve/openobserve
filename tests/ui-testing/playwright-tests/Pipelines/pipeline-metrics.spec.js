@@ -14,15 +14,17 @@
 
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
-import { LoginPage } from "../../pages/generalPages/loginPage.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
+const path = require('path');
 
 test.describe.configure({ mode: "serial" });
 
+// Use stored authentication state from global setup instead of logging in each test
+const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
+  storageState: authFile,
   contextOptions: {
     slowMo: 1000
   }
@@ -38,7 +40,6 @@ function generateUniqueMetricsStreamName(prefix = 'e2e_metrics') {
 
 test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics', '@pipelinesMetrics'] }, () => {
   let pageManager;
-  let loginPage;
   // METRICS_STREAM will be set per test to avoid conflicts
   let METRICS_STREAM;
 
@@ -52,12 +53,7 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
 
-    // Login using LoginPage
-    loginPage = new LoginPage(page);
-    await loginPage.gotoLoginPage();
-    await loginPage.loginAsInternalUser();
-    await loginPage.login();
-
+    // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
 
     // Generate unique metrics stream name for this test to avoid conflicts
@@ -85,10 +81,6 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
         streamName: METRICS_STREAM
       });
     }
-
-    // Ingest logs test data (keep this for scheduled pipeline tests that use e2e_automate)
-    const streamNames = ["e2e_automate"];
-    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -155,13 +147,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use actual metrics stream (cpu_usage)
+    // Add source stream - use actual metrics stream
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -210,13 +201,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use actual metrics stream (cpu_usage)
+    // Add source stream - use actual metrics stream
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -280,13 +270,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.addPipeline();
 
-    // Add source stream - use actual metrics stream (cpu_usage)
+    // Add source stream - use actual metrics stream
     await pageManager.pipelinesPage.selectStream();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
     await pageManager.pipelinesPage.selectMetrics();
-    await pageManager.pipelinesPage.enterStreamName(METRICS_STREAM);
-    await page.waitForTimeout(1000);
-    await pageManager.pipelinesPage.selectStreamOptionByName(METRICS_STREAM);
+    // Use selectStreamName which properly clicks the label, fills, and selects from dropdown
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
 
@@ -349,12 +338,12 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
   });
 
   /**
-   * Test: Create scheduled pipeline with query source
+   * Test: Create scheduled pipeline with query source for metrics
    * Priority: P1 - Functional
-   * Objective: Verify scheduled pipeline can be created with SQL query
+   * Objective: Verify scheduled pipeline can be created with SQL query using metrics stream
    */
   test("should create scheduled pipeline with query source @P1 @scheduled @functional", async ({ page }) => {
-    testLogger.info('Testing scheduled pipeline with query source');
+    testLogger.info('Testing scheduled pipeline with query source for metrics');
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -372,38 +361,42 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.expandBuildQuerySection();
     await page.waitForTimeout(500);
 
-    // Select stream type (logs - since metrics may not exist)
-    await pageManager.pipelinesPage.selectStreamType('logs');
+    // Select stream type - use metrics for metrics pipeline test
+    await pageManager.pipelinesPage.selectStreamType('metrics');
     await page.waitForTimeout(1000);
 
-    // Select stream
-    await pageManager.pipelinesPage.selectStreamName('e2e_automate');
+    // Select the metrics stream created for this test
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await page.waitForTimeout(1000);
 
     // Verify SQL editor is visible
     await pageManager.pipelinesPage.expectSqlEditorVisible();
 
-    // Verify query contains stream name
-    await pageManager.pipelinesPage.expectQueryToContain('e2e_automate');
+    // Verify query contains the metrics stream name
+    await pageManager.pipelinesPage.expectQueryToContain(METRICS_STREAM);
 
-    testLogger.info('Query generated with stream name');
+    testLogger.info('Query generated with metrics stream name', { streamName: METRICS_STREAM });
 
-    // Delete the query node to clean up
-    await pageManager.pipelinesPage.deleteQueryNode();
+    // The scheduled pipeline has a nested dialog overlay that intercepts clicks
+    // Try pressing Escape multiple times and use force click for the cancel button
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
 
-    // Navigate back from pipeline editing
-    await pageManager.pipelinesPage.clickCancelPipelineBtn();
+    // Use force click to bypass the dialog overlay
+    await page.locator('[data-test="add-pipeline-cancel-btn"]').click({ force: true });
 
-    testLogger.info('Test completed: Scheduled pipeline with query source');
+    testLogger.info('Test completed: Scheduled pipeline with query source for metrics');
   });
 
   /**
-   * Test: Verify scheduled pipeline query auto-updates on stream change
+   * Test: Verify scheduled pipeline query auto-updates on stream change for metrics
    * Priority: P1 - Regression
-   * Objective: Verify SQL query is auto-generated when stream selection changes
+   * Objective: Verify SQL query is auto-generated when metrics stream selection changes
    */
   test("should auto-generate query when stream changes in scheduled pipeline @P1 @scheduled @regression", async ({ page }) => {
-    testLogger.info('Testing query auto-generation on stream change');
+    testLogger.info('Testing query auto-generation on stream change for metrics');
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -421,38 +414,41 @@ test.describe("Metrics Pipeline Tests", { tag: ['@all', '@pipelines', '@metrics'
     await pageManager.pipelinesPage.expandBuildQuerySection();
     await page.waitForTimeout(500);
 
-    // Select stream type
-    await pageManager.pipelinesPage.selectStreamType('logs');
+    // Select stream type - use metrics for metrics pipeline test
+    await pageManager.pipelinesPage.selectStreamType('metrics');
     await page.waitForTimeout(1000);
 
-    // Select first stream
-    await pageManager.pipelinesPage.selectStreamName('e2e_automate');
+    // Select the metrics stream created for this test
+    await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM);
     await page.waitForTimeout(1000);
 
-    // Verify default query generated
+    // Verify default query generated with metrics stream
     await pageManager.pipelinesPage.expectSqlEditorVisible();
-    await pageManager.pipelinesPage.expectQueryToContain('e2e_automate');
-    testLogger.info('First stream query generated');
+    await pageManager.pipelinesPage.expectQueryToContain(METRICS_STREAM);
+    testLogger.info('First metrics stream query generated', { streamName: METRICS_STREAM });
 
-    // Change to different stream (if available)
+    // Change to different metrics stream (if available) - try cpu_usage which is a common metrics stream
     try {
-      await pageManager.pipelinesPage.selectStreamName('k8s_json');
+      await pageManager.pipelinesPage.selectStreamName('cpu_usage');
       await pageManager.pipelinesPage.waitForStreamChangeWatcher();
 
       // Verify query updated with new stream
       await pageManager.pipelinesPage.expectQueryToContain('SELECT');
       await pageManager.pipelinesPage.expectQueryToContain('FROM');
-      await pageManager.pipelinesPage.expectQueryToContain('k8s_json');
-      testLogger.info('Query auto-updated with new stream name');
+      await pageManager.pipelinesPage.expectQueryToContain('cpu_usage');
+      testLogger.info('Query auto-updated with new metrics stream name');
     } catch (e) {
-      testLogger.info('Second stream not available, skipping stream change test');
+      testLogger.info('Second metrics stream not available, skipping stream change test');
     }
 
-    // Clean up
-    await pageManager.pipelinesPage.deleteQueryNode();
-    await pageManager.pipelinesPage.clickCancelPipelineBtn();
+    // Clean up - use force click and escape to dismiss dialogs
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.locator('[data-test="add-pipeline-cancel-btn"]').click({ force: true });
 
-    testLogger.info('Test completed: Query auto-generation on stream change');
+    testLogger.info('Test completed: Query auto-generation on stream change for metrics');
   });
 
   /**

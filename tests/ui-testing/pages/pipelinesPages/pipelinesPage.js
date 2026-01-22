@@ -1976,14 +1976,20 @@ export class PipelinesPage {
 
     /**
      * Delete query node complete flow
+     * Fixed: Removed waitForQuerySectionHidden at start - the query section should be visible when deleting
      */
     async deleteQueryNode() {
-        await this.waitForQuerySectionHidden();
+        // First wait for query node to be visible (it should already be on canvas)
         await this.waitForQueryNodeVisible();
+        // Hover over the query node to show delete button
         await this.hoverQueryNode();
         await this.page.waitForTimeout(500);
+        // Click delete button
         await this.clickQueryNodeDeleteBtn();
+        // Confirm deletion
         await this.clickConfirmButton();
+        // After deletion, wait briefly for UI to update
+        await this.page.waitForTimeout(1000);
     }
 
     /**
