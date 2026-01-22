@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Aggregation Section (only for custom mode and scheduled alerts) -->
-          <div v-if="isRealTime === 'false'" class="tw:mt-6 tw:pt-6" :style="store.state.theme === 'dark' ? 'border-top: 1px solid #343434' : 'border-top: 1px solid #e6e6e6'">
+          <div v-if="isRealTime === 'false'" class="tw:mt-6 tw:pt-6" :style="store.state.theme === 'dark' ? 'border-top: 2px solid #343434' : 'border-top: 2px solid #e6e6e6'">
             <!-- Aggregation Toggle -->
             <div class="flex justify-start items-center tw:font-semibold tw:mb-4">
               <div class="flex items-center" style="width: 190px; height: 36px">
