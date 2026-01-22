@@ -651,17 +651,16 @@ test.describe("Logs Page testcases", () => {
       await savedViewsBtn.click();
       await page.waitForTimeout(500);
 
-      // Click "Save View" option and fill view details
-      try {
-        await pm.logsPage.clickSaveViewOption();
-        await page.waitForTimeout(500);
-        await pm.logsPage.fillViewNameInput(testViewName);
-        await pm.logsPage.clickSaveViewDialogSaveButton();
-        await page.waitForTimeout(1000);
-        testLogger.info(`View saved: ${testViewName}`);
-      } catch (saveViewError) {
-        testLogger.warn('Save view step encountered issue - continuing');
-      }
+      // Click "Save View" option and fill view details (Rule 5: no try-catch, must succeed)
+      await pm.logsPage.clickSaveViewOption();
+      await page.waitForTimeout(500);
+      await pm.logsPage.fillViewNameInput(testViewName);
+      await pm.logsPage.clickSaveViewDialogSaveButton();
+      await page.waitForTimeout(1000);
+
+      // Verify save was successful by checking for success notification or dialog close
+      await page.waitForLoadState('networkidle');
+      testLogger.info(`View saved: ${testViewName}`);
 
       // Step 6: Reload the page to simulate fresh load
       testLogger.info('Step 6: Reloading page');
