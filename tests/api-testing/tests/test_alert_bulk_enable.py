@@ -84,7 +84,9 @@ class TestAlertBulkEnable:
         )
         assert response.status_code == 200, \
             f"Failed to create folder: {response.text}"
-        self.folder_id = response.json()["folderId"]
+        folder_data = response.json()
+        assert "folderId" in folder_data, f"Response missing folderId: {folder_data}"
+        self.folder_id = folder_data["folderId"]
 
     def _create_alerts(self):
         """Create test alerts."""
@@ -138,7 +140,10 @@ class TestAlertBulkEnable:
                 alerts_resp = self.session.get(
                     f"{self.base_url}api/v2/{self.ORG_ID}/alerts"
                 )
-                for alert in alerts_resp.json().get("list", []):
+                assert alerts_resp.status_code == 200, \
+                    f"Failed to fetch alerts: {alerts_resp.text}"
+                alerts_data = alerts_resp.json()
+                for alert in alerts_data.get("list", []):
                     if alert["name"] == alert_name:
                         self.alert_ids.append(alert["alert_id"])
                         break

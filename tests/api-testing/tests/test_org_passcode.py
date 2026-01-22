@@ -50,7 +50,10 @@ class TestOrgPasscode:
             f"{self.base_url}api/{self.ORG_ID}/passcode"
         )
         assert get_resp.status_code == 200
-        old_passcode = get_resp.json()["data"]["passcode"]
+        get_data = get_resp.json()
+        assert "data" in get_data and "passcode" in get_data["data"], \
+            f"Response missing data/passcode: {get_data}"
+        old_passcode = get_data["data"]["passcode"]
 
         # Update the passcode
         response = self.session.put(
@@ -83,7 +86,10 @@ class TestOrgPasscode:
             f"{self.base_url}api/{self.ORG_ID}/passcode"
         )
         assert update_resp.status_code == 200
-        new_passcode = update_resp.json()["data"]["passcode"]
+        update_data = update_resp.json()
+        assert "data" in update_data and "passcode" in update_data["data"], \
+            f"Response missing data/passcode: {update_data}"
+        new_passcode = update_data["data"]["passcode"]
 
         # Get the passcode again and verify it matches
         get_resp = self.session.get(

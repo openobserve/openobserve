@@ -77,6 +77,8 @@ class TestFunctionTestEndpoint:
             f"Expected 200, got {response.status_code}: {response.text}"
 
         data = response.json()
+        assert "results" in data and len(data["results"]) > 0, \
+            f"Response should have results: {data}"
         result = data["results"][0]
         assert result["event"].get("level") == "INFO", \
             f"Function should uppercase 'level': {result}"

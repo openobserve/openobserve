@@ -34,7 +34,7 @@ class TestMultiStreamSearch:
         all_hits = []
         metadata = []
 
-        for line in response_text.split('\n'):
+        for line in response_text.splitlines():
             if line.startswith('data: '):
                 data_str = line[6:]  # Remove 'data: ' prefix
                 if data_str == '[[DONE]]':

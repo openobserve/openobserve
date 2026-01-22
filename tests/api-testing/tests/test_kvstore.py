@@ -38,7 +38,7 @@ class TestKVStore:
         # Cleanup: Try to delete test key
         try:
             self.session.delete(f"{self.base_url}api/{self.ORG_ID}/kv/{self.test_key}")
-        except Exception:
+        except (ConnectionError, TimeoutError):
             pass
 
     def test_01_create_kv_pair(self):
