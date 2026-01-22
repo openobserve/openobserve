@@ -40,60 +40,20 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", () => {
     // Add global variable
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
 
-    // Wait for variable to be saved and settings to stabilize
-    await page.locator(`[data-test="dashboard-edit-variable-${globalVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
+    // Add tab variable with dependency on global variable
     await pm.dashboardSetting.openSetting();
-    await pm.dashboardSetting.goToVariablesTab();
-    // Add tab variable
-    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-name"]').fill(tabVar);
-
-    // Set scope to tab
-    await page.locator('[data-test="dashboard-variable-scope-select"]').click();
-    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
-
-    // Assign to Tab1 - need to open the tabs dropdown first
-    await page.locator('[data-test="dashboard-variable-tabs-select"]').waitFor({ state: "visible" });
-    await page.locator('[data-test="dashboard-variable-tabs-select"]').click();
-    // Wait for dropdown menu to be visible
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    // Click the Tab1 option - find the q-item that has exact text "Tab1"
-    await page.locator('.q-item').filter({ hasText: /^Tab1$/ }).waitFor({ state: "visible" });
-    await page.locator('.q-item').filter({ hasText: /^Tab1$/ }).click();
-
-    // Select stream and field
-    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    // Wait for options to load
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-
-    // Add dependency using filter mechanism
-    // Dependencies are created through filters where the value references another variable using $variableName
-    await scopedVars.addDependency(globalVar, "kubernetes_namespace_name", "=");
-
-    // Save the variable - using helper method to handle potential DOM updates
-    // await scopedVars.clickSaveButton();
-
-    const saveBtn = page.locator('[data-test="dashboard-variable-save-btn"]');
-    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
-    await saveBtn.click();
-
-    // Wait for variable to be saved before closing settings
-    await page.locator(`[data-test="dashboard-edit-variable-${tabVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
+    await scopedVars.addScopedVariable(
+      tabVar,
+      "logs",
+      "e2e_automate",
+      "kubernetes_container_name",
+      {
+        scope: "tabs",
+        assignedTabs: ["tab1"],
+        dependsOn: globalVar,
+        dependsOnField: "kubernetes_namespace_name"
+      }
+    );
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed

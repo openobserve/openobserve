@@ -38,55 +38,21 @@ test.describe("Dashboard Variables - Null Handling", () => {
     );
     await pm.dashboardSetting.closeSettingWindow();
 
-    // Reopen settings to add child variable
+    // Add Child Variable with a dependency filter that forces empty results
+    // By using dependsOn with a field mismatch (parent is namespace, child is pod but filtered by namespace value)
+    // This creates an impossible condition where we're looking for pods where pod_name = namespace_name value
     await pm.dashboardSetting.openSetting();
-    await pm.dashboardSetting.openVariables();
-    // Wait for variable to be saved and visible in settings
-    await page.locator(`[data-test="dashboard-edit-variable-${parentVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Add Child Variable with an impossible filter to force empty results
-    await page.locator('[data-test="dashboard-add-variable-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-name"]').fill(childVar);
-    await page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator('[data-test="dashboard-variable-stream-select"]');
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.click();
-    await page.keyboard.type("kubernetes_pod_name", { delay: 100 });
-    await page.waitForFunction(
-      () => document.querySelectorAll('[role="option"]').length > 0,
-      { timeout: 10000, polling: 100 }
+    await scopedVars.addScopedVariable(
+      childVar,
+      "logs",
+      "e2e_automate",
+      "kubernetes_pod_name",
+      {
+        scope: "global",
+        dependsOn: parentVar,
+        dependsOnField: "kubernetes_pod_name" // This creates the impossible filter: WHERE kubernetes_pod_name = $parent_var (namespace value)
+      }
     );
-    await page.locator('[role="option"]').first().click();
-
-    // Add an IMPOSSIBLE filter to force empty results
-    await page.locator('[data-test="dashboard-add-filter-btn"]').click();
-
-    const filterNameSelector = page.locator('[data-test="dashboard-query-values-filter-name-selector"]').last();
-    await filterNameSelector.waitFor({ state: "visible", timeout: 5000 });
-    await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_pod_name");
-    await page.getByRole("option", { name: "kubernetes_pod_name" }).first().click();
-
-    const operatorSelector = page.locator('[data-test="dashboard-query-values-filter-operator-selector"]').last();
-    await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
-
-    // Use parent variable in the filter - this will cause child to have no matching data
-    const valueInput = page.locator('[data-test="common-auto-complete"]').last();
-    await valueInput.waitFor({ state: "visible", timeout: 5000 });
-    await valueInput.fill(`$${parentVar}`);
-
-    await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-    await page.locator(`[data-test="dashboard-edit-variable-${childVar}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
