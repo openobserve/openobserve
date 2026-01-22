@@ -28,14 +28,14 @@ use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
-pub use immutable::{get_memtable_id_from_file_name, read_from_immutable};
+pub use immutable::{check_persist_done, get_memtable_id_from_file_name, read_from_immutable};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
     Writer, check_disk_circuit_breaker, check_memory_circuit_breaker, check_memtable_size,
-    flush_all, get_writer, read_from_memtable,
+    flush_all, get_max_writer_seq_id, get_writer, read_from_memtable,
 };
 
 use crate::errors::OpenDirSnafu;

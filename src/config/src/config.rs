@@ -53,7 +53,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 26;
+pub const DB_SCHEMA_VERSION: u64 = 27;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -927,6 +927,12 @@ pub struct Common {
         help = "Enable enrichment table broadcast join"
     )]
     pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,

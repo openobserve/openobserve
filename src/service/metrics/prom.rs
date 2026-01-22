@@ -962,7 +962,6 @@ pub(crate) async fn get_labels(
     Ok(label_names)
 }
 
-// XXX-TODO: filter the results in accordance with `selector.matchers`
 pub(crate) async fn get_label_values(
     org_id: &str,
     label_name: String,
@@ -1032,9 +1031,45 @@ pub(crate) async fn get_label_values(
     if schema.field_with_name(&label_name).is_err() {
         return Ok(vec![]);
     }
+
+    // Build SQL query with optional WHERE clause based on selector matchers
+    let mut sql = format!("SELECT DISTINCT({label_name}) FROM {metric_name}");
+    let mut sql_where = Vec::new();
+
+    if let Some(selector) = selector {
+        for mat in selector.matchers.matchers.iter() {
+            // Skip special fields and fields that don't exist in the schema
+            if mat.name == TIMESTAMP_COL_NAME
+                || mat.name == VALUE_LABEL
+                || mat.name == NAME_LABEL
+                || schema.field_with_name(&mat.name).is_err()
+            {
+                continue;
+            }
+            match &mat.op {
+                MatchOp::Equal => {
+                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
+                }
+                MatchOp::NotEqual => {
+                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
+                }
+                MatchOp::Re(_re) => {
+                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
+                }
+                MatchOp::NotRe(_re) => {
+                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
+                }
+            }
+        }
+        if !sql_where.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&sql_where.join(" AND "));
+        }
+    }
+
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: format!("SELECT DISTINCT({label_name}) FROM {metric_name}"),
+            sql,
             from: 0,
             size: 1000,
             start_time: start,

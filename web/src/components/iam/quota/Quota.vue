@@ -134,15 +134,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="app-tabs-container tw:h-[36px] tw:w-fit float-right q-ml-auto"
+              class="flex items-center float-right q-ml-auto"
             >
-              <app-tabs
-                data-test="table-json-type-selection-tabs"
-                class="tabs-selection-container"
-                :tabs="typeTabs"
-                v-model:active-tab="activeType"
-                @update:active-tab="updateActiveType"
-              />
+              <div class="app-tabs-container tw:h-[36px] tw:w-fit q-mr-md">
+                <app-tabs
+                  data-test="time-unit-tabs"
+                  class="tabs-selection-container"
+                  :tabs="timeUnitTabs"
+                  v-model:active-tab="activeTimeUnit"
+                  @update:active-tab="updateTimeUnit"
+                />
+              </div>
+              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+                <app-tabs
+                  data-test="table-json-type-selection-tabs"
+                  class="tabs-selection-container"
+                  :tabs="typeTabs"
+                  v-model:active-tab="activeType"
+                  @update:active-tab="updateActiveType"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -620,6 +631,8 @@ export default defineComponent({
     const rolesLimitRows = ref<any[]>([]);
     const rolesColumns = ref<any[]>([]);
     const activeType = ref<any>("table");
+    const activeTimeUnit = ref<string>("second");
+
     const tabs = ref<any[]>([
       {
         label: "API Limits",
@@ -630,6 +643,22 @@ export default defineComponent({
         value: "role-limits",
       },
     ]);
+
+    const timeUnitTabs = ref<any[]>([
+      {
+        label: "Per Second",
+        value: "second",
+      },
+      {
+        label: "Per Minute",
+        value: "minute",
+      },
+      {
+        label: "Per Hour",
+        value: "hour",
+      },
+    ]);
+
     const typeTabs = computed(() => [
       {
         label: "Table",
@@ -641,104 +670,120 @@ export default defineComponent({
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
-    const apiLimitsColumns: any = [
-      {
-        name: "module_name",
-        field: "module_name",
-        label: t("quota.moduleName"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "list",
-        field: "list",
-        label: t("quota.listLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "get",
-        field: "get",
-        label: t("quota.getLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "create",
-        field: "create",
-        label: t("quota.createLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "update",
-        field: "update",
-        label: t("quota.updateLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "delete",
-        field: "delete",
-        label: t("quota.deleteLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-    ];
-    const roleLimitsColumns: any = [
-      {
-        name: "role_name",
-        field: "role_name",
-        label: t("quota.roleName"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "list",
-        field: "list",
-        label: t("quota.listLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "get",
-        field: "get",
-        label: t("quota.getLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "create",
-        field: "create",
-        label: t("quota.createLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "update",
-        field: "update",
-        label: t("quota.updateLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-      {
-        name: "delete",
-        field: "delete",
-        label: t("quota.deleteLimit"),
-        align: "center",
-        sortable: true,
-        style: "width: 200px !important; ",
-      },
-    ];
+
+    const getTimeUnitLabel = () => {
+      const unitMap: any = {
+        second: "(Req/s)",
+        minute: "(Req/m)",
+        hour: "(Req/h)",
+      };
+      return unitMap[activeTimeUnit.value] || "(Req/s)";
+    };
+
+    const apiLimitsColumns = computed(() => {
+      const unitLabel = getTimeUnitLabel();
+      return [
+        {
+          name: "module_name",
+          field: "module_name",
+          label: t("quota.moduleName"),
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "list",
+          field: "list",
+          label: `${t("quota.listLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "get",
+          field: "get",
+          label: `${t("quota.getLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "create",
+          field: "create",
+          label: `${t("quota.createLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "update",
+          field: "update",
+          label: `${t("quota.updateLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "delete",
+          field: "delete",
+          label: `${t("quota.deleteLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+      ];
+    });
+    const roleLimitsColumns = computed(() => {
+      const unitLabel = getTimeUnitLabel();
+      return [
+        {
+          name: "role_name",
+          field: "role_name",
+          label: t("quota.roleName"),
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "list",
+          field: "list",
+          label: `${t("quota.listLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "get",
+          field: "get",
+          label: `${t("quota.getLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "create",
+          field: "create",
+          label: `${t("quota.createLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "update",
+          field: "update",
+          label: `${t("quota.updateLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+        {
+          name: "delete",
+          field: "delete",
+          label: `${t("quota.deleteLimit")} ${unitLabel}`,
+          align: "center",
+          sortable: true,
+          style: "width: 200px !important; ",
+        },
+      ];
+    });
     const activeTab = ref<string>("api-limits");
     const searchQuery = ref<string>("");
     const apiLimitsRows = ref<any[]>([]);
@@ -794,6 +839,7 @@ export default defineComponent({
           //here we are getting the api limits for the selected organization
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
+            activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else {
@@ -872,6 +918,7 @@ export default defineComponent({
         ) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
+            activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else {
@@ -952,6 +999,7 @@ export default defineComponent({
         ) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
+            activeTimeUnit.value,
           );
         } else {
           apiLimitsRows.value =
@@ -1071,6 +1119,8 @@ export default defineComponent({
             selectedOrganization.value.value,
             payload,
             "module",
+            undefined,
+            activeTimeUnit.value,
           );
         } else {
           response = await ratelimitService.update_batch(
@@ -1078,6 +1128,7 @@ export default defineComponent({
             payload,
             "role",
             user_role,
+            activeTimeUnit.value,
           );
         }
         if (selectedOrganization.value.value == "global_rules") {
@@ -1100,12 +1151,14 @@ export default defineComponent({
         if (activeTab.value === "api-limits") {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
+            activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else if (activeTab.value === "role-limits") {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
             openedRole.value,
+            activeTimeUnit.value,
           );
           filterModulesBasedOnCategory();
         }
@@ -1143,6 +1196,8 @@ export default defineComponent({
             selectedOrganization.value.value,
             payload,
             "module",
+            undefined,
+            activeTimeUnit.value,
           );
         } else {
           response = await ratelimitService.update_batch(
@@ -1150,6 +1205,7 @@ export default defineComponent({
             payload,
             "role",
             user_role,
+            activeTimeUnit.value,
           );
         }
         if (selectedOrganization.value.value == "global_rules") {
@@ -1169,12 +1225,14 @@ export default defineComponent({
         if (activeTab.value === "api-limits") {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
+            activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
             openedRole.value,
+            activeTimeUnit.value,
           );
           filterModulesBasedOnCategory();
         }
@@ -1204,7 +1262,7 @@ export default defineComponent({
         selectedOrganization.value?.hasOwnProperty("value") &&
         selectedOrganization.value.value != ""
       ) {
-        return apiLimitsColumns;
+        return apiLimitsColumns.value;
       } else {
         return [];
       }
@@ -1352,6 +1410,7 @@ export default defineComponent({
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
             props.row.role_name,
+            activeTimeUnit.value,
           );
         } else {
           roleLevelModuleRows.value =
@@ -1548,6 +1607,60 @@ export default defineComponent({
       store.dispatch("setApiLimitsByOrgId", {});
       store.dispatch("setRoleLimitsByOrgIdByRole", {});
     };
+
+    const updateTimeUnit = async (newTimeUnit: string) => {
+      // Check if there are unsaved changes
+      let isChanged = Object.keys(changedValues.value).length > 0;
+
+      if (isChanged) {
+        $q.notify({
+          type: "warning",
+          message: "Please save or cancel your changes before switching time units",
+          timeout: 3000,
+        });
+        // Revert back to previous time unit
+        activeTimeUnit.value = activeTimeUnit.value;
+        return;
+      }
+
+      activeTimeUnit.value = newTimeUnit;
+
+      // Refresh data for new time unit
+      if (activeTab.value === "api-limits") {
+        const storeKey = `${selectedOrganization.value.value}_${newTimeUnit}`;
+        if (store.state.allApiLimitsByOrgId[storeKey]) {
+          // Use cached data
+          apiLimitsRows.value = store.state.allApiLimitsByOrgId[storeKey];
+        } else {
+          // Fetch from API
+          apiLimitsRows.value = await getApiLimitsByOrganization(
+            selectedOrganization.value.value,
+            newTimeUnit,
+          );
+        }
+        resultTotal.value = apiLimitsRows.value.length;
+      } else if (activeTab.value === "role-limits" && openedRole.value) {
+        const storeKey = `${openedRole.value}_${newTimeUnit}`;
+        if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
+          // Use cached data
+          roleLevelModuleRows.value = store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
+        } else {
+          // Fetch from API
+          roleLevelModuleRows.value = await getRoleLimitsByOrganization(
+            selectedOrganization.value.value,
+            openedRole.value,
+            newTimeUnit,
+          );
+        }
+        filterModulesBasedOnCategory();
+      }
+
+      // Update JSON view if in JSON mode
+      if (activeType.value === "json") {
+        populateJsonStr();
+      }
+    };
+
     return {
       t,
       selectedOrganization,
@@ -1641,6 +1754,10 @@ export default defineComponent({
       isRoleLimitsLoading,
       isApiLimitsLoading,
       isRolesLoading,
+      activeTimeUnit,
+      timeUnitTabs,
+      updateTimeUnit,
+      getTimeUnitLabel,
     };
   },
 });

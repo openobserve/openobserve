@@ -46,16 +46,10 @@ pub(crate) fn try_decode(
         .iter()
         .map(|v| parse_expr(v, ctx, &extension_codec))
         .collect::<Result<Vec<_>, _>>()?;
-    let projection = if node.projection.is_empty() {
-        None
-    } else {
-        Some(
-            node.projection
-                .iter()
-                .map(|v| *v as usize)
-                .collect::<Vec<_>>(),
-        )
-    };
+    let projection = node
+        .projection
+        .as_ref()
+        .map(|p| p.values.iter().map(|v| *v as usize).collect::<Vec<_>>());
     Ok(Arc::new(NewEmptyExec::new(
         &node.name,
         schema,
@@ -76,10 +70,9 @@ pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Res
     let plan_node = cluster_rpc::NewEmptyExecNode {
         name: node.name().to_string(),
         schema: Some(node.schema().as_ref().try_into()?),
-        projection: match node.projection() {
-            Some(v) => v.iter().map(|v| *v as u64).collect(),
-            None => vec![],
-        },
+        projection: node.projection().map(|v| cluster_rpc::Uint64List {
+            values: v.iter().map(|v| *v as u64).collect(),
+        }),
         filters,
         limit: node.limit().map(|v| v as u64),
         sorted_by_time: node.sorted_by_time(),

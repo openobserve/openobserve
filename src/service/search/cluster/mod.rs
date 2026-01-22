@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,127 +18,10 @@ use std::sync::Arc;
 use ::datafusion::arrow::datatypes::Schema;
 use config::{TIMESTAMP_COL_NAME, utils::json};
 use hashbrown::HashMap;
-#[cfg(feature = "enterprise")]
-use {
-    crate::service::search::SEARCH_SERVER,
-    config::datafusion::request::Request,
-    config::metrics,
-    infra::dist_lock,
-    infra::errors::{Error, ErrorCodes, Result},
-};
 
 pub mod cacher;
 pub mod flight;
 pub mod http;
-
-#[cfg(feature = "enterprise")]
-#[tracing::instrument(name = "work_group:checking", skip_all, fields(user_id = user_id))]
-pub async fn work_group_checking(
-    trace_id: &str,
-    start: std::time::Instant,
-    req: &Request,
-    work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
-    locker: &Option<dist_lock::Locker>,
-    user_id: Option<&str>,
-) -> Result<()> {
-    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if SEARCH_SERVER
-        .insert_sender(trace_id, abort_sender, false)
-        .await
-        .is_err()
-    {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
-        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
-        ))));
-    }
-    tokio::select! {
-        res = work_group_need_wait(trace_id, start, req, work_group, user_id) => {
-            match res {
-                Ok(_) => {
-                    return Ok(());
-                },
-                Err(e) => {
-                    metrics::QUERY_PENDING_NUMS
-                        .with_label_values(&[&req.org_id])
-                        .dec();
-                    dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-                    return Err(e);
-                }
-            }
-        }
-        _ = abort_receiver => {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[&req.org_id])
-                .dec();
-            dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-            log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-#[tracing::instrument(name = "work_group:need_wait", skip_all, fields(user_id = user_id))]
-pub async fn work_group_need_wait(
-    trace_id: &str,
-    start: std::time::Instant,
-    req: &Request,
-    work_group: &Option<o2_enterprise::enterprise::search::WorkGroup>,
-    user_id: Option<&str>,
-) -> Result<()> {
-    let mut log_wait = false;
-    loop {
-        if start.elapsed().as_millis() as u64 >= req.timeout as u64 * 1000 {
-            metrics::QUERY_TIMEOUT_NUMS
-                .with_label_values(&[&req.org_id])
-                .inc();
-            return Err(Error::Message(format!(
-                "[trace_id {trace_id}] search: request timeout in queue"
-            )));
-        }
-        if let Some(wg) = work_group.as_ref() {
-            match wg.need_wait(Some(&req.org_id), user_id).await {
-                Ok((true, status)) => {
-                    if !log_wait {
-                        log::info!(
-                            "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {wg:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                            status.global_current,
-                            status.global_limit,
-                            status.org_current,
-                            status.org_limit,
-                            status.user_current,
-                            status.user_limit
-                        );
-                        log_wait = true;
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                }
-                Ok((false, status)) => {
-                    if log_wait {
-                        log::info!(
-                            "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {wg:?}[global:{}/{}, org:{}/{}, user:{}/{}]",
-                            status.global_current,
-                            status.global_limit,
-                            status.org_current,
-                            status.org_limit,
-                            status.user_current,
-                            status.user_limit
-                        );
-                    }
-                    return Ok(());
-                }
-                Err(e) => {
-                    return Err(Error::Message(e.to_string()));
-                }
-            }
-        }
-    }
-}
 
 pub fn handle_table_response(
     schema: Arc<Schema>,
