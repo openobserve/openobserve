@@ -251,6 +251,7 @@ jobs:
           #   run_files:
           #     [
           #       "logs-regression.spec.js",
+          #       "logs-regression-bugs.spec.js",
           #       "streams-regression.spec.js",
           #       "enrichment-regression.spec.js",
           #       "ui-regression.spec.js",
