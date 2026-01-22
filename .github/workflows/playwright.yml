@@ -289,12 +289,12 @@ jobs:
             #     [
             #       "dashboard-variables-refresh.spec.js",
             #     ]
-            # - testfolder: "Dashboards-Variables-URL"
-            #   browser: "chrome"
-            #   run_files:
-            #     [
-            #       "dashboard-variables-url-sync.spec.js",
-            #     ]
+            - testfolder: "Dashboards-Variables-URL"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-url-sync.spec.js",
+                ]
             - testfolder: "Dashboards-Variables-Creation"
               browser: "chrome"
               run_files:
