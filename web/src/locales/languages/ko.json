@@ -1850,7 +1850,8 @@
       "evaluationTime": "평가 (들)",
       "queryTime": "쿼리 (밀리초)",
       "error": "오류"
-    }
+    },
+    "aggregation_threshold": "그룹이 있는 경우 경고"
   },
   "alert_templates": {
     "header": "템플릿",

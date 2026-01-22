@@ -1850,7 +1850,8 @@
       "evaluationTime": "Evaluación (es)",
       "queryTime": "Consulta (ms)",
       "error": "Error"
-    }
+    },
+    "aggregation_threshold": "Alerta si hay algún grupo"
   },
   "alert_templates": {
     "header": "Plantillas",

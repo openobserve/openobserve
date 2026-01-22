@@ -1860,7 +1860,8 @@
       "evaluationTime": "評価 (s)",
       "queryTime": "クエリ (ミリ秒)",
       "error": "[エラー]"
-    }
+    },
+    "aggregation_threshold": "グループがある場合はアラート"
   },
   "alert_templates": {
     "header": "テンプレート",

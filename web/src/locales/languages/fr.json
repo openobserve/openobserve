@@ -1850,7 +1850,8 @@
       "evaluationTime": "Évaluation (s)",
       "queryTime": "Requête (ms)",
       "error": "Erreur"
-    }
+    },
+    "aggregation_threshold": "Alerter s'il y a des groupes"
   },
   "alert_templates": {
     "header": "Modèles",

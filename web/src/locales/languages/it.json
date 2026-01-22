@@ -1850,7 +1850,8 @@
       "evaluationTime": "Valutazione/i",
       "queryTime": "Interrogazione (ms)",
       "error": "Errore"
-    }
+    },
+    "aggregation_threshold": "Avvisa se ci sono gruppi"
   },
   "alert_templates": {
     "header": "Modelli",

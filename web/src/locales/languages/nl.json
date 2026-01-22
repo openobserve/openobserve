@@ -1850,7 +1850,8 @@
       "evaluationTime": "Evaluatie (s)",
       "queryTime": "Zoekopdracht (ms)",
       "error": "Fout"
-    }
+    },
+    "aggregation_threshold": "Waarschuwing als er groepen zijn"
   },
   "alert_templates": {
     "header": "Sjablonen",
