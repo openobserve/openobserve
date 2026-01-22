@@ -20,8 +20,11 @@ class TestAlertBulkEnable:
     STREAM_NAME = "stream_pytest_data"
 
     @pytest.fixture(autouse=True)
-    def setup(self, create_session, base_url):
-        """Setup test fixtures - create template, destination, folder, and alerts."""
+    def setup(self, create_session, base_url, ingest_data):
+        """Setup test fixtures - create template, destination, folder, and alerts.
+
+        Depends on ingest_data to ensure org and stream exist.
+        """
         self.session = create_session
         self.base_url = base_url
 
