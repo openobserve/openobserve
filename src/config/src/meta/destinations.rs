@@ -243,6 +243,17 @@ impl fmt::Display for TemplateType {
     }
 }
 
+impl Destination {
+    /// Get prebuilt destination configurations for common services
+    ///
+    /// This provides predefined configurations for popular notification services
+    /// that users can customize with their own URLs and credentials.
+    pub fn prebuilt_destinations() -> Vec<Self> {
+        // Load from config file instead of embedded code
+        crate::prebuilt_loader::load_prebuilt_destinations()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike;
@@ -494,6 +505,63 @@ mod tests {
                 assert_eq!(title, "Welcome Email");
             }
             _ => panic!("Should be Email template type"),
+        }
+    }
+
+    #[test]
+    fn test_prebuilt_destinations() {
+        let prebuilt = Destination::prebuilt_destinations();
+
+        // Should have 8 prebuilt destinations: Slack, Teams, PagerDuty, Discord, Generic Webhook,
+        // Opsgenie, ServiceNow, Email
+        assert_eq!(prebuilt.len(), 8);
+
+        // Check that each destination has expected properties
+        // Use flexible matching since names may vary between JSON config and built-in defaults
+        let slack = prebuilt.iter().find(|d| d.name.contains("Slack")).unwrap();
+        assert_eq!(slack.org_id, "");
+        match &slack.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("slack.com"));
+                    assert_eq!(endpoint.method, HTTPType::POST);
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "slack");
+                }
+                _ => panic!("Slack destination should be HTTP type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Teams destination
+        let teams = prebuilt.iter().find(|d| d.name.contains("Teams")).unwrap();
+        match &teams.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Http(endpoint) => {
+                    assert!(endpoint.url.contains("webhook.office.com"));
+                    assert_eq!(endpoint.destination_type.as_ref().unwrap(), "teams");
+                }
+                _ => panic!("Teams destination should be HTTP type"),
+            },
+            _ => panic!("Should be Alert module"),
+        }
+
+        // Check Email destination
+        let email = prebuilt.iter().find(|d| d.name.contains("Email")).unwrap();
+        match &email.module {
+            Module::Alert {
+                destination_type, ..
+            } => match destination_type {
+                DestinationType::Email(email_config) => {
+                    assert!(!email_config.recipients.is_empty());
+                    assert!(email_config.recipients[0].contains("@"));
+                }
+                _ => panic!("Email destination should be Email type"),
+            },
+            _ => panic!("Should be Alert module"),
         }
     }
 }

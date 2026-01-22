@@ -140,6 +140,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
 
+        <template v-slot:body-cell-type="props">
+          <q-td :props="props">
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <!-- Prebuilt Destination Badge -->
+              <template v-if="getPrebuiltTypeName(props.row)">
+                <q-badge
+                  :data-test="`destination-type-badge-${getPrebuiltTypeName(props.row)?.toLowerCase()}`"
+                  :color="'primary'"
+                  class="tw:text-xs"
+                  :label="getPrebuiltTypeName(props.row)"
+                />
+                <q-icon
+                  name="auto_awesome"
+                  size="16px"
+                  color="primary"
+                  :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
+                />
+              </template>
+              <!-- Custom Destination -->
+              <template v-else>
+                <q-badge
+                  data-test="destination-type-badge-custom"
+                  color="grey-6"
+                  class="tw:text-xs"
+                  label="Custom"
+                />
+                <q-icon
+                  name="settings"
+                  size="16px"
+                  color="grey-6"
+                  title="Custom destination"
+                />
+              </template>
+            </div>
+          </q-td>
+        </template>
+
         <template v-slot:body-selection="scope">
           <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
         </template>
@@ -257,6 +294,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
+import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
@@ -286,6 +324,9 @@ export default defineComponent({
     const { getAllActions } = useActions();
     const { track } = useReo();
 
+    // Prebuilt destinations composable
+    const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
+
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -300,6 +341,14 @@ export default defineComponent({
         label: t("alert_destinations.name"),
         align: "left",
         sortable: true,
+      },
+      {
+        name: "type",
+        field: "type",
+        label: "Type",
+        align: "left",
+        sortable: true,
+        style: "width: 120px",
       },
       {
         name: "url",
@@ -592,6 +641,15 @@ export default defineComponent({
       });
     };
 
+    // Get display name for prebuilt destination type
+    const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
+      const prebuiltType = detectPrebuiltType(destination);
+      if (!prebuiltType) return null;
+
+      const typeConfig = availableTypes.value.find(t => t.id === prebuiltType);
+      return typeConfig ? typeConfig.name : prebuiltType;
+    };
+
     const visibleRows = computed(() => {
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
@@ -735,6 +793,7 @@ export default defineComponent({
       bulkDeleteDestinations,
       confirmBulkDelete,
       selectedDestinations,
+      getPrebuiltTypeName,
     };
   },
 });
