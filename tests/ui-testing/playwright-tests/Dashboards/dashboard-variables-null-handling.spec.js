@@ -118,17 +118,28 @@ test.describe("Dashboard Variables - Null Handling", () => {
     await page.locator('.q-dialog').waitFor({ state: "visible", timeout: 5000 });
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Get all text from Query Inspector dialog
+    // // Get all text from Query Inspector dialog
     // The Query Inspector shows variable substitution in multiple places:
     // 1. The "Query" row shows the executed query with _o2_all_ instead of the variable
     // 2. The "Variable(s)" row explicitly shows: child_var_xxx: _o2_all_
-    const dialogContent = page.locator('.q-dialog').first();
-    await dialogContent.waitFor({ state: "visible", timeout: 5000 });
-    const fullText = await dialogContent.textContent();
+    // const dialogContent = page.locator('.q-dialog').first();
+    // await dialogContent.waitFor({ state: "visible", timeout: 5000 });
+    // const fullText = await dialogContent.textContent();
 
-    // Verify that the child variable was replaced with _o2_all_
-    // When a variable has no data (null value), it should be replaced with _o2_all_ in the actual query
-    expect(fullText).toContain("_o2_all_");
+    // // Verify that the child variable was replaced with _o2_all_
+    // // When a variable has no data (null value), it should be replaced with _o2_all_ in the actual query
+    // expect(fullText).toContain("_o2_all_");
+
+    // await page
+    // .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+    // .click();
+
+  await expect(
+    page.getByRole("cell", {
+      name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_pod_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_pod_name = \'_o2_all_\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+      exact: true,
+    })
+  ).toBeVisible();
 
     // Close Query Inspector dialog
     await page.keyboard.press('Escape');
