@@ -645,21 +645,14 @@ test.describe("Logs Page testcases", () => {
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
-      // Step 5: Save the view (using POM)
+      // Step 5: Save the view (using existing POM methods from logsqueries.spec.js)
       testLogger.info('Step 5: Saving current view');
-      const savedViewsBtn = pm.logsPage.getSavedViewsButtonLocator();
-      await savedViewsBtn.click();
+      await pm.logsPage.clickSavedViewsExpand();
       await page.waitForTimeout(500);
-
-      // Click "Save View" option and fill view details (Rule 5: no try-catch, must succeed)
-      await pm.logsPage.clickSaveViewOption();
-      await page.waitForTimeout(500);
-      await pm.logsPage.fillViewNameInput(testViewName);
-      await pm.logsPage.clickSaveViewDialogSaveButton();
-      await page.waitForTimeout(1000);
-
-      // Verify save was successful by checking for success notification or dialog close
-      await page.waitForLoadState('networkidle');
+      await pm.logsPage.clickSaveViewButton();
+      await pm.logsPage.fillSavedViewName(testViewName);
+      await pm.logsPage.clickSavedViewDialogSave();
+      await page.waitForTimeout(2000);
       testLogger.info(`View saved: ${testViewName}`);
 
       // Step 6: Reload the page to simulate fresh load
@@ -675,16 +668,15 @@ test.describe("Logs Page testcases", () => {
       await pm.logsPage.selectStream("e2e_automate");
       await page.waitForTimeout(1000);
 
-      // Open saved views dropdown with search input (using POM)
-      await pm.logsPage.expandSavedViewsDropdown();
-
-      // Search for our saved view (using POM)
+      // Open saved views dropdown and search (using existing POM methods from logsqueries.spec.js)
+      await pm.logsPage.clickSavedViewsExpand();
+      await pm.logsPage.clickSavedViewSearchInput();
       await pm.logsPage.fillSavedViewSearchInput(testViewName);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
-      // Click on the saved view - MUST be visible (Rule 5: no graceful skipping)
-      await pm.logsPage.expectSavedViewVisible(testViewName, { timeout: 10000 });
-      await pm.logsPage.clickSavedViewByName(testViewName);
+      // Wait for and click on the saved view (Rule 5: waitForSavedViewText will fail if not found)
+      await pm.logsPage.waitForSavedViewText(testViewName);
+      await pm.logsPage.clickSavedViewByText(testViewName);
       await page.waitForTimeout(2000);
 
       // Step 8: Verify VRL function is loaded (using POM)
@@ -713,12 +705,10 @@ test.describe("Logs Page testcases", () => {
       testLogger.error(`Test error: ${error.message}`);
       throw error;
     } finally {
-      // Cleanup: Delete the saved view if possible (using POM)
+      // Cleanup: Delete the saved view if possible (using existing POM methods)
       try {
-        await pm.logsPage.expandSavedViewsDropdown().catch(() => {});
-
-        // Look for delete option for our view
-        await pm.logsPage.clickDeleteSavedViewByName(testViewName).catch(() => {});
+        await pm.logsPage.clickDeleteSavedViewButton(testViewName).catch(() => {});
+        await page.waitForTimeout(500);
         await pm.logsPage.clickConfirmButton().catch(() => {});
         testLogger.info(`Cleaned up test view: ${testViewName}`);
       } catch (cleanupError) {
