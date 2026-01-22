@@ -306,6 +306,7 @@ export default defineComponent({
     });
 
     const createDependencyProposals = (range: any) => {
+      if (!CompletionKind || !insertTextRules) return [];
       return keywords.value.map((keyword: any) => {
         const itemObj: any = {
           ...keyword,
@@ -612,7 +613,7 @@ export default defineComponent({
     };
 
     const registerAutoCompleteProvider = () => {
-      if (!props.showAutoComplete) return;
+      if (!props.showAutoComplete || !monaco) return;
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
