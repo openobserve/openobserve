@@ -1081,9 +1081,10 @@ export class AlertDestinationsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // Reload to ensure we see the latest destinations
+        // Full page reload to ensure clean state before edit
+        // This is critical for ServiceNow and other complex destination types
         await this.page.reload({ waitUntil: 'networkidle' });
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(3000);
 
         // Wait for table to be visible
         await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 15000 }).catch(() => {});
@@ -1093,7 +1094,7 @@ export class AlertDestinationsPage {
         if (await searchInput.isVisible().catch(() => false)) {
             await searchInput.clear();
             await searchInput.fill(name);
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(2000);
             testLogger.debug('Used search to find destination for edit', { name });
         }
 
@@ -1105,8 +1106,23 @@ export class AlertDestinationsPage {
         while (retries > 0) {
             try {
                 await editBtn.waitFor({ state: 'visible', timeout: 5000 });
+
+                // Listen for console errors before clicking
+                const consoleErrors = [];
+                this.page.on('console', msg => {
+                    if (msg.type() === 'error') {
+                        consoleErrors.push(msg.text());
+                    }
+                });
+
                 await editBtn.click();
-                await this.page.waitForTimeout(2000);
+                await this.page.waitForTimeout(3000);
+
+                // Log any console errors that occurred
+                if (consoleErrors.length > 0) {
+                    testLogger.warn('Console errors after clicking edit', { consoleErrors, name });
+                }
+
                 testLogger.debug('Clicked Edit button for destination', { name });
                 return;
             } catch (error) {
@@ -1136,9 +1152,83 @@ export class AlertDestinationsPage {
      * @param {string} name - Expected destination name
      */
     async expectEditFormLoaded(name) {
+        // Wait for the edit form title to show "update"
         await expect(this.page.locator('[data-test="add-destination-title"]')).toContainText(/update/i);
-        const nameInput = this.page.locator(this.destinationNameInput);
-        await expect(nameInput).toHaveValue(name);
+        testLogger.debug('Edit form title shows Update');
+
+        // In edit mode, the form data loads asynchronously from the API
+        // A loading spinner appears with text "Loading destination data..."
+        // We must wait for this to disappear before the name input becomes visible
+
+        // Wait for loading state to complete - use text match for the loading message
+        const loadingMessage = this.page.getByText('Loading destination data...');
+        const loadingSpinner = this.page.locator('.q-spinner');
+
+        // Check if loading state is present and wait for it to disappear
+        const isLoadingVisible = await loadingMessage.isVisible().catch(() => false) ||
+                                  await loadingSpinner.isVisible().catch(() => false);
+
+        if (isLoadingVisible) {
+            testLogger.debug('Loading state detected, waiting for it to complete...');
+            try {
+                // Wait for loading message to disappear (60 seconds for slow API - ServiceNow can be slow)
+                await loadingMessage.waitFor({ state: 'hidden', timeout: 60000 });
+                testLogger.debug('Loading message disappeared');
+            } catch (e) {
+                testLogger.warn('Loading message still visible after timeout', { name });
+                // Take screenshot to debug
+                await this.page.screenshot({ path: `/tmp/edit-form-loading-stuck-${name}.png`, fullPage: true }).catch(() => {});
+            }
+        } else {
+            testLogger.debug('No loading state detected, form should be ready');
+        }
+
+        // Additional wait for form to stabilize after data load
+        await this.page.waitForTimeout(2000);
+
+        // The name input only appears after formData.destination_type is loaded
+        // Wait for the name input to be visible with extended timeout
+        let nameInput = this.page.locator(this.destinationNameInput);
+
+        // Debug: Check how many name inputs exist and their visibility
+        const nameInputCount = await nameInput.count();
+        testLogger.debug('Name input element count', { count: nameInputCount });
+
+        // For custom destinations in edit mode, there may be 2 name inputs:
+        // 1. Readonly display field (in edit mode header)
+        // 2. Editable field (in custom form section)
+        // Use .first() to get the readonly one which shows the destination name
+        if (nameInputCount > 1) {
+            testLogger.debug('Multiple name inputs found, using first (readonly) for verification');
+            nameInput = nameInput.first();
+        }
+
+        try {
+            await nameInput.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            // Take screenshot for debugging before failing
+            await this.page.screenshot({ path: `/tmp/edit-form-debug-${name}.png`, fullPage: true }).catch(() => {});
+            testLogger.error('Name input not visible in edit form', {
+                name,
+                inputCount: nameInputCount,
+                screenshot: `/tmp/edit-form-debug-${name}.png`
+            });
+
+            // Check if still loading
+            const stillLoading = await loadingMessage.isVisible().catch(() => false);
+            testLogger.error('Debug form state', {
+                stillLoading,
+                titleVisible: await this.page.locator('[data-test="add-destination-title"]').isVisible().catch(() => false),
+                prebuiltFormVisible: await this.page.locator('[data-test="prebuilt-form"]').isVisible().catch(() => false),
+                urlInputVisible: await this.page.locator('[data-test="add-destination-url-input"]').isVisible().catch(() => false),
+                readonlyTypeVisible: await this.page.locator('[data-test="destination-type-readonly"]').isVisible().catch(() => false)
+            });
+
+            throw e;
+        }
+
+        // Now verify the name value
+        await expect(nameInput).toHaveValue(name, { timeout: 10000 });
         testLogger.debug('Edit form loaded with existing data', { name });
     }
 
