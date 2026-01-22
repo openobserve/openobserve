@@ -1020,6 +1020,7 @@ pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Respon
 #[cfg(feature = "cloud")]
 #[utoipa::path(
     post,
+    path = "/auth/invites/{token}",
     context_path = "/api",
     tag = "Users",
     operation_id = "UserInvitations",

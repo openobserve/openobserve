@@ -167,24 +167,24 @@ pub async fn search_multi(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         format!("org {org_id} has expired its trial period"),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             Err(e) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         e.to_string(),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             _ => {}
         }
@@ -763,24 +763,24 @@ pub async fn _search_partition_multi(
     {
         match is_org_in_free_trial_period(&org_id).await {
             Ok(false) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         format!("org {org_id} has expired its trial period"),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             Err(e) => {
-                return Ok((
+                return (
                     AxumStatusCode::FORBIDDEN,
                     Json(MetaHttpResponse::error(
                         StatusCode::FORBIDDEN,
                         e.to_string(),
                     )),
                 )
-                    .into_response());
+                    .into_response();
             }
             _ => {}
         }
