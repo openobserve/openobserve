@@ -2004,4 +2004,165 @@ export class PipelinesPage {
         await this.confirmButton.click().catch(() => {});
         testLogger.info('Clicked confirm button');
     }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect pipeline page to be visible
+     * Bug #9498, #10029 - Pipeline tests
+     */
+    async expectPipelinePageVisible() {
+        const pipelineTable = this.page.locator('[data-test*="pipeline-list"], [data-test*="pipeline"]').first();
+        await expect(pipelineTable).toBeVisible({ timeout: 15000 });
+        testLogger.info('Pipeline page is visible');
+    }
+
+    /**
+     * Expect pipeline canvas to be visible
+     * Bug #10029 - Backfill creation
+     */
+    async expectPipelineCanvasVisible() {
+        await expect(this.vueFlowPane).toBeVisible({ timeout: 15000 });
+        testLogger.info('Pipeline canvas is visible');
+    }
+
+    /**
+     * Get count of pipeline rows
+     * Bug #9498, #10029 - Pipeline tests
+     */
+    async getPipelineRowCount() {
+        const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
+        const count = await pipelineRows.count();
+        testLogger.info(`Found ${count} pipeline rows`);
+        return count;
+    }
+
+    /**
+     * Hover over a pipeline row by index
+     * Bug #9498 - Preview bounds
+     */
+    async hoverPipelineRow(index) {
+        const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
+        const row = pipelineRows.nth(index);
+        if (await row.isVisible().catch(() => false)) {
+            await row.hover();
+            testLogger.info(`Hovered pipeline row ${index}`);
+        }
+    }
+
+    /**
+     * Get preview/tooltip bounding box
+     * Bug #9498 - Preview bounds
+     */
+    async getPreviewBoundingBox() {
+        const preview = this.page.locator('.q-tooltip, .q-menu, .preview-popup, [class*="preview"], [class*="tooltip"]').first();
+        if (await preview.isVisible().catch(() => false)) {
+            return await preview.boundingBox();
+        }
+        return null;
+    }
+
+    /**
+     * Check if query button is visible
+     * Bug #10029 - Backfill
+     */
+    async isQueryButtonVisible() {
+        const queryButton = this.page.locator('[data-test*="query"], [data-test*="scheduled"]').first();
+        return await queryButton.isVisible().catch(() => false);
+    }
+
+    /**
+     * Check if scheduled dialog is visible
+     * Bug #10029 - Backfill
+     */
+    async isScheduledDialogVisible() {
+        const dialog = this.page.locator('.q-dialog, [data-test*="dialog"]');
+        return await dialog.isVisible().catch(() => false);
+    }
+
+    /**
+     * Test pause toggle functionality
+     * Bug #10029 - Pause/unpause
+     */
+    async testPauseToggle(rowIndex) {
+        const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
+        const row = pipelineRows.nth(rowIndex);
+        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"], .q-toggle').first();
+
+        if (await pauseToggle.isVisible().catch(() => false)) {
+            const initialState = await pauseToggle.getAttribute('aria-pressed').catch(() => 'unknown');
+            await pauseToggle.click();
+            await this.page.waitForTimeout(1000);
+
+            // Handle confirmation dialog if it appears
+            const confirmDialog = this.page.locator('.q-dialog, [data-test*="confirm-dialog"]');
+            if (await confirmDialog.isVisible().catch(() => false)) {
+                const confirmBtn = this.page.locator('.q-dialog button:has-text("OK"), .q-dialog button:has-text("Yes"), .q-dialog button:has-text("Confirm")').first();
+                if (await confirmBtn.isVisible().catch(() => false)) {
+                    await confirmBtn.click();
+                    await this.page.waitForTimeout(1000);
+                }
+            }
+
+            const newState = await pauseToggle.getAttribute('aria-pressed').catch(() => 'unknown');
+            return { found: true, initialState, newState };
+        }
+        return { found: false };
+    }
+
+    // ============================================================================
+    // POM COMPLIANCE METHODS - Rule 3 Fixes
+    // Extract raw locators from spec files into POM
+    // ============================================================================
+
+    /**
+     * Get function node locator by name
+     * Used in pipeline-core.spec.js
+     * @param {string} funcName - Function name
+     * @returns {import('@playwright/test').Locator} Function node locator
+     */
+    getFunctionNodeByName(funcName) {
+        return this.page.locator(`text=${funcName}`);
+    }
+
+    /**
+     * Check if function node is visible by name
+     * @param {string} funcName - Function name
+     * @returns {Promise<boolean>} True if visible
+     */
+    async isFunctionNodeVisible(funcName) {
+        const funcNode = this.getFunctionNodeByName(funcName);
+        return await funcNode.isVisible().catch(() => false);
+    }
+
+    /**
+     * Get pipeline row locator by name
+     * Used in pipelines.spec.js
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Pipeline row locator
+     */
+    getPipelineRowByName(pipelineName) {
+        return this.page.locator('tr').filter({ hasText: pipelineName });
+    }
+
+    /**
+     * Get pipeline toggle locator for a specific pipeline
+     * @param {string} pipelineName - Pipeline name
+     * @returns {import('@playwright/test').Locator} Toggle locator
+     */
+    getPipelineToggle(pipelineName) {
+        const pipelineRow = this.getPipelineRowByName(pipelineName);
+        return pipelineRow.locator('[data-test*="toggle"]');
+    }
+
+    /**
+     * Toggle pipeline enabled/disabled state
+     * @param {string} pipelineName - Pipeline name
+     */
+    async togglePipeline(pipelineName) {
+        const toggle = this.getPipelineToggle(pipelineName);
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        await toggle.click();
+        testLogger.info(`Toggled pipeline: ${pipelineName}`);
+    }
 }
