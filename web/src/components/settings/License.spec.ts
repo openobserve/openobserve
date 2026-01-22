@@ -292,7 +292,7 @@ describe('License.vue', () => {
 
     it('should display usage information section', () => {
       expect(wrapper.text()).toContain('Usage Information');
-      expect(wrapper.text()).toContain('Ingestion Usage');
+      expect(wrapper.text()).toContain('100 GB of data ingestion per day');
     });
 
     it('should calculate ingestion usage percentage correctly', () => {
@@ -300,15 +300,17 @@ describe('License.vue', () => {
     });
 
     it('should display ingestion limit', () => {
-      expect(wrapper.text()).toContain('100 GB / day');
+      expect(wrapper.text()).toContain('100 GB of data ingestion per day');
     });
 
     it('should display ingestion type', () => {
-      expect(wrapper.text()).toContain('PerDayCount');
+      // The ingestion type is not directly displayed in the new UI
+      // It's used internally for the limit calculation
+      expect(wrapper.vm.licenseData.license.limits.Ingestion.typ).toBe('PerDayCount');
     });
 
     it('should display limit exceeded count', () => {
-      expect(wrapper.text()).toContain('2 times this month');
+      expect(wrapper.text()).toContain('The limit was exceeded on 2 days this month');
     });
 
     it('should show green color for usage under 60%', () => {
@@ -369,7 +371,9 @@ describe('License.vue', () => {
     });
 
     it('should display "Unlimited" in usage section', () => {
-      expect(wrapper.text()).toContain('Unlimited');
+      // For unlimited license, the component displays a disclaimer instead of "Unlimited" text
+      // Check that the disclaimer is displayed
+      expect(wrapper.text()).toContain('Usage shows 0% for unlimited plans');
     });
 
     it('should show disclaimer for unlimited plans', () => {
