@@ -285,6 +285,7 @@ export default defineComponent({
     watch(
       () => store.state.theme,
       () => {
+        if (!monaco) return;
         monaco.editor.setTheme(
           store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
@@ -330,6 +331,20 @@ export default defineComponent({
 
       // Initialize Monaco constants after loading
       initializeMonacoConstants();
+
+      // Register custom languages after Monaco is loaded
+      if (props.language === "promql") {
+        monaco.languages.register({ id: "promql" });
+      }
+      if (props.language === "vrl") {
+        monaco.languages.register({ id: "vrl" });
+
+        // Register a tokens provider for the language
+        monaco.languages.setMonarchTokensProvider(
+          "vrl",
+          vrlLanguageDefinition as any,
+        );
+      }
 
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
@@ -491,18 +506,6 @@ export default defineComponent({
 
     onMounted(async () => {
       provider.value?.dispose();
-      if (props.language === "promql") {
-        monaco.languages.register({ id: "promql" });
-      }
-      if (props.language === "vrl") {
-        monaco.languages.register({ id: "vrl" });
-
-        // Register a tokens provider for the language
-        monaco.languages.setMonarchTokensProvider(
-          "vrl",
-          vrlLanguageDefinition as any,
-        );
-      }
 
       if (props.language === "sql") {
         await import(
@@ -589,6 +592,7 @@ export default defineComponent({
     watch(
       () => store.state.theme,
       () => {
+        if (!monaco) return;
         monaco.editor.setTheme(
           store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
@@ -715,6 +719,7 @@ export default defineComponent({
     };
 
     const decorateRanges = (ranges: any[]) => {
+      if (!monaco) return;
       // Highlight the ranges
       const decorations = ranges.map((range) => {
         return {
@@ -731,6 +736,7 @@ export default defineComponent({
     };
 
     function addErrorDiagnostics(ranges: any) {
+      if (!monaco) return;
       // const markers = [
       //   {
       //     resource: {
