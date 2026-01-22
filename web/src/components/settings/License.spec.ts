@@ -4,6 +4,17 @@ import { Quasar } from 'quasar';
 import License from './License.vue';
 import licenseServer from '@/services/license_server';
 import { createStore } from 'vuex';
+import i18n from '@/locales';
+import type { AxiosResponse } from 'axios';
+
+// Helper to create mock Axios responses
+const createAxiosResponse = <T = any>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+});
 
 // Mock the license server service
 vi.mock('@/services/license_server', () => ({
@@ -92,6 +103,7 @@ describe('License.vue', () => {
             plugins: {},
           }],
           store,
+          i18n,
         ],
         stubs: {
           LicensePeriod: true,
@@ -135,14 +147,14 @@ describe('License.vue', () => {
 
   describe('Component Mounting', () => {
     it('should mount successfully', () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
     it('should show loading spinner while fetching license data', async () => {
       vi.mocked(licenseServer.get_license).mockImplementation(() =>
-        new Promise(resolve => setTimeout(() => resolve({ data: mockLicenseData }), 100))
+        new Promise(resolve => setTimeout(() => resolve(createAxiosResponse(mockLicenseData)), 100))
       );
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
@@ -153,7 +165,7 @@ describe('License.vue', () => {
     });
 
     it('should call loadLicenseData on mount', async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -168,7 +180,7 @@ describe('License.vue', () => {
     };
 
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: noLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(noLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -214,7 +226,7 @@ describe('License.vue', () => {
 
   describe('Active License State', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -273,7 +285,7 @@ describe('License.vue', () => {
 
   describe('Usage Information', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -308,7 +320,7 @@ describe('License.vue', () => {
         ...mockLicenseData,
         ingestion_used: 75,
       };
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: highUsageData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(highUsageData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -320,7 +332,7 @@ describe('License.vue', () => {
         ...mockLicenseData,
         ingestion_used: 95,
       };
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: criticalUsageData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(criticalUsageData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -343,7 +355,7 @@ describe('License.vue', () => {
     };
 
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: unlimitedLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(unlimitedLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
