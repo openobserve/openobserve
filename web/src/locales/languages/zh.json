@@ -1846,7 +1846,8 @@
       "evaluationTime": "评估",
       "queryTime": "查询 (ms)",
       "error": "错误"
-    }
+    },
+    "aggregation_threshold": "如果有群组则发出警报"
   },
   "alert_templates": {
     "header": "模板",

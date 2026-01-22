@@ -1850,7 +1850,8 @@
       "evaluationTime": "Bewertung (en)",
       "queryTime": "Anfrage (ms)",
       "error": "Fehler"
-    }
+    },
+    "aggregation_threshold": "Bei Gruppen benachrichtigen"
   },
   "alert_templates": {
     "header": "Vorlagen",

@@ -1850,7 +1850,8 @@
       "evaluationTime": "Avaliação (ões)",
       "queryTime": "Consulta (ms)",
       "error": "Erro"
-    }
+    },
+    "aggregation_threshold": "Alerte se houver algum grupo"
   },
   "alert_templates": {
     "header": "Modelos",

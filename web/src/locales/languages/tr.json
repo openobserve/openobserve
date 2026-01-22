@@ -1850,7 +1850,8 @@
       "evaluationTime": "Değerlendirme (lar)",
       "queryTime": "Sorgu (ms)",
       "error": "Hata"
-    }
+    },
+    "aggregation_threshold": "Herhangi Bir Grup Varsa Uyarı"
   },
   "alert_templates": {
     "header": "Şablonlar",
