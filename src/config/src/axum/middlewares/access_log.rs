@@ -30,7 +30,7 @@ use tower::{Layer, Service};
 ///
 /// Supported format specifiers:
 /// - %a - Remote IP address (from X-Forwarded-For or Forwarded header)
-/// - %t - Time the request was received (format: [dd/Mon/yyyy:HH:mm:ss +zzzz])
+/// - %t - Time the request was received (format: [dd/Mon/yyyyTHH:mm:ss.fff +zzzz])
 /// - %r - Request line (method, path, HTTP version)
 /// - %s - Response status code
 /// - %b - Size of response in bytes (from Content-Length header)
@@ -98,7 +98,7 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let start = Instant::now();
-        let timestamp = Local::now().format("[%d/%b/%Y:%H:%M:%S %z]").to_string();
+        let timestamp = Local::now().format("[%d/%b/%YT%H:%M:%S%.3f %z]").to_string();
 
         // Extract request info before moving req
         let remote_addr = req
