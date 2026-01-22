@@ -50,6 +50,7 @@ pub mod schema;
 pub mod search_job;
 pub mod session;
 pub mod short_url;
+pub mod sourcemaps;
 pub mod system_settings;
 pub mod user;
 
