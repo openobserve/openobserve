@@ -58,8 +58,9 @@ def base_url():
 def ingest_data():
     """Ingest data into the openobserve running instance."""
 
-    session = _create_session_inner()
-    
+    # Use v2 session for consistent auth header
+    session = _create_session_inner_v2()
+
     # Ingest main test data
     with open(root_dir / "test-data/logs_data.json") as f:
         data = f.read()
@@ -69,12 +70,16 @@ def ingest_data():
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp1 = session.post(url, data=data, headers={"Content-Type": "application/json"})
     logging.info("Main data ingested successfully, status code: %s", resp1.status_code)
-    
+    assert resp1.status_code == 200, \
+        f"Failed to ingest main test data: {resp1.status_code} - {resp1.text[:500]}"
+
     # Ingest camel case test data
     with open(root_dir / "test-data/match_all.json") as f:
         camel_data = f.read()
-    
+
     resp2 = session.post(url, data=camel_data, headers={"Content-Type": "application/json"})
     logging.info("Camel case data ingested successfully, status code: %s", resp2.status_code)
-    
-    return resp1.status_code == 200 and resp2.status_code == 200
+    assert resp2.status_code == 200, \
+        f"Failed to ingest camel case test data: {resp2.status_code} - {resp2.text[:500]}"
+
+    return True
