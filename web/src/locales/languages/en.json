@@ -1740,7 +1740,8 @@
     "trigger": "Trigger",
     "period": "Look back window",
     "frequency": "Check every",
-    "threshold": "Alert when ",
+    "threshold": "Alert if ",
+    "aggregation_threshold": "Alert If Any Groups",
     "thresholdDynamic": {
       "alertMeWhen": "Alert me when",
       "metricTypes": {

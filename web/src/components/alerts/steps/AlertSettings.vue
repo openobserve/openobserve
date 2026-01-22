@@ -172,111 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- For Scheduled Alerts -->
       <template v-else>
-        <!-- Aggregation Toggle (only for custom queries, not SQL or PromQL) -->
-        <div v-if="queryType === 'custom'" class="flex justify-start items-center tw:font-semibold alert-settings-row">
-          <div class="flex items-center" style="width: 190px; height: 36px">
-            {{ t("common.aggregation") }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  Enable to summarize data using functions like count, sum, avg, etc. before triggering the alert.<br />
-                  Example: Alert when average response time exceeds 500ms instead of individual events.
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <q-toggle
-            v-model="localIsAggregationEnabled"
-            size="30px"
-            class="text-bold o2-toggle-button-xs"
-            @update:model-value="toggleAggregation"
-          />
-        </div>
-
-        <!-- Group By Fields (shown when aggregation is enabled) -->
-        <div
-          v-if="localIsAggregationEnabled && formData.query_condition.aggregation"
-          class="flex items-start no-wrap q-mr-sm alert-settings-row"
-        >
-          <div class="flex items-center tw:font-semibold" style="width: 190px; height: 36px">
-            {{ t("alerts.groupBy") }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  Group the aggregated data by specific fields to create separate alerts for each unique value.<br />
-                  Example: Group by "hostname" to get individual alerts per server, or by "status_code" to track errors separately.
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div class="flex justify-start items-center flex-wrap" style="width: calc(100% - 190px)">
-            <template
-              v-for="(group, index) in formData.query_condition.aggregation.group_by"
-              :key="index"
-            >
-              <div class="flex justify-start items-center no-wrap">
-                <div>
-                  <q-select
-                    v-model="formData.query_condition.aggregation.group_by[index]"
-                    :options="filteredFields"
-                    class="no-case q-py-none q-mb-sm"
-                    borderless
-                    dense
-                    use-input
-                    emit-value
-                    hide-selected
-                    :placeholder="t('alerts.placeholders.selectColumn')"
-                    fill-input
-                    :input-debounce="400"
-                    hide-bottom-space
-                    @filter="(val: string, update: any) => filterFields(val, update)"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="width: 200px"
-                    @update:model-value="emitAggregationUpdate"
-                  />
-                </div>
-                <q-btn
-                  icon="delete"
-                  class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  padding="xs"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('alert_templates.delete')"
-                  @click="deleteGroupByColumn(index)"
-                  style="min-width: auto"
-                />
-              </div>
-            </template>
-            <q-btn
-              icon="add"
-              class="iconHoverBtn q-mb-sm q-mr-sm"
-              :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('common.add')"
-              @click="addGroupByColumn"
-              style="min-width: auto"
-            />
-          </div>
-        </div>
-
-  <!-- PromQL Trigger Condition (for promql queries only) -->
+        <!-- PromQL Trigger Condition (for promql queries only) -->
         <div v-if="queryType === 'promql' && formData.query_condition.promql_condition" class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             Trigger if the value is *
@@ -350,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
 
-        <!-- Threshold (for custom and sql queries, always shown for promql) -->
+        <!-- Threshold (for custom and sql queries without aggregation, always shown for promql) -->
         <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
@@ -369,83 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div style="width: calc(100% - 190px)">
-            <!-- With Aggregation -->
-            <template v-if="localIsAggregationEnabled && formData.query_condition.aggregation">
-              <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:gap-2">
-                <div class="tw:flex tw:items-center">
-                  <div class="q-mr-xs">
-                    <q-select
-                      v-model="formData.query_condition.aggregation.function"
-                      :options="aggFunctions"
-                      class="no-case q-py-none q-mb-xs"
-                      borderless
-                      hide-bottom-space
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      style="width: 120px"
-                      @update:model-value="emitAggregationUpdate"
-                    />
-                  </div>
-                  <div class="q-mr-xs">
-                    <q-select
-                      v-model="formData.query_condition.aggregation.having.column"
-                      :options="filteredNumericColumns"
-                      class="no-case q-py-none q-mb-xs"
-                      borderless
-                      dense
-                      use-input
-                      emit-value
-                      hide-selected
-                      fill-input
-                      @filter="filterNumericColumns"
-                      style="width: 250px"
-                      @update:model-value="emitAggregationUpdate"
-                      hide-bottom-space
-                      :error="!formData.query_condition.aggregation.having.column || formData.query_condition.aggregation.having.column.length === 0"
-                      error-message="Field is required!"
-                    />
-                  </div>
-                </div>
-                <div class="flex items-center q-mt-xs">
-                  <div class="monaco-editor-test q-mr-xs tw:pb-1">
-                    <q-select
-                      v-model="formData.query_condition.aggregation.having.operator"
-                      :options="triggerOperators"
-                      color="input-border"
-                      class="no-case q-py-none"
-                      borderless
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      style="width: 120px"
-                      @update:model-value="emitAggregationUpdate"
-                    />
-                  </div>
-                  <div class="flex items-center tw:pb-1">
-                    <div style="width: 250px; margin-left: 0 !important">
-                      <q-input
-                        v-model="formData.query_condition.aggregation.having.value"
-                        type="number"
-                        dense
-                        borderless
-                        min="0"
-                        :placeholder="t('alerts.placeholders.value')"
-                        @update:model-value="emitAggregationUpdate"
-                        hide-bottom-space
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Without Aggregation -->
-            <template v-else>
-              <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:w-full">
+            <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:w-full">
                 <!-- Main threshold input row -->
                 <div class="flex items-start tw:w-full">
                   <div class="tw:flex tw:flex-col">
@@ -529,7 +349,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </template>
           </div>
         </div>
 
@@ -1270,6 +1089,13 @@ export default defineComponent({
     // Trigger operators
     const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
 
+    const havingFieldsText = computed(() => {
+      if (!querySchema.value.having) {
+        return '';
+      }
+      return parseHavingNode(querySchema.value.having);
+    });
+
     // Dynamic threshold description based on query schema
     // CRITICAL: Threshold compares RESULT ROW COUNT, not aggregated column values
     // See: /test-data/ALERTS_UI_TEXT_COMPLETE.md for detailed examples
@@ -1384,26 +1210,6 @@ export default defineComponent({
       return querySchema.value.group_by.join(', ');
     });
 
-    const havingFieldsText = computed(() => {
-      if (!querySchema.value.having) {
-        return '';
-      }
-      return parseHavingNode(querySchema.value.having);
-    });
-
-    // Filtered fields for group by
-    const filteredFields = ref([...props.columns]);
-    const filterFields = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredFields.value = [...props.columns];
-        } else {
-          const needle = val.toLowerCase();
-          filteredFields.value = props.columns.filter((v: any) => v.toLowerCase().indexOf(needle) > -1);
-        }
-      });
-    };
-
     // Filtered numeric columns for aggregation
     const filteredNumericColumns = ref([...props.columns]);
     const filterNumericColumns = (val: string, update: any) => {
@@ -1514,50 +1320,6 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
-    // Toggle aggregation
-    const toggleAggregation = () => {
-      // Only allow aggregation toggle when query type is "custom"
-      if (queryType.value !== "custom") {
-        localIsAggregationEnabled.value = false;
-        return;
-      }
-
-      // Initialize aggregation object when enabling
-      if (localIsAggregationEnabled.value && !props.formData.query_condition.aggregation) {
-        props.formData.query_condition.aggregation = {
-          group_by: [""],
-          function: "avg",
-          having: {
-            column: "",
-            operator: "=",
-            value: "",
-          },
-        };
-      }
-
-      // Also initialize if aggregation exists but doesn't have function property
-      if (localIsAggregationEnabled.value && props.formData.query_condition.aggregation && !props.formData.query_condition.aggregation.function) {
-        props.formData.query_condition.aggregation.function = "avg";
-      }
-
-      emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
-    };
-
-    // Add group by column
-    const addGroupByColumn = () => {
-      if (props.formData.query_condition.aggregation) {
-        props.formData.query_condition.aggregation.group_by.push("");
-        emitAggregationUpdate();
-      }
-    };
-
-    // Delete group by column
-    const deleteGroupByColumn = (index: number) => {
-      if (props.formData.query_condition.aggregation) {
-        props.formData.query_condition.aggregation.group_by.splice(index, 1);
-        emitAggregationUpdate();
-      }
-    };
 
     // Validate cron expression
     const validateFrequency = () => {
@@ -1785,15 +1547,10 @@ export default defineComponent({
       localDestinations,
       aggFunctions,
       triggerOperators,
-      filteredFields,
-      filterFields,
       filteredNumericColumns,
       filterNumericColumns,
       filteredDestinations,
       filterDestinations,
-      toggleAggregation,
-      addGroupByColumn,
-      deleteGroupByColumn,
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,

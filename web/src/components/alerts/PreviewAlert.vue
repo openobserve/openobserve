@@ -46,6 +46,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -171,6 +172,8 @@ const props = defineProps({
   },
 });
 
+  const { hasAggregation, fnParsedSQL } = logsUtils();
+
 onBeforeMount(() => {
   dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
   dashboardPanelData.data.type = "line";
@@ -196,12 +199,16 @@ const { t } = useI18n();
 const store = useStore();
 
 // Computed property to determine if histogram should be used
-// For SQL/custom with aggregations (GROUP BY), we should NOT use histogram
-// because the query already has its own aggregation logic
+// For SQL/custom with aggregations (GROUP BY), we should use histogram
+// because histogram is needed for aggregated queries
 const shouldUseHistogram = computed(() => {
-  // SQL mode with aggregations: never use histogram
+  // SQL mode with aggregations: dont use histogram
   if (props.selectedTab === "sql") {
-    return false;
+    const parsedSQL = fnParsedSQL(props.query);
+    if (parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null)) {
+      return false;
+    }
+    return true;
   }
 
   // Custom mode with aggregations: never use histogram
@@ -367,6 +374,7 @@ const fetchQuerySchema = async () => {
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
+
     // Convert schema to fields
     const fields = convertSchemaToFields(extractedFields, chartType);
 
@@ -382,6 +390,15 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queries[0].fields.y = fields.y;
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = fields.breakdown;
+
+    // For SQL queries without aggregation, use zo_sql_key for x and zo_sql_num for y
+    const parsedSQL = fnParsedSQL(props.query);
+    const hasAgg = parsedSQL && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
+    if (props.selectedTab === "sql" && !hasAgg) {
+      dashboardPanelData.data.queries[0].fields.x = [{ label: 'zo_sql_key', alias: 'zo_sql_key', column: 'zo_sql_key' }];
+      dashboardPanelData.data.queries[0].fields.y = [{ label: 'zo_sql_num', alias: 'zo_sql_num', column: 'zo_sql_num', aggregationFunction: 'count' }];
+      dashboardPanelData.data.queries[0].fields.breakdown = [];
+    }
 
     // Ensure filter is always an object
     if (!dashboardPanelData.data.queries[0].fields.filter || Array.isArray(dashboardPanelData.data.queries[0].fields.filter)) {
@@ -829,9 +846,7 @@ watch(
     props.formData.trigger_condition?.period,
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
-    props.isAggregationEnabled,
     props.selectedTab,
-    props.formData.query_condition?.aggregation,
     props.isUsingBackendSql,
   ],
   () => {

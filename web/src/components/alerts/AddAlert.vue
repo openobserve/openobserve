@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :vrlFunction="decodedVrlFunction"
                   :streamName="formData.stream_name"
                   :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                  :isAggregationEnabled="isAggregationEnabled"
                   @update:tab="updateTab"
                   @update-group="updateGroup"
                   @remove-group="removeConditionGroup"
@@ -164,6 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @clear-multi-windows="clearMultiWindows"
                   @editor-closed="handleEditorClosed"
                   @editor-state-changed="handleEditorStateChanged"
+                  @update:isAggregationEnabled="(value) => isAggregationEnabled = value"
+                  @update:aggregation="(value) => formData.query_condition.aggregation = value"
                 />
               </div>
             </div>
