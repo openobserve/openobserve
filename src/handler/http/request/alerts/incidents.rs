@@ -41,11 +41,56 @@ fn default_limit() -> u64 {
     50
 }
 
-/// Request body for updating incident status
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateIncidentStatusRequest {
-    /// New status: open, acknowledged, or resolved
-    pub status: String,
+/// Severity values for incident updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum IncidentSeverity {
+    P1,
+    P2,
+    P3,
+    P4,
+}
+
+impl IncidentSeverity {
+    pub fn as_str(&self) -> &str {
+        match self {
+            IncidentSeverity::P1 => "P1",
+            IncidentSeverity::P2 => "P2",
+            IncidentSeverity::P3 => "P3",
+            IncidentSeverity::P4 => "P4",
+        }
+    }
+}
+
+/// Status values for incident updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum IncidentStatus {
+    Open,
+    Acknowledged,
+    Resolved,
+}
+
+impl IncidentStatus {
+    pub fn as_str(&self) -> &str {
+        match self {
+            IncidentStatus::Open => "open",
+            IncidentStatus::Acknowledged => "acknowledged",
+            IncidentStatus::Resolved => "resolved",
+        }
+    }
+}
+
+/// Update payload enum for incident field updates
+/// Ensures only one field can be updated per request
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum UpdatePayload {
+    /// Update incident title
+    Title { title: String },
+    /// Update incident severity
+    Severity { severity: IncidentSeverity },
+    /// Update incident status
+    Status { status: IncidentStatus },
 }
 
 /// Response for list incidents
@@ -131,52 +176,92 @@ pub async fn get_incident(path: web::Path<(String, String)>) -> HttpResponse {
 }
 
 #[cfg(feature = "enterprise")]
-/// UpdateIncidentStatus
+/// UpdateIncident
 #[utoipa::path(
     context_path = "/api",
     tag = "Incidents",
-    operation_id = "UpdateIncidentStatus",
-    summary = "Update incident status",
-    description = "Updates the status of an incident (open, acknowledged, resolved).",
+    operation_id = "UpdateIncident",
+    summary = "Update incident fields",
+    description = "Updates incident title, severity, or status. Only one field can be updated per request.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
-    request_body(content = UpdateIncidentStatusRequest, description = "New status", content_type = "application/json"),
+    request_body(content = UpdatePayload, description = "Field to update", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
-        (status = 400, description = "Invalid status", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid value", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
-#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
-pub async fn update_incident_status(
+#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/update")]
+pub async fn update_incident(
     path: web::Path<(String, String)>,
-    body: web::Json<UpdateIncidentStatusRequest>,
+    body: web::Json<UpdatePayload>,
 ) -> HttpResponse {
     let (org_id, incident_id) = path.into_inner();
-    let status = &body.status;
 
-    // Validate status
-    if !["open", "acknowledged", "resolved"].contains(&status.as_str()) {
-        return MetaHttpResponse::bad_request(
-            "Invalid status. Must be: open, acknowledged, or resolved",
-        );
-    }
+    match body.into_inner() {
+        UpdatePayload::Title { title } => {
+            // Validate title
+            if title.trim().is_empty() {
+                return MetaHttpResponse::bad_request("Title cannot be empty");
+            }
+            if title.len() > 255 {
+                return MetaHttpResponse::bad_request("Title cannot exceed 255 characters");
+            }
 
-    match crate::service::alerts::incidents::update_status(&org_id, &incident_id, status).await {
-        Ok(incident) => MetaHttpResponse::json(incident),
-        Err(e) => {
-            if e.to_string().contains("not found") {
-                MetaHttpResponse::not_found("Incident not found")
-            } else {
-                MetaHttpResponse::internal_error(e)
+            match crate::service::alerts::incidents::update_title(&org_id, &incident_id, &title)
+                .await
+            {
+                Ok(incident) => MetaHttpResponse::json(incident),
+                Err(e) => {
+                    if e.to_string().contains("not found") {
+                        MetaHttpResponse::not_found("Incident not found")
+                    } else {
+                        MetaHttpResponse::internal_error(e)
+                    }
+                }
             }
         }
+        UpdatePayload::Severity { severity } => {
+            match crate::service::alerts::incidents::update_severity(
+                &org_id,
+                &incident_id,
+                severity.as_str(),
+            )
+            .await
+            {
+                Ok(incident) => MetaHttpResponse::json(incident),
+                Err(e) => {
+                    if e.to_string().contains("not found") {
+                        MetaHttpResponse::not_found("Incident not found")
+                    } else {
+                        MetaHttpResponse::internal_error(e)
+                    }
+                }
+            }
+        }
+        UpdatePayload::Status { status } => match crate::service::alerts::incidents::update_status(
+            &org_id,
+            &incident_id,
+            status.as_str(),
+        )
+        .await
+        {
+            Ok(incident) => MetaHttpResponse::json(incident),
+            Err(e) => {
+                if e.to_string().contains("not found") {
+                    MetaHttpResponse::not_found("Incident not found")
+                } else {
+                    MetaHttpResponse::internal_error(e)
+                }
+            }
+        },
     }
 }
 
@@ -499,35 +584,6 @@ pub async fn get_incident(_path: web::Path<(String, String)>) -> HttpResponse {
 #[utoipa::path(
     context_path = "/api",
     tag = "Incidents",
-    operation_id = "UpdateIncidentStatus",
-    summary = "Update incident status",
-    description = "Updates the status of an incident. This endpoint is only available with enterprise features enabled.",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("incident_id" = String, Path, description = "Incident ID"),
-    ),
-    request_body(content = UpdateIncidentStatusRequest, description = "New status", content_type = "application/json"),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
-        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
-    )
-)]
-#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/status")]
-pub async fn update_incident_status(
-    _path: web::Path<(String, String)>,
-    _body: web::Json<UpdateIncidentStatusRequest>,
-) -> HttpResponse {
-    MetaHttpResponse::forbidden("Not Supported")
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Incidents",
     operation_id = "GetIncidentStats",
     summary = "Get incident statistics",
     description = "Retrieves statistics about incidents. This endpoint is only available with enterprise features enabled.",
@@ -545,6 +601,35 @@ pub async fn update_incident_status(
 )]
 #[get("/v2/{org_id}/alerts/incidents/stats")]
 pub async fn get_incident_stats(_path: web::Path<String>) -> HttpResponse {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UpdateIncident",
+    summary = "Update incident fields",
+    description = "Updates incident title, severity, or status. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    request_body(content = UpdatePayload, description = "Field to update", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+#[patch("/v2/{org_id}/alerts/incidents/{incident_id}/update")]
+pub async fn update_incident(
+    _path: web::Path<(String, String)>,
+    _body: web::Json<UpdatePayload>,
+) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -579,14 +664,6 @@ mod tests {
         assert_eq!(query.status.unwrap(), "open");
         assert_eq!(query.limit, 100);
         assert_eq!(query.offset, 25);
-    }
-
-    #[test]
-    fn test_update_incident_status_request() {
-        let request = UpdateIncidentStatusRequest {
-            status: "acknowledged".to_string(),
-        };
-        assert_eq!(request.status, "acknowledged");
     }
 
     #[test]
@@ -627,5 +704,127 @@ mod tests {
         assert_eq!(response.total, 1);
         assert_eq!(response.incidents[0].id, "test-id");
         assert_eq!(response.incidents[0].alert_count, 5);
+    }
+
+    #[test]
+    fn test_update_severity_enum() {
+        assert_eq!(IncidentSeverity::P1.as_str(), "P1");
+        assert_eq!(IncidentSeverity::P2.as_str(), "P2");
+        assert_eq!(IncidentSeverity::P3.as_str(), "P3");
+        assert_eq!(IncidentSeverity::P4.as_str(), "P4");
+    }
+
+    #[test]
+    fn test_update_status_enum() {
+        assert_eq!(IncidentStatus::Open.as_str(), "open");
+        assert_eq!(IncidentStatus::Acknowledged.as_str(), "acknowledged");
+        assert_eq!(IncidentStatus::Resolved.as_str(), "resolved");
+    }
+
+    #[test]
+    fn test_update_payload_title_serialization() {
+        let payload = UpdatePayload::Title {
+            title: "New Incident Title".to_string(),
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("New Incident Title"));
+        assert!(json.contains("title"));
+    }
+
+    #[test]
+    fn test_update_payload_severity_serialization() {
+        let payload = UpdatePayload::Severity {
+            severity: IncidentSeverity::P1,
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("P1"));
+        assert!(json.contains("severity"));
+    }
+
+    #[test]
+    fn test_update_payload_status_serialization() {
+        let payload = UpdatePayload::Status {
+            status: IncidentStatus::Acknowledged,
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("acknowledged"));
+        assert!(json.contains("status"));
+    }
+
+    #[test]
+    fn test_update_payload_title_deserialization() {
+        let json = r#"{"title":"Critical Production Issue"}"#;
+        let payload: UpdatePayload = serde_json::from_str(json).unwrap();
+        match payload {
+            UpdatePayload::Title { title } => {
+                assert_eq!(title, "Critical Production Issue");
+            }
+            _ => panic!("Expected Title variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_payload_severity_deserialization() {
+        let json = r#"{"severity":"P2"}"#;
+        let payload: UpdatePayload = serde_json::from_str(json).unwrap();
+        match payload {
+            UpdatePayload::Severity { severity } => {
+                assert_eq!(severity, IncidentSeverity::P2);
+            }
+            _ => panic!("Expected Severity variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_payload_status_deserialization() {
+        let json = r#"{"status":"resolved"}"#;
+        let payload: UpdatePayload = serde_json::from_str(json).unwrap();
+        match payload {
+            UpdatePayload::Status { status } => {
+                assert_eq!(status, IncidentStatus::Resolved);
+            }
+            _ => panic!("Expected Status variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_status_serde_roundtrip() {
+        for status in [
+            IncidentStatus::Open,
+            IncidentStatus::Acknowledged,
+            IncidentStatus::Resolved,
+        ] {
+            let json = serde_json::to_string(&status).unwrap();
+            let deserialized: IncidentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(status, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_update_severity_serde_roundtrip() {
+        for severity in [
+            IncidentSeverity::P1,
+            IncidentSeverity::P2,
+            IncidentSeverity::P3,
+            IncidentSeverity::P4,
+        ] {
+            let json = serde_json::to_string(&severity).unwrap();
+            let deserialized: IncidentSeverity = serde_json::from_str(&json).unwrap();
+            assert_eq!(severity, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_update_severity_equality() {
+        assert_eq!(IncidentSeverity::P1, IncidentSeverity::P1);
+        assert_ne!(IncidentSeverity::P1, IncidentSeverity::P2);
+        assert_ne!(IncidentSeverity::P3, IncidentSeverity::P4);
+    }
+
+    #[test]
+    fn test_update_status_equality() {
+        assert_eq!(IncidentStatus::Open, IncidentStatus::Open);
+        assert_ne!(IncidentStatus::Open, IncidentStatus::Acknowledged);
+        assert_ne!(IncidentStatus::Acknowledged, IncidentStatus::Resolved);
     }
 }

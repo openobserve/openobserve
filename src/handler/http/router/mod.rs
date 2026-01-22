@@ -531,7 +531,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::incidents::trigger_incident_rca)
         .service(alerts::incidents::get_incident_service_graph)
         .service(alerts::incidents::get_incident)
-        .service(alerts::incidents::update_incident_status)
+        .service(alerts::incidents::update_incident)
         // Agent chat routes (enterprise only, but always exposed in API)
         .service(alerts::create_alert)
         .service(alerts::get_alert)

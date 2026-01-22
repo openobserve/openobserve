@@ -20,9 +20,17 @@
 use std::collections::{HashMap, HashSet};
 
 use config::{
-    meta::alerts::{alert::Alert, deduplication::GlobalDeduplicationConfig},
+    meta::alerts::{
+        alert::Alert,
+        deduplication::GlobalDeduplicationConfig,
+        incidents::{
+            AlertEdge, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
+            IncidentGraphStats, IncidentServiceGraph, IncidentTopology, IncidentWithAlerts,
+        },
+    },
     utils::json::{Map, Value},
 };
+use itertools::Itertools;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -80,10 +88,7 @@ pub async fn correlate_alert_to_incident(
             GlobalDeduplicationConfig::default()
         }
         Err(e) => {
-            log::warn!(
-                "Failed to fetch org config for incident correlation: {}, using defaults",
-                e
-            );
+            log::warn!("Failed to fetch org config for incident correlation: {e}, using defaults",);
             GlobalDeduplicationConfig::default()
         }
     };
@@ -455,7 +460,7 @@ async fn find_or_create_incident(
 pub async fn get_incident_with_alerts(
     org_id: &str,
     incident_id: &str,
-) -> Result<Option<config::meta::alerts::incidents::IncidentWithAlerts>, anyhow::Error> {
+) -> Result<Option<IncidentWithAlerts>, anyhow::Error> {
     let incident = match infra::table::alert_incidents::get(org_id, incident_id).await? {
         Some(i) => i,
         None => return Ok(None),
@@ -463,33 +468,16 @@ pub async fn get_incident_with_alerts(
 
     let incident_alerts = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
 
-    // Get topology using centralized method
-    let topology_context =
-        infra::table::alert_incidents::get_topology(&incident.org_id, &incident.id).await?;
+    // Store org_id before moving incident
+    let incident_org_id = incident.org_id.clone();
 
     // Convert to config types
-    let incident_data = config::meta::alerts::incidents::Incident {
-        id: incident.id,
-        org_id: incident.org_id.clone(),
-        correlation_key: incident.correlation_key,
-        status: incident.status.parse().unwrap_or_default(),
-        severity: incident.severity.parse().unwrap_or_default(),
-        stable_dimensions: serde_json::from_value(incident.stable_dimensions).unwrap_or_default(),
-        topology_context,
-        first_alert_at: incident.first_alert_at,
-        last_alert_at: incident.last_alert_at,
-        resolved_at: incident.resolved_at,
-        alert_count: incident.alert_count,
-        title: incident.title,
-        assigned_to: incident.assigned_to,
-        created_at: incident.created_at,
-        updated_at: incident.updated_at,
-    };
+    let incident_data = model_to_incident(incident).await?;
 
     // Convert incident_alerts to triggers
-    let triggers: Vec<config::meta::alerts::incidents::IncidentAlert> = incident_alerts
+    let triggers: Vec<IncidentAlert> = incident_alerts
         .iter()
-        .map(|a| config::meta::alerts::incidents::IncidentAlert {
+        .map(|a| IncidentAlert {
             incident_id: a.incident_id.clone(),
             alert_id: a.alert_id.clone(),
             alert_name: a.alert_name.clone(),
@@ -497,19 +485,8 @@ pub async fn get_incident_with_alerts(
             correlation_reason: a
                 .correlation_reason
                 .as_ref()
-                .and_then(|r| match r.as_str() {
-                    "service_discovery" => {
-                        Some(config::meta::alerts::incidents::CorrelationReason::ServiceDiscovery)
-                    }
-                    "temporal" => {
-                        Some(config::meta::alerts::incidents::CorrelationReason::Temporal)
-                    }
-                    "manual_extraction" => {
-                        Some(config::meta::alerts::incidents::CorrelationReason::ManualExtraction)
-                    }
-                    _ => None,
-                })
-                .unwrap_or(config::meta::alerts::incidents::CorrelationReason::ManualExtraction),
+                .and_then(|r| CorrelationReason::try_from(r.as_str()).ok())
+                .unwrap_or(CorrelationReason::ManualExtraction),
             created_at: a.created_at,
         })
         .collect();
@@ -529,7 +506,7 @@ pub async fn get_incident_with_alerts(
         if let Some(trigger) = incident_alerts.iter().find(|a| a.alert_name == alert_name) {
             // Parse alert_id as Ksuid
             if let Ok(alert_ksuid) = trigger.alert_id.parse() {
-                match super::alert::get_by_id_db(&incident.org_id, alert_ksuid).await {
+                match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
                     Ok(alert) => alerts.push(alert),
                     Err(e) => {
                         log::warn!(
@@ -543,7 +520,7 @@ pub async fn get_incident_with_alerts(
         }
     }
 
-    Ok(Some(config::meta::alerts::incidents::IncidentWithAlerts {
+    Ok(Some(IncidentWithAlerts {
         incident: incident_data,
         triggers,
         alerts,
@@ -556,7 +533,7 @@ pub async fn list_incidents(
     status: Option<&str>,
     limit: u64,
     offset: u64,
-) -> Result<(Vec<config::meta::alerts::incidents::Incident>, u64), anyhow::Error> {
+) -> Result<(Vec<Incident>, u64), anyhow::Error> {
     // Get total count before pagination
     let total = infra::table::alert_incidents::count(org_id, status).await?;
 
@@ -566,36 +543,21 @@ pub async fn list_incidents(
         .into_iter()
         .map(|i| {
             let incident_id = i.id.clone();
-            config::meta::alerts::incidents::Incident {
-                id: i.id,
-                org_id: i.org_id,
-                correlation_key: i.correlation_key,
-                status: i.status.parse().unwrap_or_default(),
-                severity: i.severity.parse().unwrap_or_default(),
-                stable_dimensions: serde_json::from_value(i.stable_dimensions).unwrap_or_default(),
-                topology_context: i.topology_context.and_then(|v| {
-                    match serde_json::from_value(v.clone()) {
-                        Ok(topology) => Some(topology),
-                        Err(e) => {
-                            log::error!(
-                                "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
-                                incident_id,
-                                e,
-                                v
-                            );
-                            None
-                        }
+            let topology_context = i.topology_context.as_ref().and_then(|v| {
+                match serde_json::from_value(v.clone()) {
+                    Ok(topology) => Some(topology),
+                    Err(e) => {
+                        log::error!(
+                            "[incidents] Failed to deserialize topology_context for incident {}: {}. Raw value: {:?}",
+                            incident_id,
+                            e,
+                            v
+                        );
+                        None
                     }
-                }),
-                first_alert_at: i.first_alert_at,
-                last_alert_at: i.last_alert_at,
-                resolved_at: i.resolved_at,
-                alert_count: i.alert_count,
-                title: i.title,
-                assigned_to: i.assigned_to,
-                created_at: i.created_at,
-                updated_at: i.updated_at,
-            }
+                }
+            });
+            model_to_incident_with_topology(i, topology_context)
         })
         .collect();
 
@@ -614,7 +576,9 @@ pub async fn enrich_with_topology(
     alert_name: &str,
     alert_fired_at: i64,
 ) -> Result<(), anyhow::Error> {
-    use config::meta::alerts::incidents::{AlertEdge, AlertNode, EdgeType};
+    use AlertEdge;
+    use AlertNode;
+    use EdgeType;
 
     use crate::service::traces::service_graph;
 
@@ -725,67 +689,58 @@ pub async fn enrich_with_topology(
     for (idx, node) in topology.nodes.iter().enumerate() {
         service_nodes
             .entry(&node.service_name)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(idx);
     }
 
     // For each pair of services in the graph, check if there's a Service Graph edge
-    for (from_service, from_indices) in &service_nodes {
-        for (to_service, to_indices) in &service_nodes {
-            if from_service == to_service {
-                continue; // Skip same service (handled by temporal edges)
-            }
+    for ((from_service, from_indices), (to_service, to_indices)) in service_nodes
+        .iter()
+        .cartesian_product(service_nodes.iter())
+        .filter(|((from_svc, _), (to_svc, _))| from_svc != to_svc)
+    {
+        // Check if Service Graph has edge from_service -> to_service
+        let has_sg_edge = sg_edges
+            .iter()
+            .any(|e| &e.from == from_service && &e.to == to_service);
 
-            // Check if Service Graph has edge from_service -> to_service
-            let has_sg_edge = sg_edges
-                .iter()
-                .any(|e| &e.from == from_service && &e.to == to_service);
+        // Add edge from each node in from_service to each node in to_service
+        // that occurred chronologically after
+        for &from_idx in from_indices {
+            for &to_idx in to_indices {
+                let from_node = &topology.nodes[from_idx];
+                let to_node = &topology.nodes[to_idx];
 
-            // Add edge from each node in from_service to each node in to_service
-            // that occurred chronologically after
-            for &from_idx in from_indices {
-                for &to_idx in to_indices {
-                    let from_node = &topology.nodes[from_idx];
-                    let to_node = &topology.nodes[to_idx];
+                // Only add if from happened before to (chronological)
+                if from_node.first_fired_at < to_node.first_fired_at {
+                    // Determine edge type: ServiceDependency if SG edge exists, otherwise
+                    // Temporal
+                    let edge_type = if has_sg_edge {
+                        EdgeType::ServiceDependency
+                    } else {
+                        EdgeType::Temporal
+                    };
 
-                    // Only add if from happened before to (chronological)
-                    if from_node.first_fired_at < to_node.first_fired_at {
-                        // Determine edge type: ServiceDependency if SG edge exists, otherwise
-                        // Temporal
-                        let edge_type = if has_sg_edge {
-                            EdgeType::ServiceDependency
-                        } else {
-                            EdgeType::Temporal
-                        };
+                    // Check if edge already exists
+                    let edge_exists = topology.edges.iter().any(|e| {
+                        e.from_node_index == from_idx
+                            && e.to_node_index == to_idx
+                            && matches!(
+                                (&e.edge_type, &edge_type),
+                                (EdgeType::ServiceDependency, EdgeType::ServiceDependency)
+                                    | (EdgeType::Temporal, EdgeType::Temporal)
+                            )
+                    });
 
-                        // Check if edge already exists
-                        let edge_exists = topology.edges.iter().any(|e| {
-                            e.from_node_index == from_idx
-                                && e.to_node_index == to_idx
-                                && match (&e.edge_type, &edge_type) {
-                                    (EdgeType::ServiceDependency, EdgeType::ServiceDependency) => {
-                                        true
-                                    }
-                                    (EdgeType::Temporal, EdgeType::Temporal) => true,
-                                    _ => false,
-                                }
+                    if !edge_exists {
+                        topology.edges.push(AlertEdge {
+                            from_node_index: from_idx,
+                            to_node_index: to_idx,
+                            edge_type,
                         });
-
-                        if !edge_exists {
-                            topology.edges.push(AlertEdge {
-                                from_node_index: from_idx,
-                                to_node_index: to_idx,
-                                edge_type: edge_type.clone(),
-                            });
-                            log::debug!(
-                                "[incidents] Added {:?} edge: {} ({}) -> {} ({})",
-                                edge_type,
-                                from_idx,
-                                from_service,
-                                to_idx,
-                                to_service
-                            );
-                        }
+                        log::debug!(
+                            "[incidents] Added {edge_type:?} edge: {from_idx} ({from_service}) -> {to_idx} ({to_service})"
+                        );
                     }
                 }
             }
@@ -805,6 +760,40 @@ pub async fn enrich_with_topology(
     Ok(())
 }
 
+/// Convert database model to domain model with topology (fetches topology)
+async fn model_to_incident(
+    db_model: infra::table::entity::alert_incidents::Model,
+) -> Result<Incident, anyhow::Error> {
+    let topology_context =
+        infra::table::alert_incidents::get_topology(&db_model.org_id, &db_model.id).await?;
+
+    Ok(model_to_incident_with_topology(db_model, topology_context))
+}
+
+/// Convert database model to domain model with pre-fetched topology
+fn model_to_incident_with_topology(
+    db_model: infra::table::entity::alert_incidents::Model,
+    topology_context: Option<IncidentTopology>,
+) -> Incident {
+    Incident {
+        id: db_model.id,
+        org_id: db_model.org_id,
+        correlation_key: db_model.correlation_key,
+        status: db_model.status.parse().unwrap_or_default(),
+        severity: db_model.severity.parse().unwrap_or_default(),
+        stable_dimensions: serde_json::from_value(db_model.stable_dimensions).unwrap_or_default(),
+        topology_context,
+        first_alert_at: db_model.first_alert_at,
+        last_alert_at: db_model.last_alert_at,
+        resolved_at: db_model.resolved_at,
+        alert_count: db_model.alert_count,
+        title: db_model.title,
+        assigned_to: db_model.assigned_to,
+        created_at: db_model.created_at,
+        updated_at: db_model.updated_at,
+    }
+}
+
 /// Get alert flow graph for an incident
 ///
 /// Returns the pre-built alert flow graph showing how alerts cascaded
@@ -812,9 +801,7 @@ pub async fn enrich_with_topology(
 pub async fn get_service_graph(
     org_id: &str,
     incident_id: &str,
-) -> Result<Option<config::meta::alerts::incidents::IncidentServiceGraph>, anyhow::Error> {
-    use config::meta::alerts::incidents::IncidentGraphStats;
-
+) -> Result<Option<IncidentServiceGraph>, anyhow::Error> {
     // Check if incident exists
     if infra::table::alert_incidents::get(org_id, incident_id)
         .await?
@@ -830,17 +817,7 @@ pub async fn get_service_graph(
     let topology = match topology {
         Some(t) => t,
         None => {
-            return Ok(Some(
-                config::meta::alerts::incidents::IncidentServiceGraph {
-                    nodes: vec![],
-                    edges: vec![],
-                    stats: IncidentGraphStats {
-                        total_services: 0,
-                        total_alerts: 0,
-                        services_with_alerts: 0,
-                    },
-                },
-            ));
+            return Ok(Some(IncidentServiceGraph::default()));
         }
     };
 
@@ -860,17 +837,15 @@ pub async fn get_service_graph(
         .len();
 
     // Return topology directly
-    Ok(Some(
-        config::meta::alerts::incidents::IncidentServiceGraph {
-            nodes: topology.nodes,
-            edges: topology.edges,
-            stats: IncidentGraphStats {
-                total_services,
-                total_alerts,
-                services_with_alerts,
-            },
+    Ok(Some(IncidentServiceGraph {
+        nodes: topology.nodes,
+        edges: topology.edges,
+        stats: IncidentGraphStats {
+            total_services,
+            total_alerts,
+            services_with_alerts,
         },
-    ))
+    }))
 }
 
 /// Update incident status
@@ -878,7 +853,7 @@ pub async fn update_status(
     org_id: &str,
     incident_id: &str,
     status: &str,
-) -> Result<config::meta::alerts::incidents::Incident, anyhow::Error> {
+) -> Result<Incident, anyhow::Error> {
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     #[cfg(feature = "enterprise")]
@@ -896,24 +871,26 @@ pub async fn update_status(
         log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
     }
 
-    // Get topology using centralized method
-    let topology_context = infra::table::alert_incidents::get_topology(org_id, incident_id).await?;
+    model_to_incident(updated).await
+}
 
-    Ok(config::meta::alerts::incidents::Incident {
-        id: updated.id.clone(),
-        org_id: updated.org_id,
-        correlation_key: updated.correlation_key,
-        status: updated.status.parse().unwrap_or_default(),
-        severity: updated.severity.parse().unwrap_or_default(),
-        stable_dimensions: serde_json::from_value(updated.stable_dimensions).unwrap_or_default(),
-        topology_context,
-        first_alert_at: updated.first_alert_at,
-        last_alert_at: updated.last_alert_at,
-        resolved_at: updated.resolved_at,
-        alert_count: updated.alert_count,
-        title: updated.title,
-        assigned_to: updated.assigned_to,
-        created_at: updated.created_at,
-        updated_at: updated.updated_at,
-    })
+/// Update incident title
+pub async fn update_title(
+    org_id: &str,
+    incident_id: &str,
+    title: &str,
+) -> Result<Incident, anyhow::Error> {
+    let updated = infra::table::alert_incidents::update_title(org_id, incident_id, title).await?;
+    model_to_incident(updated).await
+}
+
+/// Update incident severity
+pub async fn update_severity(
+    org_id: &str,
+    incident_id: &str,
+    severity: &str,
+) -> Result<Incident, anyhow::Error> {
+    let updated =
+        infra::table::alert_incidents::update_severity(org_id, incident_id, severity).await?;
+    model_to_incident(updated).await
 }
