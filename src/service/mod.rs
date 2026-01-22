@@ -15,6 +15,7 @@
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
+use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub mod alerts;
@@ -70,7 +71,31 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
 }
 
 /// Setup tracing with a trace ID
+/// This function should be called when the parent span is already active (entered) in the tracing context.
+/// It will use the current active span as parent, maintaining the span hierarchy.
+/// If no parent span is active, it creates a synthetic parent context with the given trace_id.
 pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
+    // Check if there's a current OpenTelemetry context with a valid span
+    let current_otel_ctx = opentelemetry::Context::current();
+
+    // Check if the current context has a valid span with matching trace_id
+    let has_valid_parent = {
+        let span_ref = current_otel_ctx.span();
+        let span_context = span_ref.span_context();
+        span_context.is_valid() && span_context.trace_id().to_string() == trace_id
+    };
+
+    // If there's a valid current span with matching trace_id, use it as parent
+    // This happens when this function is called within an entered parent span
+    if has_valid_parent {
+        // The new span should be a child of the current span
+        // Set the current context as parent
+        span.set_parent(current_otel_ctx);
+        return span;
+    }
+
+    // Otherwise, create a synthetic parent context with the trace_id
+    // This is used when there's no active parent span or the trace_id doesn't match
     let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let traceparent = format!(
         "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be

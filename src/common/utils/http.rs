@@ -153,11 +153,26 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
     {
         // Set as parent context if tracing is enabled
         if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled) && !span.is_none() {
+            // Check for x-openobserve-span-id header (parent span ID from RUM SDK)
+            let parent_span_id = if let Some(oo_span_id) = headers.get("x-openobserve-span-id")
+                && let Ok(span_id_str) = oo_span_id.to_str()
+                // Validate: 16 hex chars, not all zeros
+                && span_id_str.len() == 16
+                && span_id_str.chars().all(|c| c.is_ascii_hexdigit())
+                && !span_id_str.chars().all(|c| c == '0')
+            {
+                // Use the provided span ID from RUM SDK
+                span_id_str.to_string()
+            } else {
+                // Generate a new span ID if not provided or invalid
+                config::ider::generate_span_id()
+            };
+
             // Create a synthetic traceparent and set as parent
             let traceparent = format!(
                 "00-{}-{}-01",
                 trace_id_str,
-                config::ider::generate_span_id()
+                parent_span_id
             );
             let mut headers_map = std::collections::HashMap::new();
             headers_map.insert("traceparent".to_string(), traceparent);
