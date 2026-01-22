@@ -1779,7 +1779,9 @@ export class LogsPage {
     }
 
     async fillSavedViewSearchInput(text) {
-        return await this.fillInputField(this.savedViewSearchInput, text);
+        const searchInput = this.page.locator(this.savedViewSearchInput);
+        await searchInput.waitFor({ state: 'visible', timeout: 15000 });
+        return await searchInput.fill(text);
     }
 
     async clickSavedViewByTitle(title) {
@@ -2411,7 +2413,37 @@ export class LogsPage {
     }
 
     async clickLiveMode5Sec() {
-        return await this.page.locator(this.liveMode5SecBtn).click();
+        // Wait for button to be enabled before clicking (button starts disabled)
+        const button = this.page.locator(this.liveMode5SecBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for button to become enabled
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        return await button.click();
+    }
+
+    async isLiveMode5SecEnabled() {
+        const testLogger = require('../../playwright-tests/utils/test-logger.js');
+        const button = this.page.locator(this.liveMode5SecBtn);
+        try {
+            // Wait for button to be visible first (isEnabled() doesn't support timeout)
+            await button.waitFor({ state: 'visible', timeout: 5000 });
+            return await button.isEnabled();
+        } catch (error) {
+            testLogger.warn(`isLiveMode5SecEnabled check failed: ${error.message}`);
+            return false;
+        }
+    }
+
+    /**
+     * Get the Live Mode 5 second button locator
+     * @returns {import('@playwright/test').Locator} The 5-second live mode button locator
+     */
+    getLiveMode5SecButton() {
+        return this.page.locator(this.liveMode5SecBtn);
+    }
+
+    async getPageContent() {
+        return await this.page.locator('body').innerText().catch(() => '');
     }
 
     async clickVrlToggle() {
@@ -3041,8 +3073,27 @@ export class LogsPage {
 
     // Field management methods for add/remove fields to table
     async hoverOnFieldExpandButton(fieldName) {
-        await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover();
-        await this.page.waitForTimeout(300);
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+
+        // Check primary selector first (use waitFor since isVisible doesn't support timeout)
+        try {
+            await expandBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await expandBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        } catch {
+            // Primary selector not found, try alternate
+        }
+
+        // Try alternate selector
+        const altBtn = this.page.locator(`[data-test*="expand-${fieldName}"]`).first();
+        if (await altBtn.isVisible().catch(() => false)) {
+            await altBtn.hover();
+            await this.page.waitForTimeout(300);
+            return;
+        }
+
+        throw new Error(`Field expand button not found for: ${fieldName}`);
     }
 
     async clickAddFieldToTableButton(fieldName) {
@@ -3831,7 +3882,11 @@ export class LogsPage {
     }
 
     async clickResultErrorDetailsButton() {
-        return await this.page.locator(this.resultErrorDetailsBtn).click();
+        // Wait for element to be stable before clicking (avoids detached DOM issues)
+        const button = this.page.locator(this.resultErrorDetailsBtn);
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.waitForTimeout(500); // Allow DOM to stabilize
+        return await button.click({ timeout: 15000 });
     }
 
     async expectSearchDetailErrorMessageVisible() {
@@ -4778,5 +4833,354 @@ export class LogsPage {
     async getLogsTableContent() {
         const table = this.page.locator(this.logsTable);
         return await table.textContent().catch(() => '');
+    }
+
+    // ========== BUG REGRESSION TEST METHODS ==========
+
+    /**
+     * Expect refresh button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectRefreshButtonVisible() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('Refresh button is visible');
+    }
+
+    /**
+     * Expect refresh button to be enabled
+     * Bug #9533 - Loading states
+     */
+    async expectRefreshButtonEnabled() {
+        const button = this.page.locator(this.queryButton);
+        await expect(button).toBeEnabled({ timeout: 10000 });
+        testLogger.info('Refresh button is enabled');
+    }
+
+    /**
+     * Expect stream selector to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectStreamSelectorVisible() {
+        const selector = this.page.locator(this.indexDropDown);
+        await expect(selector).toBeVisible({ timeout: 10000 });
+        testLogger.info('Stream selector is visible');
+    }
+
+    /**
+     * Expect DateTime button to be visible
+     * Bug #8928 - UI consistency
+     */
+    async expectDateTimeButtonVisible() {
+        const button = this.page.locator(this.dateTimeButton);
+        await expect(button).toBeVisible({ timeout: 10000 });
+        testLogger.info('DateTime button is visible');
+    }
+
+    /**
+     * Enable histogram if not already enabled
+     * Bug #8928 - Histogram rendering
+     */
+    async enableHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
+        if (isPressed === 'false') {
+            await histogramToggle.click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Histogram enabled');
+        }
+    }
+
+    /**
+     * Toggle histogram on/off
+     * Bug #8928 - Histogram rendering
+     */
+    async toggleHistogram() {
+        const histogramToggle = this.page.locator(this.histogramToggle);
+        await histogramToggle.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Histogram toggled');
+    }
+
+    /**
+     * Expect histogram to be visible
+     * Bug #8928 - Histogram rendering
+     */
+    async expectHistogramVisible() {
+        const histogramCanvas = this.page.locator(this.barChartCanvas);
+        await expect(histogramCanvas).toBeVisible({ timeout: 10000 });
+        testLogger.info('Histogram is visible');
+    }
+
+    // ============================================================================
+    // VRL & SAVED VIEWS POM METHODS - Bug #9690
+    // Rule 3 Compliance: Extract raw locators from spec files into POM
+    // ============================================================================
+
+    /**
+     * Click the VRL toggle button to enable/disable VRL editor
+     * @returns {Promise<void>}
+     */
+    async clickVrlToggleButton() {
+        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
+        await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
+        await vrlToggle.click();
+        testLogger.info('Clicked VRL toggle button');
+    }
+
+    /**
+     * Get the VRL editor locator
+     * @returns {import('@playwright/test').Locator} VRL editor locator
+     */
+    getVrlEditor() {
+        return this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+    }
+
+    /**
+     * Type text into the VRL editor
+     * @param {string} text - Text to type
+     */
+    async typeInVrlEditor(text) {
+        const vrlEditor = this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+        await vrlEditor.first().waitFor({ state: 'visible', timeout: 10000 });
+        const textbox = vrlEditor.first().locator('.inputarea');
+        await textbox.waitFor({ state: 'visible', timeout: 5000 });
+        await textbox.fill(text);
+        testLogger.info('Typed text into VRL editor');
+    }
+
+    /**
+     * Get VRL editor content text
+     * @returns {Promise<string>} Editor content
+     */
+    async getVrlEditorContent() {
+        const vrlEditor = this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor');
+        await vrlEditor.first().waitFor({ state: 'visible', timeout: 10000 });
+        const content = await vrlEditor.first().textContent();
+        return content || '';
+    }
+
+    /**
+     * Click the Save Transform button
+     */
+    async clickSaveTransformButton() {
+        const saveBtn = this.page.locator('[data-test="logs-search-bar-save-transform-btn"]');
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await saveBtn.click();
+        testLogger.info('Clicked Save Transform button');
+    }
+
+    /**
+     * Fill the saved function name input
+     * @param {string} name - Function name
+     */
+    async fillSavedFunctionNameInput(name) {
+        const input = this.page.locator('[data-test="saved-function-name-input"]');
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(name);
+        testLogger.info(`Filled saved function name: ${name}`);
+    }
+
+    /**
+     * Click the "Save View" option in the saved views dropdown
+     */
+    async clickSaveViewOption() {
+        const saveViewOption = this.page.getByText('Save View', { exact: false });
+        await saveViewOption.waitFor({ state: 'visible', timeout: 10000 });
+        await saveViewOption.click();
+        testLogger.info('Clicked Save View option');
+    }
+
+    /**
+     * Fill the view name input in the save view dialog
+     * @param {string} name - View name
+     */
+    async fillViewNameInput(name) {
+        const input = this.page.locator('[data-test="add-alert-name-input"]');
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(name);
+        testLogger.info(`Filled view name: ${name}`);
+    }
+
+    /**
+     * Click the save button in the save view dialog
+     */
+    async clickSaveViewDialogSaveButton() {
+        const saveBtn = this.page.locator('[data-test="saved-view-dialog-save-btn"]');
+        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await saveBtn.scrollIntoViewIfNeeded();
+        await saveBtn.click({ force: true });
+        testLogger.info('Clicked Save View dialog save button');
+    }
+
+    /**
+     * Get the function dropdown text
+     * @returns {Promise<string>} Dropdown text
+     */
+    async getFunctionDropdownText() {
+        const dropdown = this.page.locator('[data-test="logs-search-bar-function-dropdown"]');
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        const text = await dropdown.textContent();
+        return text || '';
+    }
+
+    /**
+     * Click a saved view by name
+     * @param {string} name - Saved view name
+     */
+    async clickSavedViewByName(name) {
+        const savedView = this.page.getByText(name, { exact: false });
+        await savedView.waitFor({ state: 'visible', timeout: 10000 });
+        await savedView.click();
+        testLogger.info(`Clicked saved view: ${name}`);
+    }
+
+    /**
+     * Expect a saved view to be visible
+     * @param {string} name - Saved view name
+     * @param {Object} options - Options
+     * @param {number} options.timeout - Timeout in ms (default 10000)
+     */
+    async expectSavedViewVisible(name, options = {}) {
+        const timeout = options.timeout || 10000;
+        const savedView = this.page.getByText(name, { exact: false });
+        await expect(savedView).toBeVisible({ timeout });
+        testLogger.info(`Saved view visible: ${name}`);
+    }
+
+    /**
+     * Get the saved views button locator
+     * @returns {import('@playwright/test').Locator} Saved views button locator
+     */
+    getSavedViewsButtonLocator() {
+        return this.page.locator('[data-test="logs-search-saved-views-btn"]');
+    }
+
+    /**
+     * Click the saved views dropdown arrow to expand and show the list
+     * This opens the dropdown panel with search input
+     */
+    async clickSavedViewsDropdownArrow() {
+        const arrow = this.page.locator(this.savedViewArrow);
+        await arrow.waitFor({ state: 'visible', timeout: 10000 });
+        await arrow.click();
+        // Wait for dropdown panel to appear
+        await this.page.waitForTimeout(500);
+        testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Expand the saved views dropdown and wait for search input
+     * Tries arrow click first, then main button if search input doesn't appear
+     */
+    async expandSavedViewsDropdown() {
+        // First try clicking the dropdown arrow
+        try {
+            await this.clickSavedViewsDropdownArrow();
+            const searchInput = this.page.locator(this.savedViewSearchInput);
+            await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+            return;
+        } catch (e) {
+            testLogger.debug('Arrow click did not show search input, trying main button');
+        }
+
+        // Fallback: try clicking the main button
+        const btn = this.getSavedViewsButtonLocator();
+        await btn.click();
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Click delete button for a saved view by name
+     * Uses dynamic data-test attribute
+     * @param {string} name - Saved view name
+     */
+    async clickDeleteSavedViewByName(name) {
+        const deleteBtn = this.page.locator(`[data-test*="delete"][data-test*="${name}"]`);
+        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await deleteBtn.click();
+        testLogger.info(`Clicked delete for saved view: ${name}`);
+    }
+
+    // ============================================================================
+    // VRL FIELD ICONS POM METHODS - Bug #9550
+    // Rule 3 Compliance: Extract raw locators from logstable.spec.js into POM
+    // ============================================================================
+
+    /**
+     * Get the computed field button locator
+     * @returns {import('@playwright/test').Locator} Computed field button locator
+     */
+    getComputedFieldButton() {
+        return this.page.locator('[data-test*="computed_field"]');
+    }
+
+    /**
+     * Get the include/exclude icon for a field
+     * @param {string} fieldName - Field name (optional, for specific field)
+     * @returns {import('@playwright/test').Locator} Include/exclude icon locator
+     */
+    getIncludeExcludeIcon(fieldName = null) {
+        if (fieldName) {
+            return this.page.locator(`[data-test*="${fieldName}"] [data-test*="include-exclude"]`);
+        }
+        return this.page.locator('[data-test*="computed_field"] [data-test*="include-exclude"]');
+    }
+
+    /**
+     * Get the equals icon for a computed field
+     * @param {string} fieldName - Field name (optional)
+     * @returns {import('@playwright/test').Locator} Equals icon locator
+     */
+    getEqualsIcon(fieldName = null) {
+        if (fieldName) {
+            return this.page.locator(`[data-test*="${fieldName}"]`).locator('..').locator('[class*="equal"]');
+        }
+        return this.page.locator('[data-test*="computed_field"]').locator('..').locator('[class*="equal"]');
+    }
+
+    /**
+     * Get the table headers locator
+     * @returns {import('@playwright/test').Locator} Table headers locator
+     */
+    getTableHeaders() {
+        return this.page.locator('thead th');
+    }
+
+    /**
+     * Get a field button by name
+     * @param {string} fieldName - Field name
+     * @returns {import('@playwright/test').Locator} Field button locator
+     */
+    getFieldButton(fieldName) {
+        return this.page.locator(`[data-test*="${fieldName}"]`);
+    }
+
+    /**
+     * Get the include button locator
+     * @returns {import('@playwright/test').Locator} Include button locator
+     */
+    getIncludeButton() {
+        return this.page.locator('[data-test*="include"]');
+    }
+
+    /**
+     * Expect equals icon to NOT be visible (Bug #9550 test)
+     * VRL-generated fields should not have equals icon
+     */
+    async expectEqualsIconNotVisible() {
+        const equalsIcon = this.getEqualsIcon();
+        await expect(equalsIcon).not.toBeVisible();
+        testLogger.info('Equals icon is NOT visible (Bug #9550 verified)');
+    }
+
+    /**
+     * Expect include/exclude icon to NOT be visible (Bug #9550 test)
+     * VRL-generated fields should not have include/exclude icon
+     */
+    async expectIncludeExcludeIconNotVisible() {
+        const icon = this.getIncludeExcludeIcon();
+        await expect(icon).not.toBeVisible();
+        testLogger.info('Include/exclude icon is NOT visible (Bug #9550 verified)');
     }
 }

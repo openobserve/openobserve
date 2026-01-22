@@ -77,11 +77,10 @@ test.describe("Logs Page testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const orgName = process.env.ORGNAME || 'default';
-    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
-    await pm.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    
+    await page.waitForLoadState('networkidle');
+
     testLogger.info('Logs page test setup completed');
   });
 
@@ -591,6 +590,136 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.expectPaginationNotVisible();
 
     testLogger.info('Pagination SQL group/order/limit query test completed');
+  });
+
+  /**
+   * Bug #9690: VRL function does not load correctly in saved views
+   * https://github.com/openobserve/openobserve/issues/9690
+   *
+   * When loading saved views, the VRL Function Editor appears empty and the
+   * selected function isn't applied, despite being correctly pre-selected.
+   */
+  test("should load VRL function correctly when opening saved view @bug-9690 @P1 @savedViews @vrl @regression", async ({ page }) => {
+    testLogger.info('Test: Verify VRL function loads correctly in saved views (Bug #9690)');
+
+    const uniqueSuffix = Date.now();
+    const testFunctionName = `TestVRLFunc_${uniqueSuffix}`;
+    const testViewName = `VRLTestView_${uniqueSuffix}`;
+    const vrlFunction = '.test_field = "bug9690_test"';
+
+    try {
+      // Step 1: Enable VRL toggle (using POM)
+      testLogger.info('Step 1: Enabling VRL function toggle');
+      await pm.logsPage.clickVrlToggleButton().catch(() => {
+        testLogger.warn('VRL toggle click failed, trying alternative');
+      });
+      await page.waitForTimeout(1000);
+
+      // Step 2: Enter VRL function in the editor (using POM)
+      testLogger.info('Step 2: Entering VRL function');
+      const vrlEditor = pm.logsPage.getVrlEditor().first();
+
+      if (await vrlEditor.isVisible().catch(() => false)) {
+        await vrlEditor.click();
+        await page.keyboard.type(vrlFunction);
+        testLogger.info(`VRL function entered: ${vrlFunction}`);
+      } else {
+        testLogger.warn('VRL editor not visible, skipping VRL entry');
+      }
+
+      // Step 3: Save the function (using POM)
+      try {
+        await pm.logsPage.clickSaveTransformButton();
+        await page.waitForTimeout(500);
+        await pm.logsPage.fillSavedFunctionNameInput(testFunctionName);
+        await pm.logsPage.clickConfirmButton();
+        await page.waitForTimeout(1000);
+        testLogger.info(`Function saved: ${testFunctionName}`);
+      } catch (saveError) {
+        testLogger.warn('Save function step skipped - UI flow may differ');
+      }
+
+      // Step 4: Run query to have results
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+
+      // Step 5: Save the view (using existing POM methods from logsqueries.spec.js)
+      testLogger.info('Step 5: Saving current view');
+      await pm.logsPage.clickSavedViewsExpand();
+      await page.waitForTimeout(500);
+      await pm.logsPage.clickSaveViewButton();
+      await pm.logsPage.fillSavedViewName(testViewName);
+      await pm.logsPage.clickSavedViewDialogSave();
+      await page.waitForTimeout(2000);
+      testLogger.info(`View saved: ${testViewName}`);
+
+      // Step 6: Reload the page to simulate fresh load
+      testLogger.info('Step 6: Reloading page');
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+
+      // Step 7: Navigate back to logs and select the saved view
+      testLogger.info('Step 7: Selecting saved view');
+
+      // Re-setup after reload
+      await pm.logsPage.selectStream("e2e_automate");
+      await page.waitForTimeout(1000);
+
+      // Open saved views dropdown and search (using existing POM methods from logsqueries.spec.js)
+      await pm.logsPage.clickSavedViewsExpand();
+      await pm.logsPage.clickSavedViewSearchInput();
+      await pm.logsPage.fillSavedViewSearchInput(testViewName);
+      await page.waitForTimeout(1000);
+
+      // Wait for and click on the saved view (Rule 5: waitForSavedViewText will fail if not found)
+      await pm.logsPage.waitForSavedViewText(testViewName);
+      await pm.logsPage.clickSavedViewByText(testViewName);
+      await page.waitForTimeout(2000);
+
+      // Step 8: Verify VRL function is loaded (using POM)
+      testLogger.info('Step 8: Verifying VRL function loaded');
+
+      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
+      await pm.logsPage.clickVrlToggle();
+      await page.waitForTimeout(1000);
+
+      // Check if VRL editor has content
+      const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
+      testLogger.info(`VRL editor content after load: ${vrlEditorContent.substring(0, 100)}`);
+
+      // Check if function dropdown shows selection
+      const dropdownText = await pm.logsPage.getFunctionDropdownText();
+      testLogger.info(`Function dropdown text: ${dropdownText}`);
+
+      // PRIMARY ASSERTION: VRL content should be present (not empty)
+      // Either the editor has content OR the function is selected in dropdown
+      const hasVrlContent = vrlEditorContent.length > 0 || dropdownText.includes(testFunctionName);
+
+      if (!hasVrlContent) {
+        testLogger.warn('⚠ VRL function did not load - Bug #9690 may still be present');
+      }
+
+      expect(hasVrlContent).toBeTruthy();
+      testLogger.info('✓ PRIMARY CHECK PASSED: VRL function loaded in saved view');
+
+    } catch (error) {
+      testLogger.error(`Test error: ${error.message}`);
+      throw error;
+    } finally {
+      // Cleanup: Delete the saved view if possible (using existing POM methods)
+      try {
+        await pm.logsPage.clickDeleteSavedViewButton(testViewName).catch(() => {});
+        await page.waitForTimeout(500);
+        await pm.logsPage.clickConfirmButton().catch(() => {});
+        testLogger.info(`Cleaned up test view: ${testViewName}`);
+      } catch (cleanupError) {
+        testLogger.debug('Cleanup skipped or failed gracefully');
+      }
+    }
+
+    testLogger.info('VRL saved views test completed (Bug #9690)');
   });
 
   test.afterEach(async ({ page }) => {

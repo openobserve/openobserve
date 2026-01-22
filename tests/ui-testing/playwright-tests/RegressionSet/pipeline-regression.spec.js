@@ -432,4 +432,5 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     testLogger.info('Test passed: Cancel button click handled correctly');
   });
+
 });
