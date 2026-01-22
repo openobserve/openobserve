@@ -18,8 +18,8 @@ class TestMultiStreamSearch:
     STREAM_NAME_2 = "stream_pytest_data"  # Use same stream for multi-stream test
 
     @pytest.fixture(autouse=True)
-    def setup(self, create_session, base_url):
-        """Setup test fixtures."""
+    def setup(self, create_session, base_url, ingest_data):
+        """Setup test fixtures. Depends on ingest_data to ensure stream exists."""
         self.session = create_session
         self.base_url = base_url
         self.session.headers.update({"Content-Type": "application/json"})
