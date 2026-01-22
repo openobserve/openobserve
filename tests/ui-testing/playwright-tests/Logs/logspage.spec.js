@@ -77,11 +77,10 @@ test.describe("Logs Page testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const orgName = process.env.ORGNAME || 'default';
-    const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`);
-    await pm.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    
+    await page.waitForLoadState('networkidle');
+
     testLogger.info('Logs page test setup completed');
   });
 
@@ -681,6 +680,10 @@ test.describe("Logs Page testcases", () => {
 
       // Step 8: Verify VRL function is loaded (using POM)
       testLogger.info('Step 8: Verifying VRL function loaded');
+
+      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
+      await pm.logsPage.clickVrlToggle();
+      await page.waitForTimeout(1000);
 
       // Check if VRL editor has content
       const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
