@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
                         <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />
                         <span class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1">
-                            Try O2 AI to write expressions 
+                            Try O2 Assistant to write expressions 
                         </span>
                         <q-icon size="sm" name="arrow_right_alt" class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1" />
 

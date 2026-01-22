@@ -23,12 +23,19 @@ use crate::meta::{
     stream::{RemoteStreamParams, StreamParams, StreamType},
 };
 
+/// Pipeline source type determines when the pipeline runs.
+/// Use "realtime" for processing data as it arrives, "scheduled" for periodic batch processing.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum PipelineSource {
+    /// Real-time pipeline: processes data immediately as it's ingested.
+    /// Example: { "source_type": "realtime" }
     Realtime(StreamParams),
+    /// Scheduled pipeline: runs periodically based on trigger_condition.
+    /// Example: { "source_type": "scheduled", "org_id": "default", "stream_type": "logs",
+    /// "query_condition": {...}, "trigger_condition": {...} }
     Scheduled(DerivedStream),
 }
 
@@ -82,12 +89,28 @@ impl DerivedStream {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {
+    /// Unique identifier for the node (use UUID format)
     pub id: String,
+    /// Node configuration. Structure depends on node_type:
+    /// - stream: { "node_type": "stream", "org_id": "org", "stream_name": "name", "stream_type":
+    ///   "logs"|"metrics"|"traces" }
+    /// - function: { "node_type": "function", "name": "func_name", "after_flatten": bool }
+    /// - condition: { "node_type": "condition", "conditions": {...} }
+    /// - query: { "node_type": "query", "org_id": "org", "stream_type": "logs", "query_condition":
+    ///   {...}, "trigger_condition": {...} }
+    /// - remote_stream: { "node_type": "remote_stream", "org_id": "org", "destination_name":
+    ///   "dest" }
     #[schema(value_type = Object)]
     pub data: NodeData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
+    /// Visual position for UI rendering
     position: Position,
+    /// Node role in the pipeline. MUST be one of:
+    /// - "input": Source stream node (first node in pipeline)
+    /// - "output": Destination stream node (last node in pipeline)
+    /// - "default": Processing node (function, condition, etc.)
+    #[schema(example = "input")]
     io_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     style: Option<NodeStyle>,
@@ -128,10 +151,15 @@ impl Node {
     }
 }
 
+/// Connection between two nodes in the pipeline
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Edge {
+    /// Edge identifier, format: "e{source_id}-{target_id}"
+    #[schema(example = "einput-1-func-1")]
     pub id: String,
+    /// Source node id (data flows from this node)
     pub source: String,
+    /// Target node id (data flows to this node)
     pub target: String,
 }
 
