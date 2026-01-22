@@ -38,7 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div v-else class="col-7 text-left q-pl-lg warning flex items-center">
-          {{ searchObj.meta.logsVisualizeToggle === 'patterns' ? patternSummaryText : noOfRecordsTitle }}
+          {{
+            searchObj.meta.logsVisualizeToggle === "patterns"
+              ? patternSummaryText
+              : noOfRecordsTitle
+          }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
             <q-spinner-hourglass
               color="primary"
@@ -69,15 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info"
-color="warning" size="sm"> </q-icon>
+            <q-icon name="info" color="warning" size="sm"> </q-icon>
             <q-tooltip position="top" class="tw:text-sm tw:font-semi-bold">
               {{ searchObj.data.histogram.errorMsg }}
             </q-tooltip>
           </div>
           <!-- Volume Analysis Button -->
           <q-btn
-            v-if="searchObj.data?.queryResults?.hits?.length > 0 && !searchObj.meta.sqlMode"
+            v-if="
+              searchObj.data?.queryResults?.hits?.length > 0 &&
+              !searchObj.meta.sqlMode
+            "
             outline
             no-caps
             dense
@@ -90,7 +96,7 @@ color="warning" size="sm"> </q-icon>
             data-test="logs-analyze-dimensions-button"
           >
             <q-tooltip>
-              {{ t('volumeInsights.analyzeTooltipLogs') }}
+              {{ t("volumeInsights.analyzeTooltipLogs") }}
             </q-tooltip>
           </q-btn>
         </div>
@@ -184,8 +190,7 @@ color="warning" size="sm"> </q-icon>
         >
           <h6 class="text-center">
             <span class="histogram-empty__message">
-              <q-icon name="warning"
-color="warning" size="xs"></q-icon> No data
+              <q-icon name="warning" color="warning" size="xs"></q-icon> No data
               found for histogram.</span
             >
           </h6>
@@ -198,8 +203,7 @@ color="warning" size="xs"></q-icon> No data
           "
         >
           <h5 class="text-center">
-            <span class="histogram-empty__message"
-style="color: transparent"
+            <span class="histogram-empty__message" style="color: transparent"
               >.</span
             >
           </h5>
@@ -233,8 +237,7 @@ style="color: transparent"
             searchObj.data.histogram.errorCode != -1
           "
         >
-          <q-icon name="warning"
-color="warning" size="xs"></q-icon> Error while
+          <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -386,7 +389,9 @@ color="warning" size="xs"></q-icon> Error while
         :streamName="searchObj.data.stream.selectedStream[0]"
         streamType="logs"
         :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
-        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
+        :rateFilter="
+          hasHistogramSelection ? histogramSelectionRange : undefined
+        "
         :baseFilter="searchObj.data.editorValue"
         :streamFields="
           searchObj.data.stream.userDefinedSchema?.length > 0
@@ -497,7 +502,9 @@ export default defineComponent({
     formatPatternSummary(stats: any, totalEvents: number, histogramMs: number) {
       const patternsFound = stats?.total_patterns_found || 0;
       const logsAnalyzed = (stats?.total_logs_analyzed || 0).toLocaleString();
-      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+      const totalEventsStr = totalEvents
+        ? totalEvents.toLocaleString()
+        : logsAnalyzed;
 
       // Combine histogram time + pattern extraction time
       const patternMs = stats?.extraction_time_ms || 0;
@@ -507,7 +514,7 @@ export default defineComponent({
         totalEvents: totalEventsStr,
         patternsFound: patternsFound,
         logsAnalyzed: logsAnalyzed,
-        totalTime: totalTimeMs
+        totalTime: totalTimeMs,
       });
     },
     handleColumnSizesUpdate(newColSizes: any) {
@@ -543,7 +550,11 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
-          this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
+          this.searchObj.data.stream.selectedFields = selectedFields.filter(
+            (_field) =>
+              _field !==
+              (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+          );
           this.updatedLocalLogFilterField();
         }
       }
@@ -633,7 +644,11 @@ export default defineComponent({
 
       selectedFields.splice(SFIndex, 1);
 
-      this.searchObj.data.stream.selectedFields = selectedFields.filter((_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || '_timestamp'));
+      this.searchObj.data.stream.selectedFields = selectedFields.filter(
+        (_field) =>
+          _field !==
+          (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+      );
 
       this.searchObj.organizationIdentifier =
         this.store.state.selectedOrganization.identifier;
@@ -648,10 +663,17 @@ export default defineComponent({
           startTime: this.searchObj.data.datetime.startTime,
           endTime: this.searchObj.data.datetime.endTime,
         };
-        console.log('[Logs Volume Analysis] Stored original time range before selection:', {
-          start: new Date(this.originalTimeRangeBeforeSelection.startTime / 1000).toISOString(),
-          end: new Date(this.originalTimeRangeBeforeSelection.endTime / 1000).toISOString(),
-        });
+        console.log(
+          "[Logs Volume Analysis] Stored original time range before selection:",
+          {
+            start: new Date(
+              this.originalTimeRangeBeforeSelection.startTime / 1000,
+            ).toISOString(),
+            end: new Date(
+              this.originalTimeRangeBeforeSelection.endTime / 1000,
+            ).toISOString(),
+          },
+        );
       }
 
       this.$emit("update:datetime", { start, end });
@@ -661,21 +683,28 @@ export default defineComponent({
       if (start && end) {
         this.hasHistogramSelection = true;
         this.histogramSelectionRange = {
-          start: -1,  // Placeholder to indicate time-based selection (not Y-axis)
-          end: -1,    // Placeholder to indicate time-based selection (not Y-axis)
-          timeStart: start * 1000,  // Convert ms to microseconds
-          timeEnd: end * 1000       // Convert ms to microseconds
+          start: -1, // Placeholder to indicate time-based selection (not Y-axis)
+          end: -1, // Placeholder to indicate time-based selection (not Y-axis)
+          timeStart: start * 1000, // Convert ms to microseconds
+          timeEnd: end * 1000, // Convert ms to microseconds
         };
-        console.log('[Logs Volume Analysis] Histogram selection range:', {
+        console.log("[Logs Volume Analysis] Histogram selection range:", {
           timeStart: new Date(start).toISOString(),
           timeEnd: new Date(end).toISOString(),
           timeStartMicros: start * 1000,
           timeEndMicros: end * 1000,
         });
       } else {
-        console.log('[Logs Volume Analysis] Histogram selection cleared (zoom reset)');
+        console.log(
+          "[Logs Volume Analysis] Histogram selection cleared (zoom reset)",
+        );
         this.hasHistogramSelection = false;
-        this.histogramSelectionRange = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+        this.histogramSelectionRange = {
+          start: 0,
+          end: 0,
+          timeStart: undefined,
+          timeEnd: undefined,
+        };
         // Reset original time range when selection is cleared
         this.originalTimeRangeBeforeSelection = null;
       }
@@ -725,8 +754,16 @@ export default defineComponent({
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
-    const histogramSelectionRange = ref({ start: 0, end: 0, timeStart: undefined, timeEnd: undefined });
-    const originalTimeRangeBeforeSelection = ref<{ startTime: number; endTime: number } | null>(null);
+    const histogramSelectionRange = ref({
+      start: 0,
+      end: 0,
+      timeStart: undefined,
+      timeEnd: undefined,
+    });
+    const originalTimeRangeBeforeSelection = ref<{
+      startTime: number;
+      endTime: number;
+    } | null>(null);
 
     const searchTableRef: any = ref(null);
 
@@ -741,12 +778,15 @@ export default defineComponent({
 
     // Debug: computed to check why dialog isn't showing
     const shouldShowInlineDialog = computed(() => {
-      const result = showCorrelation.value && correlationDashboardProps.value && !searchObj.meta.showDetailTab;
+      const result =
+        showCorrelation.value &&
+        correlationDashboardProps.value &&
+        !searchObj.meta.showDetailTab;
       console.log("[SearchResult] shouldShowInlineDialog:", {
         showCorrelation: showCorrelation.value,
         hasProps: !!correlationDashboardProps.value,
         showDetailTab: searchObj.meta.showDetailTab,
-        result
+        result,
       });
       return result;
     });
@@ -814,7 +854,8 @@ export default defineComponent({
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
       const currentMode = store.state.theme === "dark" ? "dark" : "light";
-      const appliedThemeKey = currentMode === "light" ? "appliedLightTheme" : "appliedDarkTheme";
+      const appliedThemeKey =
+        currentMode === "light" ? "appliedLightTheme" : "appliedDarkTheme";
       const appliedTheme = localStorage.getItem(appliedThemeKey);
 
       // If -1, user is picking custom color - debounce to avoid performance issues
@@ -831,12 +872,12 @@ export default defineComponent({
     onMounted(() => {
       reDrawChart();
       // Listen for theme color changes
-      window.addEventListener('themeColorChanged', handleThemeColorChange);
+      window.addEventListener("themeColorChanged", handleThemeColorChange);
     });
 
     onBeforeUnmount(() => {
       // Remove event listener to prevent memory leaks
-      window.removeEventListener('themeColorChanged', handleThemeColorChange);
+      window.removeEventListener("themeColorChanged", handleThemeColorChange);
       // Clear any pending debounce timer
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -889,11 +930,17 @@ export default defineComponent({
     };
 
     const openLogDetailsWithCorrelation = (row: any) => {
-      console.log("[SearchResult] openLogDetailsWithCorrelation called with row:", row);
+      console.log(
+        "[SearchResult] openLogDetailsWithCorrelation called with row:",
+        row,
+      );
 
       // If sidebar is already open, we already know the index
       if (searchObj.meta.showDetailTab) {
-        console.log("[SearchResult] Sidebar already open, using current index:", searchObj.meta.resultGrid.navigation.currentRowIndex);
+        console.log(
+          "[SearchResult] Sidebar already open, using current index:",
+          searchObj.meta.resultGrid.navigation.currentRowIndex,
+        );
         // Just set the tab and load correlation data
         detailTableInitialTab.value = "correlated-logs";
         openCorrelationFromLog(row);
@@ -901,16 +948,20 @@ export default defineComponent({
       }
 
       // Find the index of this row in the hits array by comparing timestamp
-      const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
+      const timestampColumn =
+        store.state.zoConfig?.timestamp_column || "_timestamp";
       const index = searchObj.data.queryResults?.hits?.findIndex(
-        (hit: any) => hit[timestampColumn] === row[timestampColumn]
+        (hit: any) => hit[timestampColumn] === row[timestampColumn],
       );
 
       if (index === -1 || index === undefined) {
-        console.error("[SearchResult] Could not find row index for correlation", {
-          rowTimestamp: row[timestampColumn],
-          hitsCount: searchObj.data.queryResults?.hits?.length,
-        });
+        console.error(
+          "[SearchResult] Could not find row index for correlation",
+          {
+            rowTimestamp: row[timestampColumn],
+            hitsCount: searchObj.data.queryResults?.hits?.length,
+          },
+        );
         return;
       }
 
@@ -932,8 +983,14 @@ export default defineComponent({
     };
 
     const openCorrelationFromLog = async (logData: any) => {
-      console.log("[SearchResult] openCorrelationFromLog called with logData:", logData);
-      console.log("[SearchResult] Current stream:", searchObj.data.stream.selectedStream[0]);
+      console.log(
+        "[SearchResult] openCorrelationFromLog called with logData:",
+        logData,
+      );
+      console.log(
+        "[SearchResult] Current stream:",
+        searchObj.data.stream.selectedStream[0],
+      );
 
       try {
         correlationLoading.value = true;
@@ -953,7 +1010,7 @@ export default defineComponent({
           context,
           "logs",
           5, // 5 minute time window
-          searchObj.data.stream.selectedStream[0]
+          searchObj.data.stream.selectedStream[0],
         );
 
         console.log("[SearchResult] findRelatedTelemetry result:", result);
@@ -989,7 +1046,9 @@ export default defineComponent({
 
         // Check if there are any metric streams
         if (result.correlationData.related_streams.metrics.length === 0) {
-          console.warn("[SearchResult] No metric streams found for correlation");
+          console.warn(
+            "[SearchResult] No metric streams found for correlation",
+          );
           correlationError.value = `No metric streams found for service "${result.correlationData.service_name}"`;
           $q.notify({
             type: "info",
@@ -1013,8 +1072,12 @@ export default defineComponent({
         }
 
         // Check if there are any metrics to show
-        if (!result.correlationData.related_streams.metrics || result.correlationData.related_streams.metrics.length === 0) {
-          correlationError.value = "No correlated metrics found for this service";
+        if (
+          !result.correlationData.related_streams.metrics ||
+          result.correlationData.related_streams.metrics.length === 0
+        ) {
+          correlationError.value =
+            "No correlated metrics found for this service";
           $q.notify({
             type: "info",
             message: "No correlated metrics found for this service",
@@ -1024,14 +1087,16 @@ export default defineComponent({
         }
 
         // Extract FTS fields from stream settings
-        const ftsFields = searchObj.data.stream.selectedStreamFields
-          ?.filter((field: any) => field.ftsKey === true)
-          .map((field: any) => field.name) || [];
+        const ftsFields =
+          searchObj.data.stream.selectedStreamFields
+            ?.filter((field: any) => field.ftsKey === true)
+            .map((field: any) => field.name) || [];
 
         correlationDashboardProps.value = {
           serviceName: result.correlationData.service_name,
           matchedDimensions: result.correlationData.matched_dimensions,
-          additionalDimensions: result.correlationData.additional_dimensions || {},
+          additionalDimensions:
+            result.correlationData.additional_dimensions || {},
           metricStreams: result.correlationData.related_streams.metrics,
           logStreams: result.correlationData.related_streams.logs || [],
           traceStreams: result.correlationData.related_streams.traces || [],
@@ -1047,12 +1112,19 @@ export default defineComponent({
 
         // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
-        console.log("[SearchResult] showDetailTab:", searchObj.meta.showDetailTab);
+        console.log(
+          "[SearchResult] showDetailTab:",
+          searchObj.meta.showDetailTab,
+        );
         if (!searchObj.meta.showDetailTab) {
-          console.log("[SearchResult] Opening correlation dialog for inline expansion");
+          console.log(
+            "[SearchResult] Opening correlation dialog for inline expansion",
+          );
           showCorrelation.value = true;
         } else {
-          console.log("[SearchResult] DetailTable drawer is open, passing props to drawer tabs");
+          console.log(
+            "[SearchResult] DetailTable drawer is open, passing props to drawer tabs",
+          );
         }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
@@ -1146,12 +1218,12 @@ export default defineComponent({
         // Escape special characters for match_all query
         // Order matters: backslash must be escaped first
         const escapedConstant = constant
-          .replace(/\\/g, "\\\\")  // Escape backslashes
-          .replace(/'/g, "\\'")     // Escape single quotes
-          .replace(/"/g, '\\"')     // Escape double quotes
-          .replace(/\n/g, "\\n")    // Escape newlines
-          .replace(/\r/g, "\\r")    // Escape carriage returns
-          .replace(/\t/g, "\\t");   // Escape tabs
+          .replace(/\\/g, "\\\\") // Escape backslashes
+          .replace(/'/g, "\\'") // Escape single quotes
+          .replace(/"/g, '\\"') // Escape double quotes
+          .replace(/\n/g, "\\n") // Escape newlines
+          .replace(/\r/g, "\\r") // Escape carriage returns
+          .replace(/\t/g, "\\t"); // Escape tabs
         return `match_all('${escapedConstant}')`;
       });
 
@@ -1227,7 +1299,9 @@ export default defineComponent({
           searchObj.data.stream.selectedFields.filter(
             (v: any) => v !== fieldName,
           );
-      } else if(fieldName !== (store?.state?.zoConfig?.timestamp_column || '_timestamp')) {
+      } else if (
+        fieldName !== (store?.state?.zoConfig?.timestamp_column || "_timestamp")
+      ) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
       searchObj.organizationIdentifier =
@@ -1351,9 +1425,16 @@ export default defineComponent({
         searchObj.meta.resetPlotChart = false;
 
         // Clear histogram selection when chart is reset
-        console.log('[Logs Volume Analysis] Chart reset, clearing histogram selection');
+        console.log(
+          "[Logs Volume Analysis] Chart reset, clearing histogram selection",
+        );
         hasHistogramSelection.value = false;
-        histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+        histogramSelectionRange.value = {
+          start: 0,
+          end: 0,
+          timeStart: undefined,
+          timeEnd: undefined,
+        };
         originalTimeRangeBeforeSelection.value = null;
       }
     });
@@ -1378,12 +1459,14 @@ export default defineComponent({
       (isOpen, wasOpen) => {
         // When sidebar closes, clear correlation data
         if (wasOpen && !isOpen) {
-          console.log("[SearchResult] Sidebar closed, clearing correlation data");
+          console.log(
+            "[SearchResult] Sidebar closed, clearing correlation data",
+          );
           correlationDashboardProps.value = null;
           correlationLoading.value = false;
           correlationError.value = null;
         }
-      }
+      },
     );
 
     // Watch for datetime changes from outside (datetime picker, search button, etc.)
@@ -1406,17 +1489,28 @@ export default defineComponent({
         const isFromBrushSelection =
           histogramStartTime &&
           histogramEndTime &&
-          Math.abs((newTime.start / 1000) - histogramStartTime) < 1000 && // Within 1 second
-          Math.abs((newTime.end / 1000) - histogramEndTime) < 1000;
+          Math.abs(newTime.start / 1000 - histogramStartTime) < 1000 && // Within 1 second
+          Math.abs(newTime.end / 1000 - histogramEndTime) < 1000;
 
-        if (!isFromBrushSelection && oldTime && (newTime.start !== oldTime.start || newTime.end !== oldTime.end)) {
-          console.log('[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection');
+        if (
+          !isFromBrushSelection &&
+          oldTime &&
+          (newTime.start !== oldTime.start || newTime.end !== oldTime.end)
+        ) {
+          console.log(
+            "[Logs Volume Analysis] Datetime changed from outside, clearing histogram selection",
+          );
           hasHistogramSelection.value = false;
-          histogramSelectionRange.value = { start: 0, end: 0, timeStart: undefined, timeEnd: undefined };
+          histogramSelectionRange.value = {
+            start: 0,
+            end: 0,
+            timeStart: undefined,
+            timeEnd: undefined,
+          };
           originalTimeRangeBeforeSelection.value = null;
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     const selectedStreamFullTextSearchKeys = computed(() => {
@@ -1520,10 +1614,15 @@ export default defineComponent({
     },
     volumeAnalysisTimeRange() {
       // Use histogram selection if available, otherwise use current time range
-      const hasSelection = this.histogramSelectionRange.start && this.histogramSelectionRange.end;
+      const hasSelection =
+        this.histogramSelectionRange.start && this.histogramSelectionRange.end;
       return {
-        startTime: hasSelection ? this.histogramSelectionRange.start : this.searchObj.data.datetime.startTime,
-        endTime: hasSelection ? this.histogramSelectionRange.end : this.searchObj.data.datetime.endTime,
+        startTime: hasSelection
+          ? this.histogramSelectionRange.start
+          : this.searchObj.data.datetime.startTime,
+        endTime: hasSelection
+          ? this.histogramSelectionRange.end
+          : this.searchObj.data.datetime.endTime,
       };
     },
   },
@@ -1541,13 +1640,16 @@ export default defineComponent({
       if (this.patternsState?.patterns?.statistics) {
         // Reuse the same summary logic from PatternStatistics component
         const stats = this.patternsState.patterns.statistics;
-        const totalEvents = this.searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
+        const totalEvents =
+          this.searchObj.data.queryResults?.total ||
+          stats.total_logs_analyzed ||
+          0;
         const histogramMs = this.searchObj.data.queryResults?.took || 0;
-        
+
         this.patternSummaryText = this.formatPatternSummary(
           stats,
           totalEvents,
-          histogramMs
+          histogramMs,
         );
       }
     },

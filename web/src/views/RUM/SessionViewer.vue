@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :event="selectedEvent"
       :raw-event="selectedRawEvent"
       :session-id="sessionId"
+      :session-details="sessionDetails"
     />
   </div>
 </template>

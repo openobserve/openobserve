@@ -49,11 +49,15 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const frustrationConfig: Record<string, { label: string; class: string; tooltip: string; icon?: string }> = {
+const frustrationConfig: Record<
+  string,
+  { label: string; class: string; tooltip: string; icon?: string }
+> = {
   rage_click: {
     label: "Rage Click",
     class: "frustration-badge-rage",
-    tooltip: "User clicked rapidly multiple times (3+) - indicating frustration",
+    tooltip:
+      "User clicked rapidly multiple times (3+) - indicating frustration",
   },
   dead_click: {
     label: "Dead Click",
@@ -100,7 +104,7 @@ const getTooltipText = (type: string) => {
 .frustration-event-badge {
   font-weight: 600;
   font-size: 0.65rem;
-  padding: 0.125rem 0.375rem;
+  padding: 0.25rem 0.375rem;
   border-radius: 0.25rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;

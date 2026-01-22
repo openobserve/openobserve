@@ -15,143 +15,183 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-drawer
+  <q-dialog
     v-model="isOpen"
-    side="right"
-    overlay
-    elevated
-    :width="600"
-    class="event-detail-drawer"
+    position="right"
+    full-height
+    maximized
+    @hide="closeDrawer"
   >
-    <div class="tw:h-full tw:flex tw:flex-col">
+    <q-card class="column full-height no-wrap tw:w-[70vw]!">
       <!-- Header -->
-      <div
-        class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-      >
-        <div class="flex justify-between items-center">
-          <div class="text-bold text-h6">Event Details</div>
-          <q-btn
-            flat
-            dense
-            round
-            icon="close"
-            @click="closeDrawer"
-            class="hover:tw:text-[var(--o2-primary-btn-bg)]"
-          />
+      <q-card-section class="tw:px-2 tw:py-[0.625rem]!">
+        <div class="row items-center no-wrap">
+          <div class="col">
+            <!-- Event Header -->
+            <div>
+              <div class="row items-center justify-between tw:mb-[0.625rem]">
+                <div
+                  class="row items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
+                >
+                  <div
+                    class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+                    :class="getEventTypeClass(event.type)"
+                  >
+                    {{ event.type }}
+                  </div>
+
+                  <template
+                    v-if="
+                      event.frustration_types &&
+                      event.frustration_types.length > 0
+                    "
+                  >
+                    <FrustrationEventBadge
+                      :frustration-types="event.frustration_types"
+                      class="q-mr-xs inline"
+                    />
+                  </template>
+                  <div
+                    class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-[calc(100%-12rem)]"
+                    :title="event.name"
+                  >
+                    {{ event.name }}
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <q-btn
+                    v-close-popup="true"
+                    round
+                    flat
+                    dense
+                    size="sm"
+                    icon="cancel"
+                  />
+                </div>
+              </div>
+              <div
+                data-test="event-session-meta-data"
+                class="row items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
+              >
+                <div class="text-caption ellipsis tw:flex tw:items-center">
+                  <q-icon name="language" size="0.75rem" class="q-pr-xs" />
+                  {{ sessionDetails.ip }}
+                </div>
+                <div class="text-caption tw:flex tw:items-center">
+                  <q-icon :name="outlinedCode" size="1rem" class="q-pr-xs" />
+                  {{ rawEvent.service || "Unknown User" }}
+                </div>
+                <div class="text-caption tw:flex tw:items-center">
+                  V {{ rawEvent.version || "Unknown User" }}
+                </div>
+                <div class="text-caption tw:flex tw:items-center">
+                  <q-icon name="mail" size="0.75rem" class="q-pr-xs" />
+                  {{ sessionDetails.user_email || "Unknown User" }}
+                </div>
+                <div class="text-caption ellipsis tw:flex tw:items-center">
+                  <q-icon name="settings" size="0.75rem" class="q-pr-xs" />
+                  {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+                </div>
+                <div class="text-caption ellipsis tw:flex tw:items-center">
+                  <q-icon name="location_on" size="0.75rem" class="q-pr-xs" />
+                  {{ sessionDetails.city }}, {{ sessionDetails.country }}
+                </div>
+                <div class="text-caption ellipsis tw:flex tw:items-center">
+                  <q-icon name="schedule" size="0.75rem" class="q-pr-xs" />
+                  {{ sessionDetails.date }}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- Content -->
-      <div class="tw:flex-1 tw:overflow-y-auto tw:p-[0.625rem]">
-        <template v-if="event && Object.keys(event).length">
-          <!-- Event Header -->
-          <div class="q-mb-md">
-            <div class="row items-center q-mb-sm">
+      </q-card-section>
+      <template
+        v-if="event && Object.keys(event).length && rawEvent.action_type"
+      >
+        <q-separator class="tw:my-2" />
+        <q-card-section
+          class="tw:px-2 tw:py-[0.5rem]! tw-flex-1 tw:overflow-y-auto"
+        >
+          <div v-if="event.type === 'action'" class="tw:mb-3">
+            <div class="tw:font-bold tw:mb-1 tw:text-sm">Action Details</div>
+            <div>
               <div
-                class="event-type-badge q-mr-sm q-px-sm q-py-xs tw:rounded"
-                :class="getEventTypeClass(event.type)"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
               >
-                {{ event.type }}
-              </div>
-              <div class="text-bold text-subtitle1">
-                {{ event.name }}
-              </div>
-            </div>
-            <div class="row items-center q-gutter-sm text-grey-7">
-              <div class="row items-center">
-                <q-icon name="access_time" size="sm" class="q-mr-xs" />
-                <span>{{ event.displayTime }}</span>
-              </div>
-              <q-separator vertical />
-              <div class="row items-center">
-                <q-icon name="schedule" size="sm" class="q-mr-xs" />
-                <span>{{ formatTimestamp(event.timestamp) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <q-separator class="q-my-md" />
-
-          <!-- Frustration Signals (for actions) -->
-          <div
-            v-if="event.frustration_types && event.frustration_types.length > 0"
-            class="q-mb-md"
-          >
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">
-              Frustration Signals
-            </div>
-            <div
-              class="frustration-signals q-pa-md tw:bg-[var(--o2-hover-accent)] tw:rounded"
-            >
-              <div
-                v-for="(frustrationType, index) in event.frustration_types"
-                :key="index"
-                class="row items-center q-mb-xs"
-              >
-                <q-icon
-                  name="sentiment_very_dissatisfied"
-                  size="sm"
-                  class="q-mr-sm"
-                  style="color: #fb923c"
-                />
-                <span class="text-capitalize" style="color: #fb923c">{{
-                  frustrationType.replace("_", " ")
-                }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Action Details with Resource Linking -->
-          <div v-if="event.type === 'action'" class="q-mb-md">
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">
-              Action Details
-            </div>
-            <div class="action-details-grid">
-              <div class="info-row">
-                <div class="info-label">Action Type:</div>
-                <div class="info-value text-capitalize">
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Action Type:
+                </div>
+                <div class="tw:flex-1 text-capitalize tw:break-words">
                   {{ rawEvent?.action_type || "N/A" }}
                 </div>
               </div>
-              <div class="info-row">
-                <div class="info-label">Target:</div>
-                <div class="info-value">
+              <div
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Target:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
                   {{ rawEvent?.action_target_name || "N/A" }}
                 </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.action_id">
-                <div class="info-label">Action ID:</div>
-                <div class="info-value">
-                  <code class="event-id-text">{{
-                    formatId(rawEvent.action_id)
-                  }}</code>
+              <div
+                v-if="rawEvent?.action_id"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Action ID:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
+                  <code
+                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+                  >
+                    {{ formatId(rawEvent.action_id) }}
+                  </code>
                 </div>
               </div>
             </div>
-
+          </div>
+        </q-card-section>
+      </template>
+      <q-separator class="tw:my-2" />
+      <!-- Content -->
+      <q-card-section
+        class="tw:px-2 tw:py-[0.5rem]! tw-flex-1 tw:overflow-y-auto"
+      >
+        <template v-if="event && Object.keys(event).length">
+          <!-- Action Details with Resource Linking -->
+          <div v-if="event.type === 'action'" class="tw:mb-3">
             <!-- Related Events Section -->
             <template v-if="isLoadingRelatedResources">
-              <div class="q-mt-md q-pa-md text-center">
-                <q-spinner-hourglass color="primary" size="1.5rem" />
-                <div class="q-mt-sm text-grey-7">Loading related events...</div>
+              <div class="tw:mt-2 tw:p-2 text-center">
+                <q-spinner-hourglass color="primary" size="1rem" />
+                <div class="tw:mt-1 text-grey-7 tw:text-xs">
+                  Loading related events...
+                </div>
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
-              <q-separator class="q-my-md" />
-              <div class="tags-title text-bold q-ml-xs q-mb-sm">
+              <div class="tw:font-bold tw:mb-1 tw:text-sm">
                 Related Events ({{ relatedResources.length }})
               </div>
-              <div class="related-resources-list">
+              <div>
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="resource-item q-pa-sm q-mb-xs tw:bg-[var(--o2-hover-accent)] tw:rounded cursor-pointer hover:tw:bg-[#e0e0e0]"
+                  class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer hover:tw:bg-[#e0e0e0] tw:transition-colors"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
-                  <div class="row items-center q-mb-xs">
+                  <div class="row items-center tw:mb-0.5">
                     <div
-                      class="event-type-badge-small q-mr-xs q-px-xs q-py-xxs tw:rounded"
+                      class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -159,58 +199,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span class="resource-method q-mr-xs text-bold">{{
-                        item.resource_method || "GET"
-                      }}</span>
-                      <span class="resource-url ellipsis">{{
-                        item.resource_url
-                      }}</span>
+                      <span
+                        class="tw:mr-1 text-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
+                      >
+                        {{ item.resource_method || "GET" }}
+                      </span>
+                      <span
+                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
+                      >
+                        {{ item.resource_url }}
+                      </span>
                     </template>
 
                     <!-- Error -->
                     <template v-else-if="item.type === 'error'">
-                      <span class="ellipsis">{{
-                        item.error_message || item.error_type
-                      }}</span>
+                      <span
+                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
+                      >
+                        {{ item.error_message || item.error_type }}
+                      </span>
                     </template>
 
                     <!-- View -->
                     <template v-else-if="item.type === 'view'">
-                      <span class="ellipsis">{{ item.view_url }}</span>
+                      <span
+                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
+                      >
+                        {{ item.view_url }}
+                      </span>
                     </template>
 
                     <!-- Action -->
                     <template v-else-if="item.type === 'action'">
-                      <span class="ellipsis"
-                        >{{ item.action_type }} on
-                        {{ item.action_target_name }}</span
+                      <span
+                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
                       >
+                        {{ item.action_type }} on {{ item.action_target_name }}
+                      </span>
                     </template>
 
                     <!-- Other -->
                     <template v-else>
-                      <span class="ellipsis">{{ item.type }} event</span>
+                      <span
+                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
+                      >
+                        {{ item.type }} event
+                      </span>
                     </template>
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="row items-center text-caption text-grey-7">
-                    <q-icon name="schedule" size="xs" class="q-mr-xs" />
-                    <span class="q-mr-md">{{
+                  <div class="row items-center text-grey-7 tw:text-[10px]">
+                    <q-icon name="schedule" size="xs" class="tw:mr-1" />
+                    <span class="tw:mr-2">{{
                       formatTimestamp(item.date)
                     }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <q-icon name="access_time" size="xs" class="q-mr-xs" />
-                      <span class="q-mr-md">{{
+                      <q-icon name="access_time" size="xs" class="tw:mr-0.5" />
+                      <span class="tw:mr-2">{{
                         formatDuration(item.resource_duration)
                       }}</span>
                       <q-icon
                         :name="getStatusIcon(item.resource_status_code)"
                         :color="getStatusColor(item.resource_status_code)"
                         size="xs"
-                        class="q-mr-xs"
+                        class="tw:mr-0.5"
                       />
                       <span>{{ item.resource_status_code }}</span>
                     </template>
@@ -218,17 +273,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Clickable Trace Button -->
                     <q-btn
                       v-if="item._oo_trace_id"
-                      flat
                       dense
-                      round
                       :icon="outlinedAccountTree"
                       size="xs"
-                      color="info"
-                      class="q-ml-md"
+                      outline
+                      class="tw:ml-[0.625rem]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
                       title="View trace details"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
-                    />
-                    <span v-if="item._oo_trace_id">Trace</span>
+                    >
+                      <span
+                        v-if="item._oo_trace_id"
+                        class="tw:text-[10px] tw:pl-[0.2rem] tw:text-[var(--o2-theme-primary)]"
+                      >
+                        Trace
+                      </span>
+                    </q-btn>
                   </div>
                 </div>
               </div>
@@ -236,24 +295,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error Details -->
-          <div v-if="event.type === 'error'" class="q-mb-md">
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">
-              Error Details
-            </div>
-            <div class="error-details-grid">
-              <div class="info-row" v-if="rawEvent?.error_type">
-                <div class="info-label">Error Type:</div>
-                <div class="info-value">{{ rawEvent.error_type }}</div>
+          <div v-if="event.type === 'error'" class="tw:mb-3">
+            <div class="tw:font-bold tw:mb-1 tw:text-sm">Error Details</div>
+            <div>
+              <div
+                v-if="rawEvent?.error_type"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Error Type:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
+                  {{ rawEvent.error_type }}
+                </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.error_message">
-                <div class="info-label">Message:</div>
-                <div class="info-value">{{ rawEvent.error_message }}</div>
+              <div
+                v-if="rawEvent?.error_message"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Message:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
+                  {{ rawEvent.error_message }}
+                </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.error_handling">
-                <div class="info-label">Handling:</div>
-                <div class="info-value">
+              <div
+                v-if="rawEvent?.error_handling"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Handling:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
                   <span
-                    class="q-px-xs tw:rounded"
+                    class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px]"
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-red-6 tw:border tw:border-solid tw:border-red-6'
@@ -264,39 +346,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.error_id">
-                <div class="info-label">Error ID:</div>
-                <div class="info-value">
-                  <code class="event-id-text">{{
-                    formatId(rawEvent.error_id)
-                  }}</code>
+              <div
+                v-if="rawEvent?.error_id"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Error ID:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
+                  <code
+                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+                  >
+                    {{ formatId(rawEvent.error_id) }}
+                  </code>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- View Details -->
-          <div v-if="event.type === 'view'" class="q-mb-md">
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">View Details</div>
-            <div class="view-details-grid">
-              <div class="info-row" v-if="rawEvent?.view_loading_type">
-                <div class="info-label">Loading Type:</div>
-                <div class="info-value text-capitalize">
+          <div v-if="event.type === 'view'" class="tw:mb-3">
+            <div class="tw:font-bold tw:mb-1 tw:text-sm">View Details</div>
+            <div>
+              <div
+                v-if="rawEvent?.view_loading_type"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  Loading Type:
+                </div>
+                <div class="tw:flex-1 text-capitalize tw:break-words">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.view_url">
-                <div class="info-label">URL:</div>
-                <div class="info-value ellipsis" :title="rawEvent.view_url">
+              <div
+                v-if="rawEvent?.view_url"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  URL:
+                </div>
+                <div
+                  class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+                  :title="rawEvent.view_url"
+                >
                   {{ rawEvent.view_url }}
                 </div>
               </div>
-              <div class="info-row" v-if="rawEvent?.view_id">
-                <div class="info-label">View ID:</div>
-                <div class="info-value">
-                  <code class="event-id-text">{{
-                    formatId(rawEvent.view_id)
-                  }}</code>
+              <div
+                v-if="rawEvent?.view_id"
+                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
+              >
+                <div
+                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
+                >
+                  View ID:
+                </div>
+                <div class="tw:flex-1 tw:break-words">
+                  <code
+                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+                  >
+                    {{ formatId(rawEvent.view_id) }}
+                  </code>
                 </div>
               </div>
             </div>
@@ -304,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Trace Correlation (if trace_id exists in related resource) -->
           <template v-if="selectedResourceWithTrace">
-            <q-separator class="q-my-md" />
+            <q-separator class="tw:my-2" />
             <TraceCorrelationCard
               :trace-id="selectedResourceWithTrace._oo_trace_id"
               :span-id="selectedResourceWithTrace._oo_trace_id"
@@ -314,24 +431,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- Raw Event Data (Collapsible) -->
-          <q-separator class="q-my-md" />
-          <div class="q-mb-md">
-            <q-expansion-item
-              label="Raw Event Data"
-              icon="code"
-              header-class="text-bold"
-            >
-              <div class="q-pa-md tw:bg-[var(--o2-hover-accent)] tw:rounded">
-                <pre class="event-raw-data">{{
-                  JSON.stringify(rawEvent, null, 2)
-                }}</pre>
-              </div>
-            </q-expansion-item>
-          </div>
         </template>
-      </div>
-    </div>
-  </q-drawer>
+      </q-card-section>
+
+      <q-separator class="tw:my-2" />
+      <q-card-section
+        class="tw:px-2 tw:py-[0.5rem]! tw-flex-1 tw:overflow-y-auto"
+      >
+        <div class="tw:mb-2">
+          <q-expansion-item
+            label="Raw Event Data"
+            header-class="text-bold tw:text-sm"
+            dense
+          >
+            <div class="tw:p-2 tw:bg-[var(--o2-hover-accent)] tw:rounded">
+              <pre
+                class="tw:text-[10px] tw:font-mono tw:m-0 tw:whitespace-pre-wrap tw:break-words tw:leading-tight"
+              >
+                  {{ JSON.stringify(rawEvent, null, 2) }}
+                </pre
+              >
+            </div>
+          </q-expansion-item>
+        </div>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -341,7 +466,11 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedAccountTree,
+  outlinedCode,
+} from "@quasar/extras/material-icons-outlined";
+import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 
 const props = defineProps({
   modelValue: {
@@ -359,6 +488,18 @@ const props = defineProps({
   sessionId: {
     type: String,
     default: "",
+  },
+  sessionDetails: {
+    type: Object,
+    default: () => ({
+      user_email: "",
+      date: "",
+      browser: "",
+      os: "",
+      ip: "",
+      city: "",
+      country: "",
+    }),
   },
 });
 
@@ -579,93 +720,4 @@ defineExpose({
 });
 </script>
 
-<style lang="scss" scoped>
-.event-detail-drawer {
-  .tags-title {
-    font-size: 1rem;
-    color: var(--o2-text-color);
-  }
-
-  .event-type-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .event-type-badge-small {
-    font-size: 0.625rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .action-details-grid,
-  .error-details-grid,
-  .view-details-grid {
-    .info-row {
-      display: flex;
-      padding: 0.5rem 0.75rem;
-      border-bottom: 1px solid var(--o2-border-color);
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .info-label {
-        width: 150px;
-        color: var(--o2-text-secondary);
-        font-weight: 500;
-      }
-
-      .info-value {
-        flex: 1;
-        color: var(--o2-text-color);
-        word-break: break-word;
-      }
-    }
-  }
-
-  .event-id-text {
-    font-family: monospace;
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    background-color: var(--o2-hover-accent);
-    border-radius: 4px;
-    color: var(--o2-text-color);
-  }
-
-  .frustration-signals {
-    font-size: 0.875rem;
-  }
-
-  .related-resources-list {
-    .resource-item {
-      transition: background-color 0.2s ease;
-
-      .resource-method {
-        font-size: 0.75rem;
-        color: var(--o2-primary-btn-bg);
-      }
-
-      .resource-url {
-        font-size: 0.875rem;
-        color: var(--o2-text-color);
-      }
-    }
-  }
-
-  .event-raw-data {
-    font-size: 0.75rem;
-    font-family: monospace;
-    color: var(--o2-text-color);
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .ellipsis {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-</style>
+<style lang="scss" scoped></style>
