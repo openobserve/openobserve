@@ -19,5 +19,6 @@ pub mod http;
 pub mod js;
 pub mod jwt;
 pub mod redirect_response;
+pub mod ssrf_guard;
 pub mod stream;
 pub mod zo_logger;

@@ -282,12 +282,13 @@ describe("AlertsDestinationList", () => {
   describe("Data Initialization", () => {
     it("should initialize columns correctly", () => {
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(5);
+      expect(columns).toHaveLength(6);
       expect(columns[0].name).toBe("#");
       expect(columns[1].name).toBe("name");
-      expect(columns[2].name).toBe("url");
-      expect(columns[3].name).toBe("method");
-      expect(columns[4].name).toBe("actions");
+      expect(columns[2].name).toBe("type");
+      expect(columns[3].name).toBe("url");
+      expect(columns[4].name).toBe("method");
+      expect(columns[5].name).toBe("actions");
     });
 
     it("should initialize perPageOptions correctly", () => {
@@ -701,9 +702,5 @@ describe("AlertsDestinationList", () => {
     });
 
   });
-
-
-
-
 
 });

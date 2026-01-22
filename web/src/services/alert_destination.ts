@@ -65,6 +65,9 @@ const destination = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/alerts/destinations/bulk`, { data });
   },
+  test: ({ org_identifier, data }: any) => {
+    return http().post(`/api/${org_identifier}/alerts/destinations/test`, data);
+  },
 };
 
 export default destination;
