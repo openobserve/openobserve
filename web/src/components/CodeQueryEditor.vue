@@ -829,6 +829,7 @@ export default defineComponent({
       visibility: visible !important;
     }
   }
+  --vscode-focusBorder: transparent !important;
 }
 
 .highlight-error {
