@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Billing is handled through your AWS account
         </div>
       </div>
-      <div v-if="billingProvider === 'azure'" class="full-width text-center">
+      <div v-else-if="billingProvider === 'azure'" class="full-width text-center">
         <q-chip
           color="green-2"
           text-color="green-10"
