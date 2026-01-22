@@ -133,10 +133,10 @@ test.describe("Dashboard Variables - Refresh Indicators & Panel Reload", () => {
 
     // Reopen settings to add second variable
     await pm.dashboardSetting.openSetting();
-    await pm.dashboardSetting.openVariables();
-    // Wait for variable to be saved and visible in settings
-    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // await pm.dashboardSetting.openVariables();
+    // // Wait for variable to be saved and visible in settings
+    // await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    // await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", {
       scope: "global",

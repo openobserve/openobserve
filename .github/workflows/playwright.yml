@@ -283,12 +283,12 @@ jobs:
             #     [
             #       "dashboard-variables-dependency.spec.js",
             #     ]
-            # - testfolder: "Dashboards-Variables-Refresh"
-            #   browser: "chrome"
-            #   run_files:
-            #     [
-            #       "dashboard-variables-refresh.spec.js",
-            #     ]
+            - testfolder: "Dashboards-Variables-Refresh"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-refresh.spec.js",
+                ]
             - testfolder: "Dashboards-Variables-URL"
               browser: "chrome"
               run_files:
