@@ -73,7 +73,11 @@ export class AlertDestinationsPage {
         await this.navigateToDestinations();
         await this.page.waitForTimeout(2000); // Wait for page to load
 
-        await this.page.locator(this.addDestinationButton).click();
+        // Wait for button to be enabled before clicking
+        const addBtn = this.page.locator(this.addDestinationButton);
+        await addBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(addBtn).toBeEnabled({ timeout: 30000 });
+        await addBtn.click();
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
@@ -411,7 +415,11 @@ export class AlertDestinationsPage {
         await this.navigateToDestinations();
         await this.page.waitForTimeout(2000);
 
-        await this.page.locator(this.addDestinationButton).click();
+        // Wait for button to be enabled before clicking
+        const addBtn = this.page.locator(this.addDestinationButton);
+        await addBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(addBtn).toBeEnabled({ timeout: 30000 });
+        await addBtn.click();
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
@@ -450,8 +458,11 @@ export class AlertDestinationsPage {
                     await this.navigateToDestinations();
                     await this.page.waitForTimeout(2000);
 
-                    // Re-open the add destination form
-                    await this.page.locator(this.addDestinationButton).click();
+                    // Re-open the add destination form (wait for button to be enabled)
+                    const retryBtn = this.page.locator(this.addDestinationButton);
+                    await retryBtn.waitFor({ state: 'visible', timeout: 30000 });
+                    await expect(retryBtn).toBeEnabled({ timeout: 30000 });
+                    await retryBtn.click();
 
                     // Select 'custom' destination type again
                     await this.selectDestinationType('custom');
@@ -539,9 +550,20 @@ export class AlertDestinationsPage {
 
     /**
      * Click New Destination button
+     * Waits for the button to be enabled before clicking (button starts disabled on page load)
      */
     async clickNewDestination() {
-        await this.page.locator(this.addDestinationButton).click();
+        const button = this.page.locator(this.addDestinationButton);
+
+        // Wait for button to be visible first
+        await button.waitFor({ state: 'visible', timeout: 30000 });
+        testLogger.debug('New Destination button is visible');
+
+        // Wait for button to be enabled (it starts disabled while page loads)
+        await expect(button).toBeEnabled({ timeout: 30000 });
+        testLogger.debug('New Destination button is enabled');
+
+        await button.click();
         await this.page.waitForTimeout(2000);
         testLogger.debug('Clicked New Destination button');
     }
