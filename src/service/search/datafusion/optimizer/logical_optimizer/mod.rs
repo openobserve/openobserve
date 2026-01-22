@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod add_sort_and_limit;
-pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
 pub mod limit_join_right_side;

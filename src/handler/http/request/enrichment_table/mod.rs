@@ -26,7 +26,7 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::save_enrichment_data,
+    service::enrichment_table::{extract_multipart, save_enrichment_data},
 };
 
 /// CreateEnrichmentTable
@@ -59,7 +59,7 @@ pub async fn save_enrichment_table(
     Path((org_id, table_name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
     headers: HeaderMap,
-    mut payload: Multipart,
+    payload: Multipart,
 ) -> Response {
     let bad_req_msg = if org_id.trim().is_empty() {
         Some("Organization cannot be empty")
@@ -112,7 +112,7 @@ pub async fn save_enrichment_table(
                 };
 
                 // Extract multipart data using axum's Multipart
-                match extract_multipart_axum(&mut payload, append_data).await {
+                match extract_multipart(payload, append_data).await {
                     Ok(json_record) => {
                         match save_enrichment_data(&org_id, &table_name, json_record, append_data)
                             .await
@@ -133,80 +133,6 @@ pub async fn save_enrichment_table(
             MetaHttpResponse::bad_request("Bad Request, content-type must be multipart/form-data")
         }
     }
-}
-
-/// Extract multipart data using axum's Multipart extractor
-async fn extract_multipart_axum(
-    payload: &mut Multipart,
-    append_data: bool,
-) -> Result<Vec<config::utils::json::Map<String, config::utils::json::Value>>, String> {
-    use hashbrown::HashSet;
-
-    let mut records = Vec::new();
-    let mut headers_set = HashSet::new();
-
-    while let Ok(Some(field)) = payload.next_field().await {
-        let file_name = match field.file_name() {
-            Some(name) => name.to_string(),
-            None => continue,
-        };
-
-        let data = match field.bytes().await {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                return Err(format!("Failed to read multipart field: {}", e));
-            }
-        };
-
-        // Determine file type and parse accordingly
-        if file_name.ends_with(".csv") {
-            let data_vec = data.to_vec();
-            let mut rdr = csv::Reader::from_reader(data_vec.as_slice());
-            let headers: Vec<String> = rdr
-                .headers()
-                .map_err(|e| format!("Failed to read CSV headers: {}", e))?
-                .iter()
-                .map(|h| h.to_lowercase())
-                .collect();
-
-            for result in rdr.records() {
-                let record = result.map_err(|e| format!("Failed to read CSV record: {}", e))?;
-                let mut map = config::utils::json::Map::new();
-                for (i, value) in record.iter().enumerate() {
-                    if let Some(header) = headers.get(i) {
-                        // Skip duplicate headers if append_data is false
-                        if !append_data && headers_set.contains(header) {
-                            continue;
-                        }
-                        headers_set.insert(header.clone());
-                        map.insert(
-                            header.clone(),
-                            config::utils::json::Value::String(value.to_string()),
-                        );
-                    }
-                }
-                if !map.is_empty() {
-                    records.push(map);
-                }
-            }
-        } else if file_name.ends_with(".json") {
-            let json_data: Vec<config::utils::json::Map<String, config::utils::json::Value>> =
-                config::utils::json::from_slice(&data)
-                    .map_err(|e| format!("Failed to parse JSON: {}", e))?;
-            records.extend(json_data);
-        } else {
-            return Err(format!(
-                "Unsupported file type: {}. Only .csv and .json files are supported.",
-                file_name
-            ));
-        }
-    }
-
-    if records.is_empty() {
-        return Err("No valid records found in the uploaded file".to_string());
-    }
-
-    Ok(records)
 }
 
 // ============================================================================

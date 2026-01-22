@@ -645,6 +645,8 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
+    #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
+    pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
     /// How often to run the background job that deletes expired sessions
     #[env_config(name = "ZO_SESSION_CLEANUP_INTERVAL", default = 3600)]
@@ -871,6 +873,12 @@ pub struct Common {
         help = "Enable enrichment table broadcast join"
     )]
     pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,

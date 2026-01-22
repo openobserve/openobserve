@@ -38,7 +38,6 @@ pub struct EnrichExec {
     org_id: String,
     name: String,
     schema: SchemaRef, // The schema for the produced row
-    partitions: usize, // Number of partitions
     cache: PlanProperties,
     metrics: ExecutionPlanMetricsSet,
 }
@@ -51,30 +50,16 @@ impl EnrichExec {
             org_id: org_id.to_string(),
             name: name.to_string(),
             schema,
-            partitions: 1,
             cache,
             metrics: ExecutionPlanMetricsSet::new(),
         }
-    }
-
-    /// Create a new EnrichExec with specified partition number
-    pub fn with_partitions(mut self, partitions: usize) -> Self {
-        self.partitions = partitions;
-        // Changing partitions may invalidate output partitioning, so update it:
-        let output_partitioning = Self::output_partitioning_helper(self.partitions);
-        self.cache = self.cache.with_partitioning(output_partitioning);
-        self
-    }
-
-    fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
-        Partitioning::UnknownPartitioning(n_partitions)
     }
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
     fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
         let eq_properties = EquivalenceProperties::new(schema);
-        let output_partitioning = Self::output_partitioning_helper(n_partitions);
+        let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
         PlanProperties::new(
             eq_properties,
             // Output Partitioning
@@ -219,6 +204,5 @@ mod tests {
         let exec = EnrichExec::new("default", "test", schema.clone());
         assert_eq!(exec.org_id, "default");
         assert_eq!(exec.name, "test");
-        assert_eq!(exec.partitions, 1);
     }
 }
