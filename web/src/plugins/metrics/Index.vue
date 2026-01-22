@@ -206,26 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <div class="tw:flex tw:justify-end tw:mr-2">
-                      <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                        <span class="lastRefreshedAtIcon">🕑</span
-                        ><RelativeTime
-                          :timestamp="lastTriggeredAt"
-                          fullTimePrefix="Last Refreshed At: "
-                        />
-                      </span>
-                      <PanelErrorButtons
-                        :error="errorMessage"
-                        :maxQueryRangeWarning="maxQueryRangeWarning"
-                        :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                        :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                        :isPartialData="isPartialData"
-                        :isPanelLoading="isPanelLoading"
-                      />
-                    </div>
                     <div class="col tw:relative" >
                       <div
-                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]"
+                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[54px]"
                       >
                         <PanelSchemaRenderer
                           v-if="chartData"
@@ -260,8 +243,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                       <div
-                        class="flex justify-end q-pr-sm q-mb-md q-pt-xs"
-                        style="position: absolute; top: 4px; right: 0px"
+                        class="flex column items-end q-pr-lg q-mb-md q-pt-xs tw:gap-1"
+                        style="position: absolute; top: 0px; right: -13px"
                       >
                         <q-btn
                           size="md"
@@ -273,6 +256,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :title="t('search.addToDashboard')"
                           >{{ t("search.addToDashboard") }}</q-btn
                         >
+                        <PanelErrorButtons
+                        :error="errorMessage"
+                        :maxQueryRangeWarning="maxQueryRangeWarning"
+                        :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                        :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                        :isPartialData="isPartialData"
+                        :isPanelLoading="isPanelLoading"
+                        :lastTriggeredAt="lastTriggeredAt"
+                        :viewOnly="false"
+                      />
                       </div>
                     </div>
                     <DashboardErrorsComponent

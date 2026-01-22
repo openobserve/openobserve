@@ -149,10 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="
                         flex: 1;
-                        min-height: calc(100% - 36px);
-                        height: calc(100% - 36px);
+                        min-height: calc(100% - 54px);
+                        height: calc(100% - 54px);
                         width: 100%;
-                        margin-top: 36px;
+                        margin-top: 54px;
                       "
                     >
                       <PanelSchemaRenderer
@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
                         @is-partial-data-update="handleIsPartialDataUpdate"
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         @loading-state-change="handleLoadingStateChange"
                         @is-cached-data-differ-with-current-time-range-update="
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
@@ -186,18 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div
-                      class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
+                      class="flex column items-end q-pr-lg q-mb-md q-pt-xs tw:gap-1"
                       style="position: absolute; top: 0px; right: -13px"
                     >
-                      <!-- Error/Warning tooltips -->
-                      <PanelErrorButtons
-                          :error="errorMessage"
-                          :maxQueryRangeWarning="maxQueryRangeWarning"
-                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                          :isPartialData="isPartialData"
-                          :isPanelLoading="isPanelLoading"
-                      />
                       <q-btn
                         size="md"
                         class="no-border"
@@ -210,6 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="errorData?.errors?.length > 0"
                         >{{ t("search.addToDashboard") }}</q-btn
                       >
+                       <!-- Error/Warning tooltips -->
+                      <PanelErrorButtons
+                          :error="errorMessage"
+                          :maxQueryRangeWarning="maxQueryRangeWarning"
+                          :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                          :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                          :isPartialData="isPartialData"
+                          :isPanelLoading="isPanelLoading"
+                          :lastTriggeredAt="lastTriggeredAt"
+                           :viewOnly="false"
+                      />
                     </div>
                   </div>
                   <DashboardErrorsComponent
@@ -373,6 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :allowAlertCreation="true"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
                       />
                     </template>
                   </q-splitter>
@@ -553,6 +557,12 @@ export default defineComponent({
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
+
+     // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null);
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
+    };
 
     watch(
       () => visualizeChartData.value,
@@ -980,6 +990,8 @@ export default defineComponent({
       currentPanelData,
       panelSchemaRendererRef,
       isPartialData,
+      lastTriggeredAt,
+      handleLastTriggeredAtUpdate,
       isPanelLoading,
       isCachedDataDifferWithCurrentTimeRange,
       handleIsPartialDataUpdate,

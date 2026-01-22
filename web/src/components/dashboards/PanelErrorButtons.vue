@@ -1,5 +1,8 @@
 <template>
-  <div class="row items-center no-wrap">
+  <div
+    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly)"
+    class="row items-center no-wrap"
+  >
     <q-btn
       v-if="error"
       :key="error"
@@ -160,11 +163,11 @@ export default defineComponent({
 .lastRefreshedAt {
   display: flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: 2px;
   font-size: 13px;
 }
 .lastRefreshedAtIcon {
-  margin-right: 4px;
+  margin-right: 2px;
   display: flex;
   align-items: center;
 }
