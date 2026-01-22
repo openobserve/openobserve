@@ -36,3 +36,4 @@ pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
 pub mod users;
+pub mod source_maps;
