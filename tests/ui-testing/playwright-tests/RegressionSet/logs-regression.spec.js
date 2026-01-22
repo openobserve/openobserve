@@ -352,11 +352,9 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Initial pagination text: ${initialPaginationText}`);
 
     // Extract initial total count (e.g., "1-50 of 100")
+    // Rule 5: No graceful skipping - test must fail if pagination format is unexpected
     const initialMatch = initialPaginationText.match(/of\s+(\d+)/i);
-    if (!initialMatch) {
-      testLogger.warn(`Could not parse pagination text: "${initialPaginationText}" - skipping test`);
-      test.skip(true, 'Pagination not available or not in expected format');
-    }
+    expect(initialMatch, `Pagination text "${initialPaginationText}" must match expected format "X-Y of Z"`).toBeTruthy();
     const initialTotal = parseInt(initialMatch[1]);
     testLogger.info(`Initial total count: ${initialTotal}`);
 
