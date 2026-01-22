@@ -73,7 +73,11 @@ export class AlertDestinationsPage {
         await this.navigateToDestinations();
         await this.page.waitForTimeout(2000); // Wait for page to load
 
-        await this.page.locator(this.addDestinationButton).click();
+        // Wait for button to be enabled before clicking
+        const addBtn = this.page.locator(this.addDestinationButton);
+        await addBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(addBtn).toBeEnabled({ timeout: 30000 });
+        await addBtn.click();
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
@@ -411,7 +415,11 @@ export class AlertDestinationsPage {
         await this.navigateToDestinations();
         await this.page.waitForTimeout(2000);
 
-        await this.page.locator(this.addDestinationButton).click();
+        // Wait for button to be enabled before clicking
+        const addBtn = this.page.locator(this.addDestinationButton);
+        await addBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(addBtn).toBeEnabled({ timeout: 30000 });
+        await addBtn.click();
 
         // Select 'custom' destination type (required by prebuilt destinations feature)
         await this.selectDestinationType('custom');
@@ -450,8 +458,11 @@ export class AlertDestinationsPage {
                     await this.navigateToDestinations();
                     await this.page.waitForTimeout(2000);
 
-                    // Re-open the add destination form
-                    await this.page.locator(this.addDestinationButton).click();
+                    // Re-open the add destination form (wait for button to be enabled)
+                    const retryBtn = this.page.locator(this.addDestinationButton);
+                    await retryBtn.waitFor({ state: 'visible', timeout: 30000 });
+                    await expect(retryBtn).toBeEnabled({ timeout: 30000 });
+                    await retryBtn.click();
 
                     // Select 'custom' destination type again
                     await this.selectDestinationType('custom');
@@ -539,9 +550,20 @@ export class AlertDestinationsPage {
 
     /**
      * Click New Destination button
+     * Waits for the button to be enabled before clicking (button starts disabled on page load)
      */
     async clickNewDestination() {
-        await this.page.locator(this.addDestinationButton).click();
+        const button = this.page.locator(this.addDestinationButton);
+
+        // Wait for button to be visible first
+        await button.waitFor({ state: 'visible', timeout: 30000 });
+        testLogger.debug('New Destination button is visible');
+
+        // Wait for button to be enabled (it starts disabled while page loads)
+        await expect(button).toBeEnabled({ timeout: 30000 });
+        testLogger.debug('New Destination button is enabled');
+
+        await button.click();
         await this.page.waitForTimeout(2000);
         testLogger.debug('Clicked New Destination button');
     }
@@ -901,8 +923,8 @@ export class AlertDestinationsPage {
             if (retries === 0) {
                 testLogger.error('Destination not found after all attempts', { name });
                 // Take screenshot for debugging
-                await this.page.screenshot({ path: `/tmp/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                throw new Error(`Destination "${name}" not found in list after multiple attempts and selectors. Screenshot saved to /tmp/destination-not-found-${name}.png`);
+                await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+                throw new Error(`Destination "${name}" not found in list after multiple attempts and selectors. Screenshot saved to test-results/destination-not-found-${name}.png`);
             }
             testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
             await this.page.waitForTimeout(2000);
@@ -1081,9 +1103,10 @@ export class AlertDestinationsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         await this.page.waitForTimeout(2000);
 
-        // Reload to ensure we see the latest destinations
+        // Full page reload to ensure clean state before edit
+        // This is critical for ServiceNow and other complex destination types
         await this.page.reload({ waitUntil: 'networkidle' });
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(3000);
 
         // Wait for table to be visible
         await this.page.waitForSelector('table tbody tr', { state: 'visible', timeout: 15000 }).catch(() => {});
@@ -1093,7 +1116,7 @@ export class AlertDestinationsPage {
         if (await searchInput.isVisible().catch(() => false)) {
             await searchInput.clear();
             await searchInput.fill(name);
-            await this.page.waitForTimeout(1500);
+            await this.page.waitForTimeout(2000);
             testLogger.debug('Used search to find destination for edit', { name });
         }
 
@@ -1105,16 +1128,35 @@ export class AlertDestinationsPage {
         while (retries > 0) {
             try {
                 await editBtn.waitFor({ state: 'visible', timeout: 5000 });
+
+                // Listen for console errors before clicking (use once() to avoid memory leak)
+                const consoleErrors = [];
+                const consoleHandler = msg => {
+                    if (msg.type() === 'error') {
+                        consoleErrors.push(msg.text());
+                    }
+                };
+                this.page.on('console', consoleHandler);
+
                 await editBtn.click();
-                await this.page.waitForTimeout(2000);
+                await this.page.waitForTimeout(3000);
+
+                // Remove listener to prevent memory leak
+                this.page.off('console', consoleHandler);
+
+                // Log any console errors that occurred
+                if (consoleErrors.length > 0) {
+                    testLogger.warn('Console errors after clicking edit', { consoleErrors, name });
+                }
+
                 testLogger.debug('Clicked Edit button for destination', { name });
                 return;
             } catch (error) {
                 retries--;
                 if (retries === 0) {
                     testLogger.error('Edit button not found', { name });
-                    await this.page.screenshot({ path: `/tmp/edit-button-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                    throw new Error(`Edit button for destination "${name}" not found after multiple attempts. Screenshot: /tmp/edit-button-not-found-${name}.png`);
+                    await this.page.screenshot({ path: `test-results/edit-button-not-found-${name}.png`, fullPage: true }).catch(() => {});
+                    throw new Error(`Edit button for destination "${name}" not found after multiple attempts. Screenshot: test-results/edit-button-not-found-${name}.png`);
                 }
                 testLogger.debug(`Edit button not found, retrying... (${retries} attempts left)`);
                 await this.page.waitForTimeout(2000);
@@ -1136,9 +1178,83 @@ export class AlertDestinationsPage {
      * @param {string} name - Expected destination name
      */
     async expectEditFormLoaded(name) {
+        // Wait for the edit form title to show "update"
         await expect(this.page.locator('[data-test="add-destination-title"]')).toContainText(/update/i);
-        const nameInput = this.page.locator(this.destinationNameInput);
-        await expect(nameInput).toHaveValue(name);
+        testLogger.debug('Edit form title shows Update');
+
+        // In edit mode, the form data loads asynchronously from the API
+        // A loading spinner appears with text "Loading destination data..."
+        // We must wait for this to disappear before the name input becomes visible
+
+        // Wait for loading state to complete - use text match for the loading message
+        const loadingMessage = this.page.getByText('Loading destination data...');
+        const loadingSpinner = this.page.locator('.q-spinner');
+
+        // Check if loading state is present and wait for it to disappear
+        const isLoadingVisible = await loadingMessage.isVisible().catch(() => false) ||
+                                  await loadingSpinner.isVisible().catch(() => false);
+
+        if (isLoadingVisible) {
+            testLogger.debug('Loading state detected, waiting for it to complete...');
+            try {
+                // Wait for loading message to disappear (60 seconds for slow API - ServiceNow can be slow)
+                await loadingMessage.waitFor({ state: 'hidden', timeout: 60000 });
+                testLogger.debug('Loading message disappeared');
+            } catch (e) {
+                testLogger.warn('Loading message still visible after timeout', { name });
+                // Take screenshot to debug
+                await this.page.screenshot({ path: `test-results/edit-form-loading-stuck-${name}.png`, fullPage: true }).catch(() => {});
+            }
+        } else {
+            testLogger.debug('No loading state detected, form should be ready');
+        }
+
+        // Additional wait for form to stabilize after data load
+        await this.page.waitForTimeout(2000);
+
+        // The name input only appears after formData.destination_type is loaded
+        // Wait for the name input to be visible with extended timeout
+        let nameInput = this.page.locator(this.destinationNameInput);
+
+        // Debug: Check how many name inputs exist and their visibility
+        const nameInputCount = await nameInput.count();
+        testLogger.debug('Name input element count', { count: nameInputCount });
+
+        // For custom destinations in edit mode, there may be 2 name inputs:
+        // 1. Readonly display field (in edit mode header)
+        // 2. Editable field (in custom form section)
+        // Use .first() to get the readonly one which shows the destination name
+        if (nameInputCount > 1) {
+            testLogger.debug('Multiple name inputs found, using first (readonly) for verification');
+            nameInput = nameInput.first();
+        }
+
+        try {
+            await nameInput.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            // Take screenshot for debugging before failing
+            await this.page.screenshot({ path: `test-results/edit-form-debug-${name}.png`, fullPage: true }).catch(() => {});
+            testLogger.error('Name input not visible in edit form', {
+                name,
+                inputCount: nameInputCount,
+                screenshot: `test-results/edit-form-debug-${name}.png`
+            });
+
+            // Check if still loading
+            const stillLoading = await loadingMessage.isVisible().catch(() => false);
+            testLogger.error('Debug form state', {
+                stillLoading,
+                titleVisible: await this.page.locator('[data-test="add-destination-title"]').isVisible().catch(() => false),
+                prebuiltFormVisible: await this.page.locator('[data-test="prebuilt-form"]').isVisible().catch(() => false),
+                urlInputVisible: await this.page.locator('[data-test="add-destination-url-input"]').isVisible().catch(() => false),
+                readonlyTypeVisible: await this.page.locator('[data-test="destination-type-readonly"]').isVisible().catch(() => false)
+            });
+
+            throw e;
+        }
+
+        // Now verify the name value
+        await expect(nameInput).toHaveValue(name, { timeout: 10000 });
         testLogger.debug('Edit form loaded with existing data', { name });
     }
 
@@ -1325,9 +1441,9 @@ export class AlertDestinationsPage {
 
         if (!updated) {
             // Take screenshot before throwing error
-            await this.page.screenshot({ path: `/tmp/webhook-update-failed.png`, fullPage: true }).catch(() => {});
+            await this.page.screenshot({ path: `test-results/webhook-update-failed.png`, fullPage: true }).catch(() => {});
             testLogger.error('Webhook URL input not found for update');
-            throw new Error('Webhook URL input not found for update. Screenshot saved to /tmp/webhook-update-failed.png');
+            throw new Error('Webhook URL input not found for update. Screenshot saved to test-results/webhook-update-failed.png');
         }
     }
 

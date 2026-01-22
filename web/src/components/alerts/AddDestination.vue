@@ -787,7 +787,7 @@ const setupDestinationData = () => {
             detectedType = 'discord';
           } else if (hostname === 'outlook.office.com' || hostname.endsWith('.outlook.office.com') || hostname === 'webhook.office.com' || hostname.endsWith('.webhook.office.com')) {
             detectedType = 'msteams';
-          } else if (hostname === 'service-now.com' || (hostname.endsWith('.service-now.com') && hostname.split('.').slice(-3, -1).join('.') === 'service-now')) {
+          } else if (hostname === 'service-now.com' || hostname.endsWith('.service-now.com')) {
             detectedType = 'servicenow';
           } else if (hostname === 'events.pagerduty.com' || hostname.endsWith('.events.pagerduty.com')) {
             detectedType = 'pagerduty';
@@ -816,6 +816,10 @@ const setupDestinationData = () => {
       // If we detected a type, set it
       if (detectedType) {
         formData.value.destination_type = detectedType;
+      } else {
+        // No prebuilt type detected - default to 'custom' for edit mode
+        // This handles destinations created before prebuilt types or generic webhook destinations
+        formData.value.destination_type = 'custom';
       }
     }
 
