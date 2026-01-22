@@ -537,7 +537,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
-        .route("/{org_id}/traces", post(traces::otlp_traces_write))
+        .route("/{org_id}/traces", post(traces::traces_write))
+        .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
 
         // Traces
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
