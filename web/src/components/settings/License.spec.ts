@@ -379,13 +379,13 @@ describe('License.vue', () => {
 
   describe('Update License Functionality', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
 
     it('should call update_license API when updating license', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
 
       // Set license key directly
       wrapper.vm.licenseKey = 'new-license-key';
@@ -398,7 +398,7 @@ describe('License.vue', () => {
     });
 
     it('should show success notification on successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
 
       wrapper.vm.licenseKey = 'new-license-key';
       await wrapper.vm.updateLicense();
@@ -424,7 +424,7 @@ describe('License.vue', () => {
     });
 
     it('should clear license key after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
 
       wrapper.vm.licenseKey = 'new-license-key';
       await wrapper.vm.updateLicense();
@@ -434,7 +434,7 @@ describe('License.vue', () => {
     });
 
     it('should hide update form after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
 
       wrapper.vm.showUpdateForm = true;
       wrapper.vm.licenseKey = 'new-license-key';
@@ -445,7 +445,7 @@ describe('License.vue', () => {
     });
 
     it('should reload license data after successful update', async () => {
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
       vi.mocked(licenseServer.get_license).mockClear();
 
       wrapper.vm.licenseKey = 'new-license-key';
@@ -458,7 +458,7 @@ describe('License.vue', () => {
 
   describe('License Key Masking', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -495,7 +495,7 @@ describe('License.vue', () => {
 
   describe('License Key Modal', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -551,7 +551,7 @@ describe('License.vue', () => {
 
   describe('Get License Redirect', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -599,7 +599,7 @@ describe('License.vue', () => {
         license: null,
       };
 
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: noLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(noLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -615,7 +615,7 @@ describe('License.vue', () => {
         license: null,
       };
 
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: noLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(noLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -626,8 +626,8 @@ describe('License.vue', () => {
       window.location.search = '?installation_id=test-installation-123&license_key=auto-filled-key';
       const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
-      vi.mocked(licenseServer.update_license).mockResolvedValue({ data: { success: true } });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
+      vi.mocked(licenseServer.update_license).mockResolvedValue(createAxiosResponse({ success: true }));
 
       wrapper = createWrapper();
       await flushPromises();
@@ -642,7 +642,7 @@ describe('License.vue', () => {
     it('should not auto-fill if installation IDs do not match', async () => {
       window.location.search = '?installation_id=different-id&license_key=auto-filled-key';
 
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -653,7 +653,7 @@ describe('License.vue', () => {
 
   describe('Date Formatting', () => {
     beforeEach(async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
     });
@@ -694,7 +694,7 @@ describe('License.vue', () => {
     it('should handle clipboard copy failure gracefully', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
@@ -717,7 +717,7 @@ describe('License.vue', () => {
 
   describe('Component Cleanup', () => {
     it('should cleanup properly on unmount', async () => {
-      vi.mocked(licenseServer.get_license).mockResolvedValue({ data: mockLicenseData });
+      vi.mocked(licenseServer.get_license).mockResolvedValue(createAxiosResponse(mockLicenseData));
       wrapper = createWrapper();
       await flushPromises();
 
