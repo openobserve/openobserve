@@ -157,7 +157,7 @@ pub async fn process_session_detail(
         Some(org) => org,
     };
 
-    log::debug!("handling checkout session detail");
+    log::info!("handling checkout session detail");
     match o2_cloud_billings::process_checkout_session_details(
         &org_id,
         &query.session_id,
@@ -165,13 +165,17 @@ pub async fn process_session_detail(
     )
     .await
     {
-        Err(e) => e.into_http_response(),
+        Err(e) => {
+            log::info!("checkout session errored : {e}");
+            e.into_http_response()
+        }
         Ok(()) => {
             let redirect_url = format!(
                 "{}/web/billings/plans?org_identifier={}",
                 &get_config().common.web_url,
                 &org_id
             );
+            log::info!("checkout session success, redirecting to {redirect_url}");
             // Send event to ActiveCampaign
             let segment_event_data = HashMap::from([
                 ("email".to_string(), json::Value::String(email.to_string())),
@@ -208,9 +212,9 @@ pub async fn process_session_detail(
                 stream_name: None,
             })
             .await;
-            RedirectResponseBuilder::new(&redirect_url)
-                .build()
-                .redirect_http()
+            let res = RedirectResponseBuilder::new(&redirect_url).build();
+            log::info!("redirecting to {}", res);
+            res.redirect_http()
         }
     }
 }
