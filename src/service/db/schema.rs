@@ -799,31 +799,51 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     let total = std::time::Instant::now();
+    let mut cached_count = 0;
+    let mut failed_count = 0;
     for (key, tbl) in tables_to_cache {
         let start = std::time::Instant::now();
         // Only use the primary region if specified to fetch enrichment table data assuming only the
         // primary region contains the data.
-        let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
-                .await?;
-        let len = data.len();
-        ENRICHMENT_TABLES.insert(
-            key,
-            StreamTable {
-                org_id: tbl.org_id.clone(),
-                stream_name: tbl.stream_name.clone(),
-                data,
-            },
-        );
-        log::info!(
-            "EnrichmentTables Cached: org_id: {}, stream_name: {}, len: {}, took {:?}",
-            tbl.org_id,
-            tbl.stream_name,
-            len,
-            start.elapsed()
-        );
+        match super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
+            .await
+        {
+            Ok(data) => {
+                let len = data.len();
+                ENRICHMENT_TABLES.insert(
+                    key.clone(),
+                    StreamTable {
+                        org_id: tbl.org_id.clone(),
+                        stream_name: tbl.stream_name.clone(),
+                        data,
+                    },
+                );
+                log::info!(
+                    "EnrichmentTables Cached: org_id: {}, stream_name: {}, len: {}, took {:?}",
+                    tbl.org_id,
+                    tbl.stream_name,
+                    len,
+                    start.elapsed()
+                );
+                cached_count += 1;
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to cache enrichment table {}/{}: {}. Skipping this table.",
+                    tbl.org_id,
+                    tbl.stream_name,
+                    e
+                );
+                failed_count += 1;
+            }
+        }
     }
-    log::info!("EnrichmentTables Cached, took {:?}", total.elapsed());
+    log::info!(
+        "EnrichmentTables Cached: {} succeeded, {} failed, took {:?}",
+        cached_count,
+        failed_count,
+        total.elapsed()
+    );
     Ok(())
 }
 

@@ -56,6 +56,13 @@ pub async fn get_enrichment_table_data(
 ) -> Result<Values, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
 
+    // Validate time range before proceeding with the query
+    if start_time <= 0 || end_time <= 0 || start_time > end_time {
+        return Err(anyhow::anyhow!(
+            "Invalid time range for enrichment table {org_id}/{name}: start_time={start_time}, end_time={end_time}"
+        ));
+    }
+
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
         start_time,
@@ -455,7 +462,19 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
 /// Get the start time of the enrichment table
 pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
     match get_meta_table_stats(org_id, name).await {
-        Some(meta_stats) => meta_stats.start_time,
+        Some(meta_stats) => {
+            // If meta_stats has invalid start_time (0 or negative), fallback to other sources
+            if meta_stats.start_time > 0 {
+                meta_stats.start_time
+            } else {
+                let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+                if stats.doc_time_min > 0 {
+                    stats.doc_time_min
+                } else {
+                    BASE_TIME.timestamp_micros()
+                }
+            }
+        }
         None => {
             let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
             if stats.doc_time_min > 0 {
