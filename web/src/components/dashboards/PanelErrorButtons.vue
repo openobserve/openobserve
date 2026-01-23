@@ -161,14 +161,23 @@ export default defineComponent({
   color: var(--q-warning);
 }
 .lastRefreshedAt {
-  display: flex;
-  align-items: center;
-  margin-left: 2px;
-  font-size: 13px;
-}
-.lastRefreshedAtIcon {
-  margin-right: 2px;
-  display: flex;
-  align-items: center;
+  font-size: smaller;
+  margin-left: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &::after {
+    content: "";
+  }
+
+  &::before {
+    content: "";
+  }
+
+  & .lastRefreshedAtIcon {
+    font-size: smaller;
+    margin-right: 2px;
+  }
 }
 </style>
