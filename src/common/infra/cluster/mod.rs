@@ -16,7 +16,7 @@
 use std::{cmp::max, sync::atomic::Ordering};
 
 use config::{
-    cluster::{LOCAL_NODE, LOCAL_NODE_STATUS, load_local_node},
+    cluster::{LOCAL_NODE, LOCAL_NODE_STATUS},
     get_config,
     meta::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
