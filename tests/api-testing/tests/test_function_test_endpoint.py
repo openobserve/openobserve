@@ -111,7 +111,7 @@ class TestFunctionTestEndpoint:
 
         # Verify all events have the added field
         for i, result in enumerate(data["results"]):
-            assert result["event"].get("processed") == True, \
+            assert result["event"].get("processed") is True, \
                 f"Event {i} should have 'processed' = true: {result}"
 
         print(f"✓ VRL function successfully processed {len(data['results'])} events")
