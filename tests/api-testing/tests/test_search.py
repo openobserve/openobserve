@@ -1701,7 +1701,7 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
-    
+
     json_data = {
         "query": {
             "sql": "SELECT * FROM \"stream_pytest_data\" WHERE match_all('UserManagementService')",
@@ -1710,15 +1710,373 @@ def test_e2e_camel_case_multi_token_search(create_session, base_url):
             "size": 100
         }
     }
-    
+
     resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
     if resp.status_code != 200:
         print(f"DEBUG UserManagementService: Status {resp.status_code}, Response: {resp.text}")
     assert resp.status_code == 200, f"UserManagementService test failed - Status {resp.status_code}: {resp.text}"
-    
+
     response_data = resp.json()
     hits = response_data["hits"]
     print(f"DEBUG UserManagementService: Found {len(hits)} hits, Total: {response_data.get('total', 0)}")
     if len(hits) == 0:
         print(f"DEBUG UserManagementService: Full response: {response_data}")
     assert len(hits) > 0, "Should find logs containing 'UserManagementService'"
+
+
+# ============================================================================
+# Histogram Interval Validation Tests
+# These tests verify the fix for PR #10169 - histogram interval validation
+# for multi-day factors of 24 hours (e.g., weekly intervals should not be
+# converted to daily intervals)
+# ============================================================================
+
+# Constants for histogram interval tests (in seconds)
+SECONDS_PER_HOUR = 3600
+SECONDS_PER_DAY = 86400  # 24 hours
+SECONDS_PER_WEEK = 604800  # 7 days
+
+
+def _assert_histogram_interval(response_data, expected_interval, context_msg=""):
+    """Helper to validate histogram_interval in response with clear error messages.
+
+    Args:
+        response_data: The JSON response from the search API
+        expected_interval: Expected interval value in seconds
+        context_msg: Additional context for error messages (e.g., "7 days", "weekly")
+
+    Raises:
+        AssertionError: If histogram_interval is missing, wrong type, or wrong value
+    """
+    # Check field exists
+    assert "histogram_interval" in response_data, (
+        f"Response missing 'histogram_interval' field. "
+        f"Available keys: {list(response_data.keys())}. "
+        f"This may indicate an API change or query issue."
+    )
+
+    returned_interval = response_data["histogram_interval"]
+
+    # Check not None
+    assert returned_interval is not None, (
+        f"histogram_interval is None (expected {expected_interval}s{' - ' + context_msg if context_msg else ''}). "
+        f"This may indicate the histogram was not processed."
+    )
+
+    # Check type
+    assert isinstance(returned_interval, int), (
+        f"histogram_interval should be int, got {type(returned_interval).__name__}: {returned_interval}"
+    )
+
+    # Check value
+    assert returned_interval == expected_interval, (
+        f"histogram_interval mismatch{' (' + context_msg + ')' if context_msg else ''}: "
+        f"expected {expected_interval}s, got {returned_interval}s"
+    )
+
+    return returned_interval
+
+
+def test_histogram_interval_weekly_preserved(create_session, base_url):
+    """Test that weekly histogram interval (7 days = 604800 seconds) is preserved.
+
+    This is the main regression test for PR #10169. Previously, the backend was
+    incorrectly converting 7-day intervals to 1-day intervals because it only
+    checked if the interval was a factor of 24 hours, not a multiple.
+
+    Bug: Dashboard panels showing daily data instead of weekly data.
+    Fix: Added check for multiples of 24 hours before factor check.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    # Use 30 days range to ensure weekly intervals make sense
+    thirty_days_ago = int((now - timedelta(days=30)).timestamp() * 1000000)
+
+    # 7 days in seconds = 604800
+    weekly_interval = SECONDS_PER_WEEK
+
+    json_data = {
+        "query": {
+            "sql": f"SELECT histogram(_timestamp, '{weekly_interval} second') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            "start_time": thirty_days_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 0,
+            "quick_mode": True,
+            "track_total_hits": False
+        }
+    }
+
+    resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert resp.status_code == 200, f"Weekly histogram query failed: {resp.status_code} {resp.content}"
+
+    response_data = resp.json()
+
+    # The histogram_interval in the response should be preserved as 604800 (7 days)
+    # NOT adjusted down to 86400 (1 day)
+    returned_interval = _assert_histogram_interval(
+        response_data,
+        weekly_interval,
+        context_msg="7 days/weekly - REGRESSION TEST for PR #10169"
+    )
+
+    print(f"Weekly interval test: Sent {weekly_interval}s, Got back {returned_interval}s")
+    print(f"✅ Weekly histogram interval correctly preserved: {returned_interval}s (7 days)")
+
+
+def test_histogram_interval_multiples_of_24h_preserved(create_session, base_url):
+    """Test that various multiples of 24 hours are preserved (2, 7, 14, 30, 90 days).
+
+    All intervals that are exact multiples of 24 hours should be returned as-is,
+    not adjusted to a different value.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    # Use 180 days range to accommodate 90-day intervals
+    start_time = int((now - timedelta(days=180)).timestamp() * 1000000)
+
+    # Test cases: (days, expected_seconds)
+    test_cases = [
+        (1, SECONDS_PER_DAY),       # 1 day = 86400s
+        (2, 2 * SECONDS_PER_DAY),   # 2 days = 172800s
+        (7, 7 * SECONDS_PER_DAY),   # 7 days = 604800s (weekly)
+        (14, 14 * SECONDS_PER_DAY), # 14 days = 1209600s (bi-weekly)
+        (30, 30 * SECONDS_PER_DAY), # 30 days = 2592000s (monthly)
+        (90, 90 * SECONDS_PER_DAY), # 90 days = 7776000s (quarterly)
+    ]
+
+    for days, expected_interval in test_cases:
+        json_data = {
+            "query": {
+                "sql": f"SELECT histogram(_timestamp, '{expected_interval} second') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+                "start_time": start_time,
+                "end_time": end_time,
+                "from": 0,
+                "size": 0,
+                "quick_mode": True,
+                "track_total_hits": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"{days}-day histogram query failed: {resp.status_code} {resp.content}"
+
+        response_data = resp.json()
+        returned_interval = _assert_histogram_interval(
+            response_data,
+            expected_interval,
+            context_msg=f"{days} days (multiple of 24h)"
+        )
+
+        print(f"{days}-day interval test: Sent {expected_interval}s, Got back {returned_interval}s")
+
+    print(f"✅ All multiples of 24h correctly preserved")
+
+
+def test_histogram_interval_factors_of_24h_preserved(create_session, base_url):
+    """Test that factors of 24 hours are preserved (1h, 2h, 4h, 6h, 8h, 12h).
+
+    Intervals that divide evenly into 24 hours should be returned as-is.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_day_ago = int((now - timedelta(days=1)).timestamp() * 1000000)
+
+    # Test cases: (hours, expected_seconds)
+    test_cases = [
+        (1, 1 * SECONDS_PER_HOUR),   # 1 hour = 3600s
+        (2, 2 * SECONDS_PER_HOUR),   # 2 hours = 7200s
+        (4, 4 * SECONDS_PER_HOUR),   # 4 hours = 14400s
+        (6, 6 * SECONDS_PER_HOUR),   # 6 hours = 21600s
+        (8, 8 * SECONDS_PER_HOUR),   # 8 hours = 28800s
+        (12, 12 * SECONDS_PER_HOUR), # 12 hours = 43200s
+    ]
+
+    for hours, expected_interval in test_cases:
+        json_data = {
+            "query": {
+                "sql": f"SELECT histogram(_timestamp, '{expected_interval} second') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+                "start_time": one_day_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 0,
+                "quick_mode": True,
+                "track_total_hits": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"{hours}-hour histogram query failed: {resp.status_code} {resp.content}"
+
+        response_data = resp.json()
+        returned_interval = _assert_histogram_interval(
+            response_data,
+            expected_interval,
+            context_msg=f"{hours} hours (factor of 24h)"
+        )
+
+        print(f"{hours}-hour interval test: Sent {expected_interval}s, Got back {returned_interval}s")
+
+    print(f"✅ All factors of 24h correctly preserved")
+
+
+def test_histogram_interval_invalid_adjusted_to_nearest_factor(create_session, base_url):
+    """Test that invalid intervals (not factor or multiple of 24h) are adjusted.
+
+    Intervals like 5 hours or 25 hours that don't divide evenly into 24h
+    and aren't multiples of 24h should be rounded to the nearest valid factor.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    three_days_ago = int((now - timedelta(days=3)).timestamp() * 1000000)
+
+    # Test cases: (invalid_interval_seconds, expected_adjusted_interval)
+    # 5 hours (18000s) should round up to 6 hours (21600s)
+    # 25 hours (90000s) is not a multiple of 24h, should be capped at 1 day (86400s)
+    test_cases = [
+        (5 * SECONDS_PER_HOUR, 6 * SECONDS_PER_HOUR),     # 5h -> 6h
+        (25 * SECONDS_PER_HOUR, SECONDS_PER_DAY),         # 25h -> 1 day (capped)
+        (36 * SECONDS_PER_HOUR, SECONDS_PER_DAY),         # 1.5 days -> 1 day (capped)
+    ]
+
+    for invalid_interval, expected_adjusted in test_cases:
+        json_data = {
+            "query": {
+                "sql": f"SELECT histogram(_timestamp, '{invalid_interval} second') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+                "start_time": three_days_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 0,
+                "quick_mode": True,
+                "track_total_hits": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"Invalid interval {invalid_interval}s query failed: {resp.status_code} {resp.content}"
+
+        response_data = resp.json()
+        returned_interval = _assert_histogram_interval(
+            response_data,
+            expected_adjusted,
+            context_msg=f"invalid {invalid_interval}s should adjust to {expected_adjusted}s"
+        )
+
+        print(f"Invalid interval test: Sent {invalid_interval}s, Expected adjustment to {expected_adjusted}s, Got {returned_interval}s")
+
+    print(f"✅ All invalid intervals correctly adjusted")
+
+
+def test_histogram_interval_with_human_readable_format(create_session, base_url):
+    """Test histogram intervals using human-readable format (e.g., '7 day', '1 week').
+
+    Verifies that the backend correctly parses and preserves intervals specified
+    in human-readable format, which is what dashboard panels typically use.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    thirty_days_ago = int((now - timedelta(days=30)).timestamp() * 1000000)
+
+    # Test cases using human-readable interval strings
+    # Format: (interval_string, expected_seconds)
+    test_cases = [
+        ("1 hour", SECONDS_PER_HOUR),
+        ("6 hour", 6 * SECONDS_PER_HOUR),
+        ("1 day", SECONDS_PER_DAY),
+        ("7 day", 7 * SECONDS_PER_DAY),  # Weekly - main regression case
+    ]
+
+    for interval_str, expected_interval in test_cases:
+        json_data = {
+            "query": {
+                "sql": f"SELECT histogram(_timestamp, '{interval_str}') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+                "start_time": thirty_days_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 0,
+                "quick_mode": True,
+                "track_total_hits": False
+            }
+        }
+
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"'{interval_str}' histogram query failed: {resp.status_code} {resp.content}"
+
+        response_data = resp.json()
+        returned_interval = _assert_histogram_interval(
+            response_data,
+            expected_interval,
+            context_msg=f"human-readable '{interval_str}'"
+        )
+
+        print(f"Human-readable interval test: '{interval_str}' -> Expected {expected_interval}s, Got {returned_interval}s")
+
+    print(f"✅ All human-readable intervals correctly processed")
+
+
+def test_histogram_interval_consistency_across_requests(create_session, base_url):
+    """Test that histogram interval is consistent across multiple requests.
+
+    This verifies that caching doesn't cause inconsistent interval handling.
+    The same query should always return the same histogram_interval.
+    """
+    session = create_session
+    url = base_url
+    org_id = "default"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    thirty_days_ago = int((now - timedelta(days=30)).timestamp() * 1000000)
+
+    weekly_interval = SECONDS_PER_WEEK
+
+    json_data = {
+        "query": {
+            "sql": f"SELECT histogram(_timestamp, '{weekly_interval} second') AS zo_sql_key, count(*) AS zo_sql_num FROM stream_pytest_data GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            "start_time": thirty_days_ago,
+            "end_time": end_time,
+            "from": 0,
+            "size": 0,
+            "quick_mode": True,
+            "track_total_hits": False
+        }
+    }
+
+    # Make multiple requests and verify consistency
+    intervals = []
+    for i in range(3):
+        resp = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+        assert resp.status_code == 200, f"Request {i+1} failed: {resp.status_code} {resp.content}"
+
+        response_data = resp.json()
+
+        # Validate each response properly
+        returned_interval = _assert_histogram_interval(
+            response_data,
+            weekly_interval,
+            context_msg=f"consistency check request {i+1}"
+        )
+        intervals.append(returned_interval)
+        print(f"Request {i+1}: histogram_interval = {returned_interval}s")
+
+    # All intervals should be the same (this is redundant after _assert_histogram_interval
+    # but provides a clearer error message for consistency issues)
+    assert all(interval == intervals[0] for interval in intervals), (
+        f"Histogram interval inconsistent across requests: {intervals}"
+    )
+
+    print(f"✅ Histogram interval consistent across {len(intervals)} requests: {intervals[0]}s")
