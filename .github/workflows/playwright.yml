@@ -209,6 +209,7 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
+                "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]
           - testfolder: "Functions"

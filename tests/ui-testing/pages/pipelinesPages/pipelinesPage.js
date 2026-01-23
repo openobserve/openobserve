@@ -2165,4 +2165,63 @@ export class PipelinesPage {
         await toggle.click();
         testLogger.info(`Toggled pipeline: ${pipelineName}`);
     }
+
+    // ============================================================================
+    // SCHEDULED PIPELINE TAB METHODS - POM Compliance Fix
+    // These methods replace raw selectors in spec files for PromQL/SQL tab switching
+    // ============================================================================
+
+    /**
+     * Select first available stream option from dropdown
+     * Used when any stream option is acceptable (e.g., metrics streams)
+     * Replaces: page.getByRole("option").filter({ hasText: /^[a-z0-9_]+$/ }).first()
+     */
+    async selectFirstAvailableStreamOption() {
+        const option = this.page.getByRole("option").first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+        testLogger.info('Selected first available stream option');
+    }
+
+    /**
+     * Click PromQL tab in scheduled pipeline dialog
+     * Note: AppTabs renders tabs as <div> elements with data-test="tab-{value}", not buttons
+     */
+    async clickPromqlTab() {
+        const promqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-promql"]');
+        await promqlTab.waitFor({ state: 'visible', timeout: 5000 });
+        await promqlTab.click();
+        testLogger.info('Clicked PromQL tab');
+    }
+
+    /**
+     * Click SQL tab in scheduled pipeline dialog
+     * Note: AppTabs renders tabs as <div> elements with data-test="tab-{value}", not buttons
+     */
+    async clickSqlTab() {
+        const sqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-sql"]');
+        await sqlTab.waitFor({ state: 'visible', timeout: 5000 });
+        await sqlTab.click();
+        testLogger.info('Clicked SQL tab');
+    }
+
+    /**
+     * Verify PromQL tab is active/selected
+     * Note: AppTabs uses 'active' CSS class for the selected tab
+     */
+    async expectPromqlTabActive() {
+        const promqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-promql"]');
+        await expect(promqlTab).toHaveClass(/active/);
+        testLogger.info('Verified PromQL tab is active');
+    }
+
+    /**
+     * Verify SQL tab is active/selected
+     * Note: AppTabs uses 'active' CSS class for the selected tab
+     */
+    async expectSqlTabActive() {
+        const sqlTab = this.scheduledPipelineTabs.locator('[data-test="tab-sql"]');
+        await expect(sqlTab).toHaveClass(/active/);
+        testLogger.info('Verified SQL tab is active');
+    }
 }
