@@ -247,6 +247,16 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     #[cfg(feature = "cloud")]
     svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
+    // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
+    // Must be publicly accessible (no auth) as users haven't logged in yet
+    // Using /marketplace path to avoid conflict with authenticated /api scope
+    #[cfg(feature = "cloud")]
+    svc.service(
+        web::scope("/marketplace")
+            .wrap(cors.clone())
+            .service(cloud::aws_marketplace::aws_marketplace_register),
+    );
+
     // OAuth 2.0 Authorization Server Metadata endpoint (RFC 8414)
     // Must be publicly accessible (no auth) at root per MCP spec
     svc.service(mcp::oauth_authorization_server_metadata);
@@ -705,6 +715,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::billings::create_billing_portal_session)
         .service(cloud::org_usage::get_org_usage)
         .service(cloud::marketing::handle_new_attribution_event)
+        .service(cloud::aws_marketplace::link_subscription)
+        .service(cloud::aws_marketplace::activation_status)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 

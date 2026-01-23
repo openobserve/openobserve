@@ -61,8 +61,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="row justify-between q-pa-md">
+      <!-- AWS Marketplace billing - show managed externally message -->
+      <div v-if="billingProvider === 'aws'" class="full-width text-center">
+        <q-chip
+          color="green-2"
+          text-color="green-10"
+          icon="check_circle"
+          label="Managed via AWS Marketplace"
+          class="q-px-md q-py-sm"
+        />
+        <div class="text-caption text-grey-7 q-mt-sm">
+          Billing is handled through your AWS account
+        </div>
+      </div>
+      <!-- Stripe billing - show subscribe/manage buttons -->
       <q-btn
-        v-if="planType == planName"
+        v-else-if="planType == planName"
         :label="btnCancelSubscription"
         text-color="black"
         class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1"
@@ -87,7 +101,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "proPlan",
-  props: ["planType"],
+  props: ["planType", "billingProvider"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";
