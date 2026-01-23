@@ -235,6 +235,19 @@ pub fn get_memtable_id_from_file_name(file_name: &str) -> u64 {
         .unwrap_or_default()
 }
 
+// check if the persist is done for the given seq_id
+// if there is no id less than the given seq_id, return true
+pub async fn check_persist_done(seq_id: u64) -> bool {
+    let r = IMMUTABLES.read().await;
+    let mut min_id = u64::MAX;
+    for (_, i) in r.iter() {
+        if i.memtable.id() < seq_id {
+            min_id = min_id.min(i.memtable.id());
+        }
+    }
+    min_id < seq_id
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

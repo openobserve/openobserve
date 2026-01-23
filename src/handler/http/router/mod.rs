@@ -537,7 +537,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
-        .route("/{org_id}/traces", post(traces::otlp_traces_write))
+        .route("/{org_id}/traces", post(traces::traces_write))
+        .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
 
         // Traces
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
@@ -638,7 +639,9 @@ pub fn service_routes() -> Router {
 
         // Alert destinations
         .route("/{org_id}/alerts/destinations", get(alerts::destinations::list_destinations).post(alerts::destinations::save_destination))
+        .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
+        .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
         // Deduplication
@@ -653,7 +656,7 @@ pub fn service_routes() -> Router {
         // Enrichment tables
         .route("/{org_id}/enrichment_tables/{table_name}", post(enrichment_table::save_enrichment_table))
         .route("/{org_id}/enrichment_tables/{table_name}/url", post(enrichment_table::save_enrichment_table_from_url))
-        .route("/{org_id}/enrichment_tables", get(enrichment_table::get_all_enrichment_table_statuses))
+        .route("/{org_id}/enrichment_tables/status", get(enrichment_table::get_all_enrichment_table_statuses))
 
         // Authz/FGA
         .route("/{org_id}/roles", get(authz::fga::get_roles).post(authz::fga::create_role))
@@ -696,8 +699,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-        .route("/{org_id}/mcp", post(mcp::handle_mcp_post))
-        .route("/{org_id}/mcp/{*mcp_path}", get(mcp::handle_mcp_get));
+        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post));
 
     #[cfg(feature = "enterprise")]
     {

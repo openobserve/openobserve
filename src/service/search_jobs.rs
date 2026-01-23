@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -445,7 +445,7 @@ pub async fn get_result(
         let path = path.to_string();
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
             let response = match client.get_result(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -493,7 +493,7 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
             let task = tokio::task::spawn(async move {
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node).await?;
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
                 let response = match client.delete_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {

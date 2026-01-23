@@ -145,11 +145,9 @@ mod tests {
             "            AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "                AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
-            "                  CooperativeExec",
-            "                    NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "                  NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
             "            RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "              CooperativeExec",
-            "                NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "              NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -184,12 +182,10 @@ mod tests {
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
             "        FilterExec: _timestamp@0 > 1000, projection=[name@1]",
-            "          CooperativeExec",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "          NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
             "  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "    FilterExec: _timestamp@0 < 2000, projection=[name@1]",
-            "      CooperativeExec",
-            "        NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
+            "      NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -224,12 +220,10 @@ mod tests {
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
             "        FilterExec: _timestamp@0 > 1000, projection=[name@1]",
-            "          CooperativeExec",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "          NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
             "  RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "    FilterExec: _timestamp@0 < 2000, projection=[name@1]",
-            "      CooperativeExec",
-            "        NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
+            "      NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -272,10 +266,8 @@ mod tests {
             "                  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
             "                    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
-            "                        CooperativeExec",
-            "                          NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
-            "            CooperativeExec",
-            "              NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "                        NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "            NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -313,14 +305,12 @@ mod tests {
             "      SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
             "        SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
             "          FilterExec: _timestamp@0 < 2000, fetch=50000",
-            "            CooperativeExec",
-            "              NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
             "  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
             "        FilterExec: _timestamp@0 > 1000, projection=[name@1]",
-            "          CooperativeExec",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "          NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -358,14 +348,12 @@ mod tests {
             "      SortExec: expr=[name@1 DESC NULLS LAST, _timestamp@0 DESC NULLS LAST], preserve_partitioning=[false]",
             "        SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=50000",
             "          FilterExec: _timestamp@0 < 2000, fetch=50000",
-            "            CooperativeExec",
-            "              NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
+            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp < Int64(2000)\"], sorted_by_time=true",
             "  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
             "        FilterExec: _timestamp@0 > 1000, projection=[name@1]",
-            "          CooperativeExec",
-            "            NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
+            "          NewEmptyExec: name=\"t\", projection=[\"_timestamp\", \"name\"], filters=[\"_timestamp > Int64(1000)\"]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

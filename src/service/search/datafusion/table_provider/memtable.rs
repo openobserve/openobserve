@@ -18,7 +18,7 @@ use std::{any::Any, sync::Arc};
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
-use config::get_config;
+use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::Session,
     common::{Constraints, Result},
@@ -30,7 +30,7 @@ use datafusion::{
 use hashbrown::HashMap;
 
 use crate::service::search::{
-    datafusion::table_provider::helpers::{apply_filter, apply_projection},
+    datafusion::table_provider::helpers::{apply_combined_filter, apply_projection},
     index::IndexCondition,
 };
 
@@ -41,6 +41,7 @@ pub(crate) struct NewMemTable {
     sorted_by_time: bool,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
+    timestamp_filter: (i64, i64),
 }
 
 impl NewMemTable {
@@ -52,7 +53,9 @@ impl NewMemTable {
         sorted_by_time: bool,
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
+        timestamp_filter: (i64, i64),
     ) -> Result<Self> {
+        // this schema is the full schema of the table, from empty_exec.full_schema()
         let mem = MemTable::try_new(schema, partitions)?;
         Ok(Self {
             mem_table: mem,
@@ -60,6 +63,7 @@ impl NewMemTable {
             sorted_by_time,
             index_condition,
             fst_fields,
+            timestamp_filter,
         })
     }
 }
@@ -89,26 +93,36 @@ impl TableProvider for NewMemTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let (mem_projection, filter_projection) =
-            if let Some(index_condition) = self.index_condition.as_ref() {
-                // get the projection for the filter
-                let mut filter_projection =
-                    index_condition.get_schema_projection(self.schema(), &self.fst_fields);
-                if let Some(v) = projection.as_ref() {
-                    filter_projection.extend(v.iter().copied());
-                }
-                filter_projection.sort();
-                filter_projection.dedup();
-                // regenerate the projection with the filter_projection
-                let projection = projection.as_ref().map(|p| {
-                    p.iter()
-                        .filter_map(|i| filter_projection.iter().position(|f| f == i))
-                        .collect::<Vec<_>>()
-                });
-                (Some(filter_projection), projection)
-            } else {
-                (projection.cloned(), None)
-            };
+        let (mem_projection, filter_projection) = {
+            // get the projection for the filter
+            let mut filter_projection = self
+                .index_condition
+                .as_ref()
+                .map(|ic| ic.get_schema_projection(self.schema(), &self.fst_fields))
+                .unwrap_or_default();
+
+            // add _timestamp column if timestamp_filter is present
+            if let Ok(timestamp_idx) = self.schema().index_of(TIMESTAMP_COL_NAME)
+                && !filter_projection.contains(&timestamp_idx)
+            {
+                filter_projection.push(timestamp_idx);
+            }
+
+            // add requested projection columns
+            if let Some(v) = projection.as_ref() {
+                filter_projection.extend(v.iter().copied());
+            }
+            filter_projection.sort();
+            filter_projection.dedup();
+
+            // regenerate the projection with the filter_projection
+            let projection = projection.as_ref().map(|p| {
+                p.iter()
+                    .filter_map(|i| filter_projection.iter().position(|f| f == i))
+                    .collect::<Vec<_>>()
+            });
+            (Some(filter_projection), projection)
+        };
         let mem_projection = mem_projection.as_ref();
         let filter_projection = filter_projection.as_ref();
 
@@ -131,18 +145,20 @@ impl TableProvider for NewMemTable {
             .as_ref()
             .map(|v| v.can_remove_filter())
             .unwrap_or(true);
-        let filter_exec =
+        let index_condition =
             if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
-                apply_filter(
-                    self.index_condition.as_ref(),
-                    &projection_exec.schema(),
-                    &self.fst_fields,
-                    projection_exec,
-                    filter_projection,
-                )?
+                self.index_condition.as_ref()
             } else {
-                projection_exec
+                None
             };
+        let filter_exec = apply_combined_filter(
+            index_condition,
+            Some(self.timestamp_filter),
+            &projection_exec.schema(),
+            &self.fst_fields,
+            projection_exec,
+            filter_projection,
+        )?;
 
         apply_sort(filter_exec, self.sorted_by_time)
     }

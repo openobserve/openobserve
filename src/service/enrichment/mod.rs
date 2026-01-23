@@ -16,7 +16,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use async_trait::async_trait;
-use config::utils::time::parse_str_to_time;
+use config::utils::time::{now_micros, parse_str_to_time};
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::{KeyString, ObjectMap, Value};
 
@@ -187,10 +187,17 @@ pub async fn get_enrichment_table_inner(
 
     let values = if (db_stats.end_time > local_last_updated) || local_last_updated == 0 {
         log::debug!("get_enrichment_table: fetching from remote: {org_id}/{table_name}");
+        // Use current timestamp if end_time is 0 (no meta stats exist)
+        let end_time = if db_stats.end_time == 0 {
+            now_micros()
+        } else {
+            db_stats.end_time + 1 // search query end time is not inclusive
+        };
         enrichment_table::get_enrichment_table_data(
             org_id,
             table_name,
             apply_primary_region_if_specified,
+            end_time,
         )
         .await?
     } else {

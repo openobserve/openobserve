@@ -137,7 +137,20 @@
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
                 <template v-for="(block, blockIndex) in message.blocks" :key="blockIndex">
-                  <div v-if="block.type === 'code'" class="code-block" >
+                  <!-- Tool call block -->
+                  <div
+                    v-if="block.type === 'tool_call'"
+                    class="tool-call-item"
+                    :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  >
+                    <q-icon name="check_circle" size="14px" color="positive" />
+                    <span class="tool-call-name">{{ block.message }}</span>
+                    <span v-if="block.context && block.context.query" class="tool-call-query">
+                      {{ truncateQuery(block.context.query) }}
+                    </span>
+                  </div>
+                  <!-- Code block -->
+                  <div v-else-if="block.type === 'code'" class="code-block" >
                     <div  class="code-block-header code-block-theme">
                       <span v-if="block.language" class="code-type-label">
                         {{ getLanguageDisplay(block.language) }}
@@ -179,6 +192,7 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Text block -->
                   <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
 
                 </template>
@@ -264,6 +278,7 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { marked } from 'marked';
 import { MarkedOptions } from 'marked';
+import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
@@ -540,7 +555,7 @@ export default defineComponent({
         
         // Reset streaming state
         currentStreamingMessage.value = '';
-        
+
         // Save the current state including cancellation
         await saveToHistory();
         
@@ -602,11 +617,24 @@ export default defineComponent({
                     // Status/thinking events - just continue, already showing "Observing..."
                     continue;
                   } else if (data.type === 'tool_call' && data.message) {
-                    // Tool call event - show what tool is being called with spacing
-                    const toolMessage = `\n🔧 ${data.message}\n`;
-                    currentStreamingMessage.value += toolMessage;
-                    updateAssistantMessage();
+                    // Tool call event - add as contentBlock for consistent display
+                    const toolCallBlock = {
+                      type: 'tool_call',
+                      tool: data.tool,
+                      message: data.message,
+                      context: data.context || {}
+                    };
+
+                    // Add to current assistant message's contentBlocks
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) {
+                        lastMessage.contentBlocks = [];
+                      }
+                      lastMessage.contentBlocks.push(toolCallBlock);
+                    }
                     await scrollToBottom();
+                    continue;
                   } else if (data.type === 'tool_response' && data.message) {
                     // Tool response event - skip, don't show completion messages
                     continue;
@@ -622,7 +650,7 @@ export default defineComponent({
                     messageComplete = true;
                   } else if (data.type === 'error') {
                     // Error event with spacing
-                    const errorMsg = `\n\n❌ Error: ${data.error}\n\n`;
+                    const errorMsg = `\n\nError: ${data.error}\n\n`;
                     currentStreamingMessage.value += errorMsg;
                     updateAssistantMessage();
                     await scrollToBottom();
@@ -975,19 +1003,17 @@ export default defineComponent({
             content: msg.content,
           }));
 
-          // Call agent chat API
+          // Call AI chat API - backend will select sre agent based on incident_id in context
           response = await fetch(
-            `/api/${store.state.selectedOrganization.identifier}/agent/chat/stream`,
+            `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/ai/chat_stream`,
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                agent_type: "sre",
-                message: userMessage,
+                messages: [...history, { role: "user", content: userMessage }],
                 context: context,
-                history: history,
               }),
               signal: currentAbortController.value.signal,
               credentials: "include",
@@ -1236,8 +1262,8 @@ export default defineComponent({
           }
           
           const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? hljs.highlight(codeText, { language: token.lang }).value
-            : hljs.highlightAuto(codeText).value;
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
             type: 'code',
@@ -1257,11 +1283,29 @@ export default defineComponent({
     };
 
     const processedMessages = computed(() => {
-      return chatMessages.value.map(message => ({
-        ...message,
-        blocks: processMessageContent(message.content)
-      }));
+      return chatMessages.value.map(message => {
+        // Process text content into code/text blocks
+        const textBlocks = processMessageContent(message.content);
+
+        // Merge contentBlocks (tool calls) with text blocks
+        // contentBlocks come first (tool calls), then text content
+        const allBlocks = [
+          ...(message.contentBlocks || []),
+          ...textBlocks
+        ];
+
+        return {
+          ...message,
+          blocks: allBlocks
+        };
+      });
     });
+
+    // Truncate query for display in tool call items
+    const truncateQuery = (query: string, maxLength: number = 50) => {
+      if (!query) return '';
+      return query.length > maxLength ? query.substring(0, maxLength) + '...' : query;
+    };
 
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== 'assistant') return;
@@ -1310,9 +1354,11 @@ export default defineComponent({
     };
 
     const processHtmlBlock = (content: string) => {
+      // Sanitize HTML to prevent XSS attacks
+      const sanitized = DOMPurify.sanitize(content);
       // Replace pre tags with span and add our custom class
-      return content.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-                   .replace(/<\/pre>/g, '</span>');
+      return sanitized.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
+                     .replace(/<\/pre>/g, '</span>');
     };
 
     const formatTime = (timestamp: string) => {
@@ -1365,6 +1411,7 @@ export default defineComponent({
       openHistory,
       loadChat,
       processedMessages,
+      truncateQuery,
       copyToClipboard,
       retryGeneration,
       getLanguageDisplay,
@@ -1976,5 +2023,52 @@ export default defineComponent({
   background: linear-gradient(135deg, #1e213a 0%, #2a2d47 100%);
   border: 1px solid #3a3d5c;
   color: #e2e8f0;
+}
+
+// Tool call item - inline in chat flow (interleaved with text)
+.tool-call-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+
+  &.light-mode {
+    background: rgba(76, 175, 80, 0.08);
+    color: #4a5568;
+  }
+
+  &.dark-mode {
+    background: rgba(76, 175, 80, 0.12);
+    color: #a0aec0;
+  }
+
+  .tool-call-name {
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .tool-call-query {
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    .light-mode & {
+      background: rgba(0, 0, 0, 0.05);
+      color: #666;
+    }
+
+    .dark-mode & {
+      background: rgba(255, 255, 255, 0.08);
+      color: #888;
+    }
+  }
 }
 </style> 

@@ -74,24 +74,6 @@ pub async fn traces_write(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    handle_req(org_id, user_email, headers, body).await
-}
-
-pub async fn otlp_traces_write(
-    Path(org_id): Path<String>,
-    Headers(user_email): Headers<UserEmail>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    handle_req(org_id, user_email, headers, body).await
-}
-
-async fn handle_req(
-    org_id: String,
-    user_email: UserEmail,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
     // log start processing time
     let process_time = get_process_time();
 

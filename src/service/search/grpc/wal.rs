@@ -52,7 +52,7 @@ use crate::{
     service::{
         file_list,
         search::{
-            datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
+            datafusion::table_provider::memtable::NewMemTable,
             generate_filter_from_equal_items, generate_search_schema_diff,
             index::IndexCondition,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -86,7 +86,7 @@ pub async fn search_parquet(
     let files = get_file_list(
         query.clone(),
         &stream_settings.partition_keys,
-        query.time_range,
+        Some(query.time_range),
         search_partition_keys,
         partition_time_level,
         memtable_ids,
@@ -135,9 +135,8 @@ pub async fn search_parquet(
             lock_files.retain(|f| f != &file.key);
             continue;
         }
-        if let Some((min_ts, max_ts)) = query.time_range
-            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts)
-        {
+        let (min_ts, max_ts) = query.time_range;
+        if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
             log::debug!(
                 "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{})",
                 &file.key,
@@ -203,8 +202,6 @@ pub async fn search_parquet(
         return Err(Error::ResourceError(e.to_string()));
     }
 
-    let start = std::time::Instant::now();
-
     let session = config::meta::search::Session {
         id: format!("{trace_id}-wal"),
         storage_type: StorageType::Wal,
@@ -212,25 +209,21 @@ pub async fn search_parquet(
         target_partitions: cfg.limit.cpu_num,
     };
 
-    let table = match TableBuilder::new()
-        .sorted_by_time(sorted_by_time)
-        .file_stat_cache(file_stat_cache.clone())
-        .index_condition(index_condition.clone())
-        .fst_fields(fst_fields.clone())
-        .build(
-            session,
-            files,
-            Arc::new(schema.as_ref().clone().with_metadata(Default::default())),
-        )
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            // release all files
+    let start = std::time::Instant::now();
+    let tables = super::create_tables_from_files(
+        files,
+        session,
+        query.clone(),
+        schema,
+        sorted_by_time,
+        file_stat_cache,
+        index_condition,
+        fst_fields,
+        || {
             wal::release_files(&lock_files);
-            return Err(e.into());
-        }
-    };
+        },
+    )
+    .await?;
 
     // lock these files for this request
     wal::lock_request(&query.trace_id, &lock_files);
@@ -251,7 +244,7 @@ pub async fn search_parquet(
         )
     );
 
-    Ok((vec![table], scan_stats, HashSet::new()))
+    Ok((tables, scan_stats, HashSet::new()))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -289,7 +282,7 @@ pub async fn search_memtable(
         &query.org_id,
         query.stream_type.as_str(),
         &query.stream_name,
-        query.time_range,
+        Some(query.time_range),
         &filters,
     )
     .await
@@ -301,7 +294,7 @@ pub async fn search_memtable(
         &query.org_id,
         query.stream_type.as_str(),
         &query.stream_name,
-        query.time_range,
+        Some(query.time_range),
         &filters,
         &memtable_ids,
     )
@@ -450,13 +443,13 @@ pub async fn search_memtable(
             sorted_by_time,
             index_condition.clone(),
             fst_fields.clone(),
+            query.time_range,
         ) {
             Ok(table) => Arc::new(table),
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] wal->mem->search: create memtable error: {}",
+                    "[trace_id {}] wal->mem->search: create memtable error: {e}",
                     query.trace_id,
-                    e
                 );
                 return Err(e.into());
             }
@@ -511,31 +504,39 @@ async fn get_file_list(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = if let Some((start_time, end_time)) = query.time_range.and_then(|(s, e)| {
-        let (s, e) = if partition_time_level == PartitionTimeLevel::Daily {
-            let s = s - s % DAY_MICRO_SECS;
-            let e = e - e % DAY_MICRO_SECS;
-            (s, e)
-        } else {
-            let s = s - s % HOUR_MICRO_SECS;
-            let e = e - e % HOUR_MICRO_SECS;
-            (s, e)
-        };
-        DateTime::from_timestamp_micros(s).zip(DateTime::from_timestamp_micros(e))
-    }) {
-        let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
-        // Skip count is the number of segments in the cannonicalised path before
-        // <YY>/<MM>/<DD>/<HH>/<file> appear
-        let filter = create_wal_dir_datetime_filter(
-            start_time,
-            end_time,
-            "parquet".to_string(),
-            skip_count + 1,
-        );
+    let files = {
+        let (start_ts, end_ts) = query.time_range;
 
-        scan_files_filtered(&pattern, filter, None).await?
-    } else {
-        scan_files_filtered(&pattern, |_| true, None).await?
+        // normalize timestamps to partition boundaries
+        let normalized = if partition_time_level == PartitionTimeLevel::Daily {
+            (
+                start_ts - start_ts % DAY_MICRO_SECS,
+                end_ts - end_ts % DAY_MICRO_SECS,
+            )
+        } else {
+            (
+                start_ts - start_ts % HOUR_MICRO_SECS,
+                end_ts - end_ts % HOUR_MICRO_SECS,
+            )
+        };
+
+        if let Some((start_time, end_time)) = DateTime::from_timestamp_micros(normalized.0)
+            .zip(DateTime::from_timestamp_micros(normalized.1))
+        {
+            let skip_count = AsRef::<Path>::as_ref(&pattern).components().count();
+            // Skip count is the number of segments in the cannonicalised path before
+            // <YY>/<MM>/<DD>/<HH>/<file> appear
+            let filter = create_wal_dir_datetime_filter(
+                start_time,
+                end_time,
+                "parquet".to_string(),
+                skip_count + 1,
+            );
+
+            scan_files_filtered(&pattern, filter, None).await?
+        } else {
+            scan_files_filtered(&pattern, |_| true, None).await?
+        }
     };
 
     let files = files
@@ -604,7 +605,7 @@ async fn get_file_list(
     }
 
     let mut result = Vec::with_capacity(files.len());
-    let (min_ts, max_ts) = query.time_range.unwrap_or_default();
+    let (min_ts, max_ts) = query.time_range;
     for file in files.iter() {
         let file_key = FileKey::from_file_name(file);
         if (min_ts, max_ts) != (0, 0) {

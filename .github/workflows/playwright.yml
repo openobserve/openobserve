@@ -162,6 +162,7 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
                 "alerts-advanced.spec.js",
+                "alerts-destinations-prebuilt.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -249,6 +250,7 @@ jobs:
             run_files:
               [
                 "logs-regression.spec.js",
+                "logs-regression-bugs.spec.js",
                 "streams-regression.spec.js",
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
@@ -734,8 +736,15 @@ jobs:
             echo "::notice::Test job results: $SUCCEEDED succeeded, $FAILED failed, $TOTAL total"
 
             if [ "$SUCCEEDED" -gt 0 ] && [ "$FAILED" -eq 0 ]; then
-              echo "::notice::✅ All test jobs succeeded - tests likely skipped because they already passed"
-              echo "::notice::Skipping merge and upload (no reports to process)"
+              echo "::notice::✅ All test jobs succeeded - they likely skipped because tests already passed"
+              echo "::notice::This is VALID behavior for optimized reruns"
+              echo "::notice::Creating empty report structure for downstream jobs"
+              mkdir -p playwright-results/html-report
+              # Add stats object to make report compatible with TestDino
+              # startTime must be ISO 8601 string (not Unix timestamp number) for TestDino compatibility
+              START_TIME=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+              echo '{"config":{},"suites":[],"errors":[],"stats":{"startTime":"'"$START_TIME"'","duration":0,"expected":0,"unexpected":0,"flaky":0,"skipped":0}}' > playwright-results/report.json
+              echo "<html><body><h1>No tests executed - all shards skipped</h1><p>All test shards exited early because tests had already passed in a previous attempt.</p></body></html>" > playwright-results/html-report/index.html
               echo "::endgroup::"
               exit 0
             else
@@ -798,8 +807,7 @@ jobs:
               echo "$CACHE_OUTPUT"
             fi
           else
-            echo "::error::JSON report not found at playwright-results/report.json"
-            echo "::warning::Cannot cache test failures - skipping"
+            echo "::notice::Skipping cache - no report.json found (tests may have been skipped due to rerun optimization)"
           fi
           echo "::endgroup::"
 
@@ -808,15 +816,19 @@ jobs:
         run: |
           cd tests/ui-testing
 
+          # Check if report.json exists (it won't exist if all tests were skipped due to rerun optimization)
+          if [ ! -f "playwright-results/report.json" ]; then
+            echo "::notice::Skipping TestDino upload - no report.json found (tests may have been skipped due to rerun optimization)"
+            exit 0
+          fi
+
           # Fix startTime format: convert Unix timestamp (number) to ISO 8601 string for TestDino compatibility
-          if [ -f "playwright-results/report.json" ]; then
-            # Check if startTime is a number and convert it
-            START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
-            if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
-              echo "Converting startTime from Unix timestamp to ISO 8601 string"
-              jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
-              mv playwright-results/report.json.tmp playwright-results/report.json
-            fi
+          # Check if startTime is a number and convert it
+          START_TIME=$(jq -r '.stats.startTime // empty' playwright-results/report.json)
+          if [ -n "$START_TIME" ] && [[ "$START_TIME" =~ ^[0-9]+$ ]]; then
+            echo "Converting startTime from Unix timestamp to ISO 8601 string"
+            jq '.stats.startTime = (.stats.startTime / 1000 | strftime("%Y-%m-%dT%H:%M:%S.000Z"))' playwright-results/report.json > playwright-results/report.json.tmp
+            mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
           npx --yes tdpw@latest upload playwright-results \
@@ -845,20 +857,31 @@ jobs:
           path: merged-coverage
           merge-multiple: true
 
-      - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
+      - name: Check Downloaded Coverage Files
+        id: check_coverage
+        run: |
+          if [ -d "merged-coverage" ] && [ "$(ls -A merged-coverage 2>/dev/null)" ]; then
+            echo "has_coverage=true" >> $GITHUB_OUTPUT
+            echo "::notice::Coverage data found"
+            ls -R merged-coverage
+          else
+            echo "has_coverage=false" >> $GITHUB_OUTPUT
+            echo "::notice::No coverage data found (tests may have been skipped due to rerun optimization)"
+          fi
 
       - name: Move Coverage Files to .nyc_output
+        if: steps.check_coverage.outputs.has_coverage == 'true'
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          mv merged-coverage/* tests/ui-testing/.nyc_output/
 
       - name: Generate Coverage Report
+        if: steps.check_coverage.outputs.has_coverage == 'true'
         run: cd tests/ui-testing && npm ci && npx nyc report
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
-        if: hashFiles('tests/ui-testing/coverage-report/**') != ''
+        if: steps.check_coverage.outputs.has_coverage == 'true' && hashFiles('tests/ui-testing/coverage-report/**') != ''
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
