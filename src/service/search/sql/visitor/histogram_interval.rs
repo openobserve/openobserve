@@ -141,6 +141,17 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     Ok(seconds)
 }
 
+/// Validates and adjusts histogram intervals to ensure they work well with charts.
+///
+/// This function accepts any interval and ensures it's either:
+/// 1. A **multiple** of 24 hours (2 days, 7 days, 30 days, etc.) - returned as-is
+/// 2. A **factor** of 24 hours (6h, 12h, etc.) - returned as-is
+/// 3. Otherwise, rounds up to the nearest valid factor of 24 hours
+///
+/// Examples:
+/// - 6 hours → 6 hours (factor: 24 / 6 = 4) ✓
+/// - 7 days → 7 days (multiple: 7 × 24 hours) ✓
+/// - 5 hours → 6 hours (not valid, rounds up to nearest factor)
 pub fn validate_and_adjust_histogram_interval(
     interval_seconds: i64,
     time_range: Option<(i64, i64)>,
@@ -155,7 +166,14 @@ pub fn validate_and_adjust_histogram_interval(
         return interval_seconds;
     }
 
-    // Check if the interval can divide 24 hours evenly and is not a multiple of 24
+    // Check if the interval is a multiple of 24 hours (like 2 days, 7 days, etc.)
+    // Example: 7 days (604800 sec) % 86400 sec = 0 ✓
+    if interval_seconds % TWENTY_FOUR_HOURS_SECONDS == 0 {
+        return interval_seconds;
+    }
+
+    // Check if the interval can divide 24 hours evenly (is a factor of 24h)
+    // Example: 6 hours (21600 sec): 86400 % 21600 = 0 ✓
     if TWENTY_FOUR_HOURS_SECONDS % interval_seconds == 0 {
         return interval_seconds;
     }
@@ -327,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_validate_and_adjust_histogram_interval() {
-        // Test valid intervals that don't need adjustment
+        // Test valid intervals that don't need adjustment (factors of 24 hours)
         assert_eq!(validate_and_adjust_histogram_interval(3600, None), 3600); // 1 hour
         assert_eq!(validate_and_adjust_histogram_interval(7200, None), 7200); // 2 hours
         assert_eq!(validate_and_adjust_histogram_interval(21600, None), 21600); // 6 hours
@@ -342,7 +360,46 @@ mod tests {
         assert_eq!(validate_and_adjust_histogram_interval(0, None), 3600); // 0 -> default 1 hour
         assert_eq!(validate_and_adjust_histogram_interval(-100, None), 3600); // negative -> default 1 hour
         assert_eq!(validate_and_adjust_histogram_interval(1, None), 1); // 1 second is valid
-        assert_eq!(validate_and_adjust_histogram_interval(100000, None), 86400); // very large -> 1 day
+    }
+
+    #[test]
+    fn test_validate_and_adjust_histogram_interval_multiples_of_24h() {
+        // Test intervals that are multiples of 24 hours (2 days, 7 days, 30 days, etc.)
+        // These should be returned as-is, not adjusted
+        assert_eq!(validate_and_adjust_histogram_interval(86400, None), 86400); // 1 day
+        assert_eq!(validate_and_adjust_histogram_interval(172800, None), 172800); // 2 days
+        assert_eq!(validate_and_adjust_histogram_interval(259200, None), 259200); // 3 days
+        assert_eq!(validate_and_adjust_histogram_interval(604800, None), 604800); // 7 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(1209600, None),
+            1209600
+        ); // 14 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(2592000, None),
+            2592000
+        ); // 30 days
+        assert_eq!(
+            validate_and_adjust_histogram_interval(7776000, None),
+            7776000
+        ); // 90 days
+    }
+
+    #[test]
+    fn test_validate_and_adjust_histogram_interval_edge_cases_above_1_day() {
+        // Test intervals between 1 day and 2 days (not perfect multiples of 24h)
+        // These get capped at 1 day (86400 sec) which is the current behavior
+
+        // 25 hours (90000 sec) - not a multiple of 24h, gets capped at 1 day
+        let result = validate_and_adjust_histogram_interval(90000, None);
+        assert_eq!(result, 86400); // Currently returns 1 day (86400)
+
+        // 1.5 days (129600 sec) - not a multiple of 24h, gets capped at 1 day
+        let result = validate_and_adjust_histogram_interval(129600, None);
+        assert_eq!(result, 86400); // Currently returns 1 day (86400)
+
+        // 1.9 days (164160 sec) - not a multiple of 24h, gets capped at 1 day
+        let result = validate_and_adjust_histogram_interval(164160, None);
+        assert_eq!(result, 86400); // Currently returns 1 day (86400)
     }
 
     #[test]
