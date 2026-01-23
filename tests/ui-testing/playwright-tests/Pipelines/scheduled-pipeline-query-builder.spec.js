@@ -13,7 +13,7 @@ test.use({
   }
 });
 
-test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@scheduledPipeline'] }, () => {
+test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPipeline'] }, () => {
   let pageManager;
   let loginPage;
 
@@ -142,10 +142,15 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
     testLogger.info('✅ Test passed: Default query generated correctly');
   });
 
-  test.skip("should not update PromQL tab when stream changes", {
+  test("should not update PromQL tab when stream changes", {
     tag: ['@functional', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing PromQL tab is unaffected by SQL watcher');
+
+    // Ingest metrics data to ensure metrics streams exist for PromQL testing
+    testLogger.info('Ingesting metrics data for PromQL test');
+    await pageManager.pipelinesPage.ingestMetricsData('e2e_test_metrics', 10);
+    await page.waitForTimeout(2000); // Wait for metrics to be indexed
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -167,13 +172,9 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
     await pageManager.pipelinesPage.selectStreamType('metrics');
     await page.waitForTimeout(1000);
 
-    // Select a metrics stream in SQL tab
-    testLogger.info('Selecting metrics stream');
-    await pageManager.pipelinesPage.streamNameLabel.click();
-    await page.waitForTimeout(500);
-    // Note: We'll use any available metrics stream
-    const streamOptions = page.getByRole("option").filter({ hasText: /^[a-z0-9_]+$/ }).first();
-    await streamOptions.click();
+    // Select the metrics stream we just ingested
+    testLogger.info('Selecting metrics stream: e2e_test_metrics');
+    await pageManager.pipelinesPage.selectStreamName('e2e_test_metrics');
     await page.waitForTimeout(2000);
 
     // Get SQL query text
@@ -181,9 +182,7 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
 
     // Switch to PromQL tab (now enabled because we selected metrics)
     testLogger.info('Switching to PromQL tab');
-    const promqlTab = pageManager.pipelinesPage.scheduledPipelineTabs.getByRole('button', { name: /PromQL/i });
-    await promqlTab.waitFor({ state: 'visible', timeout: 5000 });
-    await promqlTab.click();
+    await pageManager.pipelinesPage.clickPromqlTab();
     await page.waitForTimeout(1000);
 
     // Verify we're on PromQL tab
@@ -191,8 +190,7 @@ test.describe("Scheduled Pipeline Stream Auto-Update", { tag: ['@all', '@schedul
 
     // Switch back to SQL tab
     testLogger.info('Switching back to SQL tab');
-    const sqlTab = pageManager.pipelinesPage.scheduledPipelineTabs.getByRole('button', { name: /SQL/i });
-    await sqlTab.click();
+    await pageManager.pipelinesPage.clickSqlTab();
     await page.waitForTimeout(1000);
 
     // Verify SQL query still exists (tab switching doesn't affect SQL query)
