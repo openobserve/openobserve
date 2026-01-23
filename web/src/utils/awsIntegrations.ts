@@ -13,6 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+export interface CloudFormationTemplate {
+  name: string;
+  description: string;
+  url: string;
+}
+
+export interface ComponentOption {
+  name: string;
+  description: string;
+  component: string; // Component name/path
+}
+
 export interface AWSIntegration {
   id: string;
   name: string;
@@ -20,6 +32,8 @@ export interface AWSIntegration {
   icon: string;
   description: string;
   cloudFormationTemplate: string;
+  cloudFormationTemplates?: CloudFormationTemplate[]; // Multiple templates option
+  componentOptions?: ComponentOption[]; // Multiple component options
   hasDashboard: boolean;
   dashboardFolderId?: string;
   documentationUrl?: string;
@@ -73,7 +87,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'CloudWatch Logs',
     icon: '',
     description: 'Stream CloudWatch logs to OpenObserve for analysis',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudwatch-logs-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/cloudwatch-logs',
     category: 'logs',
@@ -98,6 +112,18 @@ export const awsIntegrations: AWSIntegration[] = [
     icon: '',
     description: 'Analyze network traffic in your VPC',
     cloudFormationTemplate: '',
+    cloudFormationTemplates: [
+      {
+        name: 'CloudWatch Integration',
+        description: 'Stream VPC Flow Logs via CloudWatch to OpenObserve',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-cloudwatch.yaml',
+      },
+      {
+        name: 'Firehose Integration',
+        description: 'Stream VPC Flow Logs directly via Kinesis Firehose',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-firehose.yaml',
+      },
+    ],
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/vpc-flow-logs',
     category: 'networking',
@@ -110,6 +136,30 @@ export const awsIntegrations: AWSIntegration[] = [
     icon: '',
     description: 'Collect logs from EC2 instances',
     cloudFormationTemplate: '',
+    cloudFormationTemplates: [
+      {
+        name: 'CloudWatch via SSM',
+        description: 'Deploy CloudWatch agent to EC2 instances via AWS Systems Manager',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-cloudwatch-via-ssm.yaml',
+      },
+      {
+        name: 'OpenTelemetry via SSM',
+        description: 'Deploy OpenTelemetry collector to EC2 instances via AWS Systems Manager',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-otel-via-ssm.yaml',
+      },
+    ],
+    componentOptions: [
+      {
+        name: 'Windows (Manual Install)',
+        description: 'Manually install OpenObserve collector on Windows EC2 instances',
+        component: 'WindowsConfig',
+      },
+      {
+        name: 'Linux/Unix/MacOS (Manual Install)',
+        description: 'Manually install OpenObserve collector on Linux/Unix/MacOS EC2 instances',
+        component: 'LinuxConfig',
+      },
+    ],
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/ec2',
     category: 'logs',
@@ -121,7 +171,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'RDS Logs',
     icon: '',
     description: 'Monitor RDS database logs',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/rds-logs-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/rds',
     category: 'logs',
@@ -133,7 +183,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'S3 Access Logs',
     icon: '',
     description: 'Track S3 bucket access and operations',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/s3-access-logs-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://openobserve.ai/docs/ingestion/logs/s3/',
     category: 'logs',
@@ -157,7 +207,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'API Gateway Logs',
     icon: '',
     description: 'Analyze API Gateway access logs',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/apigateway-logs-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/api-gateway',
     category: 'logs',
@@ -169,7 +219,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'Cognito',
     icon: '',
     description: 'Monitor Cognito authentication events',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cognito-events-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/cognito',
     category: 'security',
@@ -182,6 +232,18 @@ export const awsIntegrations: AWSIntegration[] = [
     icon: '',
     description: 'Track DynamoDB operations',
     cloudFormationTemplate: '',
+    cloudFormationTemplates: [
+      {
+        name: 'Lambda Integration',
+        description: 'Stream DynamoDB data to OpenObserve via Lambda',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve-lambda.yaml',
+      },
+      {
+        name: 'Direct Integration',
+        description: 'Stream DynamoDB data directly to OpenObserve',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve.yaml',
+      },
+    ],
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/dynamodb',
     category: 'logs',
@@ -193,7 +255,19 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'CloudFront Logs',
     icon: '',
     description: 'Analyze CloudFront access logs',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: '', // Keep empty when using cloudFormationTemplates
+    cloudFormationTemplates: [
+      {
+        name: 'Direct Integration',
+        description: 'Stream CloudFront logs directly to OpenObserve',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve.yaml',
+      },
+      {
+        name: 'S3 Integration',
+        description: 'Ingest CloudFront logs from S3 bucket',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve-s3.yaml',
+      },
+    ],
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/cloudfront',
     category: 'networking',
@@ -205,7 +279,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'Route53 Query Logs',
     icon: '',
     description: 'Monitor DNS query logs',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/route53-logs-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/route53',
     category: 'networking',
@@ -217,7 +291,7 @@ export const awsIntegrations: AWSIntegration[] = [
     displayName: 'EventBridge Events',
     icon: '',
     description: 'Capture EventBridge/CloudWatch events',
-    cloudFormationTemplate: '',
+    cloudFormationTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/eventbridge-to-openobserve.yaml',
     hasDashboard: false,
     documentationUrl: 'https://short.openobserve.ai/aws/eventbridge',
     category: 'other',
@@ -230,6 +304,18 @@ export const awsIntegrations: AWSIntegration[] = [
     icon: '',
     description: 'Integrate with Kinesis data streams',
     cloudFormationTemplate: '',
+    cloudFormationTemplates: [
+      {
+        name: 'Lambda Integration',
+        description: 'Stream Kinesis data to OpenObserve via Lambda',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-lambda.yaml',
+      },
+      {
+        name: 'Firehose Integration',
+        description: 'Stream Kinesis data directly via Kinesis Firehose',
+        url: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-firehose.yaml',
+      },
+    ],
     hasDashboard: false,
     documentationUrl: 'https://docs.aws.amazon.com/streams/latest/dev/using-other-services.html',
     category: 'other',
