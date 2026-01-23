@@ -306,22 +306,7 @@ async fn find_or_create_incident(
             );
         }
 
-        // Update incident metadata
-        let new_alert_count = existing.alert_count + 1;
-        infra::table::alert_incidents::update_incident_metadata(
-            org_id,
-            &existing.id,
-            new_alert_count,
-            triggered_at,
-            if dimensions_changed {
-                Some(serde_json::to_value(&current_dims)?)
-            } else {
-                None
-            },
-        )
-        .await?;
-
-        // Add alert to junction table
+        // Add alert to junction table (this also increments alert_count and updates last_alert_at)
         let alert_id = alert.get_unique_key();
         infra::table::alert_incidents::add_alert_to_incident(
             &existing.id,
@@ -331,6 +316,23 @@ async fn find_or_create_incident(
             correlation_reason,
         )
         .await?;
+
+        // Update dimensions if changed
+        if dimensions_changed {
+            // Get the updated count after add_alert_to_incident
+            let updated = infra::table::alert_incidents::get(org_id, &existing.id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found after update"))?;
+
+            infra::table::alert_incidents::update_incident_metadata(
+                org_id,
+                &existing.id,
+                updated.alert_count,
+                updated.last_alert_at,
+                Some(serde_json::to_value(&current_dims)?),
+            )
+            .await?;
+        }
 
         log::debug!(
             "[incidents] Added alert '{}' to existing incident {} (correlation_key: {}, dimensions_changed: {})",
