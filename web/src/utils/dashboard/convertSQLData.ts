@@ -54,6 +54,11 @@ import { type SeriesObject } from "@/ts/interfaces/dashboard";
 import { getDataValue } from "./aliasUtils";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import {
+  logTimeStart,
+  logTimeEnd,
+  logMessage,
+} from "@/utils/dashboard/debuggingLogs";
+import {
   createBaseLegendConfig,
   applyLegendConfiguration,
   applyPieDonutChartAlignment,
@@ -122,6 +127,12 @@ export const convertMultiSQLData = async (
   chartPanelStyle: any,
   annotations: any,
 ) => {
+  logTimeStart("[PERF] convertMultiSQLData: Total");
+  logMessage(
+    "[PERF] SQL Data conversion starting - Records: " +
+      (searchQueryData?.length ?? 0),
+  );
+
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     // this sets a blank object until it loads
     // because of this, it will go to UI and draw something, even 0 or a blank chart
@@ -173,6 +184,7 @@ export const convertMultiSQLData = async (
     }
   }
 
+  logTimeEnd("[PERF] convertMultiSQLData: Total");
   return options[0];
 };
 
@@ -506,7 +518,7 @@ export const convertSQLData = async (
     const utcFormatter = createDateFormatter("UTC");
 
     const missingValueLabel = `missingValueDataFillLoop-${panelSchema.id}`;
-    console.time(missingValueLabel);
+    logTimeStart(missingValueLabel);
     while (currentTime <= endTime) {
       const currentFormattedTime = formatDateWithFormatter(
         currentTime,
@@ -555,7 +567,7 @@ export const convertSQLData = async (
 
       currentTime = new Date(currentTime.getTime() + intervalMillis);
     }
-    console.timeEnd(missingValueLabel);
+    logTimeEnd(missingValueLabel);
 
     return filledData;
   };
@@ -1010,11 +1022,22 @@ export const convertSQLData = async (
   // Calculate additional spacing needed for rotated labels
   // Skip rotation for time-based x-axis and horizontal chart types (h-bar, h-stacked)
   // For horizontal charts, labels should always be at 0 degrees (not rotated)
-  let labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-  let labelWidth = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_truncate_width || 0);
+  let labelRotation =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : panelSchema.config?.axis_label_rotate || 0;
+  let labelWidth =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : panelSchema.config?.axis_label_truncate_width || 0;
 
   // If truncate width is not set and not time-based/horizontal, calculate the actual max width from data
-  if (!hasTimestampField && !isHorizontalChart && labelWidth === 0 && xAxisKeys.length > 0) {
+  if (
+    !hasTimestampField &&
+    !isHorizontalChart &&
+    labelWidth === 0 &&
+    xAxisKeys.length > 0
+  ) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
     labelWidth = calculateWidthText(longestLabelStr, "12px");
   } else if (!hasTimestampField && !isHorizontalChart && labelWidth === 0) {
@@ -1026,22 +1049,28 @@ export const convertSQLData = async (
 
   // Calculate the section height (nameGap) upfront so we can use it for bottom spacing
   // Skip rotation-based calculations for horizontal charts and time-based axes
-  const dynamicXAxisNameGap = (hasTimestampField || isHorizontalChart) ? 25 : calculateDynamicNameGap(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    25,
-    labelMargin,
-  );
+  const dynamicXAxisNameGap =
+    hasTimestampField || isHorizontalChart
+      ? 25
+      : calculateDynamicNameGap(
+          labelRotation,
+          labelWidth,
+          labelFontSize,
+          25,
+          labelMargin,
+        );
 
   // Additional bottom space is only needed for non-horizontal, non-time-based charts
-  const additionalBottomSpace = (hasTimestampField || isHorizontalChart) ? 0 : calculateRotatedLabelBottomSpace(
-    labelRotation,
-    labelWidth,
-    labelFontSize,
-    !!hasXAxisName,
-    dynamicXAxisNameGap,
-  );
+  const additionalBottomSpace =
+    hasTimestampField || isHorizontalChart
+      ? 0
+      : calculateRotatedLabelBottomSpace(
+          labelRotation,
+          labelWidth,
+          labelFontSize,
+          !!hasXAxisName,
+          dynamicXAxisNameGap,
+        );
 
   const options: any = {
     backgroundColor: "transparent",
@@ -1056,17 +1085,22 @@ export const convertSQLData = async (
             const baseBottom =
               legendConfig.orient === "horizontal" &&
               panelSchema.config?.show_legends
-                ? (panelSchema.config?.axis_width == null ? 50 : 60)
-                : (panelSchema.config?.axis_width == null ? 35 : 40);
-          // When an x-axis name is present, `nameGap` already reserves space
-          // between rotated labels and the axis name. Adding `additionalBottomSpace`
-          // here causes double-counting and extra blank space beneath the axis
-          // name. Only return the base bottom in this case.
-          return baseBottom;
+                ? panelSchema.config?.axis_width == null
+                  ? 50
+                  : 60
+                : panelSchema.config?.axis_width == null
+                  ? 35
+                  : 40;
+            // When an x-axis name is present, `nameGap` already reserves space
+            // between rotated labels and the axis name. Adding `additionalBottomSpace`
+            // here causes double-counting and extra blank space beneath the axis
+            // name. Only return the base bottom in this case.
+            return baseBottom;
           })()
         : (() => {
             const baseBottom =
-              legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+              legendConfig.orient === "vertical" &&
+              panelSchema.config?.show_legends
                 ? 0
                 : breakDownKeys.length > 0
                   ? 25
@@ -1236,8 +1270,14 @@ export const convertSQLData = async (
       }
 
       // Use 0 for rotation and width if time-based field or horizontal chart
-      const labelRotation = (hasTimestampField || isHorizontalChart) ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-      const labelWidth = (hasTimestampField || isHorizontalChart) ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
+      const labelRotation =
+        hasTimestampField || isHorizontalChart
+          ? 0
+          : panelSchema.config?.axis_label_rotate || 0;
+      const labelWidth =
+        hasTimestampField || isHorizontalChart
+          ? 120
+          : panelSchema.config?.axis_label_truncate_width || 120;
       const labelFontSize = 12;
       const labelMargin = 10;
 
@@ -1654,8 +1694,11 @@ export const convertSQLData = async (
             }
           },
         };
-        const xAxisLabelRotation = hasTimestampField ? 0 : (panelSchema.config?.axis_label_rotate || 0);
-        const xAxisLabelWidth = panelSchema.config?.axis_label_truncate_width || 120;
+        const xAxisLabelRotation = hasTimestampField
+          ? 0
+          : panelSchema.config?.axis_label_rotate || 0;
+        const xAxisLabelWidth =
+          panelSchema.config?.axis_label_truncate_width || 120;
         options.xAxis[0].axisLabel = {
           rotate: xAxisLabelRotation,
         };
@@ -2102,8 +2145,12 @@ export const convertSQLData = async (
           }
         },
       };
-      const stackedXAxisRotation = hasTimestampField ? 0 : (options.xAxis[0].axisLabel?.rotate || 0);
-      const stackedXAxisWidth = hasTimestampField ? 120 : (panelSchema.config?.axis_label_truncate_width || 120);
+      const stackedXAxisRotation = hasTimestampField
+        ? 0
+        : options.xAxis[0].axisLabel?.rotate || 0;
+      const stackedXAxisWidth = hasTimestampField
+        ? 120
+        : panelSchema.config?.axis_label_truncate_width || 120;
       options.xAxis[0].axisLabel.margin = 5;
       options.xAxis[0].axisLabel = {
         rotate: stackedXAxisRotation,
@@ -2160,7 +2207,7 @@ export const convertSQLData = async (
         });
       });
 
-      (options.visualMap = {
+      ((options.visualMap = {
         min: 0,
         max: zValues.reduce(
           (a: any, b: any) =>
@@ -2209,9 +2256,9 @@ export const convertSQLData = async (
               },
             },
           },
-        ]);
+        ]));
       // option.yAxis.data=xAxisFirstPositionUniqueValue;
-      (options.tooltip = {
+      ((options.tooltip = {
         position: "top",
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
@@ -2256,7 +2303,7 @@ export const convertSQLData = async (
             precision: panelSchema.config?.decimals,
             backgroundColor: store.state.theme === "dark" ? "#333" : "",
           },
-        });
+        }));
       // if auto sql
       if (panelSchema?.queries[0]?.customQuery == false) {
         // check if x axis has histogram or not
@@ -2273,7 +2320,7 @@ export const convertSQLData = async (
           // convert time string to selected timezone using reusable formatter
           const timezoneFormatter = createDateFormatter(store.state.timezone);
           const heatmapHistogramLabel = `heatmap timezone conversion - histogram-${panelSchema.id}`;
-          console.time(heatmapHistogramLabel);
+          logTimeStart(heatmapHistogramLabel);
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
               return formatDateWithFormatter(
@@ -2282,7 +2329,7 @@ export const convertSQLData = async (
               );
             },
           );
-          console.timeEnd(heatmapHistogramLabel);
+          logTimeEnd(heatmapHistogramLabel);
         }
         // else custom sql
       } else {
@@ -2296,7 +2343,7 @@ export const convertSQLData = async (
           // convert time string to selected timezone using reusable formatter
           const timezoneFormatter = createDateFormatter(store.state.timezone);
           const heatmapCustomSQLLabel = `heatmap timezone conversion - custom SQL-${panelSchema.id}`;
-          console.time(heatmapCustomSQLLabel);
+          logTimeStart(heatmapCustomSQLLabel);
           xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
             (it: any) => {
               return formatDateWithFormatter(
@@ -2305,12 +2352,12 @@ export const convertSQLData = async (
               );
             },
           );
-          console.timeEnd(heatmapCustomSQLLabel);
+          logTimeEnd(heatmapCustomSQLLabel);
         }
       }
 
       options.grid.bottom = 60;
-      (options.xAxis = [
+      ((options.xAxis = [
         {
           type: "category",
           data: xAxisZerothPositionUniqueValue,
@@ -2327,7 +2374,7 @@ export const convertSQLData = async (
               show: true,
             },
           }),
-        ];
+        ]);
       options.legend.show = false;
       break;
     }
@@ -2620,7 +2667,7 @@ export const convertSQLData = async (
       const timeStringCache: any = {};
 
       const autoSQLLabel = `auto SQL timezone conversion-${panelSchema.id}`;
-      console.time(autoSQLLabel);
+      logTimeStart(autoSQLLabel);
 
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
@@ -2668,7 +2715,7 @@ export const convertSQLData = async (
         }
       });
 
-      console.timeEnd(autoSQLLabel);
+      logTimeEnd(autoSQLLabel);
 
       // Trellis has multiple x axis
       if (panelSchema.config.trellis?.layout) {
@@ -2695,7 +2742,13 @@ export const convertSQLData = async (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          options.xAxis[0].nameGap = calculateDynamicNameGap(
+            0,
+            120,
+            12,
+            25,
+            10,
+          );
         }
       }
 
@@ -2848,7 +2901,7 @@ export const convertSQLData = async (
       const timezoneFormatter = createDateFormatter(store.state.timezone);
 
       const customSQLLabel = `custom SQL timezone conversion-${panelSchema.id}`;
-      console.time(customSQLLabel);
+      logTimeStart(customSQLLabel);
 
       options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
@@ -2880,7 +2933,7 @@ export const convertSQLData = async (
         }
       });
 
-      console.timeEnd(customSQLLabel);
+      logTimeEnd(customSQLLabel);
 
       // Trellis has multiple x axis
       if (panelSchema.config.trellis?.layout) {
@@ -2907,7 +2960,13 @@ export const convertSQLData = async (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
+          options.xAxis[0].nameGap = calculateDynamicNameGap(
+            0,
+            120,
+            12,
+            25,
+            10,
+          );
         }
       }
 
@@ -3169,8 +3228,6 @@ const largestLabel = (data: any) => {
   return largestlabel;
 };
 
-
-
 const showTrellisConfig = (type: string) => {
   const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
   return supportedTypes.has(type);
@@ -3201,7 +3258,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
           panelSchema.config?.line_interpolation,
         )
           ? // TODO: replace this with type integrations
-          panelSchema.config.line_interpolation.replace("step-", "")
+            panelSchema.config.line_interpolation.replace("step-", "")
           : false,
         showSymbol: panelSchema.config?.show_symbol ?? false,
         areaStyle: null,

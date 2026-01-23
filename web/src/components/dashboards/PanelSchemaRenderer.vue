@@ -347,6 +347,11 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
+import {
+  logTimeStart,
+  logTimeEnd,
+  logMessage,
+} from "@/utils/dashboard/debuggingLogs";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import {
@@ -565,7 +570,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
-      null // null default allows us to detect if key was provided
+      null, // null default allows us to detect if key was provided
     );
 
     // Only access the composable if we're in a context that provides a page key
@@ -1008,8 +1013,8 @@ export default defineComponent({
     // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
     // This prevents excessive re-renders while showing progressive updates
     const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true,  // Call immediately on first invocation
-      trailing: true  // Ensure final call after throttle period
+      leading: true, // Call immediately on first invocation
+      trailing: true, // Ensure final call after throttle period
     });
 
     // Watch for panel schema changes to re-convert panel data
@@ -1054,7 +1059,7 @@ export default defineComponent({
         data,
         () => store?.state?.theme,
         () => store?.state?.timezone,
-        annotations
+        annotations,
       ],
       async () => {
         // emit vrl function field list
@@ -1087,8 +1092,9 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
-        const hasData = data.value?.length > 0 &&
-                       data.value[0]?.result?.length > 0;
+        const hasData =
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 || data.value[0]?.length > 0);
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming
@@ -1096,14 +1102,19 @@ export default defineComponent({
           // First chunk with actual data: render immediately!
           if (hasData && !hasRenderedFirstDataChunk.value) {
             hasRenderedFirstDataChunk.value = true;
+            logMessage(
+              "[THROTTLE] First data chunk received - IMMEDIATE render",
+            );
             await convertPanelDataCommon();
           } else {
             // Subsequent chunks: throttle to reduce re-render frequency
+            logMessage("[THROTTLE] Data update - QUEUED for throttled render");
             await convertPanelDataThrottled();
           }
         } else {
           // Loading complete: immediate final render with full data
           // Cancel any pending throttled calls and render immediately
+          logMessage("[THROTTLE] Loading complete - IMMEDIATE final render");
           convertPanelDataThrottled.cancel();
           hasRenderedFirstDataChunk.value = false; // Reset for next query
           await convertPanelDataCommon();
@@ -1935,8 +1946,7 @@ export default defineComponent({
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
               });
             }
-          } catch (error) {
-          }
+          } catch (error) {}
         };
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
@@ -2227,29 +2237,32 @@ export default defineComponent({
 
             // Iterate through each response item (multiple queries can produce multiple responses)
             // Use filteredData to exclude hidden queries
-            filteredData?.value?.forEach((promData: any, queryIndex: number) => {
-              if (!promData?.result || !Array.isArray(promData.result)) return;
+            filteredData?.value?.forEach(
+              (promData: any, queryIndex: number) => {
+                if (!promData?.result || !Array.isArray(promData.result))
+                  return;
 
-              // Iterate through each result (time series)
-              promData.result.forEach((series: any, seriesIndex: number) => {
-                const metricLabels = series.metric || {};
+                // Iterate through each result (time series)
+                promData.result.forEach((series: any, seriesIndex: number) => {
+                  const metricLabels = series.metric || {};
 
-                // Iterate through values array (timestamp, value pairs)
-                series.values.forEach((point: any) => {
-                  const timestamp = point[0];
-                  const value = point[1];
+                  // Iterate through values array (timestamp, value pairs)
+                  series.values.forEach((point: any) => {
+                    const timestamp = point[0];
+                    const value = point[1];
 
-                  // Create a row with timestamp, value, and all metric labels
-                  const row = {
-                    timestamp: timestamp,
-                    value: value,
-                    ...metricLabels,
-                  };
+                    // Create a row with timestamp, value, and all metric labels
+                    const row = {
+                      timestamp: timestamp,
+                      value: value,
+                      ...metricLabels,
+                    };
 
-                  flattenedData.push(row);
+                    flattenedData.push(row);
+                  });
                 });
-              });
-            });
+              },
+            );
 
             // Get all unique keys across all data points
             const allKeys = new Set();

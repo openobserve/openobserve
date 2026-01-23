@@ -37,6 +37,11 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
+import {
+  logTimeStart,
+  logTimeEnd,
+  logMessage,
+} from "@/utils/dashboard/debuggingLogs";
 
 let moment: any;
 let momentInitialized = false;
@@ -85,6 +90,12 @@ export const convertPromQLData = async (
   annotations: any,
   metadata: any = null,
 ) => {
+  logTimeStart("[PERF] convertPromQLData: Total");
+  logMessage(
+    "[PERF] PromQL Data conversion starting - Records: " +
+      (searchQueryData?.length ?? 0),
+  );
+
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
     panelSchema?.config?.show_gridlines !== undefined
@@ -100,7 +111,7 @@ export const convertPromQLData = async (
     !searchQueryData[0] ||
     !panelSchema
   ) {
-    // console.timeEnd("convertPromQLData");
+    logTimeEnd("[PERF] convertPromQLData: Total");
     return { options: null };
   }
 
@@ -130,7 +141,11 @@ export const convertPromQLData = async (
       });
 
       // Apply annotations if present (only for ECharts-based charts)
-      if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
+      if (
+        annotations &&
+        annotations.length > 0 &&
+        panelSchema.type !== "table"
+      ) {
         const annotationResults = await getAnnotationsData(
           annotations,
           store,
@@ -140,6 +155,7 @@ export const convertPromQLData = async (
           result.options.annotations = annotationResults;
         }
       }
+      logTimeEnd("[PERF] convertPromQLData: Total");
       return result;
     } catch (error) {
       console.error(`Error converting ${panelSchema.type} chart:`, error);
@@ -194,7 +210,9 @@ export const convertPromQLData = async (
       extras.limitNumberOfSeriesWarningMessage =
         "Limiting the displayed series to ensure optimal performance";
     }
-  } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+  } else if (
+    totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)
+  ) {
     // Fallback: Series limiting happens here (for non-streaming queries)
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
@@ -238,7 +256,7 @@ export const convertPromQLData = async (
   // convert timestamp to specified timezone time
   const xAxisFormatter = createDateFormatter(store.state.timezone);
   const xAxisLabel = `promql-xAxis-conversion-${panelSchema.id}`;
-  console.time(xAxisLabel);
+  logTimeStart(xAxisLabel);
   xAxisData.forEach((value: number, index: number) => {
     // we need both milliseconds and date (object or string)
     const dateStr =
@@ -247,7 +265,7 @@ export const convertPromQLData = async (
         : new Date(value * 1000).toISOString().slice(0, -1);
     xAxisData[index] = [value, dateStr];
   });
-  console.timeEnd(xAxisLabel);
+  logTimeEnd(xAxisLabel);
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
@@ -340,7 +358,8 @@ export const convertPromQLData = async (
       top: "15",
       bottom: (() => {
         const baseBottom =
-          legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+          legendConfig.orient === "horizontal" &&
+          panelSchema.config?.show_legends
             ? panelSchema.config?.axis_width == null
               ? 30
               : 50
@@ -467,7 +486,9 @@ export const convertPromQLData = async (
         fontSize: 14,
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
+        show: searchQueryData?.every(
+          (it: any) => it && it.result && it.result.length == 0,
+        )
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -504,7 +525,9 @@ export const convertPromQLData = async (
         },
       },
       axisLine: {
-        show: searchQueryData?.every((it: any) => it && it.result && it.result.length == 0)
+        show: searchQueryData?.every(
+          (it: any) => it && it.result && it.result.length == 0,
+        )
           ? true
           : (panelSchema.config?.axis_border_show ?? false),
       },
@@ -730,7 +753,7 @@ export const convertPromQLData = async (
                     store.state.timezone,
                   );
                   const vectorLabel = `promql-vector-conversion-${panelSchema.id}`;
-                  console.time(vectorLabel);
+                  logTimeStart(vectorLabel);
                   const mappedData = values.map((value: any) => {
                     const dateStr =
                       store.state.timezone != "UTC"
@@ -741,7 +764,7 @@ export const convertPromQLData = async (
                         : new Date(value[0] * 1000).toISOString().slice(0, -1);
                     return [dateStr, value[1]];
                   });
-                  console.timeEnd(vectorLabel);
+                  logTimeEnd(vectorLabel);
                   return mappedData;
                 })(),
                 ...seriesPropsBasedOnChartType,
@@ -1062,7 +1085,7 @@ export const convertPromQLData = async (
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
-    // console.timeEnd("convertPromQLData");
+    logTimeEnd("[PERF] convertPromQLData: Total");
     return {
       options: {
         series: [],
@@ -1107,12 +1130,12 @@ export const convertPromQLData = async (
         panelSchema.config.legend_height.unit === "%"
           ? chartHeight * (panelSchema.config.legend_height.value / 100)
           : panelSchema.config.legend_height.value;
-      
+
       // Apply the configured height using the same approach as calculateBottomLegendHeight
       if (options.grid) {
         options.grid.bottom = legendHeight;
       }
-      
+
       const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
       options.legend.top = legendTopPosition;
       options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1148,12 +1171,12 @@ export const convertPromQLData = async (
       panelSchema.config.legend_height.unit === "%"
         ? chartHeight * (panelSchema.config.legend_height.value / 100)
         : panelSchema.config.legend_height.value;
-    
+
     // Apply the configured height using the same approach as calculateBottomLegendHeight
     if (options.grid) {
       options.grid.bottom = legendHeight;
     }
-    
+
     const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
     options.legend.top = legendTopPosition;
     options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1161,6 +1184,7 @@ export const convertPromQLData = async (
 
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
+  logTimeEnd("[PERF] convertPromQLData: Total");
   return {
     options,
     extras: {
@@ -1190,8 +1214,6 @@ const calculateWidthText = (text: string): number => {
   span.remove();
   return width;
 };
-
-
 
 /**
  * Retrieves the legend name for a given metric and label.

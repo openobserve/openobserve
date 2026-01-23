@@ -23,6 +23,7 @@ import {
   createDateFormatter,
   formatDateWithFormatter,
 } from "../convertDataIntoUnitValue";
+import { logTimeStart, logTimeEnd } from "../debuggingLogs";
 
 /**
  * Converter for table charts
@@ -425,7 +426,7 @@ export class TableConverter implements PromQLChartConverter {
       const dateFormatter = createDateFormatter(timezone);
 
       const singleModeLabel = `table-single-mode-conversion-${panelSchema.id}`;
-      console.time(singleModeLabel);
+      logTimeStart(singleModeLabel);
       processedData.forEach((queryData, qIndex) => {
         queryData.series.forEach((seriesData, sIndex) => {
           // Create a row for each data point
@@ -442,7 +443,7 @@ export class TableConverter implements PromQLChartConverter {
           });
         });
       });
-      console.timeEnd(singleModeLabel);
+      logTimeEnd(singleModeLabel);
 
       // Apply row limit if specified
       if (config.row_limit) {
@@ -458,7 +459,7 @@ export class TableConverter implements PromQLChartConverter {
       const dateFormatter = createDateFormatter(timezone);
 
       const expandedModeLabel = `table-expanded-timeseries-conversion-${panelSchema.id}`;
-      console.time(expandedModeLabel);
+      logTimeStart(expandedModeLabel);
       processedData.forEach((queryData, qIndex) => {
         queryData.series.forEach((seriesData, sIndex) => {
           // Create a row for each data point with all metadata
@@ -477,7 +478,7 @@ export class TableConverter implements PromQLChartConverter {
           });
         });
       });
-      console.timeEnd(expandedModeLabel);
+      logTimeEnd(expandedModeLabel);
 
       // Apply row limit if specified
       if (config.row_limit) {
