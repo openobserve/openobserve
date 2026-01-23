@@ -167,6 +167,9 @@ export class SQLQueryParser {
     this.parser = new Parser();
   }
 
+  // Store the original SQL query for reference when extracting CASE statements
+  private originalQuery: string = "";
+
   /**
    * Main parsing function that converts SQL query to panel query object
    */
@@ -175,6 +178,9 @@ export class SQLQueryParser {
     streamType: "logs" | "metrics" | "traces" = "logs"
   ): PanelQuery {
     console.log("[SQLQueryParser] Starting to parse query:", sqlQuery);
+
+    // Store original query for CASE statement extraction
+    this.originalQuery = sqlQuery;
 
     try {
       console.log("[SQLQueryParser] Step 1: Parsing SQL to AST...");
@@ -434,10 +440,13 @@ export class SQLQueryParser {
         const axisItem = this.createAxisItemFromExpression(col);
         yAxis.push(axisItem);
       } else if (col.expr.type === "case") {
-        // CASE statement - cannot be parsed into visual builder
-        // Throw error to trigger customQuery mode
-        console.log(`[SQLQueryParser.parseColumns] Column ${i} is CASE statement, cannot parse into visual builder`);
-        throw new Error("CASE statements are not supported in visual query builder. Please use custom SQL mode.");
+        // CASE statement - create as raw field
+        // Note: parser.sqlify() doesn't support CASE, so rawQuery will be empty
+        // User needs to manually enter the CASE expression or we need to extract from original SQL
+        console.log(`[SQLQueryParser.parseColumns] Column ${i} is CASE statement, creating raw field`);
+        const axisItem = this.createRawAxisItem(col, false);
+        // Add to breakdown since CASE statements are typically used for categorization
+        breakdown.push(axisItem);
       } else {
         // Other expressions - treat as raw fields
         console.log(`[SQLQueryParser.parseColumns] Column ${i} has unknown type (${col.expr.type}), treating as raw field`);
@@ -591,14 +600,20 @@ export class SQLQueryParser {
   private createRawAxisItem(col: any, assignColor: boolean = false): AxisItem {
     const alias = col.as || "field";
 
-    // Convert the expression back to SQL using the parser's sqlify method
+    // Try to convert using sqlify
     let rawQuery = "";
     try {
       rawQuery = this.parser.sqlify(col.expr);
       console.log(`[SQLQueryParser.createRawAxisItem] Converted expression to SQL: ${rawQuery}`);
     } catch (error) {
-      console.warn("[SQLQueryParser.createRawAxisItem] Failed to convert expression to SQL:", error);
-      rawQuery = "";
+      // For CASE statements, try to extract from original query
+      if (col.expr.type === "case" && alias && this.originalQuery) {
+        rawQuery = this.extractCaseStatementFromQuery(alias);
+        console.log(`[SQLQueryParser.createRawAxisItem] Extracted CASE statement for alias "${alias}": ${rawQuery}`);
+      } else {
+        console.warn("[SQLQueryParser.createRawAxisItem] Failed to convert expression to SQL:", error);
+        rawQuery = "";
+      }
     }
 
     return {
@@ -615,6 +630,52 @@ export class SQLQueryParser {
       showFieldAsJson: false,
       rawQuery: rawQuery,  // Store the raw SQL expression
     };
+  }
+
+  /**
+   * Extract CASE statement from original query by alias
+   * Supports multiple CASE statements in the same query
+   */
+  private extractCaseStatementFromQuery(alias: string): string {
+    if (!this.originalQuery) return "";
+
+    // Escape special regex characters in alias
+    const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Find all CASE...END blocks in the query
+    // We need to match balanced CASE/END pairs to handle nested CASE statements
+    const allCaseMatches: Array<{ case: string, alias: string }> = [];
+
+    // Pattern to find CASE ... END AS alias
+    const casePattern = /CASE[\s\S]*?END\s+(?:AS\s+)?['"` ]?(\w+)['"` ]?/gi;
+    let match;
+
+    while ((match = casePattern.exec(this.originalQuery)) !== null) {
+      const caseStatement = match[0];
+      const foundAlias = match[1];
+
+      // Extract just the CASE...END part (without AS alias)
+      const caseOnlyMatch = caseStatement.match(/(CASE[\s\S]*?END)/i);
+      if (caseOnlyMatch && foundAlias) {
+        allCaseMatches.push({
+          case: caseOnlyMatch[1].trim(),
+          alias: foundAlias
+        });
+      }
+    }
+
+    // Find the CASE statement matching our alias
+    const found = allCaseMatches.find(
+      item => item.alias.toLowerCase() === alias.toLowerCase()
+    );
+
+    if (found) {
+      console.log(`[SQLQueryParser] Found CASE for alias "${alias}":`, found.case);
+      return found.case;
+    }
+
+    console.warn(`[SQLQueryParser] Could not find CASE statement for alias "${alias}"`);
+    return "";
   }
 
   /**
