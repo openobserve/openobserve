@@ -1,30 +1,36 @@
 import { test, expect } from "../baseFixtures";
-import { LoginPage } from '../../pages/generalPages/loginPage';
 import { PipelinesEP } from "../../pages/pipelinesPages/pipelinesEP";
 import { IngestionPage } from '../../pages/generalPages/ingestionPage';
 import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestinations';
+const path = require('path');
 
 test.describe.configure({ mode: 'parallel' });
 
+// Use stored authentication state from global setup instead of logging in each test
+const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
+  storageState: authFile,
   contextOptions: {
     slowMo: 1000
   }
 });
 
 test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
-    let loginPage, pipelinesEP, ingestionPage, pipelineDestinations;
+    let pipelinesEP, ingestionPage, pipelineDestinations;
 
     test.beforeEach(async ({ page }) => {
-        loginPage = new LoginPage(page);
+        // Auth is handled via storageState - no login needed
         ingestionPage = new IngestionPage(page);
         pipelinesEP = new PipelinesEP(page);
         pipelineDestinations = new PipelineDestinations(page);
-        await loginPage.gotoLoginPage();
-        await loginPage.loginAsInternalUser();
-        await loginPage.login(); // Login as root user
+
+        // Ingest test data via API
         await ingestionPage.ingestion();
         await ingestionPage.ingestionJoin();
+
+        // Navigate to base URL after data ingestion (required for storageState)
+        await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`);
+        await page.waitForLoadState('networkidle');
     });
 
     test("Import RealTime Pipeline from URL, download and delete imported pipeline", async ({ page }) => {
