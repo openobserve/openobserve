@@ -109,7 +109,8 @@
     "chunkLoadError": "该应用程序的新版本可用。请刷新页面继续。",
     "chunkLoadErrorMsg": "该应用程序的新版本可用。请刷新页面继续。",
     "id": "身份证",
-    "getStarted": "开始吧"
+    "getStarted": "开始吧",
+    "test": "这是个测试"
   },
   "search": {
     "selectIndex": "选择数据流",

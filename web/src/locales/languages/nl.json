@@ -109,7 +109,8 @@
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "id": "ID",
-    "getStarted": "Ga aan de slag"
+    "getStarted": "Ga aan de slag",
+    "test": "Dit is een test"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

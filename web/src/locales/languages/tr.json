@@ -109,7 +109,8 @@
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "id": "KİMLİK",
-    "getStarted": "Başlayın"
+    "getStarted": "Başlayın",
+    "test": "Bu bir test"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

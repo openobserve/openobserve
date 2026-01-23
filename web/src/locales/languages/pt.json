@@ -109,7 +109,8 @@
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "id": "CARTEIRA DE IDENTIDADE",
-    "getStarted": "Comece"
+    "getStarted": "Comece",
+    "test": "Este é um teste"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

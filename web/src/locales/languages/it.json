@@ -109,7 +109,8 @@
     "chunkLoadError": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "chunkLoadErrorMsg": "È disponibile una nuova versione dell'applicazione. Aggiorna la pagina per continuare.",
     "id": "ID",
-    "getStarted": "Inizia"
+    "getStarted": "Inizia",
+    "test": "Questo è un test"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

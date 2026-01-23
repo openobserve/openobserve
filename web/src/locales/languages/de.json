@@ -109,7 +109,8 @@
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "id": "ID",
-    "getStarted": "Fangen Sie an"
+    "getStarted": "Fangen Sie an",
+    "test": "Das ist ein Test"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
