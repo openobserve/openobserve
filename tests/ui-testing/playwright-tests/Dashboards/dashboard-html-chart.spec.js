@@ -7,6 +7,7 @@ import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
@@ -151,6 +152,17 @@ test.describe("HTML chart dashboard", () => {
     await expect(
       page.getByRole("heading", { name: "Openobserve" })
     ).toBeVisible();
+
+    // Wait for values stream API to complete before selecting variable value
+    const valuesStreamPromise = waitForValuesStreamComplete(page);
+
+    await pm.dashboardVariables.selectValueFromVariableDropDown(
+      "variablename",
+      "controller"
+    );
+
+    // Wait for the API call to complete
+    await valuesStreamPromise;
 
     await expect(
       page.locator('[data-test="html-renderer"]').getByText("controller")
