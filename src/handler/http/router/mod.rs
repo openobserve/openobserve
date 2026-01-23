@@ -388,6 +388,14 @@ pub fn basic_routes() -> Router {
             "/webhook",
             Router::new().route("/stripe", post(cloud::billings::handle_stripe_event)),
         );
+
+        // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
+        // Must be publicly accessible (no auth) as users haven't logged in yet
+        // Using /marketplace path to avoid conflict with authenticated /api scope
+        router = router.route(
+            "/marketplace/aws/register",
+            post(cloud::aws_marketplace::aws_marketplace_register),
+        );
     }
 
     // OAuth 2.0 metadata endpoint
@@ -825,6 +833,14 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/link-subscription",
+                post(cloud::aws_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/aws-marketplace/activation-status",
+                get(cloud::aws_marketplace::activation_status),
             );
     }
 
