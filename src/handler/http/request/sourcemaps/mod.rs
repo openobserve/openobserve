@@ -26,7 +26,10 @@ use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{db::sourcemaps as db_sourcemaps, sourcemaps as sv_sourcemaps},
+    service::{
+        db::sourcemaps as db_sourcemaps,
+        sourcemaps::{self as sv_sourcemaps, TranslatedStack},
+    },
 };
 
 #[derive(Serialize)]
@@ -50,7 +53,7 @@ pub struct StacktraceRequest {
 
 #[derive(Serialize)]
 struct StacktraceResponse {
-    stacktrace: String,
+    stacktrace: TranslatedStack,
 }
 
 /// ListSourcemaps
@@ -181,7 +184,7 @@ pub async fn translate_stacktrace(
     let st = req.stacktrace;
 
     match sv_sourcemaps::translate_stacktrace(&org_id, service, env, version, st).await {
-        Ok(cst) => MetaHttpResponse::json(StacktraceResponse { stacktrace: cst }),
+        Ok(res) => MetaHttpResponse::json(StacktraceResponse { stacktrace: res }),
         Err(e) => {
             log::error!("error translating stacktrace for org_id {org_id} : {e}");
             MetaHttpResponse::internal_error(e)
@@ -296,7 +299,7 @@ pub async fn upload_maps(Path(org_id): Path<String>, mut multipart: Multipart) -
         Ok(_) => {
             log::info!("successfully saved sourcemaps for {org_id}");
             MetaHttpResponse::created("successfully stored sourcemaps")
-        },
+        }
         Err(e) => {
             log::info!("error in storing sourcemaps for org_id {org_id} : {e}");
             MetaHttpResponse::bad_request(e)

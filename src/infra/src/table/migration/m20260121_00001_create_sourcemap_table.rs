@@ -77,7 +77,11 @@ fn create_sourcemaps_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(SourceMaps::FileType).integer().not_null())
-        .col(ColumnDef::new(SourceMaps::CreatedAt).big_integer().not_null())
+        .col(
+            ColumnDef::new(SourceMaps::CreatedAt)
+                .big_integer()
+                .not_null(),
+        )
         .col(ColumnDef::new(SourceMaps::IsLocal).boolean().not_null())
         .to_owned()
 }

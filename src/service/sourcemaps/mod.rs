@@ -6,10 +6,14 @@ use infra::{
     storage,
     table::source_maps::{FileType, SourceMap},
 };
+use serde::Serialize;
 
 use super::db::sourcemaps;
 
 const UNKNOWN_STR: &str = "<unknown>";
+// half-window size for returning source. Basically for trace at line l, it will return l-this -> l+
+// this so total of this*2 +1 lines.
+const SOURCE_CONTEXT_SIZE_HALF: u32 = 5;
 
 // only for internal user as of now.
 struct Filter {
@@ -23,6 +27,45 @@ struct ParsedLine {
     file: String,
     line: u32,
     col: u32,
+}
+
+#[derive(Serialize)]
+pub struct SourceData {
+    pub source: String,
+    pub source_line_start: u32,
+    pub source_line_end: u32,
+    pub stack_line: u32,
+    pub stack_col: u32,
+}
+
+#[derive(Serialize)]
+pub struct TranslatedStackLine {
+    pub line: String,
+    pub source_info: Option<SourceData>,
+}
+
+#[derive(Serialize)]
+pub struct TranslatedStack {
+    error: String,
+    stack: Vec<TranslatedStackLine>,
+}
+
+impl TranslatedStack {
+    pub fn empty() -> Self {
+        Self {
+            error: String::new(),
+            stack: Vec::new(),
+        }
+    }
+    pub fn empty_with_message(msg: String) -> Self {
+        Self {
+            error: msg,
+            stack: Vec::new(),
+        }
+    }
+    pub fn add_line(&mut self, line: TranslatedStackLine) {
+        self.stack.push(line);
+    }
 }
 
 fn get_file_path(org_id: &str, name: &str) -> String {
@@ -196,7 +239,10 @@ async fn get_sourcemap_file_info(
     Ok(id)
 }
 
-async fn resolve_stack(parsed: ParsedLine, f: &Filter) -> Result<String, anyhow::Error> {
+async fn resolve_stack(
+    parsed: ParsedLine,
+    f: &Filter,
+) -> Result<TranslatedStackLine, anyhow::Error> {
     // sourcemaps crate use 0 based indexes for line and col, but stacktrace
     // has 1 based index, so we sub saturating-ly to adjust for that
     let smap_line = parsed.line.saturating_sub(1);
@@ -248,13 +294,42 @@ async fn resolve_stack(parsed: ParsedLine, f: &Filter) -> Result<String, anyhow:
     }
 
     let translated = format!(
-        "\tat {} @ {}:{}:{}\n",
+        "at {} @ {}:{}:{}",
         tok.get_name().unwrap_or(UNKNOWN_STR),
         tok.get_source().unwrap_or(UNKNOWN_STR),
         sline,
         scol
     );
-    Ok(translated)
+    let mut sdata = None;
+    if src_line != u32::MAX
+        && let Some(s) = tok.get_source_view()
+    {
+        let src_adj = src_line.saturating_add(1);
+        let src_ctx_start = src_adj.saturating_sub(SOURCE_CONTEXT_SIZE_HALF);
+        let mut src_ctx_end = src_adj.saturating_add(SOURCE_CONTEXT_SIZE_HALF);
+
+        let mut src_lines = Vec::new();
+
+        for i in src_ctx_start..=src_ctx_end {
+            if let Some(line) = s.get_line(i) {
+                src_lines.push(line.to_string());
+            } else {
+                src_ctx_end = i;
+                break;
+            }
+        }
+        sdata = Some(SourceData {
+            source: src_lines.join("\n"),
+            source_line_start: src_ctx_start,
+            source_line_end: src_ctx_end,
+            stack_line: src_adj,
+            stack_col: src_col.saturating_add(1),
+        });
+    }
+    Ok(TranslatedStackLine {
+        line: translated,
+        source_info: sdata,
+    })
 }
 
 pub async fn translate_stacktrace(
@@ -263,9 +338,9 @@ pub async fn translate_stacktrace(
     env: Option<String>,
     version: Option<String>,
     stacktrace: String,
-) -> Result<String, anyhow::Error> {
+) -> Result<TranslatedStack, anyhow::Error> {
     if stacktrace.is_empty() {
-        return Ok(stacktrace);
+        return Ok(TranslatedStack::empty());
     }
 
     let f = Filter {
@@ -274,8 +349,6 @@ pub async fn translate_stacktrace(
         env,
         version,
     };
-
-    let mut converted_stacks = Vec::new();
 
     // here, the stack trace will be something like
     // TypeError: can't access property "toUpperCase" of null
@@ -288,8 +361,10 @@ pub async fn translate_stacktrace(
     let mut lines = stacktrace.split("\n");
     // first line is message, so extract is separately.
     let Some(message) = lines.next() else {
-        return Ok(stacktrace);
+        return Ok(TranslatedStack::empty_with_message(stacktrace));
     };
+
+    let mut translated_stack = TranslatedStack::empty_with_message(message.to_string());
 
     //  now for the reset of the lines, process them one by one
     for line in lines {
@@ -300,16 +375,22 @@ pub async fn translate_stacktrace(
                     Err(e) => {
                         // if there is any error, we use the original line
                         log::info!("error in translating stack for {org_id} : {e}");
-                        line.to_string()
+                        TranslatedStackLine {
+                            line: line.to_string(),
+                            source_info: None,
+                        }
                     }
                 };
-                converted_stacks.push(t);
+                translated_stack.add_line(t);
             }
             Err(_) => {
-                converted_stacks.push(line.to_string());
+                let fallback_line = TranslatedStackLine {
+                    line: line.to_string(),
+                    source_info: None,
+                };
+                translated_stack.add_line(fallback_line);
             }
         }
     }
-    let converted: String = converted_stacks.into_iter().collect();
-    Ok(format!("{message}\n{converted}"))
+    Ok(translated_stack)
 }
