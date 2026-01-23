@@ -11,28 +11,15 @@ Tests for pipeline backfill functionality:
 
 These tests verify the core backfill functionality, not just UI mechanics.
 
-CI/CD Requirement:
-    These tests ingest data with timestamps 1 day in the past.
-    The server must have: ZO_INGEST_ALLOWED_UPTO=48 (or higher)
-    to allow backdated data ingestion for backfill testing.
+Note: Tests use recent timestamps (15 minutes ago) to ensure data is in the
+    current partition, which both _search API and backfill scheduler can access.
 """
 
-import os
 import pytest
 import random
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
-
-# CI environment detection - GitHub Actions sets CI=true
-IS_CI = os.environ.get("CI", "").lower() == "true"
-
-# Skip reason for scheduler-dependent tests
-CI_SCHEDULER_SKIP_REASON = (
-    "Skipped in CI: Backfill scheduler depends on derived_stream.evaluate() which "
-    "returns no data in fresh debug builds. These tests pass on dev2/production. "
-    "The backfill API and job lifecycle are verified by other tests in this file."
-)
 
 
 class TestBackfillJob:
@@ -305,8 +292,8 @@ class TestBackfillJob:
         """Test creating a backfill job for a scheduled pipeline."""
         print("\n=== Test: Create backfill job ===")
 
-        # 1. Ingest historical data (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # 1. Ingest data with recent timestamp
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=5)
         time.sleep(2)  # Wait for indexing
 
@@ -318,8 +305,8 @@ class TestBackfillJob:
         )
 
         # 3. Create backfill job
-        start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=1)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
 
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
@@ -332,25 +319,20 @@ class TestBackfillJob:
         print(f"  Job status: {status.get('status')}")
         print(f"  Progress: {status.get('progress_percent', 0)}%")
 
-    @pytest.mark.skipif(IS_CI, reason=CI_SCHEDULER_SKIP_REASON)
     def test_02_backfill_execution_and_data_verification(self):
-        """Test that backfill actually processes data and writes to destination.
-
-        NOTE: This test is skipped in CI because it depends on the backfill scheduler
-        actually processing data through derived_stream.evaluate(), which doesn't work
-        in fresh CI debug builds. The test passes on dev2/production environments.
-        """
+        """Test that backfill actually processes data and writes to destination."""
         print("\n=== Test: Backfill execution and data verification ===")
 
-        # 1. Ingest historical data with known content (23 hours ago)
-        # Note: Using 23 hours instead of 24 (1 day) to stay safely within ingestion limits
-        # Data exactly at the boundary (24h) may be rejected depending on ZO_INGEST_ALLOWED_UPTO
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # 1. Ingest data with RECENT timestamps (15 minutes ago)
+        # Using recent timestamps ensures data is in the current partition,
+        # which both _search API and derived_stream.evaluate() can access.
+        # Old timestamps (hours/days ago) may cause partition alignment issues
+        # where data is written to current partition but backfill looks elsewhere.
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         record_count = 10
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=record_count)
 
-        # 2. CRITICAL: Wait for data to be indexed and queryable BEFORE creating backfill
-        # In CI, freshly started instance may need more time to index data
+        # 2. Wait for data to be indexed and queryable
         print("  Waiting for source data to be queryable...")
         source_hits = []
         for attempt in range(15):  # Up to 30 seconds
@@ -371,9 +353,9 @@ class TestBackfillJob:
             name_suffix="verify"
         )
 
-        # 4. Create and run backfill
-        start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=2)).timestamp() * 1000000)
+        # 4. Create and run backfill - time range covers the recent data
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
 
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
 
@@ -428,8 +410,8 @@ class TestBackfillJob:
         """Test getting a specific backfill job status."""
         print("\n=== Test: Get backfill job status ===")
 
-        # Create a pipeline and backfill job (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create a pipeline and backfill job
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -439,8 +421,8 @@ class TestBackfillJob:
             name_suffix="status"
         )
 
-        start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=1)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
         # Get specific backfill job status
@@ -461,18 +443,12 @@ class TestBackfillJob:
         print(f"  Status: {job.get('status')}")
         print(f"  Progress: {job.get('progress_percent')}%")
 
-    @pytest.mark.skipif(IS_CI, reason=CI_SCHEDULER_SKIP_REASON)
     def test_04_pause_and_resume_backfill(self):
-        """Test pausing and resuming a backfill job.
-
-        NOTE: This test is skipped in CI because the backfill job completes too quickly
-        (scheduler processes chunks instantly with no data) before pause can be tested.
-        The test passes on dev2/production where backfill takes more time.
-        """
+        """Test pausing and resuming a backfill job."""
         print("\n=== Test: Pause and resume backfill ===")
 
-        # Create pipeline and backfill with longer time range (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create pipeline and backfill with recent data
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=20)
         time.sleep(2)
 
@@ -483,9 +459,9 @@ class TestBackfillJob:
         )
 
         # Create backfill with small chunks to allow pausing mid-execution
-        start_time = int((past_time - timedelta(hours=2)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=2)).timestamp() * 1000000)
-        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=10)
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=5)
 
         # Wait a bit for job to start
         time.sleep(3)
@@ -537,8 +513,8 @@ class TestBackfillJob:
         """Test deleting a backfill job."""
         print("\n=== Test: Delete backfill job ===")
 
-        # Create pipeline and backfill (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create pipeline and backfill
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -548,8 +524,8 @@ class TestBackfillJob:
             name_suffix="delete"
         )
 
-        start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=1)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
         # Remove from tracking so cleanup doesn't try to delete it again
@@ -579,8 +555,8 @@ class TestBackfillJob:
         """Test that invalid time ranges are rejected."""
         print("\n=== Test: Invalid time range validation ===")
 
-        # Create a pipeline first (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create a pipeline first
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -635,8 +611,8 @@ class TestBackfillJob:
         """Test that backfill progress is tracked correctly."""
         print("\n=== Test: Progress tracking ===")
 
-        # Create pipeline with longer time range (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create pipeline
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=10)
         time.sleep(2)
 
@@ -647,9 +623,9 @@ class TestBackfillJob:
         )
 
         # Create backfill with multiple chunks
-        start_time = int((past_time - timedelta(hours=2)).timestamp() * 1000000)
-        end_time = int((past_time + timedelta(hours=3)).timestamp() * 1000000)
-        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
+        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=10)
 
         # Track progress over time
         progress_readings = []
@@ -677,8 +653,8 @@ class TestBackfillJob:
         """Test getting a non-existent backfill job returns 404."""
         print("\n=== Test: Get non-existent backfill job ===")
 
-        # Create a real pipeline first (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Create a real pipeline first
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -747,8 +723,8 @@ class TestBackfillJob:
             "org": self.ORG_ID
         }
 
-        # Ingest data first to create stream (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
+        # Ingest data first to create stream
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=15)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
