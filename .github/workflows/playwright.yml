@@ -269,14 +269,14 @@ jobs:
           #       "metrics-visualizations.spec.js",
           #       "metrics-config.spec.js",
           #     ]
-            # - testfolder: "Dashboards-Variables-Scoped"
-            #   browser: "chrome"
-            #   run_files:
-            #     [
-            #       "dashboard-variables-global.spec.js",
-            #       "dashboard-variables-tab-level.spec.js",
-            #       "dashboard-variables-panel-level.spec.js",
-            #     ]
+            - testfolder: "Dashboards-Variables-Scoped"
+              browser: "chrome"
+              run_files:
+                [
+                  "dashboard-variables-global.spec.js",
+                  "dashboard-variables-tab-level.spec.js",
+                  "dashboard-variables-panel-level.spec.js",
+                ]
             # - testfolder: "Dashboards-Variables-Dependency"
             #   browser: "chrome"
             #   run_files:
