@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <q-icon
                 data-test="trace-details-copy-trace-id-btn"
-                class="q-ml-xs cursor-pointer trace-copy-icon"
+                class="cursor-pointer trace-copy-icon"
                 size="12px"
                 name="content_copy"
                 title="Copy"
@@ -920,6 +920,22 @@ export default defineComponent({
         const parentSpanId =
           event._oo_parent_span_id || event._oo_span_id || "";
 
+        // Add service to selectedTrace if not already present
+        const serviceName = event.service || "Frontend";
+        const existingService =
+          searchObj.data.traceDetails.selectedTrace.service_name.find(
+            (s: any) => s.service_name === serviceName,
+          );
+
+        if (!existingService) {
+          searchObj.data.traceDetails.selectedTrace.service_name.push({
+            service_name: serviceName,
+            count: 1,
+          });
+        } else {
+          existingService.count = (existingService.count || 0) + 1;
+        }
+
         return {
           [store.state.zoConfig.timestamp_column]:
             event[store.state.zoConfig.timestamp_column],
@@ -929,7 +945,7 @@ export default defineComponent({
           span_id: spanId,
           trace_id: event._oo_trace_id,
           operation_name: operationName,
-          service_name: "Client Browser",
+          service_name: event.service || "Frontend",
           span_status:
             event.type === "error" ||
             (event.type === "resource" && event.resource_status_code >= 400)
@@ -982,6 +998,7 @@ export default defineComponent({
             const rumSpans = formatRumEventsAsSpans(rumEvents);
 
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
+            updateServiceColors();
             buildTracesTree();
           })
           .catch((error) => {
@@ -1015,7 +1032,13 @@ export default defineComponent({
           services: {} as any,
           zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
         };
-        trace.service_name.forEach((service: any) => {
+        return _trace;
+      });
+    };
+
+    const updateServiceColors = () => {
+      searchObj.data.traceDetails.selectedTrace.service_name.forEach(
+        (service: any) => {
           if (!searchObj.meta.serviceColors[service.service_name]) {
             if (serviceColorIndex.value >= colors.value.length)
               generateNewColor();
@@ -1025,10 +1048,11 @@ export default defineComponent({
 
             serviceColorIndex.value++;
           }
-          _trace.services[service.service_name] = service.count;
-        });
-        return _trace;
-      });
+          searchObj.data.traceDetails.selectedTrace.services[
+            service.service_name
+          ] = service.count;
+        },
+      );
     };
 
     const showTraceDetailsError = () => {
@@ -1767,7 +1791,7 @@ $traceChartCollapseHeight: 42px;
 }
 
 .toolbar-trace-id {
-  max-width: 150px;
+  max-width: 80px;
 }
 
 .toolbar-operation-name {
