@@ -375,21 +375,19 @@ class TestBackfillJob:
         assert final_status.get("progress_percent") == 100, \
             f"Progress should be 100%: {final_status.get('progress_percent')}"
 
-        # Data verification - check if data appeared in destination
-        if len(dest_hits) > 0:
-            # Verify transformation was applied to all checked records
-            for hit in dest_hits[:3]:  # Check first few
-                assert "processing_status" in hit, \
-                    f"Record missing 'processing_status' field - transformation not applied: {hit}"
-                assert hit["processing_status"] == "backfill_processed", \
-                    f"Record should have processing_status='backfill_processed': {hit}"
-            print(f"  Data verification passed - {len(dest_hits)} records with processing_status field")
-        else:
-            # In CI, backfill may complete without data due to timing/environment differences
-            # The API functionality is verified - job created, ran, and completed
-            print(f"  WARNING: Backfill completed but destination stream empty or not found")
-            print(f"  This may be expected in CI environments where scheduled pipeline")
-            print(f"  execution differs from production. API functionality verified.")
+        # If backfill completed, destination MUST have data
+        assert len(dest_hits) > 0, \
+            f"Backfill completed but no data in destination stream '{self.dest_stream}'. " \
+            f"Source had {len(source_hits)} records. This indicates a backfill bug. " \
+            f"Status: {final_status}"
+
+        # Verify transformation was applied
+        for hit in dest_hits[:3]:
+            assert "processing_status" in hit, \
+                f"Record missing 'processing_status' field - transformation not applied: {hit}"
+            assert hit["processing_status"] == "backfill_processed", \
+                f"Record should have processing_status='backfill_processed': {hit}"
+        print(f"  Data verification passed - {len(dest_hits)} records with processing_status field")
 
     def test_03_get_backfill_job_status(self):
         """Test getting a specific backfill job status."""
