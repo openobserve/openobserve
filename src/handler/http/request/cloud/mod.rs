@@ -19,6 +19,7 @@ use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 pub mod aws_marketplace;
+pub mod azure_marketplace;
 pub mod billings;
 pub mod marketing;
 pub mod org_usage;

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-marketplace-setup">
+  <div class="azure-marketplace-setup">
     <div class="flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon name="warning" size="80px" color="warning" />
         <h5 class="q-mt-md">No Marketplace Token Found</h5>
         <p class="text-grey-7">
-          Please start the registration process from AWS Marketplace.
+          Please start the registration process from Azure Marketplace.
         </p>
         <q-btn
           color="primary"
@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
         <q-icon name="cloud" size="60px" color="primary" />
-        <h4 class="q-mt-md">Complete AWS Marketplace Setup</h4>
+        <h4 class="q-mt-md">Complete Azure Marketplace Setup</h4>
         <p class="text-grey-7 q-mb-lg">
-          Link your AWS Marketplace subscription to an organization
+          Link your Azure Marketplace subscription to an organization
         </p>
 
         <div class="options-container">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-card-section>
               <div class="text-h6">Create New Organization</div>
               <p class="text-grey-7">
-                Create a new organization with AWS Marketplace billing
+                Create a new organization with Azure Marketplace billing
               </p>
               <q-input
                 v-model="newOrgName"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 color="primary"
                 label="Create & Link"
-                @click="createNewOrgWithAws"
+                @click="createNewOrgForAzure"
                 :loading="isProcessing"
                 :disable="!newOrgName"
                 class="full-width"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-card-section>
               <div class="text-h6">Link to Existing Organization</div>
               <p class="text-grey-7">
-                Link AWS billing to an existing organization
+                Link Azure billing to an existing organization
               </p>
               <q-select
                 v-model="selectedOrg"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-btn
                 color="primary"
-                label="Link AWS Billing"
+                label="Link Azure Billing"
                 @click="linkToExistingOrg"
                 :loading="isProcessing"
                 :disable="!selectedOrg"
@@ -133,23 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-grey-7">Please wait while we configure your account.</p>
       </div>
 
-      <!-- Pending Activation State -->
-      <div v-else-if="state === 'pending_activation'" class="text-center">
-        <h5 class="q-mb-lg">Waiting for AWS Confirmation</h5>
-        <div class="flex justify-center">
-          <q-spinner-gears size="80px" color="primary" />
-        </div>
-        <p class="text-grey-7 q-mt-lg">
-          Please wait while we confirm activation with AWS and set up your account.
-        </p>
-      </div>
-
+      
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
         <q-icon name="check_circle" size="80px" color="positive" />
         <h4 class="q-mt-md">Subscription Activated!</h4>
         <p class="text-grey-7">
-          Your AWS Marketplace subscription is now active.
+          Your Azure Marketplace subscription is now active.
         </p>
         <q-btn
           color="primary"
@@ -165,8 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon name="error" size="80px" color="negative" />
         <h5 class="q-mt-md">Payment Failed</h5>
         <p class="text-grey-7">
-          There was an issue with your AWS Marketplace payment. Please check
-          your AWS account or contact AWS support.
+          There was an issue with activating Azure subscription. Please check
+          your Azure account or contact support.
         </p>
         <q-btn
           color="primary"
@@ -185,20 +175,19 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
-import awsMarketplace from "@/services/awsMarketplace";
+import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
 
 type SetupState =
   | "select_org"
   | "no_token"
   | "processing"
-  | "pending_activation"
   | "success"
   | "payment_failed"
   | "error";
 
 export default defineComponent({
-  name: "AwsMarketplaceSetup",
+  name: "AzureMarketplaceSetup",
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -214,22 +203,10 @@ export default defineComponent({
     );
     const token = ref("");
     const activatedOrgId = ref("");
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    // Helper to get cookie value
-    const getCookie = (name: string): string | null => {
-      const match = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
-      return match ? decodeURIComponent(match[2]) : null;
-    };
-
-    // Helper to delete cookie
-    const deleteCookie = (name: string) => {
-      document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    };
 
     onMounted(async () => {
-      // Get token from cookie (set by backend at /api/aws-marketplace/register)
-      token.value = getCookie("aws_marketplace_token") || "";
+      // Get token from sessionStorage (saved by /marketplace/azure/register route)
+      token.value = sessionStorage.getItem("azure_marketplace_token") || "";
 
       if (!token.value) {
         state.value = "no_token";
@@ -238,12 +215,6 @@ export default defineComponent({
 
       // Fetch user's organizations
       await fetchOrganizations();
-    });
-
-    onUnmounted(() => {
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
     });
 
     const fetchOrganizations = async () => {
@@ -259,7 +230,7 @@ export default defineComponent({
       }
     };
 
-    const createNewOrgWithAws = async () => {
+    const createNewOrgForAzure = async () => {
       if (!newOrgName.value) {
         q.notify({
           type: "negative",
@@ -307,80 +278,35 @@ export default defineComponent({
 
     const linkSubscription = async (orgId: string) => {
       try {
-        const response = await awsMarketplace.linkSubscription(
+        await azureMarketplace.linkSubscription(
           orgId,
           token.value
         );
 
-        if (response.data.success) {
-          // Clear the token cookie immediately after successful link
-          // The token has been used (ResolveCustomer called) and can't be reused
-          deleteCookie("aws_marketplace_token");
-          token.value = "";
+        // Clear the token from sessionStorage
+        sessionStorage.removeItem("azure_marketplace_token");
+        state.value = "success";
+        isProcessing.value = false;
 
-          activatedOrgId.value = orgId;
-          state.value = "pending_activation";
-
-          // Start polling for activation status
-          startPolling(orgId, response.data.customer_identifier);
-        } else {
-          throw new Error(response.data.message || "Link subscription failed");
-        }
+        // Update selected org in store
+        const orgData = {
+            identifier: orgId,
+            label: newOrgName.value || selectedOrg.value?.name || orgId,
+            user_email: store.state.userInfo?.email,
+        };
+        useLocalOrganization(orgData);
+        store.dispatch("setSelectedOrganization", orgData);
       } catch (error: any) {
         console.error("Failed to link subscription:", error);
         state.value = "error";
         errorMessage.value =
-          error.response?.data?.message || "Failed to link AWS subscription";
+          error.response?.data?.message || "Failed to link Azure subscription";
         isProcessing.value = false;
       }
     };
 
-    const startPolling = (orgId: string, customerIdentifier: string) => {
-      let attempts = 0;
-      const maxAttempts = 60; // 5 minutes at 5 second intervals
-
-      pollInterval = setInterval(async () => {
-        attempts++;
-
-        try {
-          const response = await awsMarketplace.getActivationStatus(
-            orgId,
-            customerIdentifier
-          );
-
-          const status = response.data.status;
-
-          if (status === "active") {
-            if (pollInterval) clearInterval(pollInterval);
-            state.value = "success";
-            isProcessing.value = false;
-
-            // Update selected org in store
-            const orgData = {
-              identifier: orgId,
-              label: newOrgName.value || selectedOrg.value?.name || orgId,
-              user_email: store.state.userInfo?.email,
-            };
-            useLocalOrganization(orgData);
-            store.dispatch("setSelectedOrganization", orgData);
-          } else if (status === "payment_failed") {
-            if (pollInterval) clearInterval(pollInterval);
-            state.value = "payment_failed";
-            isProcessing.value = false;
-          } else if (attempts >= maxAttempts) {
-            if (pollInterval) clearInterval(pollInterval);
-            state.value = "error";
-            errorMessage.value =
-              "Activation timeout. Please contact support if the issue persists.";
-            isProcessing.value = false;
-          }
-        } catch (error) {
-          console.error("Poll error:", error);
-        }
-      }, 5000);
-    };
-
     const goToDashboard = () => {
+      sessionStorage.removeItem("azure_marketplace_token");
       router.push({
         path: "/",
         query: activatedOrgId.value
@@ -404,7 +330,7 @@ export default defineComponent({
       selectedOrg,
       eligibleOrganizations,
       getImageURL,
-      createNewOrgWithAws,
+      createNewOrgForAzure,
       linkToExistingOrg,
       goToDashboard,
       resetAndRetry,
@@ -414,7 +340,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.aws-marketplace-setup {
+.azure-marketplace-setup {
   min-height: 100vh;
   background: var(--q-background);
 }
