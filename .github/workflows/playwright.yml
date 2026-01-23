@@ -162,7 +162,7 @@ jobs:
           #       "alerts-ui-operations.spec.js",
           #       "alerts-import.spec.js",
           #       "alerts-advanced.spec.js",
-                # "alerts-destinations-prebuilt.spec.js",
+          #       "alerts-destinations-prebuilt.spec.js",
           #     ]
           # - testfolder: "Dashboards-Core"
           #   browser: "chrome"
