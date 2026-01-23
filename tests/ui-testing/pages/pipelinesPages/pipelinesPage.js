@@ -2172,18 +2172,6 @@ export class PipelinesPage {
     // ============================================================================
 
     /**
-     * Select first available stream option from dropdown
-     * Used when any stream option is acceptable (e.g., metrics streams)
-     * Replaces: page.getByRole("option").filter({ hasText: /^[a-z0-9_]+$/ }).first()
-     */
-    async selectFirstAvailableStreamOption() {
-        const option = this.page.getByRole("option").first();
-        await option.waitFor({ state: 'visible', timeout: 5000 });
-        await option.click();
-        testLogger.info('Selected first available stream option');
-    }
-
-    /**
      * Click PromQL tab in scheduled pipeline dialog
      * Note: AppTabs renders tabs as <div> elements with data-test="tab-{value}", not buttons
      */
