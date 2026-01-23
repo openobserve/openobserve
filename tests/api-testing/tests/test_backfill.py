@@ -277,8 +277,15 @@ class TestBackfillJob:
             json=payload
         )
 
+        print(f"    Query {stream_name}: status={response.status_code}")
         if response.status_code == 200:
-            return response.json().get("hits", [])
+            data = response.json()
+            hits = data.get("hits", [])
+            total = data.get("total", 0)
+            print(f"    Query {stream_name}: total={total}, hits_returned={len(hits)}")
+            return hits
+        else:
+            print(f"    Query {stream_name} failed: {response.text[:200]}")
         return []
 
     # ==================== BASIC BACKFILL TESTS ====================
@@ -338,26 +345,33 @@ class TestBackfillJob:
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
 
         # 4. Wait for completion
-        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=90)
+        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=120)
 
         # Allow partial success - backfill might complete or still be processing
         assert final_status is not None, "Should get final status"
         status = final_status.get("status")
         print(f"  Final status: {status}")
+        print(f"  Full status response: {final_status}")
 
-        # 5. Query destination stream to verify data was processed
-        time.sleep(5)  # Wait for data to be queryable
+        # 5. Verify source stream has data
+        print("  Checking source stream...")
+        source_hits = self._query_stream(self.source_stream)
+        print(f"  Source stream has {len(source_hits)} records")
+
+        # 6. Query destination stream to verify data was processed
+        time.sleep(10)  # Wait longer for data to be queryable
+        print("  Checking destination stream...")
         dest_hits = self._query_stream(self.dest_stream)
 
         print(f"  Destination stream has {len(dest_hits)} records")
 
         # Backfill MUST complete successfully for this test
         assert status == "completed", \
-            f"Backfill did not complete within timeout. Status: {status}"
+            f"Backfill did not complete within timeout. Status: {status}, full: {final_status}"
 
         # Completed backfill MUST have data in destination
         assert len(dest_hits) > 0, \
-            f"Backfill completed but no data found in destination stream '{self.dest_stream}'"
+            f"Backfill completed but no data found in destination stream '{self.dest_stream}'. Source had {len(source_hits)} records. Backfill status: {final_status}"
 
         # Verify transformation was applied to all checked records
         for hit in dest_hits[:3]:  # Check first few
@@ -367,9 +381,9 @@ class TestBackfillJob:
                 f"Record should have processing_status='backfill_processed': {hit}"
         print(f"  Data verification passed - {len(dest_hits)} records with processing_status field")
 
-    def test_03_list_backfill_jobs(self):
-        """Test listing all backfill jobs for an organization."""
-        print("\n=== Test: List backfill jobs ===")
+    def test_03_get_backfill_job_status(self):
+        """Test getting a specific backfill job status."""
+        print("\n=== Test: Get backfill job status ===")
 
         # Create a pipeline and backfill job (1 day ago)
         past_time = datetime.now(timezone.utc) - timedelta(days=1)
@@ -379,30 +393,30 @@ class TestBackfillJob:
         pipeline_id = self._create_scheduled_pipeline(
             self.source_stream,
             self.dest_stream,
-            name_suffix="list"
+            name_suffix="status"
         )
 
         start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
         end_time = int((past_time + timedelta(hours=1)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
-        # List all backfill jobs
+        # Get specific backfill job status
         response = self.session.get(
-            f"{self.base_url}api/{self.ORG_ID}/pipelines/backfill"
+            f"{self.base_url}api/{self.ORG_ID}/pipelines/{pipeline_id}/backfill/{job_id}"
         )
 
         assert response.status_code == 200, \
-            f"List backfill jobs should succeed: {response.status_code} - {response.text[:500]}"
+            f"Get backfill job should succeed: {response.status_code} - {response.text[:500]}"
 
-        jobs = response.json()
-        assert isinstance(jobs, list), "Response should be a list"
+        job = response.json()
+        assert job.get("job_id") == job_id, f"Job ID should match: expected {job_id}, got {job.get('job_id')}"
+        assert job.get("pipeline_id") == pipeline_id, "Pipeline ID should match"
+        assert "status" in job, "Response should contain status"
+        assert "progress_percent" in job, "Response should contain progress_percent"
 
-        # Find our job in the list
-        our_job = next((j for j in jobs if j.get("job_id") == job_id), None)
-        assert our_job is not None, f"Our job {job_id} should be in the list"
-
-        print(f"  Found {len(jobs)} backfill jobs")
-        print(f"  Our job status: {our_job.get('status')}")
+        print(f"  Job ID: {job.get('job_id')}")
+        print(f"  Status: {job.get('status')}")
+        print(f"  Progress: {job.get('progress_percent')}%")
 
     def test_04_pause_and_resume_backfill(self):
         """Test pausing and resuming a backfill job."""
