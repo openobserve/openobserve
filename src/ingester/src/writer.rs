@@ -18,7 +18,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicI64, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering},
     },
     time::Instant,
 };
@@ -81,6 +81,19 @@ pub struct Writer {
     next_seq: AtomicU64,
     created_at: AtomicI64,
     write_queue: Arc<mpsc::Sender<(WriterSignal, crate::ProcessedBatch, bool)>>,
+    // Lock-free cache of WAL size for fast rotation threshold checks
+    // Updated after each write, read without locks for performance
+    wal_size_bytes: AtomicUsize,
+    memtable_size_records: AtomicUsize,
+    // Async rotation: trigger channel for background rotation task
+    // Sender sends rotation requests, receiver processes them asynchronously
+    rotation_trigger: Arc<mpsc::Sender<()>>,
+    // Flag to prevent multiple rotation triggers while one is pending/in-progress
+    // Set to true when rotation is triggered, cleared when rotation completes
+    rotation_pending: AtomicBool,
+    // Timestamp of last rotation (in microseconds) to prevent excessive rotation frequency
+    // Ensures minimum interval between rotations to avoid file fragmentation
+    last_rotation_time: AtomicI64,
 }
 
 // check total memtable size
@@ -328,6 +341,9 @@ impl Writer {
 
         let (tx, rx) = mpsc::channel(cfg.limit.wal_write_queue_size);
 
+        // Create rotation trigger channel (small buffer, rotations are rare)
+        let (rotation_tx, rotation_rx) = mpsc::channel(8);
+
         let writer = Self {
             idx,
             key: key.clone(),
@@ -345,17 +361,25 @@ impl Writer {
             next_seq,
             created_at: AtomicI64::new(now),
             write_queue: Arc::new(tx),
+            wal_size_bytes: AtomicUsize::new(0),
+            memtable_size_records: AtomicUsize::new(0),
+            rotation_trigger: Arc::new(rotation_tx),
+            rotation_pending: AtomicBool::new(false),
+            last_rotation_time: AtomicI64::new(0),
         };
         let writer = Arc::new(writer);
         let writer_clone = writer.clone();
+        let writer_rotation = writer.clone();
 
         log::info!("[INGESTER:MEM:{idx}] writer queue start consuming");
 
         // Spawn consumer tasks on the shared WAL runtime, or use the default runtime
         if let Some(rt) = WAL_RUNTIME.as_ref() {
             rt.spawn(Self::consume_loop(writer, rx, idx));
+            rt.spawn(Self::rotation_loop(writer_rotation, rotation_rx, idx));
         } else {
             tokio::spawn(Self::consume_loop(writer, rx, idx));
+            tokio::spawn(Self::rotation_loop(writer_rotation, rotation_rx, idx));
         }
 
         writer_clone
@@ -394,6 +418,39 @@ impl Writer {
             }
         }
         log::info!("[INGESTER:MEM:{idx}] writer queue closed");
+    }
+
+    /// Background rotation task that processes rotation requests asynchronously
+    /// This runs in a separate task to avoid blocking ingestion during rotation
+    async fn rotation_loop(writer: Arc<Writer>, mut rx: mpsc::Receiver<()>, idx: usize) {
+        log::debug!("[INGESTER:MEM:{idx}] rotation task started");
+        let mut total_rotations = 0;
+
+        loop {
+            match rx.recv().await {
+                None => {
+                    log::debug!(
+                        "[INGESTER:MEM:{idx}] rotation task shutting down, total rotations: {total_rotations}"
+                    );
+                    break;
+                }
+                Some(()) => {
+                    total_rotations += 1;
+                    log::debug!(
+                        "[INGESTER:MEM:{idx}] processing rotation request #{total_rotations}"
+                    );
+
+                    if let Err(e) = writer.perform_rotation().await {
+                        log::error!("[INGESTER:MEM:{idx}] rotation #{total_rotations} failed: {e}");
+                    } else {
+                        log::debug!(
+                            "[INGESTER:MEM:{idx}] rotation #{total_rotations} completed successfully"
+                        );
+                    }
+                }
+            }
+        }
+        log::debug!("[INGESTER:MEM:{idx}] rotation task closed");
     }
 
     pub fn get_key_str(&self) -> String {
@@ -505,9 +562,9 @@ impl Writer {
             return Ok(());
         }
         let _start_consume_processed = Instant::now();
-        // Check rotation
-        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
-            .await?;
+        let num_entries = batch.entries.len();
+        let json_size = batch.entries_json_size;
+        let arrow_size = batch.entries_arrow_size;
 
         // Write into WAL - pure IO, no CPU-intensive processing
         let start = std::time::Instant::now();
@@ -516,19 +573,40 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
+        if wal_lock_time > 10.0 {
+            log::debug!("[PERF] WAL lock wait: {:.2}ms", wal_lock_time);
+        }
+
         let _start_wal_processed = Instant::now();
+        let mut wal_write_count = 0;
         for entry in batch.bytes_entries {
             if entry.is_empty() {
                 continue;
             }
             wal.write(&entry).context(WalSnafu)?;
-            tokio::task::coop::consume_budget().await;
+            wal_write_count += 1;
+
+            // Yield to scheduler every 10 writes instead of every write
+            // This reduces context switching overhead significantly
+            if wal_write_count % 10 == 0 {
+                tokio::task::coop::consume_budget().await;
+            }
         }
+
+        // Update atomic size cache after writes (inside lock, using Release ordering)
+        let (current_wal_size, _) = wal.size();
+        self.wal_size_bytes
+            .store(current_wal_size, Ordering::Release);
+
         drop(wal);
         let _start_wal_processed_duration = _start_wal_processed.elapsed();
-        if _start_wal_processed_duration.as_millis() > 50 {
-            log::warn!("_start_wal_processed_duration: {_start_wal_processed_duration:?}");
-        }
+        // ALWAYS log WAL duration for performance analysis
+        log::warn!(
+            "[PERF] WAL write: {:?} for {} entries ({} bytes)",
+            _start_wal_processed_duration,
+            num_entries,
+            json_size
+        );
 
         // Write into Memtable - pure IO, no CPU-intensive processing
         let start = std::time::Instant::now();
@@ -537,53 +615,211 @@ impl Writer {
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
+        if mem_lock_time > 10.0 {
+            log::debug!("[PERF] Memtable lock wait: {:.2}ms", mem_lock_time);
+        }
+
         let _start_mem_processed = Instant::now();
+        let mut mem_write_count = 0;
         for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
             if entry.data_size == 0 {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;
-            tokio::task::coop::consume_budget().await;
-        }
-        drop(mem);
-        let _start_mem_processed_duration = _start_mem_processed.elapsed();
-        if _start_mem_processed_duration.as_millis() > 50 {
-            log::warn!("_start_mem_processed_duration: {_start_mem_processed_duration:?}");
+            mem_write_count += 1;
+
+            // Yield to scheduler every 10 writes instead of every write
+            // This reduces context switching overhead significantly
+            if mem_write_count % 10 == 0 {
+                tokio::task::coop::consume_budget().await;
+            }
         }
 
+        // Update atomic size cache after writes (inside lock, using Release ordering)
+        let (current_mem_json_size, current_mem_arrow_size) = mem.size();
+        // Store the larger of the two sizes for threshold checking
+        let current_mem_size = std::cmp::max(current_mem_json_size, current_mem_arrow_size);
+        self.memtable_size_records
+            .store(current_mem_size, Ordering::Release);
+
+        drop(mem);
+        let _start_mem_processed_duration = _start_mem_processed.elapsed();
+
+        // Check rotation AFTER writes (so atomics are fresh)
+        // This prevents fragmentation by ensuring only one rotation per threshold crossing
+        let _start_rotate = Instant::now();
+        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
+            .await?;
+        let rotate_duration = _start_rotate.elapsed();
+        if rotate_duration.as_millis() > 1 {
+            log::debug!("[PERF] Rotation check: {:?}", rotate_duration);
+        }
+
+        // ALWAYS log memtable duration for performance analysis
+        log::warn!(
+            "[PERF] Memtable write: {:?} for {} entries ({} arrow bytes)",
+            _start_mem_processed_duration,
+            num_entries,
+            arrow_size
+        );
+
         // Check fsync
-        if fsync {
+        let fsync_duration = if fsync {
+            let _start_fsync = Instant::now();
             let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
             drop(wal);
-        }
+            let duration = _start_fsync.elapsed();
+            log::debug!("[PERF] fsync: {:?}", duration);
+            duration
+        } else {
+            std::time::Duration::from_millis(0)
+        };
 
         let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 500 {
-            log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
-        }
+        // ALWAYS log total consume duration for performance analysis
+        log::warn!(
+            "[PERF] Total consume: {:?} (rotate: {:?}, WAL: {:?}, memtable: {:?}, fsync: {:?})",
+            _start_consume_processed_duration,
+            rotate_duration,
+            _start_wal_processed_duration,
+            _start_mem_processed_duration,
+            fsync_duration
+        );
 
         Ok(())
     }
 
-    // rotate is used to rotate the wal and memtable if the size exceeds the threshold
+    /// Non-blocking rotation trigger: checks if rotation is needed and sends signal to background
+    /// task Returns immediately without blocking ingestion, allowing rotation to happen
+    /// asynchronously
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
-            && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
-        {
+        // CRITICAL OPTIMIZATION: Check if rotation is already pending/in-progress
+        // This prevents 100s of threads from all triggering rotation when threshold is exceeded
+        // Without this check, we get 700 rotations instead of 16!
+        if self.rotation_pending.load(Ordering::Acquire) {
+            // Rotation already triggered by another thread, skip this check
             return Ok(());
         }
 
+        // ANTI-FRAGMENTATION: Enforce minimum rotation interval (10 seconds)
+        // Prevents excessive file fragmentation from too-frequent rotations
+        // This ensures we create reasonably-sized WAL files even with async rotation
+        let now_micros = Utc::now().timestamp_micros();
+        let last_rotation = self.last_rotation_time.load(Ordering::Acquire);
+        let min_interval_micros = Duration::try_seconds(10)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        if last_rotation > 0 && (now_micros - last_rotation) < min_interval_micros {
+            // Too soon since last rotation, skip to avoid fragmentation
+            return Ok(());
+        }
+
+        // Fast path: Check cached atomic sizes first (no locks needed!)
+        let cached_wal_size = self.wal_size_bytes.load(Ordering::Acquire);
+        let cached_mem_size = self.memtable_size_records.load(Ordering::Acquire);
+
+        // Check if rotation is needed based on cached sizes
+        if !self.check_wal_threshold((cached_wal_size, cached_wal_size), entry_bytes_size)
+            && !self.check_mem_threshold((cached_mem_size, cached_mem_size), entry_batch_size)
+        {
+            // No rotation needed, return immediately
+            return Ok(());
+        }
+
+        // Try to set rotation_pending flag (compare-and-swap)
+        // If another thread already set it, we skip triggering rotation
+        if self
+            .rotation_pending
+            .compare_exchange(
+                false, // Expected: not pending
+                true,  // Set to: pending
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_err()
+        {
+            // Another thread already triggered rotation, skip
+            return Ok(());
+        }
+
+        // We won the race! Trigger rotation
+        log::info!(
+            "[INGESTER:MEM:{}] rotation threshold exceeded (WAL: {}MB, mem: {} records), triggering async rotation",
+            self.idx,
+            cached_wal_size / 1024 / 1024,
+            cached_mem_size
+        );
+
+        // CRITICAL: Update last_rotation_time NOW (before sending signal)
+        // This prevents other threads from triggering rotation during the 10-second interval
+        // Must be done BEFORE try_send() so subsequent requests see the updated timestamp
+        self.last_rotation_time.store(now_micros, Ordering::Release);
+
+        // Try to send rotation signal (non-blocking)
+        // If channel is full, skip this rotation request (another one is already queued)
+        if let Err(e) = self.rotation_trigger.try_send(()) {
+            // Failed to send signal, clear the pending flag AND reset timestamp
+            self.rotation_pending.store(false, Ordering::Release);
+            self.last_rotation_time
+                .store(last_rotation, Ordering::Release); // Restore old value
+
+            match e {
+                mpsc::error::TrySendError::Full(_) => {
+                    log::warn!(
+                        "[INGESTER:MEM:{}] rotation channel full, will retry on next request",
+                        self.idx
+                    );
+                }
+                mpsc::error::TrySendError::Closed(_) => {
+                    log::error!(
+                        "[INGESTER:MEM:{}] rotation channel closed, cannot trigger rotation",
+                        self.idx
+                    );
+                }
+            }
+        }
+
+        // Return immediately - rotation will happen in background!
+        // Flag will be cleared by perform_rotation() when done
+        Ok(())
+    }
+
+    /// Actual rotation logic - called by background rotation task
+    /// This can take 7-44 seconds, but runs asynchronously without blocking ingestion
+    async fn perform_rotation(&self) -> Result<()> {
+        let _start_rotate_total = std::time::Instant::now();
+
         // rotation wal
+        let _step1_start = std::time::Instant::now();
         let start = std::time::Instant::now();
         let mut wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
-            return Ok(()); // check again to avoid race condition
+        let _step1_duration = _step1_start.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] Step 1 (acquire WAL lock): {:?}",
+            _step1_duration
+        );
+
+        // Double-check threshold with accurate WAL size (avoid race condition)
+        // If another rotation already happened, wal.size() will be small
+        if !self.check_wal_threshold(wal.size(), 0) {
+            log::info!(
+                "[INGESTER:MEM:{}] rotation no longer needed (already rotated by another task)",
+                self.idx
+            );
+            // CRITICAL: Clear flag even if we don't rotate (threshold no longer exceeded)
+            // This allows future rotations when threshold is exceeded again
+            self.rotation_pending.store(false, Ordering::Release);
+            return Ok(());
         }
+
+        let _step2_start = std::time::Instant::now();
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -596,6 +832,10 @@ impl Writer {
             &self.key.stream_type,
             wal_id
         );
+        let _step2_duration = _step2_start.elapsed();
+        log::debug!("[PERF:ROTATE] Step 2 (path setup): {:?}", _step2_duration);
+
+        let _step3_start = std::time::Instant::now();
         let (new_wal, _header_size) = WalWriter::new(
             build_file_path(
                 wal_dir,
@@ -608,11 +848,29 @@ impl Writer {
             None,
         )
         .context(WalSnafu)?;
+        let _step3_duration = _step3_start.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] Step 3 (create new WAL): {:?}",
+            _step3_duration
+        );
+
+        let _step4_start = std::time::Instant::now();
         wal.sync().context(WalSnafu)?; // sync wal before rotation
+        let _step4_duration = _step4_start.elapsed();
+        log::debug!("[PERF:ROTATE] Step 4 (sync old WAL): {:?}", _step4_duration);
+
+        let _step5_start = std::time::Instant::now();
         let old_wal = std::mem::replace(&mut *wal, new_wal);
+
+        // Reset atomic size to 0 after rotation (new WAL is empty)
+        self.wal_size_bytes.store(0, Ordering::Release);
+
         drop(wal);
+        let _step5_duration = _step5_start.elapsed();
+        log::debug!("[PERF:ROTATE] Step 5 (swap WAL): {:?}", _step5_duration);
 
         // rotation memtable
+        let _step6_start = std::time::Instant::now();
         let new_mem = MemTable::new();
         let start = std::time::Instant::now();
         let mut mem = self.memtable.write().await;
@@ -621,9 +879,19 @@ impl Writer {
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
         let old_mem = std::mem::replace(&mut *mem, new_mem);
+
+        // Reset atomic size to 0 after rotation (new memtable is empty)
+        self.memtable_size_records.store(0, Ordering::Release);
+
         drop(mem);
+        let _step6_duration = _step6_start.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] Step 6 (rotate memtable): {:?}",
+            _step6_duration
+        );
 
         // update created_at
+        let _step7_start = std::time::Instant::now();
         self.created_at
             .store(Utc::now().timestamp_micros(), Ordering::Release);
 
@@ -631,8 +899,44 @@ impl Writer {
         let path_str = path.display().to_string();
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {path_str}");
+        let _step7_duration = _step7_start.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] Step 7 (create Immutable): {:?}",
+            _step7_duration
+        );
+
+        let _step8_start = std::time::Instant::now();
         IMMUTABLES.write().await.insert(path, table);
+        let _step8_duration = _step8_start.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] Step 8 (add to IMMUTABLES): {:?}",
+            _step8_duration
+        );
         log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {path_str}");
+
+        let _total_rotate_duration = _start_rotate_total.elapsed();
+        log::warn!(
+            "[PERF:ROTATE] TOTAL: {:?} (lock:{:?}, path:{:?}, new:{:?}, sync:{:?}, swap:{:?}, mem:{:?}, immut_create:{:?}, immut_add:{:?})",
+            _total_rotate_duration,
+            _step1_duration,
+            _step2_duration,
+            _step3_duration,
+            _step4_duration,
+            _step5_duration,
+            _step6_duration,
+            _step7_duration,
+            _step8_duration
+        );
+
+        // Clear rotation_pending flag - allows next rotation to be triggered
+        // CRITICAL: Must be done AFTER atomic counters are reset (which happens in swap steps
+        // above) NOTE: last_rotation_time was already set in rotate() before sending the
+        // signal
+        self.rotation_pending.store(false, Ordering::Release);
+        log::info!(
+            "[INGESTER:MEM:{}] rotation complete, cleared pending flag",
+            self.idx
+        );
 
         Ok(())
     }
