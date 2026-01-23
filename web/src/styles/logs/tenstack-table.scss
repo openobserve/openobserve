@@ -66,6 +66,7 @@ th {
 
 td {
   font-family: monospace;
+  // content-visibility: auto;
 }
 
 .thead-sticky tr > *,
@@ -90,6 +91,10 @@ td {
 }
 
 .table-row-hover {
+  // Modern CSS optimization for off-screen content
+  // content-visibility: auto;
+  // contain-intrinsic-size: auto 24px; // Match row height
+
   &:hover {
     .ai-btn {
       visibility: visible !important;
