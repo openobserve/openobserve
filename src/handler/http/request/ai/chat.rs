@@ -44,12 +44,14 @@ const INCIDENT_AGENT_TYPE: &str = "sre";
 /// - Otherwise use default copilot agent
 #[cfg(feature = "enterprise")]
 fn get_agent_type(context: &serde_json::Value) -> &'static str {
-    if let Some(obj) = context.as_object() {
-        if obj.contains_key("incident_id") {
-            return INCIDENT_AGENT_TYPE;
-        }
+    if context
+        .as_object()
+        .is_some_and(|obj| obj.contains_key("incident_id"))
+    {
+        INCIDENT_AGENT_TYPE
+    } else {
+        DEFAULT_AGENT_TYPE
     }
-    DEFAULT_AGENT_TYPE
 }
 
 #[cfg(feature = "enterprise")]
@@ -115,14 +117,14 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
         Ok(bytes) => bytes,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Failed to read request body: {}", e));
+            return MetaHttpResponse::bad_request(format!("Failed to read request body: {e}"));
         }
     };
 
     let prompt_body: PromptRequest = match serde_json::from_slice(&body_bytes) {
         Ok(b) => b,
         Err(e) => {
-            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {}", e));
+            return MetaHttpResponse::bad_request(format!("Invalid JSON body: {e}"));
         }
     };
 
@@ -142,7 +144,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 "http.request",
                 http.method = "POST",
                 http.route = "/api/{org_id}/ai/chat",
-                http.target = format!("/api/{}/ai/chat", org_id_str),
+                http.target = format!("/api/{org_id_str}/ai/chat"),
                 otel.kind = "server",
             )
         } else {
