@@ -1,78 +1,187 @@
 <template>
-  <q-card style="min-width: 700px">
-    <q-card-section class="q-pt-sm">
-      <div class="row items-center">
-        <div class="text-bold text-h6 q-pb-none">Query Inspector</div>
-        <q-space />
-        <q-btn
-          icon="close"
-          class="q-mb-none"
-          flat
-          round
-          dense
-          v-close-popup="true"
-          data-test="query-inspector-close-btn"
-        />
+  <q-card
+    class="tw:min-w-[900px] tw:max-w-[95vw] tw:max-h-[90vh] tw:flex tw:flex-col tw:rounded-xl tw:shadow-2xl tw:overflow-hidden dark:tw:bg-zinc-900">
+    <!-- Header -->
+    <div
+      class="tw:flex tw:items-center tw:justify-between tw:px-6 tw:py-4 tw:bg-white dark:tw:bg-zinc-900 tw:border-b dark:tw:border-zinc-800">
+      <div class="tw:flex tw:flex-col">
+        <div
+          class="tw:text-xl tw:font-bold tw:text-zinc-900 dark:tw:text-zinc-100 tw:m-0 tw:flex tw:items-center tw:gap-2">
+          <q-icon name="search" size="24px" class="tw:text-primary" />
+          Query Inspector
+        </div>
+        <div class="tw:text-sm tw:text-zinc-500 tw:mt-1 tw:flex tw:items-center tw:gap-3">
+          <span class="tw:font-medium">Panel: {{ dataTitle }}</span>
+          <span class="tw:w-1 tw:h-1 tw:bg-zinc-400 tw:rounded-full"></span>
+          <span>Total Queries: {{ totalQueries }}</span>
+        </div>
       </div>
-      <div class="text-bold q-pb-xs">Panel : {{ dataTitle }}</div>
-      <div class="text-bold">Total Query(s) Executed: {{ totalQueries }}</div>
-      <div
-        v-for="(query, index) in ((metaData as any)?.queries ?? [])"
-        :key="query?.originalQuery"
-      >
-        <div class="text-bold q-py-xs">Query: {{ index + 1 }}</div>
-        <q-table
-          class="query-inspector-table"
-          :rows="getRows(query)"
-          :columns="columns"
-          hide-header
-          hide-bottom
-          flat
-          dense
-          v-model:pagination="pagination"
-          :rows-per-page-options="[0]"
-          row-key="index"
-          wrap-cells
-          data-test="query-inspector"
-        >
-          <template v-slot:body-cell-value="props">
-            <q-td :props="props">
-              <div
-                v-if="props.row[0] === 'Original Query' || props.row[0] === 'Query'"
-                style="
-                  max-height: 150px;
-                  overflow-y: auto;
-                  padding: 2px;
-                  font-family: monospace;
-                  font-size: 13px;
-                  white-space: pre-wrap;
-                  word-break: break-all;
-                "
-                class="inspector-query-editor"
-                v-html="colorizedQueries[`${index}-${props.row[0]}`] || props.row[1]"
-              >
+
+      <div class="tw:flex tw:items-center tw:gap-4">
+        <div class="tw:relative tw:w-64">
+          <q-input v-model="searchQuery" placeholder="Search keywords..." dense outlined
+            class="tw:bg-zinc-50 dark:tw:bg-zinc-800" color="primary">
+            <template v-slot:prepend>
+              <q-icon name="search" size="xs" />
+            </template>
+            <template v-slot:append v-if="searchQuery">
+              <q-icon name="close" size="xs" class="tw:cursor-pointer" @click="searchQuery = ''" />
+            </template>
+          </q-input>
+        </div>
+        <q-btn icon="close" flat round dense v-close-popup="true"
+          class="tw:text-zinc-400 hover:tw:text-zinc-600 dark:hover:tw:text-zinc-200"
+          data-test="query-inspector-close-btn" />
+      </div>
+    </div>
+
+    <!-- Body -->
+    <q-card-section class="tw:flex-1 tw:overflow-y-auto tw:p-6 tw:bg-zinc-50 dark:tw:bg-zinc-950/50">
+      <div v-if="queryData.length === 0"
+        class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-zinc-400">
+        <q-icon name="info" size="48px" />
+        <p class="tw:mt-2">No queries executed for this panel.</p>
+      </div>
+
+      <div v-else class="tw:space-y-10">
+        <div v-for="(query, index) in queryData" :key="query?.originalQuery + index"
+          class="tw:bg-white dark:tw:bg-zinc-900 tw:rounded-xl tw:border dark:tw:border-zinc-800 tw:shadow-sm tw:overflow-hidden">
+          <!-- Query Header -->
+          <div
+            class="tw:px-5 tw:py-3 tw:bg-zinc-50 dark:tw:bg-zinc-800/50 tw:border-b dark:tw:border-zinc-800 tw:flex tw:items-center tw:justify-between">
+            <div class="tw:flex tw:items-center tw:gap-3">
+              <span
+                class="tw:bg-primary/10 tw:text-primary tw:text-xs tw:font-bold tw:px-2.5 tw:py-1 tw:rounded-md tw:uppercase">
+                Query {{ index + 1 }}
+              </span>
+              <span
+                class="tw:bg-zinc-200 dark:tw:bg-zinc-700 tw:text-zinc-700 dark:tw:text-zinc-300 tw:text-[10px] tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:uppercase">
+                {{ query.queryType }}
+              </span>
+            </div>
+            <div class="tw:flex tw:gap-4 tw:text-[11px] tw:text-zinc-500 tw:font-medium">
+              <div class="tw:flex tw:items-center tw:gap-1.5">
+                <q-icon name="schedule" size="14px" />
+                <span>Elapsed: {{ getDuration(query.startTime, query.endTime) }}ms</span>
               </div>
-              <div
-                v-else
-                :class="{
-                  'scrollable-content':
-                    props.row[0] === 'Original Query' ||
-                    props.row[0] === 'Query',
-                  'regular-content':
-                    props.row[0] !== 'Original Query' &&
-                    props.row[0] !== 'Query',
-                }"
-              >
-                {{ props.row[1] }}
+            </div>
+          </div>
+
+          <!-- Query Content -->
+          <div class="tw:p-6 tw:space-y-8">
+            <!-- Executed Query -->
+            <div class="tw:space-y-3">
+              <div class="tw:flex tw:items-center tw:justify-between">
+                <label class="tw:text-xs tw:font-bold tw:text-zinc-500 tw:uppercase tw:tracking-wider">Executed
+                  Query</label>
+                <q-btn flat dense no-caps color="primary" size="sm" class="tw:rounded-md tw:px-2"
+                  @click="copyText(query.query)">
+                  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
+                  Copy
+                </q-btn>
               </div>
-            </q-td>
-          </template>
-          <template v-slot:body-cell-label="props">
-            <q-td :props="props" class="query-label-cell">
-              {{ props.row[0] }}
-            </q-td>
-          </template>
-        </q-table>
+              <div class="tw:relative tw:group">
+                <div
+                  class="tw:p-4 tw:rounded-lg tw:bg-zinc-50 dark:tw:bg-zinc-950 tw:border dark:tw:border-zinc-800 tw:font-mono tw:text-sm tw:max-h-60 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  v-html="highlightSearch(colorizedQueries[`${index}-Query`] || query.query)"></div>
+              </div>
+            </div>
+
+            <!-- Original Query -->
+            <div v-if="query.originalQuery" class="tw:space-y-3">
+              <div class="tw:flex tw:items-center tw:justify-between">
+                <label class="tw:text-xs tw:font-bold tw:text-zinc-500 tw:uppercase tw:tracking-wider">Original
+                  Query</label>
+                <q-btn flat dense no-caps color="primary" size="sm" class="tw:rounded-md tw:px-2"
+                  @click="copyText(query.originalQuery)">
+                  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
+                  Copy
+                </q-btn>
+              </div>
+              <div class="tw:relative tw:group">
+                <div
+                  class="tw:p-4 tw:rounded-lg tw:bg-zinc-50 dark:tw:bg-zinc-950 tw:border dark:tw:border-zinc-800 tw:font-mono tw:text-sm tw:max-h-40 tw:overflow-y-auto tw:whitespace-pre-wrap tw:break-all inspector-query-editor"
+                  v-html="highlightSearch(colorizedQueries[`${index}-Original Query`] || query.originalQuery)"></div>
+              </div>
+            </div>
+
+            <!-- Variables Grid -->
+            <div class="tw:grid tw:grid-cols-1 tw:md:grid-cols-3 tw:gap-8 tw:pt-6 tw:border-t dark:tw:border-zinc-800">
+              <!-- Standard Variables -->
+              <div class="tw:space-y-3">
+                <label
+                  class="tw:text-[10px] tw:font-bold tw:text-zinc-400 tw:uppercase tw:tracking-wider">Variable(s)</label>
+                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                  <template v-if="getVariablesByType(query, 'variable').length">
+                    <div v-for="v in getVariablesByType(query, 'variable')" :key="v.name"
+                      class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1.5 tw:rounded-lg tw:border dark:tw:border-zinc-800 tw:bg-white dark:tw:bg-zinc-900 tw:text-xs">
+                      <span class="tw:font-bold tw:text-zinc-700 dark:tw:text-zinc-300">{{ v.name }}</span>
+                      <span class="tw:text-zinc-400">:</span>
+                      <span class="tw:text-zinc-500 tw:italic">{{ v.value }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="tw:text-xs tw:text-zinc-400">-</span>
+                </div>
+              </div>
+
+              <!-- Fixed Variables -->
+              <div class="tw:space-y-3">
+                <label class="tw:text-[10px] tw:font-bold tw:text-zinc-400 tw:uppercase tw:tracking-wider">Fixed
+                  Variable(s)</label>
+                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                  <template v-if="getVariablesByType(query, 'fixed').length">
+                    <div v-for="v in getVariablesByType(query, 'fixed')" :key="v.name"
+                      class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1.5 tw:rounded-lg tw:border dark:tw:border-zinc-800 tw:bg-white dark:tw:bg-zinc-900 tw:text-xs">
+                      <span class="tw:font-bold tw:text-zinc-700 dark:tw:text-zinc-300">{{ v.name }}</span>
+                      <span class="tw:text-zinc-400">:</span>
+                      <span class="tw:text-zinc-500 tw:italic">{{ v.value }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="tw:text-xs tw:text-zinc-400">-</span>
+                </div>
+              </div>
+
+              <!-- Dynamic Variables -->
+              <div class="tw:space-y-3">
+                <label class="tw:text-[10px] tw:font-bold tw:text-zinc-400 tw:uppercase tw:tracking-wider">Dynamic
+                  Variable(s)</label>
+                <div class="tw:flex tw:flex-wrap tw:gap-2">
+                  <template v-if="getVariablesByType(query, 'dynamicVariable').length">
+                    <div v-for="v in getVariablesByType(query, 'dynamicVariable')" :key="v.name"
+                      class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1.5 tw:rounded-lg tw:border dark:tw:border-zinc-800 tw:bg-white dark:tw:bg-zinc-900 tw:text-xs">
+                      <span class="tw:font-bold tw:text-zinc-700 dark:tw:text-zinc-300">{{ v.name }}</span>
+                      <span class="tw:text-zinc-400">{{ v.operator }}</span>
+                      <span class="tw:text-zinc-500 tw:italic">{{ v.value }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="tw:text-xs tw:text-zinc-400">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Time Metadata -->
+            <div class="tw:grid tw:grid-cols-1 tw:sm:grid-cols-2 tw:gap-8 tw:pt-6 tw:border-t dark:tw:border-zinc-800">
+              <div class="tw:space-y-2">
+                <span class="tw:text-[10px] tw:font-bold tw:text-zinc-400 tw:uppercase tw:tracking-wider">Start
+                  Time</span>
+                <div
+                  class="tw:text-xs tw:text-zinc-700 dark:tw:text-zinc-300 tw:font-medium tw:flex tw:items-center tw:gap-2">
+                  <q-icon name="login" size="14px" class="tw:text-zinc-400" />
+                  {{ formatTimestamp(query.startTime) }}
+                </div>
+              </div>
+              <div class="tw:space-y-2">
+                <span class="tw:text-[10px] tw:font-bold tw:text-zinc-400 tw:uppercase tw:tracking-wider">End
+                  Time</span>
+                <div
+                  class="tw:text-xs tw:text-zinc-700 dark:tw:text-zinc-300 tw:font-medium tw:flex tw:items-center tw:gap-2">
+                  <q-icon name="logout" size="14px" class="tw:text-zinc-400" />
+                  {{ formatTimestamp(query.endTime) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </q-card-section>
   </q-card>
@@ -83,213 +192,164 @@ import { computed, defineComponent, ref, watch, onMounted } from "vue";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "QueryInspector",
   props: {
     metaData: {
-      validator: value => {
-        // Custom validation logic
-        return typeof value == 'object' || typeof value == undefined;
-      },
-      required: true
+      type: Object,
+      required: true,
     },
     data: {
       type: Object,
-      required: true
-    }
+      required: true,
+    },
   },
   setup(props: any) {
-    const queryData = props.metaData?.queries || [] ;
+    const $q = useQuasar();
     const store = useStore();
-
-    const columns = [
-      {
-        name: "label",
-        label: "Label",
-        field: (row: any) => row[0],
-        align: "left" as const,
-        style: "width: 150px; font-weight: 600;",
-      },
-      {
-        name: "value",
-        label: "Value",
-        field: (row: any) => row[1],
-        align: "left" as const,
-      },
-    ];
-    const getRows = (query: any) => { 
-      const timestampOfStartTime = query?.startTime;
-      const formattedStartTime = timestampToTimezoneDate(
-        timestampOfStartTime / 1000,
-        store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
-      );
-      const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime} ${store.state.timezone})`;
-
-      const timestampOfEndTime = query?.endTime;
-      const formattedEndTime = timestampToTimezoneDate(
-        timestampOfEndTime / 1000,
-        store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
-      );
-      const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime} ${store.state.timezone})`;
-
-      const rows: any[] = [
-        ["Original Query", query?.originalQuery],
-        ["Query", query?.query],
-        ["Start Time", startTimeEntry],
-        ["End Time", endTimeEntry],
-        ["Query Type", query?.queryType],
-        ["Variable(s)", ],
-        ["Fixed Variable(s)",],
-        ["Dynamic Variable(s)",],
-      ];
-
-      const variableRows: any[] = [];
-      const fixedVariableRows: any[] = [];
-      const dynamicVariableRows: any[] = [];
-
-      query?.variables?.forEach((variable: any) => {
-        if (variable.type === 'variable') {
-          variableRows.push(`${variable.name}: ${variable.value}`);
-        } else if (variable.type === 'fixed') {
-          fixedVariableRows.push(`${variable.name}: ${variable.value}`);
-        } else if (variable.type === 'dynamicVariable') {
-          dynamicVariableRows.push(`${variable.name} ${variable.operator} ${variable.value}`);
-        }
-      });
-
-      rows[5][1] = variableRows.length > 0 ? variableRows.join(', ') : '-';
-      rows[6][1] = fixedVariableRows.length > 0 ? fixedVariableRows.join(', ') : '-';
-      rows[7][1] = dynamicVariableRows.length > 0 ? dynamicVariableRows.join(', ') : '-';
-
-
-      return rows;
-    };
-    const totalQueries = computed(() => queryData.length);
-    const dataTitle = computed(() => props.data.title);
+    const queryData = computed(() => props.metaData?.queries || []);
+    const searchQuery = ref("");
     const colorizedQueries = ref<Record<string, string>>({});
+
+    const totalQueries = computed(() => queryData.value.length);
+    const dataTitle = computed(() => props.data.title);
+
+    const formatTimestamp = (ts: number) => {
+      if (!ts) return "-";
+      const formatted = timestampToTimezoneDate(
+        ts / 1000,
+        store.state.timezone,
+        "yyyy-MM-dd HH:mm:ss.SSS"
+      );
+      return `${ts} (${formatted} ${store.state.timezone})`;
+    };
+
+    const getDuration = (start: number, end: number) => {
+      if (!start || !end) return 0;
+      return (end / 1000 - start / 1000).toFixed(2);
+    };
+
+    const getVariablesByType = (query: any, type: string) => {
+      return (query.variables || []).filter((v: any) => v.type === type);
+    };
 
     const updateColorizedQueries = async () => {
       const newColorized: Record<string, string> = {};
-      for (const [index, query] of queryData.entries()) {
-        const lang = query.queryType?.toLowerCase() || 'sql';
-        
+      for (const [index, query] of queryData.value.entries()) {
+        const lang = query.queryType?.toLowerCase() || "sql";
+
         // Original Query
         if (query.originalQuery) {
-          newColorized[`${index}-Original Query`] = await colorizeQuery(query.originalQuery, lang);
+          newColorized[`${index}-Original Query`] = await colorizeQuery(
+            query.originalQuery,
+            lang
+          );
         }
-        
-        // Query
+
+        // Executed Query
         if (query.query) {
-           newColorized[`${index}-Query`] = await colorizeQuery(query.query, lang);
+          newColorized[`${index}-Query`] = await colorizeQuery(
+            query.query,
+            lang
+          );
         }
       }
       colorizedQueries.value = newColorized;
     };
 
+    const highlightSearch = (html: string) => {
+      if (!searchQuery.value || !html) return html;
+
+      try {
+        const escapedSearch = searchQuery.value.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        );
+        const regex = new RegExp(`(?![^<]*>)(${escapedSearch})`, "gi");
+
+        return html.replace(
+          regex,
+          (match) =>
+            `<mark class="tw:bg-yellow-400 tw:text-black tw:rounded-sm tw:px-0.5 tw:shadow-sm">${match}</mark>`
+        );
+      } catch (e) {
+        return html;
+      }
+    };
+
+    const copyText = (text: string) => {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        $q.notify({
+          type: "positive",
+          message: "Copied to clipboard",
+          timeout: 2000,
+          position: "bottom",
+        });
+      });
+    };
+
     onMounted(() => {
-        updateColorizedQueries();
+      updateColorizedQueries();
     });
 
     watch(() => props.metaData, updateColorizedQueries, { deep: true });
 
     return {
       queryData,
-      getRows,
       totalQueries,
       dataTitle,
-      columns,
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
-
-      colorizedQueries
+      searchQuery,
+      colorizedQueries,
+      formatTimestamp,
+      getDuration,
+      getVariablesByType,
+      highlightSearch,
+      copyText,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.query-inspector-table {
-  margin-bottom: 5px;
-
-  :deep(.q-table__container) {
-    border: none;
-    box-shadow: none;
-  }
-
-  :deep(.q-table tbody td) {
-    border-bottom: 1px solid #e9ecef;
-    padding: 5px;
-    vertical-align: top;
-    background: #ffffff;
-  }
-
-  :deep(.q-table tbody tr:last-child td) {
-    border-bottom: none;
-  }
-
-  :deep(.q-table tbody tr:hover td) {
-    background: #f8f9fa;
-  }
-}
-
-.query-label-cell {
-  width: 150px;
-  font-weight: 600;
-  border-right: 1px solid #dee2e6 !important;
-  color: #495057;
-  font-size: 14px;
-}
-
-.regular-content {
-  word-break: break-all;
-  white-space: pre-wrap;
-  font-size: 14px;
-  color: #495057;
-  line-height: 1.4;
-}
-
-.scrollable-content {
-  max-height: 150px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  font-family:
-    "Courier New", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  padding: 8px 0;
-  color: #495057;
-  letter-spacing: 0.5px;
-  
-  /* Better text rendering */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.inspector-query-editor {
 
   /* Custom scrollbar styling */
   &::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
+    background: transparent;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+    background: rgba(128, 128, 128, 0.3);
+    border-radius: 10px;
 
     &:hover {
-      background: #a8a8a8;
+      background: rgba(128, 128, 128, 0.5);
     }
   }
 
   /* Firefox scrollbar styling */
   scrollbar-width: thin;
-  scrollbar-color: #c1c1c1 #f1f1f1;
+  scrollbar-color: rgba(128, 128, 128, 0.3) transparent;
+}
+
+:deep(mark) {
+  all: unset;
+  background-color: #facc15;
+  color: black;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+// Ensure Monaco colorized content looks good
+:deep(.mtk1) {
+  color: inherit;
 }
 </style>
