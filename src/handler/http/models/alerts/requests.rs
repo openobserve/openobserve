@@ -21,19 +21,81 @@ use utoipa::ToSchema;
 use super::{Alert, QueryCondition, StreamType};
 
 /// HTTP request body for `CreateAlert` endpoint.
+///
+/// Creates a new alert with the specified configuration. The alert monitors
+/// a stream (logs, metrics, or traces) and triggers notifications when conditions are met.
+///
+/// ## Example
+///
+/// ```json
+/// {
+///     "name": "High Error Rate Alert",
+///     "stream_type": "logs",
+///     "stream_name": "default",
+///     "is_real_time": false,
+///     "query_condition": {
+///         "type": "sql",
+///         "sql": "SELECT count(*) as count FROM \"default\" WHERE level = 'error'"
+///     },
+///     "trigger_condition": {
+///         "period": 15,
+///         "operator": ">=",
+///         "threshold": 100,
+///         "frequency": 5,
+///         "frequency_type": "minutes",
+///         "silence": 60
+///     },
+///     "destinations": ["slack-alerts"],
+///     "enabled": true,
+///     "description": "Alert when error count exceeds 100 in 15 minutes"
+/// }
+/// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
     /// Optional folder ID indicating the folder in which to create the alert.
     /// If omitted the alert will be created in the default folder.
+    #[schema(example = "default")]
     pub folder_id: Option<String>,
 
+    /// The alert configuration. All fields from Alert are flattened into this request body.
     #[serde(flatten)]
+    #[schema(inline)]
     pub alert: Alert,
 }
 
 /// HTTP request body for `UpdateAlert` endpoint.
+///
+/// Updates an existing alert. Provide the full alert configuration - this replaces
+/// the existing alert entirely (not a partial update). The request body is the same
+/// structure as Alert.
+///
+/// ## Example
+///
+/// ```json
+/// {
+///     "name": "Updated Alert Name",
+///     "stream_type": "logs",
+///     "stream_name": "default",
+///     "is_real_time": false,
+///     "query_condition": {
+///         "type": "sql",
+///         "sql": "SELECT count(*) as count FROM \"default\" WHERE level = 'error'"
+///     },
+///     "trigger_condition": {
+///         "period": 15,
+///         "operator": ">=",
+///         "threshold": 100,
+///         "frequency": 5,
+///         "frequency_type": "minutes",
+///         "silence": 60
+///     },
+///     "destinations": ["slack-alerts"],
+///     "enabled": true,
+///     "description": "Updated description"
+/// }
+/// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-pub struct UpdateAlertRequestBody(pub Alert);
+pub struct UpdateAlertRequestBody(#[schema(inline)] pub Alert);
 
 /// HTTP request body for `MoveAlerts` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]

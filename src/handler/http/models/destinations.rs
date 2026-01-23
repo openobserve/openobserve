@@ -214,42 +214,84 @@ impl Template {
     }
 }
 
+/// Alert destination configuration for sending notifications when alerts trigger.
+///
+/// IMPORTANT: The `template` field is REQUIRED to create an alert destination.
+/// Without a template, the destination becomes a pipeline destination and cannot be used with
+/// alerts.
+///
+/// # Example - Creating an HTTP alert destination
+/// ```json
+/// {
+///   "name": "my_alert_webhook",
+///   "url": "https://example.com/webhook",
+///   "method": "post",
+///   "type": "http",
+///   "template": "Default",
+///   "skip_tls_verify": false
+/// }
+/// ```
+///
+/// # Example - Creating an Email alert destination
+/// ```json
+/// {
+///   "name": "my_email_dest",
+///   "type": "email",
+///   "emails": ["alerts@example.com", "team@example.com"],
+///   "template": "Default"
+/// }
+/// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
+    /// Unique name for this destination. Must be unique within the organization.
     #[serde(default)]
+    #[schema(example = "my_alert_webhook")]
     pub name: String,
-    /// Required for `Http` destination_type
+    /// Webhook URL for HTTP destinations. Required when `type` is `http`.
     #[serde(default)]
+    #[schema(example = "https://example.com/webhook")]
     pub url: String,
-    /// Required for `Http` destination_type
+    /// HTTP method for HTTP destinations. Typically "post" for webhooks.
     #[serde(default)]
+    #[schema(example = "post")]
     pub method: meta_dest::HTTPType,
+    /// Whether to skip TLS certificate verification for HTTP destinations.
     #[serde(default)]
     pub skip_tls_verify: bool,
+    /// Optional HTTP headers to include with webhook requests.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
+    /// REQUIRED for alert destinations. Name of the template to use for formatting alert messages.
+    /// Use "Default" for the built-in default template. Without a template, the destination
+    /// becomes a pipeline destination and cannot be used with alerts.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Default")]
     pub template: Option<String>,
-    /// Required when `destination_type` is `Email`
+    /// Email recipients for Email destinations. Required when `type` is `email`.
     #[serde(default)]
     pub emails: Vec<String>,
-    // SNS-specific fields
+    /// SNS topic ARN for SNS destinations. Required when `type` is `sns`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sns_topic_arn: Option<String>,
+    /// AWS region for SNS destinations. Required when `type` is `sns`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aws_region: Option<String>,
+    /// Destination type: `http` (webhook), `email`, or `sns`. Default is `http`.
     #[serde(rename = "type")]
     #[serde(default)]
+    #[schema(example = "http")]
     pub destination_type: DestinationType,
-    /// Required when `destination_type` is `Action`
+    /// Action ID for enterprise Action destinations. Required when `type` is `action`.
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action_id: Option<String>,
+    /// Output format for HTTP destinations (json or text). Default is json.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<meta_dest::HTTPOutputFormat>,
-    /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch")
+    /// Specific destination type identifier (e.g., "openobserve", "splunk", "elasticsearch").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_type_name: Option<String>,
+    /// Optional key-value metadata for the destination.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
 }
