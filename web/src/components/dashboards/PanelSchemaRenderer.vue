@@ -961,6 +961,7 @@ export default defineComponent({
         validatePanelData?.value?.length === 0
       ) {
         try {
+          logTimeStart("convertPanelData");
           panelData.value = await convertPanelData(
             panelSchema.value,
             filteredData.value,
@@ -973,6 +974,11 @@ export default defineComponent({
             annotations,
             loading.value,
           );
+          logTimeEnd("convertPanelData");
+
+          // logMessage(
+          //   "Converted Panel Data: " + JSON.stringify(panelData.value),
+          // );
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
