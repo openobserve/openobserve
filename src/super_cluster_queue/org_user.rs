@@ -129,11 +129,11 @@ async fn update_token(msg: Message) -> Result<()> {
         None => "".to_string(),
     };
     let keys = msg.key.split('/').collect::<Vec<&str>>();
-    if keys.len() < 4 {
+    if keys.len() < 5 {
         return Err(Error::Message("Invalid key".to_string()));
     }
-    let org_id = keys[2];
-    let user_email = keys[3];
+    let org_id = keys[3];
+    let user_email = keys[4];
     if db_org_users::get(org_id, user_email).await.is_err() {
         // User not found, ignore
         log::warn!(
@@ -157,11 +157,11 @@ async fn update_rum_token(msg: Message) -> Result<()> {
         None => "".to_string(),
     };
     let keys = msg.key.split('/').collect::<Vec<&str>>();
-    if keys.len() < 4 {
+    if keys.len() < 5 {
         return Err(Error::Message("Invalid key".to_string()));
     }
-    let org_id = keys[2];
-    let user_email = keys[3];
+    let org_id = keys[3];
+    let user_email = keys[4];
     if db_org_users::get(org_id, user_email).await.is_err() {
         // User not found, ignore
         log::warn!(
@@ -181,12 +181,12 @@ async fn update_rum_token(msg: Message) -> Result<()> {
 
 async fn delete(msg: Message) -> Result<()> {
     let keys = msg.key.split('/').collect::<Vec<&str>>();
-    if keys.len() < 4 {
+    if keys.len() < 5 {
         return Err(Error::Message("Invalid key".to_string()));
     }
-    let org_id = keys[2];
-    let user_email = keys[3];
-    if keys[1].eq("many") {
+    let org_id = keys[3];
+    let user_email = keys[4];
+    if keys[2].eq("many") {
         if let Err(e) = org_users::remove_by_user(user_email).await {
             log::error!("[SUPER_CLUSTER:sync] Failed to delete org user: {user_email}, error: {e}");
             return Err(e);
