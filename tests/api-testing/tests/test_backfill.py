@@ -331,23 +331,37 @@ class TestBackfillJob:
         past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         record_count = 10
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=record_count)
-        time.sleep(3)  # Wait for indexing
 
-        # 2. Create scheduled pipeline that adds processing_status field
+        # 2. CRITICAL: Wait for data to be indexed and queryable BEFORE creating backfill
+        # In CI, freshly started instance may need more time to index data
+        print("  Waiting for source data to be queryable...")
+        source_hits = []
+        for attempt in range(15):  # Up to 30 seconds
+            time.sleep(2)
+            source_hits = self._query_stream(self.source_stream)
+            if len(source_hits) >= record_count:
+                print(f"  Source data ready after {(attempt+1)*2}s: {len(source_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
+
+        assert len(source_hits) >= record_count, \
+            f"Source data not queryable after 30s. Found {len(source_hits)}, expected {record_count}"
+
+        # 3. Create scheduled pipeline that adds processing_status field
         pipeline_id = self._create_scheduled_pipeline(
             self.source_stream,
             self.dest_stream,
             name_suffix="verify"
         )
 
-        # 3. Create and run backfill
+        # 4. Create and run backfill
         start_time = int((past_time - timedelta(hours=1)).timestamp() * 1000000)
         end_time = int((past_time + timedelta(hours=2)).timestamp() * 1000000)
 
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
 
-        # 4. Wait for completion
-        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=120)
+        # 5. Wait for completion
+        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=180)
 
         # Allow partial success - backfill might complete or still be processing
         assert final_status is not None, "Should get final status"
@@ -355,15 +369,17 @@ class TestBackfillJob:
         print(f"  Final status: {status}")
         print(f"  Full status response: {final_status}")
 
-        # 5. Verify source stream has data
-        print("  Checking source stream...")
-        source_hits = self._query_stream(self.source_stream)
-        print(f"  Source stream has {len(source_hits)} records")
-
         # 6. Query destination stream to verify data was processed
-        time.sleep(10)  # Wait longer for data to be queryable
-        print("  Checking destination stream...")
-        dest_hits = self._query_stream(self.dest_stream)
+        # Wait for destination data to be queryable (backfill writes + indexing)
+        print("  Waiting for destination data...")
+        dest_hits = []
+        for attempt in range(10):  # Up to 20 seconds
+            time.sleep(2)
+            dest_hits = self._query_stream(self.dest_stream)
+            if len(dest_hits) > 0:
+                print(f"  Destination data ready after {(attempt+1)*2}s: {len(dest_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: destination empty, waiting...")
 
         print(f"  Destination stream has {len(dest_hits)} records")
 
