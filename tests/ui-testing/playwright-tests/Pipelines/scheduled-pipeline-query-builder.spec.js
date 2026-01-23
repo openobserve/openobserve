@@ -187,6 +187,7 @@ test.describe("Scheduled Pipeline Query Builder", { tag: ['@all', '@scheduledPip
 
     // Verify we're on PromQL tab
     testLogger.info('Verifying PromQL tab active');
+    await pageManager.pipelinesPage.expectPromqlTabActive();
 
     // Switch back to SQL tab
     testLogger.info('Switching back to SQL tab');
