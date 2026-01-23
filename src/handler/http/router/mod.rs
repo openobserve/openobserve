@@ -386,16 +386,18 @@ pub fn basic_routes() -> Router {
     {
         router = router.nest(
             "/webhook",
-            Router::new().route("/stripe", post(cloud::billings::handle_stripe_event)),
+            Router::new()
+                .route("/stripe", post(cloud::billings::handle_stripe_event))
+                .route(
+                    "/azure",
+                    post(cloud::aws_marketplace::aws_marketplace_register),
+                ),
         );
 
         // AWS Marketplace registration endpoint - receives POST from AWS Marketplace
         // Must be publicly accessible (no auth) as users haven't logged in yet
         // Using /marketplace path to avoid conflict with authenticated /api scope
-        router = router.route(
-            "/marketplace/aws/register",
-            post(cloud::aws_marketplace::aws_marketplace_register),
-        );
+        router = router.route("/marketplace/aws/register", post());
     }
 
     // OAuth 2.0 metadata endpoint
@@ -841,6 +843,10 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/aws-marketplace/activation-status",
                 get(cloud::aws_marketplace::activation_status),
+            )
+            .route(
+                "/{org_id}/azure-marketplace/link-subscription",
+                post(cloud::azure_marketplace::link_subscription),
             );
     }
 

@@ -17,6 +17,7 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 
 const useEnvRoutes = () => {
@@ -31,6 +32,20 @@ const useEnvRoutes = () => {
       meta: {
         title: "AWS Marketplace Setup",
         requiresAuth: true,
+      },
+    },
+    {
+      // Entry point from Azure Marketplace - saves token and redirects to login
+      path: "/marketplace/azure/register",
+      name: "azureMarketplaceRegister",
+      component: AzureMarketplaceSetup,
+      beforeEnter: (to: any, from: any, next: any) => {
+        const token = to.query.token;
+        if (token) {
+          // Save token for after login - Login.vue will check this
+          sessionStorage.setItem("azure_marketplace_token", token);
+        }
+        next();
       },
     },
   ];
