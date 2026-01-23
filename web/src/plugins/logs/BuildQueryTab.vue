@@ -468,6 +468,8 @@ export default defineComponent({
               }
 
               // Set customQuery to false to enable visual builder
+              // Fields that cannot fit in the schema (CASE statements, subqueries, etc.)
+              // will have type="raw" and be handled individually
               dashboardPanelData.data.queries[0].customQuery = false;
 
               queryParsed = true;

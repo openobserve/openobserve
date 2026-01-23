@@ -28,6 +28,7 @@ interface AxisItem {
   havingConditions?: HavingCondition[];
   treatAsNonTimestamp?: boolean;
   showFieldAsJson?: boolean;
+  rawQuery?: string;  // Raw SQL expression for type="raw" fields (CASE statements, etc.)
 }
 
 interface AxisArg {
@@ -432,9 +433,14 @@ export class SQLQueryParser {
         console.log(`[SQLQueryParser.parseColumns] Column ${i} is binary_expr, creating axis item...`);
         const axisItem = this.createAxisItemFromExpression(col);
         yAxis.push(axisItem);
+      } else if (col.expr.type === "case") {
+        // CASE statement - cannot be parsed into visual builder
+        // Throw error to trigger customQuery mode
+        console.log(`[SQLQueryParser.parseColumns] Column ${i} is CASE statement, cannot parse into visual builder`);
+        throw new Error("CASE statements are not supported in visual query builder. Please use custom SQL mode.");
       } else {
         // Other expressions - treat as raw fields
-        console.log(`[SQLQueryParser.parseColumns] Column ${i} has unknown type, treating as raw field`);
+        console.log(`[SQLQueryParser.parseColumns] Column ${i} has unknown type (${col.expr.type}), treating as raw field`);
         const axisItem = this.createRawAxisItem(col);
         xAxis.push(axisItem);
       }
@@ -580,10 +586,20 @@ export class SQLQueryParser {
   }
 
   /**
-   * Create raw axis item for unknown types
+   * Create raw axis item for unknown types (CASE statements, subqueries, etc.)
    */
-  private createRawAxisItem(col: any): AxisItem {
+  private createRawAxisItem(col: any, assignColor: boolean = false): AxisItem {
     const alias = col.as || "field";
+
+    // Convert the expression back to SQL using the parser's sqlify method
+    let rawQuery = "";
+    try {
+      rawQuery = this.parser.sqlify(col.expr);
+      console.log(`[SQLQueryParser.createRawAxisItem] Converted expression to SQL: ${rawQuery}`);
+    } catch (error) {
+      console.warn("[SQLQueryParser.createRawAxisItem] Failed to convert expression to SQL:", error);
+      rawQuery = "";
+    }
 
     return {
       label: this.generateLabel(alias),
@@ -597,6 +613,7 @@ export class SQLQueryParser {
       havingConditions: [],
       treatAsNonTimestamp: true,
       showFieldAsJson: false,
+      rawQuery: rawQuery,  // Store the raw SQL expression
     };
   }
 

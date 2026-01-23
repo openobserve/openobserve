@@ -12,6 +12,7 @@ export function buildSQLQueryFromInput(
 
   // if fields type is raw, return rawQuery
   if (fields.type === "raw") {
+    console.log("[dashboardAutoQueryBuilder] Raw field detected, rawQuery:", fields?.rawQuery);
     return `${fields?.rawQuery ?? ""}`;
   }
 
