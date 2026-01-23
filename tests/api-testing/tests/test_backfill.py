@@ -295,7 +295,7 @@ class TestBackfillJob:
         print("\n=== Test: Create backfill job ===")
 
         # 1. Ingest historical data (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=5)
         time.sleep(2)  # Wait for indexing
 
@@ -325,8 +325,10 @@ class TestBackfillJob:
         """Test that backfill actually processes data and writes to destination."""
         print("\n=== Test: Backfill execution and data verification ===")
 
-        # 1. Ingest historical data with known content (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        # 1. Ingest historical data with known content (23 hours ago)
+        # Note: Using 23 hours instead of 24 (1 day) to stay safely within ingestion limits
+        # Data exactly at the boundary (24h) may be rejected depending on ZO_INGEST_ALLOWED_UPTO
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         record_count = 10
         assert self._ingest_logs_with_timestamp(self.source_stream, past_time, count=record_count)
         time.sleep(3)  # Wait for indexing
@@ -394,7 +396,7 @@ class TestBackfillJob:
         print("\n=== Test: Get backfill job status ===")
 
         # Create a pipeline and backfill job (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -431,7 +433,7 @@ class TestBackfillJob:
         print("\n=== Test: Pause and resume backfill ===")
 
         # Create pipeline and backfill with longer time range (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=20)
         time.sleep(2)
 
@@ -497,7 +499,7 @@ class TestBackfillJob:
         print("\n=== Test: Delete backfill job ===")
 
         # Create pipeline and backfill (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -539,7 +541,7 @@ class TestBackfillJob:
         print("\n=== Test: Invalid time range validation ===")
 
         # Create a pipeline first (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -595,7 +597,7 @@ class TestBackfillJob:
         print("\n=== Test: Progress tracking ===")
 
         # Create pipeline with longer time range (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=10)
         time.sleep(2)
 
@@ -637,7 +639,7 @@ class TestBackfillJob:
         print("\n=== Test: Get non-existent backfill job ===")
 
         # Create a real pipeline first (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
@@ -707,7 +709,7 @@ class TestBackfillJob:
         }
 
         # Ingest data first to create stream (1 day ago)
-        past_time = datetime.now(timezone.utc) - timedelta(days=1)
+        past_time = datetime.now(timezone.utc) - timedelta(hours=23)
         self._ingest_logs_with_timestamp(self.source_stream, past_time, count=3)
         time.sleep(2)
 
