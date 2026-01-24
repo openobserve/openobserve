@@ -15,115 +15,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph tw-flex tw-flex-col tw-h-full">
-    <!-- Header with controls -->
+  <div class="incident-service-graph" style="height: calc(100vh - 202px);">
+    <!-- Loading State -->
     <div
-      class="tw-flex tw-items-center tw-justify-between tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
-      :class="isDarkMode ? 'tw-border-gray-700' : 'tw-border-gray-200'"
+      v-if="loading"
+      class="tw-flex tw-items-center tw-justify-center tw-h-full"
+      :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
     >
-      <div class="tw-flex tw-items-center tw-gap-2">
-        <q-select
-          v-model="layout"
-          :options="layoutOptions"
-          dense
-          outlined
-          emit-value
-          map-options
-          class="tw-w-36"
-          :dark="isDarkMode"
-          @update:model-value="onLayoutChange"
-        />
-        <q-btn
-          flat
-          dense
-          round
-          icon="refresh"
-          @click="loadGraph"
-          :loading="loading"
-        >
-          <q-tooltip>Refresh graph</q-tooltip>
-        </q-btn>
-      </div>
+      <q-spinner size="lg" color="primary" />
     </div>
 
-    <!-- Stats Banner -->
+    <!-- Empty State -->
     <div
-      v-if="graphData"
-      class="tw-flex tw-gap-4 tw-px-3 tw-py-2 tw-border-b tw-flex-shrink-0"
-      :class="isDarkMode ? 'tw-bg-gray-800/50 tw-border-gray-700' : 'tw-bg-gray-50 tw-border-gray-200'"
+      v-else-if="!graphData || graphData.nodes.length === 0"
+      class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
     >
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="hub" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Services:</span>
-        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
-          {{ graphData.stats.total_services }}
-        </span>
-      </div>
-      <div class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="notifications" size="16px" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-500'" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Total Alerts:</span>
-        <span class="tw-text-xs tw-font-semibold" :class="isDarkMode ? 'tw-text-gray-200' : 'tw-text-gray-800'">
-          {{ graphData.stats.total_alerts }}
-        </span>
-      </div>
-      <div v-if="graphData.root_cause_service" class="tw-flex tw-items-center tw-gap-1.5">
-        <q-icon name="gps_fixed" size="16px" class="tw-text-red-500" />
-        <span class="tw-text-xs" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">Root Cause:</span>
-        <span class="tw-text-xs tw-font-semibold tw-text-red-500">
-          {{ graphData.root_cause_service }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Graph Container -->
-    <div class="tw-flex-1 tw-relative tw-overflow-hidden">
-      <!-- Loading State -->
-      <div
-        v-if="loading"
-        class="tw-absolute tw-inset-0 tw-flex tw-items-center tw-justify-center"
-        :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
-      >
-        <q-spinner size="lg" color="primary" />
-      </div>
-
-      <!-- Empty State -->
-      <div
-        v-else-if="!graphData || graphData.nodes.length === 0"
-        class="tw-absolute tw-inset-0 tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3"
-      >
-        <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
-        <div class="tw-text-center">
-          <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
-            Service Graph Unavailable
-          </div>
-          <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
-            Topology data is being generated in the background.
-          </div>
+      <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
+      <div class="tw-text-center">
+        <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+          Service Graph Unavailable
         </div>
-        <q-btn
-          outline
-          color="primary"
-          size="sm"
-          no-caps
-          @click="loadGraph"
-          :loading="loading"
-        >
-          Refresh to Check Again
-        </q-btn>
+        <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
+          Topology data is being generated in the background.
+        </div>
       </div>
-
-      <!-- Graph Canvas using ECharts -->
-      <div
-        v-if="!loading && graphData && graphData.nodes.length > 0"
-        style="width: 100%; height: calc(100vh - 150px)"
+      <q-btn
+        outline
+        color="primary"
+        size="sm"
+        no-caps
+        @click="loadGraph"
+        :loading="loading"
       >
-        <ChartRenderer
-          ref="chartRendererRef"
-          :data="chartData"
-          :key="chartKey"
-          class="tw-h-full"
-        />
-      </div>
+        Refresh to Check Again
+      </q-btn>
+    </div>
+
+    <!-- Graph Canvas using ECharts -->
+    <div
+      v-if="!loading && graphData && graphData.nodes.length > 0"
+      style="width: 100%; height: 100%;"
+    >
+      <ChartRenderer
+        ref="chartRendererRef"
+        :data="chartData"
+        :key="chartKey"
+      />
     </div>
   </div>
 </template>
@@ -135,11 +72,13 @@ import { useQuasar } from "quasar";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import incidentsService, { IncidentServiceGraph, AlertNode } from "@/services/incidents";
+import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
+    DropzoneBackground,
   },
   props: {
     orgId: {
@@ -158,14 +97,8 @@ export default defineComponent({
     const loading = ref(false);
     const graphData = ref<IncidentServiceGraph | null>(null);
     const chartRendererRef = ref<any>(null);
-    const layout = ref("force");
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
-
-    const layoutOptions = [
-      { label: "Force Directed", value: "force" },
-      { label: "Circular", value: "circular" },
-    ];
 
     const isDarkMode = computed(() => store.state.theme === "dark");
 
@@ -254,7 +187,7 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges, incident_service, root_cause_service } = graphData.value;
+      const { nodes, edges } = graphData.value;
 
       // Prepare nodes for D3-force simulation
       const preparedNodes = nodes.map((node, index) => ({
@@ -361,23 +294,6 @@ export default defineComponent({
         },
       }));
 
-      const layoutConfig = layout.value === "circular"
-        ? {
-            type: "circular",
-            circular: {
-              rotateLabel: true,
-            },
-          }
-        : {
-            type: "force",
-            force: {
-              repulsion: 300,
-              gravity: 0.1,
-              edgeLength: 150,
-              layoutAnimation: true,
-            },
-          };
-
       const options = {
         tooltip: {
           trigger: "item",
@@ -417,10 +333,6 @@ export default defineComponent({
       return { options, notMerge: !hasAllPositions }; // Merge when using cached positions
     });
 
-    const onLayoutChange = () => {
-      chartKey.value++;
-    };
-
     // Watch for incident changes
     watch(
       () => props.incidentId,
@@ -437,13 +349,10 @@ export default defineComponent({
       loading,
       graphData,
       chartRendererRef,
-      layout,
-      layoutOptions,
       chartData,
       chartKey,
       isDarkMode,
       loadGraph,
-      onLayoutChange,
     };
   },
 });
@@ -452,5 +361,46 @@ export default defineComponent({
 <style scoped>
 .incident-service-graph {
   min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  margin: 12px;
+  padding: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Light mode */
+.incident-service-graph {
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  border: 1px solid #e5e7eb;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.08),
+    0 1px 2px 0 rgba(0, 0, 0, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.incident-service-graph:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode */
+.body--dark .incident-service-graph {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  border: 1px solid #374151;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.3),
+    0 1px 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
+}
+
+.body--dark .incident-service-graph:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 2px 4px -1px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
 }
 </style>

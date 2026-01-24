@@ -159,6 +159,20 @@ const incidents = {
   },
 
   /**
+   * Update incident details (title, severity, etc.)
+   */
+  updateIncident: (
+    org_identifier: string,
+    incident_id: string,
+    updates: { title?: string; severity?: string }
+  ) => {
+    return http().patch<Incident>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
+      updates
+    );
+  },
+
+  /**
    * Get incident statistics
    */
   getStats: (org_identifier: string) => {
