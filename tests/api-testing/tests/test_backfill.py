@@ -304,9 +304,9 @@ class TestBackfillJob:
             name_suffix="basic"
         )
 
-        # 3. Create backfill job
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        # 3. Create backfill job (end_time must be in the past, not future)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=10)).timestamp() * 1000000)
 
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
@@ -353,11 +353,11 @@ class TestBackfillJob:
             name_suffix="verify"
         )
 
-        # 4. Create and run backfill - time range covers the recent data
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        # 4. Create and run backfill - time range covers the recent data (end_time must be in the past)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=15)).timestamp() * 1000000)
 
-        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=15)
 
         # 5. Wait for completion
         final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=180)
@@ -421,8 +421,8 @@ class TestBackfillJob:
             name_suffix="status"
         )
 
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=10)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
         # Get specific backfill job status
@@ -459,8 +459,8 @@ class TestBackfillJob:
         )
 
         # Create backfill with small chunks to allow pausing mid-execution
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=25)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=5)
 
         # Wait a bit for job to start
@@ -524,8 +524,8 @@ class TestBackfillJob:
             name_suffix="delete"
         )
 
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=10)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time)
 
         # Remove from tracking so cleanup doesn't try to delete it again
@@ -623,8 +623,8 @@ class TestBackfillJob:
         )
 
         # Create backfill with multiple chunks
-        start_time = int((past_time - timedelta(minutes=30)).timestamp() * 1000000)
-        end_time = int((datetime.now(timezone.utc) + timedelta(minutes=5)).timestamp() * 1000000)
+        start_time = int((past_time - timedelta(minutes=5)).timestamp() * 1000000)
+        end_time = int((past_time + timedelta(minutes=25)).timestamp() * 1000000)
         job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=10)
 
         # Track progress over time
