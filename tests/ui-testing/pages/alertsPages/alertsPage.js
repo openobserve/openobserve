@@ -664,34 +664,6 @@ export class AlertsPage {
         await expect(this.page.locator('[data-test="dashboard-folder-tab-default"]').getByText('default')).toBeVisible();
     }
 
-<<<<<<< HEAD
-    // ==================== VIEW MODE NAVIGATION (ALERTS / INCIDENTS as separate pages) ====================
-
-    /**
-     * Navigate to Alerts page with full URL (for initial navigation)
-     * Use this in beforeEach for initial page setup
-     * @param {string} baseUrl - Optional base URL, defaults to logData.alertUrl pattern
-     */
-    async navigateToAlertsPage(baseUrl = null) {
-        testLogger.info('Navigating to Alerts page (initial navigation)');
-        const orgId = process.env["ORGNAME"] || 'default';
-        const url = baseUrl ? `${baseUrl}?org_identifier=${orgId}` : `/web/alerts?org_identifier=${orgId}`;
-        await this.page.goto(url);
-        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await this.waitForLoadingOverlayToDisappear();
-        await this.waitForAlertListPageReady();
-        testLogger.info('Alerts page loaded successfully');
-    }
-
-    /**
-     * Navigate to Alerts page (from another page)
-     * Note: Incidents is now a separate page, not a tab within Alerts
-     */
-    async clickAlertsTab() {
-        testLogger.info('Navigating to Alerts page');
-        const orgId = process.env["ORGNAME"] || 'default';
-        await this.page.goto(`/web/alerts?org_identifier=${orgId}`);
-=======
     // ==================== ALERTS / INCIDENTS NAVIGATION ====================
     // Alerts and Incidents are now separate pages accessible via sidebar menu
 
@@ -701,25 +673,12 @@ export class AlertsPage {
     async navigateToAlertsPage() {
         testLogger.info('Navigating to Alerts page');
         await this.page.locator(this.locators.alertMenuItem).click();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.waitForAlertListPageReady();
         testLogger.info('Navigated to Alerts page');
     }
 
     /**
-<<<<<<< HEAD
-     * Navigate to Incidents page
-     * Note: Incidents is now a separate page at /web/incidents
-     */
-    async clickIncidentsTab() {
-        testLogger.info('Navigating to Incidents page');
-        const orgId = process.env["ORGNAME"] || 'default';
-        await this.page.goto(`/web/incidents?org_identifier=${orgId}`);
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Wait for incidents page to be ready
-        await this.page.locator(this.locators.incidentListTable).waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-=======
      * Navigate to Incidents page via sidebar menu
      */
     async navigateToIncidentsPage() {
@@ -727,38 +686,10 @@ export class AlertsPage {
         await this.page.locator(this.locators.incidentsMenuItem).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.locator(this.locators.incidentList).waitFor({ state: 'visible', timeout: 30000 });
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         testLogger.info('Navigated to Incidents page');
     }
 
     /**
-<<<<<<< HEAD
-     * Wait for the current page to be ready
-     * Note: With separate pages, this just ensures the current page is loaded
-     */
-    async waitForViewTabsReady() {
-        // No tabs to wait for - just ensure page is loaded
-        // This method is kept for backward compatibility
-        testLogger.info('Waiting for page to be ready (no tabs in new UI)');
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    }
-
-    /**
-     * Verify we're on a valid alerts/incidents page
-     * Note: With separate pages, this verifies we're on the expected page
-     */
-    async expectViewModeTabsVisible() {
-        testLogger.info('Verifying page is valid (no tabs in new UI - checking page title)');
-        // Check for either alerts or incidents page title
-        const alertsTitle = this.page.locator('[data-test="alert-list-title"]');
-        const incidentsTitle = this.page.locator('[data-test="incidents-list-title"]');
-        const isAlertsPage = await alertsTitle.isVisible().catch(() => false);
-        const isIncidentsPage = await incidentsTitle.isVisible().catch(() => false);
-        if (!isAlertsPage && !isIncidentsPage) {
-            throw new Error('Not on a valid alerts or incidents page');
-        }
-        testLogger.info(`On ${isAlertsPage ? 'Alerts' : 'Incidents'} page`);
-=======
      * Verify sidebar menu items are visible for navigation
      */
     async expectSidebarMenuItemsVisible() {
@@ -766,7 +697,6 @@ export class AlertsPage {
         await expect(this.page.locator(this.locators.alertMenuItem)).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator(this.locators.incidentsMenuItem)).toBeVisible({ timeout: 10000 });
         testLogger.info('Sidebar menu items verified');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
     }
 
     /**

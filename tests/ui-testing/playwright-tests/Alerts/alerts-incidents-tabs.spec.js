@@ -1,21 +1,6 @@
 /**
  * Alerts & Incidents Pages - E2E Tests
  *
-<<<<<<< HEAD
- * ENTERPRISE FEATURE: This entire test suite validates the Alerts and Incidents
- * pages which are available in OpenObserve Enterprise.
- * The Incidents page and all incident-related functionality require enterprise license.
- *
- * Test Suite: Validates Alerts and Incidents as separate pages
- * Module: Alerts / Incidents
- * Priority: High (Core UX Enhancement)
- *
- * Architecture: Alerts (/web/alerts) and Incidents (/web/incidents) are separate pages.
- * Users navigate between them via the sidebar menu.
- *
- * Consolidated Test Coverage:
- * - Test 1: UI validation for Alerts and Incidents pages [ENTERPRISE]
-=======
  * ENTERPRISE FEATURE: This test suite validates the Alerts and Incidents
  * pages which are available in OpenObserve Enterprise.
  * The Incidents page and all incident-related functionality require enterprise license.
@@ -29,7 +14,6 @@
  *
  * Consolidated Test Coverage:
  * - Test 1: Page navigation and UI validation [ENTERPRISE]
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
  * - Test 2: Search functionality in both pages [ENTERPRISE]
  * - Test 3: Edge cases (empty states, page refresh) [ENTERPRISE]
  * - Test 4: Incident lifecycle actions (acknowledge, resolve, reopen) [ENTERPRISE - SKIPPED]
@@ -53,22 +37,6 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-<<<<<<< HEAD
-        // Navigate to alerts page using POM method
-        await pm.alertsPage.navigateToAlertsPage(logData.alertUrl);
-    });
-
-    /**
-     * Test 1: Page UI Validation
-     * Consolidates: TC-01 through TC-06, TC-09, TC-10
-     *
-     * Validates:
-     * - Alerts page shows correct elements
-     * - Incidents page shows correct elements (navigate via URL)
-     * - Navigation between pages works
-     */
-    test("Page navigation UI validation - elements and switching between Alerts/Incidents pages", {
-=======
         // Navigate directly to alerts page
         await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
@@ -92,20 +60,15 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
      * - Navigate back to Alerts page restores elements
      */
     test("Page navigation and UI validation - Alerts and Incidents", {
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         tag: ['@alertsIncidentsTabs', '@smoke', '@P0', '@all']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Verify Alerts page on load ===');
 
-<<<<<<< HEAD
-        // 1.1 Verify all Alerts page elements
-=======
         // 1.1 Verify sidebar menu items are visible
         await pm.alertsPage.expectSidebarMenuItemsVisible();
         testLogger.info('✓ Sidebar menu items visible');
 
         // 1.2 Verify all Alerts page elements
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         await pm.alertsPage.expectAlertListTableVisible();
         await pm.alertsPage.expectSearchAcrossFoldersToggleVisible();
         await pm.alertsPage.expectImportButtonVisible();
@@ -113,12 +76,6 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         await pm.alertsPage.expectAlertListSplitterVisible();
         testLogger.info('✓ All Alerts page elements visible');
 
-<<<<<<< HEAD
-        testLogger.info('=== PHASE 2: Navigate to Incidents page ===');
-
-        // 2.1 Navigate to Incidents page
-        await pm.alertsPage.clickIncidentsTab();
-=======
         // 1.3 Verify Incidents-only elements are hidden on Alerts page
         await pm.alertsPage.expectIncidentsOnlyElementsHidden();
         testLogger.info('✓ Incidents elements hidden on Alerts page');
@@ -127,18 +84,11 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // 2.1 Navigate to Incidents page via sidebar menu
         await pm.alertsPage.navigateToIncidentsPage();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 2.2 Verify Incidents page elements
         await pm.alertsPage.expectIncidentsViewElementsVisible();
         testLogger.info('✓ Incidents page elements visible');
 
-<<<<<<< HEAD
-        testLogger.info('=== PHASE 3: Navigate back to Alerts page ===');
-
-        // 3.1 Navigate to Alerts page
-        await pm.alertsPage.clickAlertsTab();
-=======
         // 2.3 Verify Alerts-only elements are hidden on Incidents page
         await pm.alertsPage.expectAlertsOnlyElementsHidden();
         testLogger.info('✓ Alerts elements hidden on Incidents page');
@@ -147,7 +97,6 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // 3.1 Navigate back to Alerts page via sidebar menu
         await pm.alertsPage.navigateToAlertsPage();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 3.2 Verify Alerts page elements restored
         await pm.alertsPage.expectAlertsViewElementsVisible();
@@ -155,20 +104,11 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // 3.3 Verify toggle visible
         await pm.alertsPage.expectSearchAcrossFoldersToggleVisible();
-<<<<<<< HEAD
-        testLogger.info('✓ Toggle visible in Alerts page');
-=======
         testLogger.info('✓ Toggle visible on Alerts page');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 3.4 Verify buttons visible
         await pm.alertsPage.expectImportButtonVisible();
         await pm.alertsPage.expectAddAlertButtonVisible();
-<<<<<<< HEAD
-        testLogger.info('✓ Import and Add buttons visible in Alerts page');
-
-        testLogger.info('=== Page UI validation COMPLETE ===');
-=======
         testLogger.info('✓ Import and Add buttons visible on Alerts page');
 
         // 3.5 Verify Incidents elements hidden again
@@ -176,34 +116,21 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         testLogger.info('✓ Incidents elements hidden again');
 
         testLogger.info('=== Page navigation UI validation COMPLETE ===');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
     });
 
     /**
      * Test 2: Search Functionality in Both Pages
-<<<<<<< HEAD
-     * Consolidates: TC-07, TC-08
-     *
-     * Validates:
-     * - Search input works in Alerts page
-     * - Search input works in Incidents page
-=======
      *
      * Validates:
      * - Search input works on Alerts page
      * - Search input works on Incidents page
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
      */
     test("Search functionality works in both pages", {
         tag: ['@alertsIncidentsTabs', '@functional', '@P1', '@all', '@search']
     }, async ({ page }) => {
         const searchQuery = 'test';
 
-<<<<<<< HEAD
-        testLogger.info('=== PHASE 1: Search in Alerts page ===');
-=======
         testLogger.info('=== PHASE 1: Search on Alerts page ===');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 1.1 Type in alert search input
         await pm.alertsPage.typeInAlertSearchInput(searchQuery);
@@ -211,21 +138,12 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         // 1.2 Verify search works
         await pm.alertsPage.expectAlertSearchInputFocused();
         await pm.alertsPage.expectAlertListTableVisible();
-<<<<<<< HEAD
-        testLogger.info('✓ Search in Alerts page works');
-
-        testLogger.info('=== PHASE 2: Search in Incidents page ===');
-
-        // 2.1 Navigate to Incidents page
-        await pm.alertsPage.clickIncidentsTab();
-=======
         testLogger.info('✓ Search on Alerts page works');
 
         testLogger.info('=== PHASE 2: Search on Incidents page ===');
 
         // 2.1 Navigate to Incidents page
         await pm.alertsPage.navigateToIncidentsPage();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 2.2 Type in incident search input
         await pm.alertsPage.searchInIncidentsView(searchQuery);
@@ -233,11 +151,7 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         // 2.3 Verify search input has value and table visible
         await pm.alertsPage.expectIncidentSearchInputValue(searchQuery);
         await pm.alertsPage.expectIncidentListTableVisible();
-<<<<<<< HEAD
-        testLogger.info('✓ Search in Incidents page works');
-=======
         testLogger.info('✓ Search on Incidents page works');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         testLogger.info('=== Search functionality COMPLETE ===');
     });
@@ -258,25 +172,17 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         // 1.1 Verify table container present (even if empty)
         await pm.alertsPage.expectAlertListTableVisible();
 
-<<<<<<< HEAD
-        // 1.2 Verify Add Alert button visible (key action for empty state)
-=======
         // 1.2 Verify sidebar navigation functional
         await pm.alertsPage.expectSidebarMenuItemsVisible();
 
         // 1.3 Verify Add Alert button visible (key action for empty state)
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
         await pm.alertsPage.expectAddAlertButtonVisible();
         testLogger.info('✓ Empty alerts state handled correctly');
 
         testLogger.info('=== PHASE 2: Empty Incidents state ===');
 
         // 2.1 Navigate to Incidents page
-<<<<<<< HEAD
-        await pm.alertsPage.clickIncidentsTab();
-=======
         await pm.alertsPage.navigateToIncidentsPage();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         // 2.2 Verify incident table container present
         await pm.alertsPage.expectIncidentListTableVisible();
@@ -299,14 +205,6 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
 
         // 3.4 Verify still on Incidents page (URL state preserved)
         await pm.alertsPage.expectIncidentsViewElementsVisible();
-<<<<<<< HEAD
-        testLogger.info('✓ Incidents page preserved after refresh');
-
-        // 3.5 Verify can navigate back to Alerts
-        await pm.alertsPage.clickAlertsTab();
-        await pm.alertsPage.expectAlertsViewElementsVisible();
-        testLogger.info('✓ Can navigate back to Alerts after refresh');
-=======
         await pm.alertsPage.expectAlertsOnlyElementsHidden();
         testLogger.info('✓ Incidents page preserved after refresh');
 
@@ -314,7 +212,6 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         await pm.alertsPage.navigateToAlertsPage();
         await pm.alertsPage.expectAlertsViewElementsVisible();
         testLogger.info('✓ Can navigate to Alerts after refresh');
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
 
         testLogger.info('=== Edge cases COMPLETE ===');
     });
@@ -355,11 +252,7 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
             testLogger.info('=== PHASE 1: Setup - Navigate to Incidents page ===');
 
             // Navigate to Incidents page
-<<<<<<< HEAD
-            await pm.alertsPage.clickIncidentsTab();
-=======
             await pm.alertsPage.navigateToIncidentsPage();
->>>>>>> 4a1fc9b8b (fix: service graph and incident updates (#10121))
             await pm.alertsPage.waitForIncidentsToLoad();
             testLogger.info('Navigated to Incidents page');
 
