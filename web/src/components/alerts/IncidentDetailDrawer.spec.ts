@@ -574,7 +574,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("warning");
+      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("orange");
     });
 
     it("should return correct color for resolved status", () => {

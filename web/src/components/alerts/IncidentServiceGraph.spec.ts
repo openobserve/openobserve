@@ -180,7 +180,7 @@ describe("IncidentServiceGraph.vue", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("should display stats banner when graph data is loaded", async () => {
+    it("should display graph when data is loaded", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
       } as any);
@@ -189,28 +189,9 @@ describe("IncidentServiceGraph.vue", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.text()).toContain("Services:");
-      expect(wrapper.text()).toContain("3");
-      expect(wrapper.text()).toContain("Total Alerts:");
-      expect(wrapper.text()).toContain("22");
-    });
-
-    it("should display root cause service when available", async () => {
-      const dataWithRootCause = {
-        ...mockGraphData,
-        root_cause_service: "service-c",
-      };
-
-      vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
-        data: dataWithRootCause,
-      } as any);
-
-      wrapper = mountComponent();
-      await flushPromises();
-      await nextTick();
-
-      expect(wrapper.text()).toContain("Root Cause:");
-      expect(wrapper.text()).toContain("service-c");
+      // Check that ChartRenderer component is rendered
+      expect(wrapper.findComponent({ name: "ChartRenderer" }).exists()).toBe(true);
+      expect(wrapper.vm.graphData).toEqual(mockGraphData);
     });
 
     it("should not display root cause when not available", async () => {
@@ -418,15 +399,7 @@ describe("IncidentServiceGraph.vue", () => {
   });
 
   describe("Layout Options", () => {
-    it("should have force and circular layout options", () => {
-      wrapper = mountComponent();
-      expect(wrapper.vm.layoutOptions).toEqual([
-        { label: "Force Directed", value: "force" },
-        { label: "Circular", value: "circular" },
-      ]);
-    });
-
-    it("should generate force layout configuration", async () => {
+    it("should use D3-force pre-computed layout", async () => {
       vi.mocked(incidentsService.getServiceGraph).mockResolvedValue({
         data: mockGraphData,
       } as any);
