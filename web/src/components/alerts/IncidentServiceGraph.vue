@@ -15,55 +15,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph tw-flex tw-flex-col tw-h-full">
-    <!-- Graph Container -->
-    <div class="tw-flex-1 tw-relative tw-overflow-hidden">
-      <!-- Loading State -->
-      <div
-        v-if="loading"
-        class="tw-absolute tw-inset-0 tw-flex tw-items-center tw-justify-center"
-        :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
-      >
-        <q-spinner size="lg" color="primary" />
-      </div>
+  <div class="incident-service-graph" style="height: calc(100vh - 202px);">
+    <!-- Loading State -->
+    <div
+      v-if="loading"
+      class="tw-flex tw-items-center tw-justify-center tw-h-full"
+      :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
+    >
+      <q-spinner size="lg" color="primary" />
+    </div>
 
-      <!-- Empty State -->
-      <div
-        v-else-if="!graphData || graphData.nodes.length === 0"
-        class="tw-absolute tw-inset-0 tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3"
-      >
-        <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
-        <div class="tw-text-center">
-          <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
-            Service Graph Unavailable
-          </div>
-          <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
-            Topology data is being generated in the background.
-          </div>
+    <!-- Empty State -->
+    <div
+      v-else-if="!graphData || graphData.nodes.length === 0"
+      class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
+    >
+      <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
+      <div class="tw-text-center">
+        <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
+          Service Graph Unavailable
         </div>
-        <q-btn
-          outline
-          color="primary"
-          size="sm"
-          no-caps
-          @click="loadGraph"
-          :loading="loading"
-        >
-          Refresh to Check Again
-        </q-btn>
+        <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
+          Topology data is being generated in the background.
+        </div>
       </div>
-
-      <!-- Graph Canvas using ECharts -->
-      <div
-        v-if="!loading && graphData && graphData.nodes.length > 0"
-        style="width: 100%; height: calc(100vh - 150px)"
+      <q-btn
+        outline
+        color="primary"
+        size="sm"
+        no-caps
+        @click="loadGraph"
+        :loading="loading"
       >
-        <ChartRenderer
-          ref="chartRendererRef"
-          :data="chartData"
-          :key="chartKey"
-        />
-      </div>
+        Refresh to Check Again
+      </q-btn>
+    </div>
+
+    <!-- Graph Canvas using ECharts -->
+    <div
+      v-if="!loading && graphData && graphData.nodes.length > 0"
+      style="width: 100%; height: 100%;"
+    >
+      <ChartRenderer
+        ref="chartRendererRef"
+        :data="chartData"
+        :key="chartKey"
+      />
     </div>
   </div>
 </template>
@@ -75,11 +72,13 @@ import { useQuasar } from "quasar";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import incidentsService, { IncidentServiceGraph, AlertNode } from "@/services/incidents";
+import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
+    DropzoneBackground,
   },
   props: {
     orgId: {
@@ -362,5 +361,46 @@ export default defineComponent({
 <style scoped>
 .incident-service-graph {
   min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  margin: 12px;
+  padding: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Light mode */
+.incident-service-graph {
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  border: 1px solid #e5e7eb;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.08),
+    0 1px 2px 0 rgba(0, 0, 0, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.incident-service-graph:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode */
+.body--dark .incident-service-graph {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  border: 1px solid #374151;
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.3),
+    0 1px 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
+}
+
+.body--dark .incident-service-graph:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4),
+    0 2px 4px -1px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
 }
 </style>
