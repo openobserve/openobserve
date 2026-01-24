@@ -372,6 +372,29 @@ class TestBackfillJob:
         assert len(source_hits) >= record_count, \
             f"Source data not queryable after {max_wait}s. Found {len(source_hits)}, expected {record_count}"
 
+        # 2b. Verify backdated timestamps were stored correctly
+        # This confirms ZO_INGEST_ALLOWED_UPTO setting is working
+        # Records span from 15min ago (record 0) to 6min ago (record 9)
+        print("  Verifying backdated timestamps...")
+        timestamps_ages = []
+        for hit in source_hits:
+            record_ts = hit.get("_timestamp", 0)
+            record_time = datetime.fromtimestamp(record_ts / 1000000, tz=timezone.utc)
+            age_minutes = (datetime.now(timezone.utc) - record_time).total_seconds() / 60
+            timestamps_ages.append(age_minutes)
+
+        oldest_age = max(timestamps_ages)
+        newest_age = min(timestamps_ages)
+        print(f"    Record timestamps range: {oldest_age:.1f}min ago (oldest) to {newest_age:.1f}min ago (newest)")
+
+        # The oldest record should be ~15 minutes old (the first one we ingested)
+        # Allow tolerance for test execution time
+        assert oldest_age > 10, \
+            f"Oldest record should be ~15min ago, but is only {oldest_age:.1f}min old. " \
+            f"This may indicate backdated ingestion failed - data was stored with current timestamp " \
+            f"instead of the backdated timestamp. Check ZO_INGEST_ALLOWED_UPTO setting."
+        print(f"    ✓ Backdated ingestion verified: oldest record is {oldest_age:.1f} minutes ago")
+
         # 3. Create scheduled pipeline that adds processing_status field
         pipeline_id = self._create_scheduled_pipeline(
             self.source_stream,
