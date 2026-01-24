@@ -293,14 +293,22 @@ pub async fn create_org(
 
     #[cfg(feature = "cloud")]
     {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
         let orgs = list_orgs_by_user(user_email).await?;
+        let mut free_org_count = 0;
         for org in orgs {
-            let billing = get_billing_by_org_id(&org.identifier).await?;
-            if billing.is_none() {
-                return Err(anyhow::anyhow!(
-                    "A user cannot be part of multiple free accounts"
-                ));
+            let billings = get_billing_by_org_id(&org.identifier).await?;
+            if billings.is_none() {
+                free_org_count += 1;
             }
+        }
+        // if we allow creating a new org, the free org count would be max+1
+        // hence check of >= rather than >
+        if free_org_count >= o2cfg.cloud.max_free_orgs_allowed {
+            return Err(anyhow::anyhow!(
+                "A user cannot be part of more than {} free organizations.",
+                o2cfg.cloud.max_free_orgs_allowed
+            ));
         }
     }
 
@@ -559,13 +567,22 @@ pub async fn generate_invitation(
             // irrespective of what other orgs invitees are part of.
             // if it is a free org, we must check that the orgs invitee is already part
             // of are all paid, as one user cannot be part of more than one free org.
+            let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+            let mut free_org_count = 0;
             let invitee_orgs = list_orgs_by_user(invitee).await?;
             for org in invitee_orgs {
-                if get_billing_by_org_id(&org.identifier).await?.is_none() {
-                    return Err(anyhow::anyhow!(
-                        "Invitee {invitee} is already part of another free org, cannot be invited in this org"
-                    ));
+                let billings = get_billing_by_org_id(&org.identifier).await?;
+                if billings.is_none() {
+                    free_org_count += 1;
                 }
+            }
+            // if we allow the invite the potential count would be max+1 (after accepting)
+            // hence >= instead of >
+            if free_org_count >= o2cfg.cloud.max_free_orgs_allowed {
+                return Err(anyhow::anyhow!(
+                    "Invitee {invitee} is already part of {} free organizations, cannot be invited in this organization.",
+                    o2cfg.cloud.max_free_orgs_allowed
+                ));
             }
         }
     }
@@ -647,13 +664,23 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         // if the org user is joining is paid, no issues, we can just let them join
         // if it is a free org, we must check that the orgs the joining user is already part
         // of are all paid, as one user cannot be part of more than one free org.
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let mut free_org_count = 0;
         let user_orgs = list_orgs_by_user(user_email).await?;
         for org in user_orgs {
-            if get_billing_by_org_id(&org.identifier).await?.is_none() {
-                return Err(anyhow::anyhow!(
-                    "User is already a part of a free organization. A user cannot join multiple free orgs."
-                ));
+            let billings = get_billing_by_org_id(&org.identifier).await?;
+            if billings.is_none() {
+                free_org_count += 1;
             }
+        }
+        // if we allow the invite the potential count would be max+1 (after accepting)
+        // hence >= instead of >
+        if free_org_count >= o2cfg.cloud.max_free_orgs_allowed {
+            return Err(anyhow::anyhow!(
+                "User is already a part of {} free organization. A user cannot join more than {} free organizations.",
+                o2cfg.cloud.max_free_orgs_allowed,
+                o2cfg.cloud.max_free_orgs_allowed
+            ));
         }
     }
 
