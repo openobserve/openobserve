@@ -124,7 +124,7 @@ jobs:
           sleep 5
 
           echo "=== Running all other API tests with default settings ==="
-          target/debug/openobserve > o2_default.log 2>&1 &
+          ZO_INGEST_ALLOWED_UPTO=48 target/debug/openobserve > o2_default.log 2>&1 &
           SERVER_PID_DEFAULT=$!
           echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
           sleep 15
