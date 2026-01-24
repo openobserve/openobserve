@@ -831,3 +831,115 @@ class TestBackfillJob:
         assert backfill_resp.status_code == 400, \
             f"Backfill for realtime pipeline should return 400: {backfill_resp.status_code} - {backfill_resp.text[:500]}"
         print("  Backfill for realtime pipeline correctly rejected")
+
+    # ==================== EXTENDED TIMESTAMP VERIFICATION ====================
+
+    def test_11_backfill_with_2_hour_old_data(self):
+        """Test backfill with 2-hour-old data for stronger timestamp verification.
+
+        This test uses data from 2 hours ago (instead of 15 minutes) to provide
+        stronger validation that:
+        1. ZO_INGEST_ALLOWED_UPTO setting is working correctly
+        2. Backdated timestamps are preserved, not overwritten with current time
+        3. Backfill can process data that's significantly in the past
+        """
+        print("\n=== Test: Backfill with 2-hour-old data (extended timestamp verification) ===")
+
+        # 1. Ingest data with timestamps from 2 HOURS ago
+        two_hours_ago = datetime.now(timezone.utc) - timedelta(hours=2)
+        record_count = 10
+
+        print(f"  Ingesting {record_count} records with timestamps starting at {two_hours_ago.isoformat()}")
+        assert self._ingest_logs_with_timestamp(self.source_stream, two_hours_ago, count=record_count)
+
+        # 2. Wait for data to be indexed and queryable
+        print("  Waiting for source data to be queryable...")
+        source_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            source_hits = self._query_stream(self.source_stream)
+            if len(source_hits) >= record_count:
+                print(f"  Source data ready after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(source_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: found {len(source_hits)} records, waiting...")
+
+        max_wait = MAX_QUERY_RETRIES * QUERY_RETRY_INTERVAL_SECONDS
+        assert len(source_hits) >= record_count, \
+            f"Source data not queryable after {max_wait}s. Found {len(source_hits)}, expected {record_count}"
+
+        # 3. Verify backdated timestamps were stored correctly (KEY VERIFICATION)
+        # This confirms ZO_INGEST_ALLOWED_UPTO setting is working
+        # Records span from 2 hours ago (record 0) to ~1h 51min ago (record 9)
+        print("  Verifying 2-hour-old backdated timestamps...")
+        timestamps_ages = []
+        for hit in source_hits:
+            record_ts = hit.get("_timestamp", 0)
+            record_time = datetime.fromtimestamp(record_ts / 1000000, tz=timezone.utc)
+            age_minutes = (datetime.now(timezone.utc) - record_time).total_seconds() / 60
+            timestamps_ages.append(age_minutes)
+
+        oldest_age = max(timestamps_ages)
+        newest_age = min(timestamps_ages)
+        print(f"    Record timestamps range: {oldest_age:.1f}min ago (oldest) to {newest_age:.1f}min ago (newest)")
+
+        # The oldest record should be ~120 minutes old (2 hours)
+        # This is a STRONG validation - if backdating failed, it would be < 5 min
+        assert oldest_age > 100, \
+            f"Oldest record should be ~120min ago (2 hours), but is only {oldest_age:.1f}min old. " \
+            f"This indicates backdated ingestion failed - data was stored with current timestamp " \
+            f"instead of the 2-hour-old timestamp. Check ZO_INGEST_ALLOWED_UPTO setting (must be >= 48)."
+        print(f"    ✓ 2-hour backdated ingestion verified: oldest record is {oldest_age:.1f} minutes ago")
+
+        # 4. Create scheduled pipeline
+        pipeline_id = self._create_scheduled_pipeline(
+            self.source_stream,
+            self.dest_stream,
+            name_suffix="2hour"
+        )
+
+        # 5. Create and run backfill - time range covers the 2-hour-old data
+        # start_time = 2.5 hours ago, end_time = 1 hour ago (must be in the past)
+        start_time = int((two_hours_ago - timedelta(minutes=30)).timestamp() * 1000000)
+        end_time = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp() * 1000000)
+
+        print(f"  Creating backfill job for time range: 2.5h ago to 1h ago")
+        job_id = self._create_backfill_job(pipeline_id, start_time, end_time, chunk_period_minutes=30)
+
+        # 6. Wait for completion
+        final_status = self._wait_for_backfill(pipeline_id, job_id, timeout_seconds=BACKFILL_TIMEOUT_SECONDS)
+
+        assert final_status is not None, "Should get final status"
+        status = final_status.get("status")
+        print(f"  Final status: {status}")
+
+        # 7. Query destination stream to verify data was processed
+        print("  Waiting for destination data...")
+        dest_hits = []
+        for attempt in range(MAX_QUERY_RETRIES):
+            time.sleep(QUERY_RETRY_INTERVAL_SECONDS)
+            dest_hits = self._query_stream(self.dest_stream)
+            if len(dest_hits) > 0:
+                print(f"  Destination data found after {(attempt+1)*QUERY_RETRY_INTERVAL_SECONDS}s: {len(dest_hits)} records")
+                break
+            print(f"    Attempt {attempt+1}: destination empty, waiting...")
+
+        print(f"  Destination stream has {len(dest_hits)} records")
+
+        # Backfill MUST complete successfully
+        assert status == "completed", \
+            f"Backfill did not complete within timeout. Status: {status}, full: {final_status}"
+
+        # Destination MUST have data
+        assert len(dest_hits) > 0, \
+            f"Backfill completed but no data in destination stream '{self.dest_stream}'. " \
+            f"Source had {len(source_hits)} records from 2 hours ago. " \
+            f"Status: {final_status}"
+
+        # Verify transformation was applied
+        for hit in dest_hits[:3]:
+            assert "processing_status" in hit, \
+                f"Record missing 'processing_status' field: {hit}"
+            assert hit["processing_status"] == "backfill_processed", \
+                f"Record should have processing_status='backfill_processed': {hit}"
+
+        print(f"  ✓ 2-hour-old data backfill passed - {len(dest_hits)} records processed with transformation")
