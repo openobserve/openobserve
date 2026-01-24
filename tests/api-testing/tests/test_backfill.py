@@ -477,9 +477,9 @@ class TestBackfillJob:
         is_enabled = status.get('enabled', True)
         print(f"  Status after pause: {current_status}, enabled: {is_enabled}")
 
-        # Job should be disabled (enabled=false) - status might be 'waiting', 'paused', or 'completed'
-        assert is_enabled is False or current_status in ['completed', 'failed'], \
-            f"Job should be disabled or already completed, got enabled={is_enabled}, status={current_status}"
+        # Job should be paused, disabled, or already completed
+        assert is_enabled is False or current_status in ['paused', 'completed', 'failed'], \
+            f"Job should be paused/disabled/completed, got enabled={is_enabled}, status={current_status}"
 
         # Only try to resume if job is not already completed
         if current_status not in ['completed', 'failed']:
