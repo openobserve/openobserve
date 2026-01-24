@@ -436,24 +436,42 @@ impl FileData {
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // clean the tmp dir
-    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
-        log::warn!("clean tmp dir error: {}", e);
-    }
-    std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
 
+    // Optimization: Move blocking I/O to spawn_blocking to prevent blocking async runtime
+    // clean the tmp dir
+    let tmp_dir = cfg.common.data_tmp_dir.clone();
+    tokio::task::spawn_blocking(move || {
+        if let Err(e) = std::fs::remove_dir_all(&tmp_dir) {
+            log::warn!("clean tmp dir error: {}", e);
+        }
+        std::fs::create_dir_all(&tmp_dir).expect("create tmp dir success");
+    })
+    .await
+    .expect("spawn_blocking failed");
+
+    // Create cache directories in blocking context
+    let mut dirs_to_create = Vec::new();
     for file in FILES.iter() {
         let root_dir = file.read().await.root_dir.clone();
-        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+        dirs_to_create.push(root_dir);
     }
     // trigger read only files
     for file in FILES_READER.iter() {
-        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
+        dirs_to_create.push(file.root_dir.clone());
     }
     // trigger read only aggregation files
     for file in AGGREGATION_FILES_READER.iter() {
-        std::fs::create_dir_all(&file.root_dir).expect("create cache dir success");
+        dirs_to_create.push(file.root_dir.clone());
     }
+
+    // Create all directories in blocking context
+    tokio::task::spawn_blocking(move || {
+        for dir in dirs_to_create {
+            std::fs::create_dir_all(&dir).expect("create cache dir success");
+        }
+    })
+    .await
+    .expect("spawn_blocking failed");
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
@@ -503,12 +521,22 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
         });
     };
     let path = PathBuf::from(files.get_file_path(file));
-    let (metadata, fp) = std::fs::File::open(&path)
-        .and_then(|f| Ok((f.metadata()?, f)))
-        .map_err(|e| object_store::Error::NotFound {
-            path: file.to_string(),
-            source: Box::new(e),
-        })?;
+
+    // Optimization: Use spawn_blocking for file I/O to prevent blocking async runtime
+    let path_clone = path.clone();
+    let file_name = file.to_string();
+    let (metadata, fp) = tokio::task::spawn_blocking(move || {
+        std::fs::File::open(&path_clone).and_then(|f| Ok((f.metadata()?, f)))
+    })
+    .await
+    .map_err(|e| object_store::Error::NotFound {
+        path: file_name.clone(),
+        source: Box::new(std::io::Error::other(format!("spawn_blocking error: {}", e))),
+    })?
+    .map_err(|e| object_store::Error::NotFound {
+        path: file_name,
+        source: Box::new(e),
+    })?;
 
     let last_modified = last_modified(&metadata);
     let meta = ObjectMeta {
@@ -1078,13 +1106,24 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
         get_config().common.data_tmp_dir,
         get_ymdh_from_micros(now_micros())
     );
-    if let Err(e) = std::fs::create_dir_all(&tmp_path) {
-        return Err(anyhow::anyhow!(
-            "[FileData::Disk] create tmp dir {}, failed: {}",
-            tmp_path,
-            e
-        ));
-    }
+    // Optimization: Use spawn_blocking for directory creation
+    let tmp_path_clone = tmp_path.clone();
+    tokio::task::spawn_blocking(move || std::fs::create_dir_all(&tmp_path_clone))
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "[FileData::Disk] spawn_blocking failed for tmp dir {}: {}",
+                tmp_path,
+                e
+            )
+        })?
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "[FileData::Disk] create tmp dir {}, failed: {}",
+                tmp_path,
+                e
+            )
+        })?;
     let tmp_path = tokio::fs::canonicalize(&tmp_path).await.unwrap();
     let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
     let tmp_file = tmp_file.to_str().unwrap();

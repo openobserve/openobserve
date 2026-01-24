@@ -120,9 +120,13 @@ pub async fn ingest(
     }
 
     // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
+    // Optimization: Pre-allocate with capacity based on stream_params length
+    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> =
+        HashMap::with_capacity(stream_params.len());
+    let mut streams_need_original_map: HashMap<String, bool> =
+        HashMap::with_capacity(stream_params.len());
+    let mut streams_need_all_values_map: HashMap<String, bool> =
+        HashMap::with_capacity(stream_params.len());
     crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
@@ -201,9 +205,19 @@ pub async fn ingest(
     };
 
     let mut stream_status = StreamStatus::new(&stream_name);
-    let mut json_data_by_stream: HashMap<String, (Vec<(i64, _)>, Option<usize>)> = HashMap::new();
-    let mut size_by_stream = HashMap::new();
-    for ret in data.iter() {
+    // Optimization: Pre-allocate HashMaps with capacity hints to avoid reallocation
+    // Most batches have 1-10 streams, so we allocate for 10 to minimize resizing
+    let mut json_data_by_stream: HashMap<String, (Vec<(i64, _)>, Option<usize>)> =
+        HashMap::with_capacity(10);
+    let mut size_by_stream = HashMap::with_capacity(10);
+
+    // Optimization: Add yield points to prevent task starvation in async runtime
+    // This is critical for HA deployments with concurrent multi-tenant ingestion
+    for (idx, ret) in data.iter().enumerate() {
+        // Yield every 1000 records to allow other tasks to make progress
+        if idx % 1000 == 0 && idx > 0 {
+            tokio::task::yield_now().await;
+        }
         let mut item = match ret {
             Ok(item) => item,
             Err(e) => {

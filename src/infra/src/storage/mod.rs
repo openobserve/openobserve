@@ -254,34 +254,66 @@ async fn get_parquet_metadata(
     account: &str,
     file: &str,
 ) -> Result<(usize, Arc<ParquetMetaData>), anyhow::Error> {
-    // get file info
+    // 1. Get total file size (HEAD request)
     let info = head(account, file).await?;
     let file_size = info.size;
 
-    // read metadata len
-    let mut data = get_range(
-        account,
-        file,
-        (file_size - parquet::file::FOOTER_SIZE as u64)..file_size,
-    )
-    .await?;
-    let mut buf = [0_u8; parquet::file::FOOTER_SIZE];
-    data.copy_to_slice(&mut buf);
-    let metadata_len = FooterTail::try_from(buf).map(|f| f.metadata_length())?;
+    // 2. Define Optimization Strategy
+    // For 1-2GB files, metadata often exceeds 64KB if row groups are small.
+    // We bump this to 256KB to ensure we hit the "Happy Path" more often.
+    const ESTIMATED_METADATA_SIZE: u64 = 256 * 1024;
+    let footer_len = parquet::file::FOOTER_SIZE as u64; // 8 bytes
+    let read_size = footer_len + ESTIMATED_METADATA_SIZE;
 
-    // read metadata
-    let data = get_range(
-        account,
-        file,
-        (file_size - parquet::file::FOOTER_SIZE as u64 - metadata_len as u64)
-            ..(file_size - parquet::file::FOOTER_SIZE as u64),
-    )
-    .await?;
+    // Ensure we don't read past start of file
+    let read_start = file_size.saturating_sub(read_size);
 
-    Ok((
-        file_size as usize,
-        Arc::new(ParquetMetaDataReader::decode_metadata(&data)?),
-    ))
+    // 3. Speculative Read (Footer + Estimate)
+    let data = get_range(account, file, read_start..file_size).await?;
+    let data_len = data.len();
+
+    // 4. Parse Footer Length from the last 8 bytes
+    if data_len < 8 {
+        return Err(anyhow::anyhow!("File too small to be Parquet"));
+    }
+
+    let footer_start_in_buffer = data_len - 8;
+    let mut footer_buf = [0_u8; 8];
+    // Copy the last 8 bytes to parse length
+    footer_buf.copy_from_slice(&data.chunk()[footer_start_in_buffer..]);
+
+    let metadata_len = FooterTail::try_from(footer_buf).map(|f| f.metadata_length())? as usize;
+    let metadata_len_u64 = metadata_len as u64;
+
+    // 5. Check if our speculative read covered the whole metadata
+    // We need: footer_start (in file) - metadata_len >= read_start (in file)
+    // Simplified: Is the metadata contained within our buffer?
+
+    if metadata_len <= footer_start_in_buffer {
+        // ✅ HAPPY PATH: We have all metadata in memory.
+        // The metadata starts at `footer_start_in_buffer - metadata_len`
+        let meta_start = footer_start_in_buffer - metadata_len;
+        let meta_end = footer_start_in_buffer;
+
+        let metadata_bytes = data.slice(meta_start..meta_end);
+        Ok((
+            file_size as usize,
+            Arc::new(ParquetMetaDataReader::decode_metadata(&metadata_bytes)?),
+        ))
+    } else {
+        // ❌ FALLBACK: Metadata was larger than 256KB.
+        // We must issue a second request for the EXACT range.
+
+        let full_meta_start = file_size - footer_len - metadata_len_u64;
+        let full_meta_end = file_size - footer_len;
+
+        let data = get_range(account, file, full_meta_start..full_meta_end).await?;
+
+        Ok((
+            file_size as usize,
+            Arc::new(ParquetMetaDataReader::decode_metadata(&data)?),
+        ))
+    }
 }
 
 pub fn format_key(key: &str, with_prefix: bool) -> String {
