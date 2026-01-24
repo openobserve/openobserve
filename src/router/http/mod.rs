@@ -44,6 +44,7 @@ fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         let cfg = get_config();
         reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(cfg.route.timeout))
             .pool_max_idle_per_host(cfg.route.max_connections)
             .build()
