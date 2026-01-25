@@ -432,6 +432,9 @@ export default defineComponent({
         params: {
           id: incident.id,
         },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
       });
     };
 

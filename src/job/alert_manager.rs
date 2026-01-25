@@ -292,12 +292,9 @@ async fn run_rca_job() -> Result<(), anyhow::Error> {
 
                 topology.suggested_root_cause = Some(rca_result);
 
-                if let Err(e) = infra::table::alert_incidents::update_topology(
-                    org_id,
-                    incident_id,
-                    serde_json::to_value(&topology)?,
-                )
-                .await
+                if let Err(e) =
+                    infra::table::alert_incidents::update_topology(org_id, incident_id, &topology)
+                        .await
                 {
                     log::error!(
                         "[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}"
