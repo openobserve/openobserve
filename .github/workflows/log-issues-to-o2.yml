@@ -9,24 +9,16 @@ on:
 jobs:
   capture:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Restrict to read-only, no write access
 
     steps:
       - name: Build and send payload to OpenObserve
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Create temporary files for body content
-          cat << 'ISSUE_BODY_EOF' > issue_body.txt
-          ${{ github.event.issue.body }}
-          ISSUE_BODY_EOF
-          
-          cat << 'COMMENT_BODY_EOF' > comment_body.txt
-          ${{ github.event.comment.body }}
-          COMMENT_BODY_EOF
-          
-          # Read and process the body files
-          ISSUE_BODY=$(cat issue_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
-          COMMENT_BODY=$(cat comment_body.txt | tr '\n' ' ' | sed 's/"/\\"/g')
-          
-          # Build payload using jq to properly handle JSON
+          # Build payload using jq to properly handle JSON (jq --arg handles all escaping safely)
           jq -n \
             --arg event_name "${{ github.event_name }}" \
             --arg action "${{ github.event.action }}" \
@@ -214,10 +206,7 @@ jobs:
               },
               changes: $changes
             } | walk(if type == "object" then with_entries(select(.value != "" and .value != null and .value != "null")) else . end)' > payload.json
-          
-          # Clean up temporary files
-          rm -f issue_body.txt comment_body.txt
-          
+
       - name: Send to OpenObserve
         run: |
           curl -X POST "${{ secrets.OO_CLOUD_INGEST_URL }}" \
