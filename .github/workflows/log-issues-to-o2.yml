@@ -18,11 +18,7 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Process the body content safely (already in env vars)
-          ISSUE_BODY_PROCESSED=$(printf '%s' "$ISSUE_BODY" | tr '\n' ' ' | sed 's/"/\\"/g')
-          COMMENT_BODY_PROCESSED=$(printf '%s' "$COMMENT_BODY" | tr '\n' ' ' | sed 's/"/\\"/g')
-          
-          # Build payload using jq to properly handle JSON
+          # Build payload using jq to properly handle JSON (jq --arg handles all escaping safely)
           jq -n \
             --arg event_name "${{ github.event_name }}" \
             --arg action "${{ github.event.action }}" \
@@ -75,7 +71,7 @@ jobs:
             --arg issue_updated_at "${{ github.event.issue.updated_at }}" \
             --arg issue_closed_at "${{ github.event.issue.closed_at }}" \
             --arg issue_author_association "${{ github.event.issue.author_association }}" \
-            --arg issue_body "$ISSUE_BODY_PROCESSED" \
+            --arg issue_body "$ISSUE_BODY" \
             --arg comment_id "${{ github.event.comment.id }}" \
             --arg comment_node_id "${{ github.event.comment.node_id }}" \
             --arg comment_user_login "${{ github.event.comment.user.login }}" \
@@ -86,7 +82,7 @@ jobs:
             --arg comment_created_at "${{ github.event.comment.created_at }}" \
             --arg comment_updated_at "${{ github.event.comment.updated_at }}" \
             --arg comment_author_association "${{ github.event.comment.author_association }}" \
-            --arg comment_body "$COMMENT_BODY_PROCESSED" \
+            --arg comment_body "$COMMENT_BODY" \
             --arg sender_login "${{ github.event.sender.login }}" \
             --arg sender_id "${{ github.event.sender.id }}" \
             --arg sender_node_id "${{ github.event.sender.node_id }}" \
