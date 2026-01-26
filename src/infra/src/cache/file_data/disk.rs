@@ -441,13 +441,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // clean the tmp dir
     let tmp_dir = cfg.common.data_tmp_dir.clone();
     tokio::task::spawn_blocking(move || {
-        if let Err(e) = std::fs::remove_dir_all(&tmp_dir) {
-            log::warn!("clean tmp dir error: {}", e);
-        }
-        std::fs::create_dir_all(&tmp_dir).expect("create tmp dir success");
+        std::fs::remove_dir_all(&tmp_dir).ok(); // Ignore errors
+        std::fs::create_dir_all(&tmp_dir)
     })
     .await
-    .expect("spawn_blocking failed");
+    .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+    .map_err(|e| anyhow::anyhow!("create tmp dir failed: {}", e))?;
 
     // Create cache directories in blocking context
     let mut dirs_to_create = Vec::new();
@@ -466,12 +465,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Create all directories in blocking context
     tokio::task::spawn_blocking(move || {
-        for dir in dirs_to_create {
-            std::fs::create_dir_all(&dir).expect("create cache dir success");
+        for dir in &dirs_to_create {
+            std::fs::create_dir_all(dir)?;
         }
+        Ok::<(), std::io::Error>(())
     })
     .await
-    .expect("spawn_blocking failed");
+    .map_err(|e| anyhow::anyhow!("spawn_blocking failed: {}", e))?
+    .map_err(|e| anyhow::anyhow!("create cache dirs failed: {}", e))?;
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
