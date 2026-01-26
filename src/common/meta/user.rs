@@ -408,21 +408,22 @@ pub struct UserRoleRequest {
 
 impl From<&UserRoleRequest> for UserOrgRole {
     fn from(role: &UserRoleRequest) -> Self {
-        let mut standard_role = get_default_user_role();
-        let mut custom_role = role.custom.clone();
-        let mut is_role_name_standard = false;
-        for user_role in get_roles() {
-            if user_role.to_string().eq(&role.role) {
-                standard_role = user_role;
-                is_role_name_standard = true;
-                break;
-            }
-        }
-        if !is_role_name_standard && custom_role.is_none() {
-            custom_role = Some(vec![role.role.clone()]);
-        }
+        let standard_role = get_roles()
+            .into_iter()
+            .find(|user_role| user_role.to_string().eq_ignore_ascii_case(&role.role));
+
+        let custom_role = if let Some(role) = role.custom.as_ref() {
+            Some(role.clone())
+        } else if standard_role.is_none() {
+            Some(vec![role.role.clone()])
+        } else {
+            None
+        };
+
+        let base_role = standard_role.unwrap_or_else(get_default_user_role);
+
         UserOrgRole {
-            base_role: standard_role,
+            base_role,
             custom_role,
         }
     }
@@ -585,10 +586,7 @@ mod tests {
         assert_eq!(user_request.last_name, "Doe");
         assert_eq!(user_request.password, "password123");
         assert_eq!(user_request.role.base_role, UserRole::Admin);
-        assert_eq!(
-            user_request.role.custom_role.unwrap().first().unwrap(),
-            "Admin"
-        );
+        assert!(user_request.role.custom_role.is_none());
         assert!(!user_request.is_external);
         assert!(user_request.token.is_none());
     }

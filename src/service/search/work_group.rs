@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,8 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(feature = "enterprise")]
-use config::meta::search::SearchEventType;
+
 use config::{
     datafusion::request::Request, get_config, meta::cluster::Node, metrics,
     utils::took_watcher::TookWatcher,
@@ -23,11 +22,12 @@ use infra::{
     file_list::FileId,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::WorkGroup;
+use {
+    crate::service::search::SEARCH_SERVER, config::meta::search::SearchEventType, infra::dist_lock,
+    infra::errors::ErrorCodes, o2_enterprise::enterprise::search::WorkGroup,
+};
 
 use super::utils::AsyncDefer;
-#[cfg(feature = "enterprise")]
-use crate::service::search::SEARCH_SERVER;
 
 /// Guard that automatically releases work group lock when dropped
 pub struct DeferredLock {
@@ -126,11 +126,12 @@ pub async fn check_work_group(
     };
 
     // Check all three concurrency levels (global, org, user) in a single query
-    work_group_need_wait(
+    work_group_checking(
         trace_id,
         stop_watch,
         org_id,
         timeout,
+        &locker,
         &work_group,
         user_id,
         caller,
@@ -197,6 +198,60 @@ pub async fn check_work_group(
         work_group: Some(work_group),
         _guard: guard,
     })
+}
+
+#[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "service:search:work_group:checking", skip_all, fields(user_id = user_id))]
+pub async fn work_group_checking(
+    trace_id: &str,
+    stop_watch: &mut TookWatcher,
+    org_id: &str,
+    timeout: u64,
+    locker: &Option<dist_lock::Locker>,
+    work_group: &WorkGroup,
+    user_id: Option<&str>,
+    caller: &str,
+) -> Result<()> {
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    if SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender, false)
+        .await
+        .is_err()
+    {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[org_id])
+            .dec();
+        dist_lock::unlock_with_trace_id(trace_id, locker).await?;
+        log::warn!("[trace_id {trace_id}] search->cluster: request canceled before enter queue");
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "[trace_id {trace_id}] search->cluster: request canceled before enter queue"
+        ))));
+    }
+    tokio::select! {
+        res = work_group_need_wait(trace_id, stop_watch, org_id, timeout, work_group, user_id, caller) => {
+            match res {
+                Ok(_) => {
+                    return Ok(());
+                },
+                Err(e) => {
+                    metrics::QUERY_PENDING_NUMS
+                        .with_label_values(&[org_id])
+                        .dec();
+                    dist_lock::unlock_with_trace_id(trace_id, locker).await?;
+                    return Err(e);
+                }
+            }
+        }
+        _ = abort_receiver => {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[org_id])
+                .dec();
+            dist_lock::unlock_with_trace_id(trace_id, locker).await?;
+            log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
+        }
+    }
 }
 
 /// Enterprise: Wait for workgroup slot to become available

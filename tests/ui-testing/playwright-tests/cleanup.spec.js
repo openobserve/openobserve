@@ -263,7 +263,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_test_traces$/                            // Pipeline regression test traces stream (Issue #9901)
       ],
       // Protected streams to never delete
-      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate']
+      ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
     );
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
@@ -301,7 +301,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^temp_metrics_/                  // temp_metrics_* (Temporary test streams)
       ],
       // Protected metrics streams - never delete
-      ['default']  // 'default' is the primary metrics stream used by tests
+      ['default', 'e2e_test_metrics']  // 'default' is the primary metrics stream, 'e2e_test_metrics' used by scheduled-pipeline-query-builder.spec.js
     );
 
     // Note: Stream deletion waiting is no longer needed here because:
@@ -309,6 +309,11 @@ test.describe("Pre-Test Cleanup", () => {
     // 2. Schemaload/stress tests now use unique stream names (e.g., stress_test_<runId>_w0)
     // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
     // The cleanup patterns above will clean up old test streams via regex matching
+
+    // Clean up test semantic groups created by correlation settings tests
+    // Groups: k8s-cluster, k8s-namespace, k8s-deployment, service
+    // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
+    await pm.apiCleanup.cleanupCorrelationSettings();
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

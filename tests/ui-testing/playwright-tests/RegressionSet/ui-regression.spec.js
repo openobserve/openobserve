@@ -69,46 +69,121 @@ test.describe("UI Regression Bugs", () => {
 
     testLogger.info('Help menu opened');
 
-    // Look for OpenAPI menu item - using POM method
-    const openApiVisible = await pm.enrichmentPage.isOpenApiMenuItemVisible();
+    // Wait for OpenAPI menu item to be visible (Rule 5: no graceful skipping)
+    // This test MUST validate Bug #9308 - if OpenAPI is not available, test should fail
+    await pm.enrichmentPage.expectOpenApiMenuItemVisible({ timeout: 10000 });
 
-    if (openApiVisible) {
-      testLogger.info('OpenAPI menu item found');
+    testLogger.info('OpenAPI menu item found');
 
-      // Listen for navigation or new page
-      const pagePromise = page.context().waitForEvent('page', { timeout: 10000 }).catch(() => null);
+    // Listen for navigation or new page
+    const pagePromise = page.context().waitForEvent('page', { timeout: 10000 }).catch(() => null);
 
-      // Click OpenAPI - using POM method
-      await pm.enrichmentPage.clickOpenApiMenuItemIfVisible();
-      await page.waitForTimeout(2000);
+    // Click OpenAPI - using POM method
+    await pm.enrichmentPage.clickOpenApiMenuItemIfVisible();
+    await page.waitForTimeout(2000);
 
-      // Check if new page opened or current page navigated
-      const newPage = await pagePromise;
+    // Check if new page opened or current page navigated
+    const newPage = await pagePromise;
 
-      if (newPage) {
-        // New tab opened
-        const newUrl = newPage.url();
-        testLogger.info(`✓ New page opened: ${newUrl}`);
-        expect(newUrl).toMatch(/swagger|openapi|api\/docs/i);
-        await newPage.close();
-      } else {
-        // Current page navigated
-        const currentUrl = page.url();
-        testLogger.info(`✓ Page navigated to: ${currentUrl}`);
-
-        // Check if URL contains openapi/swagger keywords or if we're on an API docs page
-        if (currentUrl.includes('swagger') || currentUrl.includes('openapi') || currentUrl.includes('/api/docs')) {
-          testLogger.info('✓ Redirected to OpenAPI documentation');
-        } else {
-          testLogger.warn(`⚠ URL doesn't contain expected OpenAPI keywords: ${currentUrl}`);
-        }
-      }
-
-      testLogger.info('✓ PRIMARY CHECK PASSED: OpenAPI navigation working');
+    if (newPage) {
+      // New tab opened
+      const newUrl = newPage.url();
+      testLogger.info(`✓ New page opened: ${newUrl}`);
+      // STRONG ASSERTION: URL should contain OpenAPI/Swagger keywords
+      expect(newUrl).toMatch(/swagger|openapi|api\/docs/i);
+      await newPage.close();
     } else {
-      testLogger.warn('⚠ OpenAPI menu item not visible - may be disabled in cloud version');
-      testLogger.info('Test requires non-cloud deployment to display OpenAPI menu');
+      // Current page navigated
+      const currentUrl = page.url();
+      testLogger.info(`✓ Page navigated to: ${currentUrl}`);
+
+      // STRONG ASSERTION: URL should contain OpenAPI/Swagger keywords
+      expect(currentUrl).toMatch(/swagger|openapi|api\/docs/i);
     }
+
+    testLogger.info('✓ PRIMARY CHECK PASSED: OpenAPI navigation working');
+  });
+
+  // ==========================================================================
+  // Bug #9325: Header refactored testing
+  // https://github.com/openobserve/openobserve/issues/9325
+  // ==========================================================================
+  test("should navigate correctly via header menu links @bug-9325 @P1 @navigation @regression", async ({ page }) => {
+    testLogger.info('Test: Verify header navigation (Bug #9325)');
+
+    // STRONG ASSERTION: Logs navigation should work
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    let currentUrl = page.url();
+    expect(currentUrl).toContain('logs');
+    testLogger.info(`Logs URL: ${currentUrl}`);
+
+    // STRONG ASSERTION: Streams navigation should work
+    await pm.logsPage.clickMenuLinkStreamsItem();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    currentUrl = page.url();
+    expect(currentUrl).toContain('streams');
+    testLogger.info(`Streams URL: ${currentUrl}`);
+
+    // STRONG ASSERTION: Pipelines navigation should work
+    await pm.pipelinesPage.openPipelineMenu();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    currentUrl = page.url();
+    expect(currentUrl).toContain('pipeline');
+    testLogger.info(`Pipelines URL: ${currentUrl}`);
+
+    testLogger.info('✓ PASSED: Header navigation works correctly');
+  });
+
+  // ==========================================================================
+  // Bug #9565: About section not including org identifier
+  // https://github.com/openobserve/openobserve/issues/9565
+  // ==========================================================================
+  test("should preserve org_identifier across navigations @bug-9565 @P1 @navigation @regression", async ({ page }) => {
+    testLogger.info('Test: Verify org_identifier preserved (Bug #9565)');
+
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    // Start with org_identifier in URL
+    const logsUrl = `/web/logs?org_identifier=${orgName}`;
+    await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle');
+
+    const initialUrl = page.url();
+    testLogger.info(`Initial URL: ${initialUrl}`);
+
+    // STRONG ASSERTION: Initial URL should have org_identifier
+    expect(initialUrl).toContain('org_identifier');
+
+    // Navigate to streams
+    await pm.logsPage.clickMenuLinkStreamsItem();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    let currentUrl = page.url();
+    testLogger.info(`After Streams navigation: ${currentUrl}`);
+
+    // STRONG ASSERTION: URL should still contain org_identifier
+    expect(currentUrl).toContain('org_identifier');
+
+    // Navigate back to logs
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+
+    currentUrl = page.url();
+    testLogger.info(`After Logs navigation: ${currentUrl}`);
+
+    // STRONG ASSERTION: URL should still contain org_identifier
+    expect(currentUrl).toContain('org_identifier');
+
+    testLogger.info('✓ PASSED: Org context preserved');
   });
 
   test.afterEach(async () => {
