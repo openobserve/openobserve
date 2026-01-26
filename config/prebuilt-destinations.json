@@ -1,0 +1,294 @@
+{
+  "destinations": [
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Send notifications to Slack channels",
+      "type": "http",
+      "icon": "slack-icon",
+      "popular": true,
+      "category": "messaging",
+      "endpoint": {
+        "url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "output_format": "JSON",
+        "destination_type": "slack"
+      },
+      "template": {
+        "name": "system-prebuilt-slack",
+        "body": "{\n  \"text\": \"🚨 Alert: {alert_name}\",\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": {\n        \"type\": \"plain_text\",\n        \"text\": \"🚨 Alert: {alert_name}\"\n      }\n    },\n    {\n      \"type\": \"section\",\n      \"fields\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Stream:*\\n{stream_name}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Type:*\\n{stream_type}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Count:*\\n{alert_count}\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Threshold:*\\n{alert_operator} {alert_threshold}\"\n        }\n      ]\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Status:* 🔴 Firing\\n*Time:* {alert_time}\"\n      }\n    },\n    {\n      \"type\": \"actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": {\n            \"type\": \"plain_text\",\n            \"text\": \"View in OpenObserve\"\n          },\n          \"url\": \"{alert_url}\"\n        }\n      ]\n    }\n  ]\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "webhookUrl",
+          "label": "Slack Webhook URL",
+          "type": "text",
+          "required": true,
+          "hint": "Get your webhook URL from Slack app configuration"
+        }
+      ],
+      "metadata": {
+        "service": "slack",
+        "description": "Slack webhook for team notifications"
+      }
+    },
+    {
+      "id": "msteams",
+      "name": "Microsoft Teams",
+      "description": "Send notifications to Teams channels",
+      "type": "http",
+      "icon": "teams-icon",
+      "popular": true,
+      "category": "messaging",
+      "endpoint": {
+        "url": "https://your-tenant.webhook.office.com/webhookb2/YOUR-TEAMS-WEBHOOK-URL",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "output_format": "JSON",
+        "destination_type": "teams"
+      },
+      "template": {
+        "name": "system-prebuilt-msteams",
+        "body": "{\n  \"@type\": \"MessageCard\",\n  \"@context\": \"http://schema.org/extensions\",\n  \"themeColor\": \"D63638\",\n  \"summary\": \"Alert: {alert_name}\",\n  \"sections\": [\n    {\n      \"activityTitle\": \"🚨 Alert: {alert_name}\",\n      \"activitySubtitle\": \"OpenObserve Alert Notification\",\n      \"activityImage\": \"https://openobserve.ai/favicon.ico\",\n      \"facts\": [\n        {\n          \"name\": \"Stream\",\n          \"value\": \"{stream_name}\"\n        },\n        {\n          \"name\": \"Type\",\n          \"value\": \"{stream_type}\"\n        },\n        {\n          \"name\": \"Status\",\n          \"value\": \"🔴 Firing\"\n        },\n        {\n          \"name\": \"Count\",\n          \"value\": \"{alert_count}\"\n        },\n        {\n          \"name\": \"Threshold\",\n          \"value\": \"{alert_operator} {alert_threshold}\"\n        },\n        {\n          \"name\": \"Time\",\n          \"value\": \"{alert_time}\"\n        }\n      ],\n      \"markdown\": true\n    }\n  ],\n  \"potentialActions\": [\n    {\n      \"@type\": \"OpenUri\",\n      \"name\": \"View in OpenObserve\",\n      \"targets\": [\n        {\n          \"os\": \"default\",\n          \"uri\": \"{alert_url}\"\n        }\n      ]\n    }\n  ]\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "webhookUrl",
+          "label": "Microsoft Teams Webhook URL",
+          "type": "text",
+          "required": true,
+          "hint": "Get your webhook URL from Teams channel connectors"
+        }
+      ],
+      "metadata": {
+        "service": "teams",
+        "description": "Microsoft Teams webhook for team notifications"
+      }
+    },
+    {
+      "id": "pagerduty",
+      "name": "PagerDuty",
+      "description": "Create incidents in PagerDuty",
+      "type": "http",
+      "icon": "pagerduty-icon",
+      "popular": true,
+      "category": "incident",
+      "endpoint": {
+        "url": "https://events.pagerduty.com/v2/enqueue",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Token YOUR_INTEGRATION_KEY"
+        },
+        "output_format": "JSON",
+        "destination_type": "pagerduty"
+      },
+      "template": {
+        "name": "system-prebuilt-pagerduty",
+        "body": "{\n  \"routing_key\": \"{integration_key}\",\n  \"event_action\": \"trigger\",\n  \"payload\": {\n    \"summary\": \"OpenObserve Alert: {alert_name}\",\n    \"severity\": \"error\",\n    \"source\": \"openobserve\",\n    \"component\": \"{stream_name}\",\n    \"group\": \"{stream_type}\",\n    \"class\": \"alert\",\n    \"custom_details\": {\n      \"alert_name\": \"{alert_name}\",\n      \"stream_name\": \"{stream_name}\",\n      \"stream_type\": \"{stream_type}\",\n      \"alert_count\": \"{alert_count}\",\n      \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n      \"alert_time\": \"{alert_time}\",\n      \"alert_url\": \"{alert_url}\"\n    }\n  }\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "integrationKey",
+          "label": "Integration Key",
+          "type": "text",
+          "required": true,
+          "hint": "Your PagerDuty Events API v2 integration key"
+        }
+      ],
+      "metadata": {
+        "service": "pagerduty",
+        "description": "PagerDuty incident management"
+      }
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "description": "Send notifications to Discord channels",
+      "type": "http",
+      "icon": "discord-icon",
+      "popular": true,
+      "category": "messaging",
+      "endpoint": {
+        "url": "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "output_format": "JSON",
+        "destination_type": "discord"
+      },
+      "template": {
+        "name": "system-prebuilt-discord",
+        "body": "{\n  \"content\": \"🚨 Alert: {alert_name}\",\n  \"embeds\": [\n    {\n      \"title\": \"Alert Details\",\n      \"color\": 15158332,\n      \"fields\": [\n        {\n          \"name\": \"Stream\",\n          \"value\": \"{stream_name}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Type\",\n          \"value\": \"{stream_type}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Count\",\n          \"value\": \"{alert_count}\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"Threshold\",\n          \"value\": \"{alert_operator} {alert_threshold}\",\n          \"inline\": true\n        }\n      ],\n      \"footer\": {\n        \"text\": \"OpenObserve Alert\",\n        \"icon_url\": \"https://openobserve.ai/favicon.ico\"\n      },\n      \"timestamp\": \"{alert_time}\"\n    }\n  ]\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "webhookUrl",
+          "label": "Discord Webhook URL",
+          "type": "text",
+          "required": true,
+          "hint": "Get your webhook URL from Discord server settings"
+        }
+      ],
+      "metadata": {
+        "service": "discord",
+        "description": "Discord webhook for community notifications"
+      }
+    },
+    {
+      "id": "webhook",
+      "name": "Generic Webhook",
+      "description": "Generic webhook for any HTTP endpoint",
+      "type": "http",
+      "icon": "webhook-icon",
+      "popular": false,
+      "category": "generic",
+      "endpoint": {
+        "url": "https://your-service.com/webhook",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "output_format": "JSON",
+        "destination_type": "webhook"
+      },
+      "template": {
+        "name": "system-prebuilt-generic",
+        "body": "{\n  \"alert\": {\n    \"name\": \"{alert_name}\",\n    \"stream\": {\n      \"name\": \"{stream_name}\",\n      \"type\": \"{stream_type}\"\n    },\n    \"status\": \"firing\",\n    \"count\": \"{alert_count}\",\n    \"threshold\": {\n      \"operator\": \"{alert_operator}\",\n      \"value\": \"{alert_threshold}\"\n    },\n    \"time\": \"{alert_time}\",\n    \"url\": \"{alert_url}\"\n  }\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "webhookUrl",
+          "label": "Webhook URL",
+          "type": "text",
+          "required": true,
+          "hint": "Your webhook endpoint URL"
+        }
+      ],
+      "metadata": {
+        "service": "webhook",
+        "description": "Generic webhook destination"
+      }
+    },
+    {
+      "id": "opsgenie",
+      "name": "Opsgenie",
+      "description": "Create alerts in Opsgenie",
+      "type": "http",
+      "icon": "opsgenie-icon",
+      "popular": true,
+      "category": "incident",
+      "endpoint": {
+        "url": "https://api.opsgenie.com/v2/alerts",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "GenieKey YOUR_API_KEY"
+        },
+        "output_format": "JSON",
+        "destination_type": "opsgenie"
+      },
+      "template": {
+        "name": "system-prebuilt-opsgenie",
+        "body": "{\n  \"message\": \"OpenObserve Alert: {alert_name}\",\n  \"alias\": \"{alert_name}_{stream_name}\",\n  \"description\": \"Alert triggered from OpenObserve\",\n  \"priority\": \"P2\",\n  \"details\": {\n    \"alert_name\": \"{alert_name}\",\n    \"stream_name\": \"{stream_name}\",\n    \"stream_type\": \"{stream_type}\",\n    \"alert_count\": \"{alert_count}\",\n    \"alert_threshold\": \"{alert_operator} {alert_threshold}\",\n    \"alert_time\": \"{alert_time}\",\n    \"alert_url\": \"{alert_url}\"\n  },\n  \"source\": \"OpenObserve\",\n  \"tags\": [\"openobserve\", \"{stream_type}\"]\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "apiKey",
+          "label": "Opsgenie API Key",
+          "type": "text",
+          "required": true,
+          "hint": "Your Opsgenie API key with alert creation permissions"
+        }
+      ],
+      "metadata": {
+        "service": "opsgenie",
+        "description": "Opsgenie incident management and alerting"
+      }
+    },
+    {
+      "id": "servicenow",
+      "name": "ServiceNow",
+      "description": "Create incidents in ServiceNow",
+      "type": "http",
+      "icon": "servicenow-icon",
+      "popular": true,
+      "category": "incident",
+      "endpoint": {
+        "url": "https://YOUR_INSTANCE.service-now.com/api/now/table/incident",
+        "method": "POST",
+        "skip_tls_verify": false,
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Basic YOUR_AUTH_TOKEN"
+        },
+        "output_format": "JSON",
+        "destination_type": "servicenow"
+      },
+      "template": {
+        "name": "system-prebuilt-servicenow",
+        "body": "{\n  \"short_description\": \"OpenObserve Alert: {alert_name}\",\n  \"description\": \"Alert triggered from OpenObserve\\n\\nStream: {stream_name}\\nType: {stream_type}\\nCount: {alert_count}\\nThreshold: {alert_operator} {alert_threshold}\\nTime: {alert_time}\\nURL: {alert_url}\",\n  \"urgency\": \"2\",\n  \"impact\": \"2\",\n  \"category\": \"monitoring\",\n  \"subcategory\": \"alert\",\n  \"assignment_group\": \"Network\",\n  \"caller_id\": \"openobserve\"\n}"
+      },
+      "credential_fields": [
+        {
+          "key": "instanceUrl",
+          "label": "ServiceNow Instance URL",
+          "type": "text",
+          "required": true,
+          "hint": "Your ServiceNow instance URL (e.g., https://instance.service-now.com)"
+        },
+        {
+          "key": "authToken",
+          "label": "Authentication Token",
+          "type": "text",
+          "required": true,
+          "hint": "Base64 encoded username:password or OAuth token"
+        }
+      ],
+      "metadata": {
+        "service": "servicenow",
+        "description": "ServiceNow incident management"
+      }
+    },
+    {
+      "id": "email",
+      "name": "Email",
+      "description": "Send HTML formatted email notifications",
+      "type": "email",
+      "icon": "email-icon",
+      "popular": true,
+      "category": "email",
+      "endpoint": null,
+      "template": {
+        "name": "system-prebuilt-email",
+        "body": "<h2>🚨 Alert Notification: {alert_name}</h2><p><strong>Stream:</strong> {stream_name}<br><strong>Type:</strong> {stream_type}<br><strong>Status:</strong> 🔴 Firing<br><strong>Count:</strong> {alert_count}<br><strong>Threshold:</strong> {alert_operator} {alert_threshold}<br><strong>Time:</strong> {alert_time}</p><p><a href='{alert_url}'>View in OpenObserve</a></p>"
+      },
+      "credential_fields": [
+        {
+          "key": "recipients",
+          "label": "Recipient Email Addresses",
+          "type": "text",
+          "required": true,
+          "hint": "Comma-separated email addresses"
+        }
+      ],
+      "metadata": {
+        "service": "email",
+        "description": "Email notification",
+        "recipients": ["admin@your-domain.com"]
+      }
+    }
+  ]
+}

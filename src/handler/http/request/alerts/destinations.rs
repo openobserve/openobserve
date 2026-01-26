@@ -21,11 +21,15 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::{auth::UserEmail, ssrf_guard::SsrfGuard},
+    },
     handler::http::{
         extractors::Headers,
         models::destinations::Destination,
@@ -33,6 +37,25 @@ use crate::{
     },
     service::{alerts::destinations, db::alerts::destinations::DestinationError},
 };
+
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDestinationRequest {
+    pub url: String,
+    pub method: Option<String>,
+    pub headers: Option<HashMap<String, String>>,
+    pub body: Option<String>,
+    pub skip_tls_verify: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TestDestinationResponse {
+    pub success: bool,
+    pub status_code: Option<u16>,
+    pub response_body: Option<String>,
+    pub error: Option<String>,
+}
 
 impl From<DestinationError> for Response {
     fn from(value: DestinationError) -> Self {
@@ -46,6 +69,132 @@ impl From<DestinationError> for Response {
     }
 }
 
+/// TestDestination
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/test",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TestDestination",
+    summary = "Test alert destination",
+    description = "Tests an alert destination configuration by sending a test HTTP request to the specified endpoint. \
+                   This allows users to verify that their destination configuration is correct before saving it. The \
+                   test sends a sample payload and returns the HTTP response status and body for validation.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = inline(TestDestinationRequest), description = "Test request data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(TestDestinationResponse)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"})),
+        ("x-o2-mcp" = json!({"description": "Test alert destination connectivity", "category": "alerts"}))
+    )
+)]
+pub async fn test_destination(
+    Path(_org_id): Path<String>,
+    Json(test_req): Json<TestDestinationRequest>,
+) -> Response {
+    let method = test_req
+        .method
+        .unwrap_or_else(|| "POST".to_string())
+        .to_uppercase();
+    let url = &test_req.url;
+    let body = test_req.body.unwrap_or_default();
+    let headers = test_req.headers.unwrap_or_default();
+    let skip_tls_verify = test_req.skip_tls_verify.unwrap_or(false);
+
+    // SSRF protection: Validate URL before making request
+    if let Err(error_msg) = SsrfGuard::validate_url(url) {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(error_msg),
+        });
+    }
+
+    // Build HTTP client
+    let mut client_builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
+
+    if skip_tls_verify {
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
+
+    let client = match client_builder.build() {
+        Ok(client) => client,
+        Err(e) => {
+            return MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                response_body: None,
+                error: Some(format!("Failed to build HTTP client: {}", e)),
+            });
+        }
+    };
+
+    // Build request
+    let mut request_builder = match method.as_str() {
+        "GET" => client.get(url),
+        "POST" => client.post(url),
+        "PUT" => client.put(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        _ => {
+            return MetaHttpResponse::json(TestDestinationResponse {
+                success: false,
+                status_code: None,
+                response_body: None,
+                error: Some(format!("Unsupported HTTP method: {}", method)),
+            });
+        }
+    };
+
+    // Add headers
+    for (key, value) in headers {
+        request_builder = request_builder.header(key, value);
+    }
+
+    // Add body if not empty
+    if !body.is_empty() {
+        request_builder = request_builder.body(body);
+    }
+
+    // Send request
+    match request_builder.send().await {
+        Ok(response) => {
+            let status_code = response.status().as_u16();
+            let success = response.status().is_success();
+
+            match response.text().await {
+                Ok(response_body) => MetaHttpResponse::json(TestDestinationResponse {
+                    success,
+                    status_code: Some(status_code),
+                    response_body: Some(response_body),
+                    error: None,
+                }),
+                Err(e) => MetaHttpResponse::json(TestDestinationResponse {
+                    success: false,
+                    status_code: Some(status_code),
+                    response_body: None,
+                    error: Some(format!("Failed to read response body: {}", e)),
+                }),
+            }
+        }
+        Err(e) => MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(format!("HTTP request failed: {}", e)),
+        }),
+    }
+}
+
 /// CreateDestination
 #[utoipa::path(
     post,
@@ -54,11 +203,20 @@ impl From<DestinationError> for Response {
     tag = "Alerts",
     operation_id = "CreateDestination",
     summary = "Create alert or pipeline destination",
-    description = "Creates a new destination configuration for an organization. Destinations define where notifications \
-                   are sent (for alerts) or where data is routed (for pipelines). For alert destinations, this includes \
-                   webhooks, email addresses, Slack channels, PagerDuty integrations, and other notification services. \
-                   For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
-                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.",
+    description = "Creates a new alert destination configuration for an organization. Destinations define where alert \
+                   notifications are sent when alert conditions are met, including webhooks, email addresses, and SNS topics.\n\n\
+                   IMPORTANT: The `template` field is REQUIRED to create an alert destination. Use 'Default' for the built-in \
+                   template. For pipeline destinations, this includes external systems like OpenObserve, Splunk, Elasticsearch, etc. \
+                   Use the 'module' query parameter to specify destination type: 'alert' (default) or 'pipeline'.\n\n\
+                   Without a template, the destination becomes a pipeline destination and cannot be used with alerts.\n\n\
+                   Example HTTP destination:\n\n\
+                   ```json\n\
+                   {\"name\": \"my_webhook\", \"url\": \"https://example.com/webhook\", \"method\": \"post\", \"type\": \"http\", \"template\": \"Default\"}\n\
+                   ```\n\n\
+                   Example Email destination:\n\
+                   ```json\n\
+                   {\"name\": \"my_email\", \"type\": \"email\", \"emails\": [\"alerts@example.com\"], \"template\": \"Default\"}\n\
+                   ```",
     security(
         ("Authorization"= [])
     ),
@@ -66,7 +224,7 @@ impl From<DestinationError> for Response {
         ("org_id" = String, Path, description = "Organization name"),
         ("module" = Option<String>, Query, description = "Destination module type: 'alert' (default) or 'pipeline'"),
       ),
-    request_body(content = inline(Destination), description = "Destination data", content_type = "application/json"),
+    request_body(content = inline(Destination), description = "Alert destination data. The 'template' field is required (use 'Default' for the built-in template).", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
@@ -346,4 +504,44 @@ pub async fn delete_destination_bulk(
         unsuccessful,
         err,
     })
+}
+
+/// ListPrebuiltDestinations
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/destinations/prebuilt",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListPrebuiltDestinations",
+    summary = "List prebuilt alert destination templates",
+    description = "Retrieves a list of prebuilt alert destination templates that can be used as starting points \
+                   for creating alert destinations. These templates include popular services like Slack, Microsoft \
+                   Teams, PagerDuty, Discord, and generic webhooks with preconfigured settings. Users can customize \
+                   these templates with their own URLs and credentials to quickly set up alert notifications.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Destination>)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "List prebuilt alert destination templates", "category": "alerts"}))
+    )
+)]
+pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response {
+    // Get prebuilt destinations from config and set the org_id
+    let prebuilt_destinations = config::meta::destinations::Destination::prebuilt_destinations()
+        .into_iter()
+        .map(|mut dest| {
+            dest.org_id = org_id.clone();
+            Destination::from(dest)
+        })
+        .collect::<Vec<_>>();
+
+    MetaHttpResponse::json(prebuilt_destinations)
 }
