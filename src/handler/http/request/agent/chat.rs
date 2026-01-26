@@ -15,6 +15,8 @@
 
 #[cfg(feature = "enterprise")]
 use axum::body::Body;
+#[cfg(feature = "enterprise")]
+use axum::http::HeaderMap;
 use axum::{Json, extract::Path, http::StatusCode, response::Response};
 // Re-export enterprise types for OpenAPI and route handlers
 #[cfg(feature = "enterprise")]
@@ -89,6 +91,7 @@ pub fn init_agent_client() -> Result<(), String> {
 )]
 pub async fn agent_chat(
     Path(_org_id): Path<String>,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     #[allow(unused_variables)] Json(req): Json<AgentChatRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -107,6 +110,13 @@ pub async fn agent_chat(
             return MetaHttpResponse::bad_request("Agent chat not enabled");
         }
 
+        // Extract user token from Authorization header for per-user MCP auth
+        let user_token = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Basic "))
+            .map(|s| s.to_string());
+
         // Create agent client
         let zo_config = get_config();
         let client = match RcaAgentClient::new(
@@ -122,7 +132,7 @@ pub async fn agent_chat(
             }
         };
 
-        // Build query request
+        // Build query request with user token for per-user MCP authentication
         let query_req = QueryRequest {
             query: req.message,
             context: req.context,
@@ -142,6 +152,7 @@ pub async fn agent_chat(
                         .collect(),
                 )
             },
+            user_token,
         };
 
         // Query agent
@@ -185,6 +196,7 @@ pub async fn agent_chat(
 )]
 pub async fn agent_chat_stream(
     Path(_org_id): Path<String>,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
     #[allow(unused_variables)] Json(req): Json<AgentChatRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -201,7 +213,14 @@ pub async fn agent_chat_stream(
             }
         };
 
-        // Build query request
+        // Extract user token from Authorization header for per-user MCP auth
+        let user_token = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Basic "))
+            .map(|s| s.to_string());
+
+        // Build query request with user token for per-user MCP authentication
         let query_req = QueryRequest {
             query: req.message,
             context: req.context,
@@ -221,6 +240,7 @@ pub async fn agent_chat_stream(
                         .collect(),
                 )
             },
+            user_token,
         };
 
         // Create streaming response with immediate feedback

@@ -162,6 +162,7 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
                 "alerts-advanced.spec.js",
+                "alerts-destinations-prebuilt.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
@@ -208,6 +209,7 @@ jobs:
                 "pipelines.spec.js",
                 "pipeline-dynamic.spec.js",
                 "pipeline-core.spec.js",
+                "scheduled-pipeline-query-builder.spec.js",
                 # "remotepipeline.spec.js"
               ]
           - testfolder: "Functions"

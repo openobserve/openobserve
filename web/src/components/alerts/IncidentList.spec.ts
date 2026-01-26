@@ -468,6 +468,9 @@ describe("IncidentList.vue", () => {
         params: {
           id: incident.id,
         },
+        query: {
+          org_identifier: "default",
+        },
       });
     });
 
@@ -484,6 +487,9 @@ describe("IncidentList.vue", () => {
         name: "incidentDetail",
         params: {
           id: "test-123",
+        },
+        query: {
+          org_identifier: "default",
         },
       });
     });

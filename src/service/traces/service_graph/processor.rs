@@ -53,6 +53,11 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     );
 
     for (org_id, stream_name) in streams {
+        log::info!(
+            "[ServiceGraph] Processing stream {}/{}",
+            org_id,
+            stream_name
+        );
         if let Err(e) = process_stream(&org_id, &stream_name, start_time, now).await {
             log::error!(
                 "[ServiceGraph] Failed to process stream {}/{}: {}",
@@ -76,13 +81,23 @@ async fn get_trace_streams() -> Result<Vec<(String, String)>, anyhow::Error> {
     let orgs = crate::service::db::organization::list(None).await?;
 
     for org in orgs {
-        // Get trace streams for this org
-        let org_streams =
-            crate::service::db::schema::list_streams_from_cache(&org.name, StreamType::Traces)
-                .await;
+        // Get trace streams for this org (using identifier, not name)
+        let org_streams = crate::service::db::schema::list_streams_from_cache(
+            &org.identifier,
+            StreamType::Traces,
+        )
+        .await;
+
+        if org_streams.is_empty() {
+            log::warn!(
+                "[ServiceGraph] No trace streams found for org '{}' (identifier: {})",
+                org.name,
+                org.identifier
+            );
+        }
 
         for stream_name in org_streams {
-            streams.push((org.name.clone(), stream_name));
+            streams.push((org.identifier.clone(), stream_name));
         }
     }
 

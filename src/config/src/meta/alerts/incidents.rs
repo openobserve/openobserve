@@ -108,14 +108,55 @@ impl std::fmt::Display for CorrelationReason {
     }
 }
 
-/// Topology context from Service Graph (optional enrichment)
+/// Alert flow graph showing how alerts cascaded across services over time
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
-    pub service: String,
-    pub upstream_services: Vec<String>,
-    pub downstream_services: Vec<String>,
+    /// Alert nodes - each unique (service, alert) pair
+    pub nodes: Vec<AlertNode>,
+    /// Edges showing temporal and service dependency relationships
+    pub edges: Vec<AlertEdge>,
+    /// Related incident IDs (for cross-incident correlation)
     pub related_incident_ids: Vec<String>,
+    /// AI-generated root cause analysis (markdown)
     pub suggested_root_cause: Option<String>,
+}
+
+/// Node in the alert flow graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AlertNode {
+    /// Unique alert identifier (from alert definition)
+    pub alert_id: String,
+    /// Human-readable alert name for display
+    pub alert_name: String,
+    /// Service name (may be "unknown")
+    pub service_name: String,
+    /// Number of times this alert fired
+    pub alert_count: u32,
+    /// Timestamp of first occurrence (microseconds)
+    pub first_fired_at: i64,
+    /// Timestamp of last occurrence (microseconds)
+    pub last_fired_at: i64,
+}
+
+/// Edge in the alert flow graph
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AlertEdge {
+    /// Source node index
+    pub from_node_index: usize,
+    /// Target node index
+    pub to_node_index: usize,
+    /// Type of relationship
+    pub edge_type: EdgeType,
+}
+
+/// Type of relationship between alert nodes
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgeType {
+    /// Same service, chronological progression
+    Temporal,
+    /// Different services, dependency from Service Graph
+    ServiceDependency,
 }
 
 /// Main incident entity - a group of correlated alerts
@@ -267,45 +308,18 @@ pub struct IncidentStats {
     pub alerts_per_incident_avg: f64,
 }
 
-/// Service Graph visualization for an incident
+/// Alert flow graph visualization for an incident
 ///
-/// Shows all services involved in the incident with their dependencies
-/// and alert counts for visualization in the incident details drawer.
+/// Shows how alerts cascaded across services over time, with nodes representing
+/// unique (service, alert) pairs and edges showing temporal and dependency relationships.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentServiceGraph {
-    /// Primary service from incident.stable_dimensions
-    pub incident_service: String,
-    /// Root cause from incident.topology_context (if available)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub root_cause_service: Option<String>,
-    /// All services involved in the incident
-    pub nodes: Vec<IncidentServiceNode>,
-    /// Service dependencies (edges between services)
-    pub edges: Vec<IncidentServiceEdge>,
+    /// Alert nodes in the flow graph
+    pub nodes: Vec<AlertNode>,
+    /// Edges showing alert flow (temporal + service dependencies)
+    pub edges: Vec<AlertEdge>,
     /// Summary statistics
     pub stats: IncidentGraphStats,
-}
-
-/// A service node in the incident service graph
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct IncidentServiceNode {
-    /// Service name
-    pub service_name: String,
-    /// Number of alerts for this service in the incident
-    pub alert_count: u32,
-    /// Whether this service is the suspected root cause
-    pub is_root_cause: bool,
-    /// Whether this is the primary incident service
-    pub is_primary: bool,
-}
-
-/// An edge between services in the incident graph
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct IncidentServiceEdge {
-    /// Source service (caller)
-    pub from: String,
-    /// Target service (callee)
-    pub to: String,
 }
 
 /// Summary statistics for the incident service graph
@@ -451,9 +465,8 @@ mod tests {
     #[test]
     fn test_incident_topology_default() {
         let topology = IncidentTopology::default();
-        assert_eq!(topology.service, "");
-        assert!(topology.upstream_services.is_empty());
-        assert!(topology.downstream_services.is_empty());
+        assert!(topology.nodes.is_empty());
+        assert!(topology.edges.is_empty());
         assert!(topology.related_incident_ids.is_empty());
         assert!(topology.suggested_root_cause.is_none());
     }
@@ -490,18 +503,42 @@ mod tests {
     }
 
     #[test]
-    fn test_incident_topology_with_values() {
+    fn test_incident_topology_with_alert_nodes() {
+        let node1 = AlertNode {
+            alert_id: "alert_cpu_high".to_string(),
+            alert_name: "High CPU Usage".to_string(),
+            service_name: "api-gateway".to_string(),
+            alert_count: 2,
+            first_fired_at: 1000,
+            last_fired_at: 2000,
+        };
+
+        let node2 = AlertNode {
+            alert_id: "alert_db_pool".to_string(),
+            alert_name: "Connection Pool Exhausted".to_string(),
+            service_name: "database".to_string(),
+            alert_count: 1,
+            first_fired_at: 1500,
+            last_fired_at: 1500,
+        };
+
+        let edge = AlertEdge {
+            from_node_index: 0,
+            to_node_index: 1,
+            edge_type: EdgeType::ServiceDependency,
+        };
+
         let topology = IncidentTopology {
-            service: "api-gateway".to_string(),
-            upstream_services: vec!["frontend".to_string()],
-            downstream_services: vec!["database".to_string(), "cache".to_string()],
+            nodes: vec![node1, node2],
+            edges: vec![edge],
             related_incident_ids: vec!["incident-1".to_string()],
             suggested_root_cause: Some("High memory usage".to_string()),
         };
 
-        assert_eq!(topology.service, "api-gateway");
-        assert_eq!(topology.upstream_services.len(), 1);
-        assert_eq!(topology.downstream_services.len(), 2);
+        assert_eq!(topology.nodes.len(), 2);
+        assert_eq!(topology.edges.len(), 1);
+        assert_eq!(topology.nodes[0].alert_id, "alert_cpu_high");
+        assert_eq!(topology.nodes[1].service_name, "database");
         assert_eq!(topology.related_incident_ids.len(), 1);
         assert!(topology.suggested_root_cause.is_some());
     }

@@ -19,7 +19,7 @@ use axum::{
     body::Body,
     extract::{Path, Query},
     http::{HeaderMap, StatusCode, header},
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings::{self as o2_cloud_billings};

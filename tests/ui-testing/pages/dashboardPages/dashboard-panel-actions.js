@@ -33,7 +33,7 @@ export default class DashboardactionPage {
     await this.panelSaveBtn.click();
 
     // Wait for save to complete
-    await this.page.waitForLoadState("networkidle");
+    // await this.page.waitForLoadState("networkidle");
   }
 
   //Apply dashboard button

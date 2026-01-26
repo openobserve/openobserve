@@ -10,7 +10,7 @@
               <img :src="o2AiTitleLogo" />
             </q-avatar>
             <div class="tw:flex tw:items-center">
-              <span class="tw:mr-[5.5px]">O2 AI
+              <span class="tw:mr-[5.5px]">O2 Assistant
               </span>
               <span class="o2-ai-beta-text"
               >Beta</span>
@@ -126,58 +126,197 @@
                 <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
               </q-avatar>
               <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-                <template v-for="(block, blockIndex) in message.blocks" :key="blockIndex">
-                  <div v-if="block.type === 'code'" class="code-block" >
-                    <div  class="code-block-header code-block-theme">
-                      <span v-if="block.language" class="code-type-label">
-                        {{ getLanguageDisplay(block.language) }}
+                <!-- Loading indicator inside message box for empty assistant messages -->
+                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
+                  <q-spinner-dots color="primary" size="1.5em" />
+                  <span>{{ currentAnalyzingMessage }}</span>
+                </div>
+                <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
+                <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
+                  <!-- Tool call block - expandable -->
+                  <div
+                    v-if="block.type === 'tool_call'"
+                    class="tool-call-item"
+                    :class="[store.state.theme == 'dark' ? 'dark-mode' : 'light-mode', { 'has-details': hasToolCallDetails(block) }]"
+                    @click="hasToolCallDetails(block) && toggleToolCallExpanded(index, blockIndex)"
+                  >
+                    <div class="tool-call-header">
+                      <q-icon name="check_circle" size="14px" color="positive" />
+                      <span class="tool-call-name">
+                        {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
                       </span>
-                      <q-btn
-                        flat
-                        dense
-                        class="copy-button"
-                        no-caps
-                        color="primary"
-                        @click="copyToClipboard(block.content)"
-                      >
-                      <div class="tw:flex tw:items-center">
-                        <q-icon size="16px" name="content_copy" />
-                        <span class="tw:ml-1" >Copy</span>
-                      </div>
-                      </q-btn>
+                      <q-icon
+                        v-if="hasToolCallDetails(block)"
+                        :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
+                        size="16px"
+                        class="expand-icon"
+                      />
                     </div>
-                    <span class="generated-code-block">
-                      <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
-                    </span>
-                    <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
-                      <q-btn
-                        flat
-                        dense
-                        class="retry-button"
-                        no-caps
-                        color="primary"
-                        @click="retryGeneration(message)"
-                      >
-                      <div class="tw:flex tw:items-center">
-                        <q-icon size="16px" name="refresh" />
-                        <span class="tw:ml-1" >Retry</span>
+                    <!-- Expandable details -->
+                    <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
+                      <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">Query</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query)"
+                          >
+                            <q-tooltip>Copy query</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.query }}</code>
                       </div>
-                      </q-btn>
-                      <div v-if="false" class="tw:flex tw:items-center tw:gap-2">
-                        <q-btn flat dense :icon="outlinedThumbUpOffAlt" color="primary" @click="likeCodeBlock(message)"  />
-                        <q-btn flat dense :icon="outlinedThumbDownOffAlt" color="primary" @click="dislikeCodeBlock(message)"  />
+                      <div v-if="getToolCallDisplayData(block.context)?.stream" class="detail-item">
+                        <span class="detail-label">Stream</span>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.stream }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.type" class="detail-item">
+                        <span class="detail-label">Type</span>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.type }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.start_time" class="detail-item">
+                        <span class="detail-label">Start</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.start_time) }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.end_time" class="detail-item">
+                        <span class="detail-label">End</span>
+                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.end_time) }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.from !== undefined" class="detail-item">
+                        <span class="detail-label">From</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.from }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.size !== undefined" class="detail-item">
+                        <span class="detail-label">Size</span>
+                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.size }}</span>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.query_type" class="detail-item">
+                        <span class="detail-label">Query Type</span>
+                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.query_type }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.vrl" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">VRL</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl)"
+                          >
+                            <q-tooltip>Copy VRL</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
                       </div>
                     </div>
                   </div>
-                  <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
-
+                  <!-- Text block - render with markdown processing -->
+                  <template v-else-if="block.type === 'text' && block.text">
+                    <template v-for="(textBlock, tbIndex) in processTextBlock(block.text)" :key="'tb-' + blockIndex + '-' + tbIndex">
+                      <div v-if="textBlock.type === 'code'" class="code-block">
+                        <div class="code-block-header code-block-theme">
+                          <span v-if="textBlock.language" class="code-type-label">
+                            {{ getLanguageDisplay(textBlock.language) }}
+                          </span>
+                          <q-btn
+                            flat
+                            dense
+                            class="copy-button"
+                            no-caps
+                            color="primary"
+                            @click="copyToClipboard(textBlock.content)"
+                          >
+                            <div class="tw:flex tw:items-center">
+                              <q-icon size="16px" name="content_copy" />
+                              <span class="tw:ml-1">Copy</span>
+                            </div>
+                          </q-btn>
+                        </div>
+                        <span class="generated-code-block">
+                          <code :class="['hljs', textBlock.language]" v-html="textBlock.highlightedContent"></code>
+                        </span>
+                        <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
+                          <q-btn
+                            flat
+                            dense
+                            class="retry-button"
+                            no-caps
+                            color="primary"
+                            @click="retryGeneration(message)"
+                          >
+                            <div class="tw:flex tw:items-center">
+                              <q-icon size="16px" name="refresh" />
+                              <span class="tw:ml-1">Retry</span>
+                            </div>
+                          </q-btn>
+                        </div>
+                      </div>
+                      <div v-else class="text-block" v-html="processHtmlBlock(textBlock.content)"></div>
+                    </template>
+                  </template>
+                </template>
+                <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
+                <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
+                  <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
+                    <div v-if="block.type === 'code'" class="code-block">
+                      <div class="code-block-header code-block-theme">
+                        <span v-if="block.language" class="code-type-label">
+                          {{ getLanguageDisplay(block.language) }}
+                        </span>
+                        <q-btn
+                          flat
+                          dense
+                          class="copy-button"
+                          no-caps
+                          color="primary"
+                          @click="copyToClipboard(block.content)"
+                        >
+                          <div class="tw:flex tw:items-center">
+                            <q-icon size="16px" name="content_copy" />
+                            <span class="tw:ml-1">Copy</span>
+                          </div>
+                        </q-btn>
+                      </div>
+                      <span class="generated-code-block">
+                        <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
+                      </span>
+                    </div>
+                    <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
+                  </template>
                 </template>
               </div>
             </div>
           </div>
-          <div v-if="isLoading" id="loading-indicator" class="">
+          <!-- Tool call indicator - shows outside message box -->
+          <div v-if="activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+            <div class="tool-call-content">
+              <q-spinner-dots color="primary" size="1.5em" />
+              <div class="tool-call-info">
+                <span class="tool-call-message">{{ activeToolCall.message }}</span>
+                <div v-if="getToolCallDisplayData(activeToolCall.context)" class="tool-call-context">
+                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
+                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query) }}</code>
+                  </div>
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.stream" class="context-tag">
+                    Stream: {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
+                  </span>
+                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.query_type" class="context-tag">
+                    Type: {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Standalone loading indicator - only shown when loading with no tool calls -->
+          <div v-if="isLoading && !activeToolCall" id="loading-indicator" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
             <q-spinner-dots color="primary" size="2em" />
-            <span>Generating response...</span>
+            <span>{{ currentAnalyzingMessage }}</span>
           </div>
         </div>
         
@@ -272,15 +411,17 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
 import hljs from 'highlight.js';
+import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/github-dark.css';
 import { marked } from 'marked';
 import { MarkedOptions } from 'marked';
+import DOMPurify from 'dompurify';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry } from '@/types/chat';
+import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -366,6 +507,7 @@ export default defineComponent({
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<HTMLElement | null>(null);
     const currentStreamingMessage = ref('');
+    const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
     const selectedProvider = ref<string>('openai');
     const selectedModel = ref<any>('gpt-4.1');
     const showHistory = ref(false);
@@ -379,10 +521,65 @@ export default defineComponent({
     const historySearchTerm = ref('');
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
-    
+
+    // Track expanded tool calls by message index and block index
+    const expandedToolCalls = ref<Set<string>>(new Set());
+
+    // Active tool call state - for showing tool progress outside message box
+    const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
+
+    // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
+    const pendingToolCalls = ref<ContentBlock[]>([]);
+
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
-    
+
+    // Analyzing messages for loading indicator
+    const ANALYZING_MESSAGES = [
+      "Analyzing...",
+      "Thinking...",
+      "Processing...",
+      "Examining data...",
+      "Reviewing context...",
+      "Formulating response...",
+      "Checking details...",
+      "Gathering insights...",
+      "Evaluating options...",
+      "Synthesizing information...",
+      "Working on it...",
+      "Almost there...",
+      "Diving deeper...",
+      "Connecting the dots...",
+      "Crunching numbers...",
+      "Exploring possibilities...",
+      "Refining answer...",
+      "Still thinking...",
+      "Making progress...",
+      "Piecing together..."
+    ];
+    const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
+    const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
+
+    /**
+     * Start rotating the analyzing message every 5 seconds
+     */
+    const startAnalyzingRotation = () => {
+      currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+      analyzingRotationInterval.value = setInterval(() => {
+        currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+      }, 5000);
+    };
+
+    /**
+     * Stop rotating the analyzing message
+     */
+    const stopAnalyzingRotation = () => {
+      if (analyzingRotationInterval.value) {
+        clearInterval(analyzingRotationInterval.value);
+        analyzingRotationInterval.value = null;
+      }
+    };
+
     // Query history functionality
     const queryHistory = ref<string[]>([]);
     const historyIndex = ref(-1);
@@ -506,7 +703,9 @@ export default defineComponent({
         
         // Update UI state to reflect cancellation
         isLoading.value = false;
-        
+        activeToolCall.value = null;
+        stopAnalyzingRotation();
+
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
@@ -523,7 +722,8 @@ export default defineComponent({
         
         // Reset streaming state
         currentStreamingMessage.value = '';
-        
+        currentTextSegment.value = '';
+
         // Save the current state including cancellation
         await saveToHistory();
         
@@ -553,6 +753,7 @@ export default defineComponent({
         console.error('Error fetching initial message:', error);
       }
       isLoading.value = false;
+      stopAnalyzingRotation();
       scrollToBottom();
     };
 
@@ -585,29 +786,130 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
+
+                  // Handle tool_call events - show spinner indicator, don't add to chat yet
+                  if (data && data.type === 'tool_call') {
+                    // If there's already an active tool call, complete it first
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                    }
+
+                    // Show active indicator (blue spinner box) - don't add to chat yet
+                    activeToolCall.value = {
+                      tool: data.tool,
+                      message: data.message,
+                      context: data.context || {}
+                    };
+
+                    // Reset text segment - next text will start a new block
+                    currentTextSegment.value = '';
+                    await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle complete events - complete any active tool call
+                  if (data && data.type === 'complete') {
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+                    continue;
+                  }
+
+                  // Handle message content (type === 'message' or legacy format with just content)
                   if (data && typeof data.content === 'string') {
+                    // Complete any active tool call first (add green checkmark to chat)
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: 'tool_call',
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context
+                      };
+                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      activeToolCall.value = null;
+                    }
+
                     // Format code blocks with proper line breaks
                     let content = data.content;
-                    
-                    // Add line break after opening backticks if not present
                     content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                    
-                    // Add line break before closing backticks if not present
                     content = content.replace(/([^`])\s*```/g, '$1\n```');
-                    
+
+                    // Add newline separator if starting a new text segment after tool call
+                    if (currentStreamingMessage.value && currentTextSegment.value === '') {
+                      currentStreamingMessage.value += '\n\n';
+                    }
+                    // Add newline between consecutive message events if needed
+                    // (when current content doesn't end with newline and new content doesn't start with newline)
+                    else if (currentStreamingMessage.value &&
+                             !currentStreamingMessage.value.endsWith('\n') &&
+                             !content.startsWith('\n')) {
+                      currentStreamingMessage.value += '\n\n';
+                      currentTextSegment.value += '\n\n';
+                    }
+
+                    // Accumulate to both total content and current segment
                     currentStreamingMessage.value += content;
-                    
-                    // Check if we need to create the assistant message for the first time
-                    const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    currentTextSegment.value += content;
+
+                    // Get or create assistant message
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                     if (!lastMessage || lastMessage.role !== 'assistant') {
-                      // First content chunk - create assistant message
+                      // Create new assistant message with pending tool calls + text
                       chatMessages.value.push({
                         role: 'assistant',
-                        content: currentStreamingMessage.value
+                        content: currentStreamingMessage.value,
+                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                       });
+                      pendingToolCalls.value = []; // Clear pending
                     } else {
-                      // Update existing assistant message
+                      // Update existing assistant message's total content
                       lastMessage.content = currentStreamingMessage.value;
+
+                      // Update or add text block in contentBlocks
+                      if (!lastMessage.contentBlocks) {
+                        lastMessage.contentBlocks = [];
+                      }
+
+                      // Find the last text block and update it, or create new one
+                      const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                      if (lastBlock && lastBlock.type === 'text') {
+                        // Append to existing text block (same segment)
+                        lastBlock.text = currentTextSegment.value;
+                      } else {
+                        // Add new text block (after tool call - new segment)
+                        lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                      }
                     }
                     messageComplete = true;
                     await scrollToBottom();
@@ -632,31 +934,121 @@ export default defineComponent({
               try {
                 const jsonStr = line.substring(line.indexOf('{'));
                 if (!jsonStr || !jsonStr.trim()) continue;
-                
+
                 const data = JSON.parse(jsonStr);
+
+                // Handle tool_call events - show spinner, don't add to chat yet
+                if (data && data.type === 'tool_call') {
+                  // If there's already an active tool call, complete it first
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                  }
+
+                  // Set new active tool call (shows spinner indicator)
+                  activeToolCall.value = {
+                    tool: data.tool,
+                    message: data.message,
+                    context: data.context || {}
+                  };
+
+                  // Reset text segment for next text block
+                  currentTextSegment.value = '';
+                  continue;
+                }
+
+                // Handle complete events - complete any active tool call
+                if (data && data.type === 'complete') {
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+                  continue;
+                }
+
+                // Handle message content
                 if (data && typeof data.content === 'string') {
-                  // Format code blocks with proper line breaks
+                  // Complete any active tool call first (add green checkmark to chat)
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: 'tool_call',
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context
+                    };
+                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    activeToolCall.value = null;
+                  }
+
                   let content = data.content;
-                  
-                  // Add line break after opening backticks if not present
                   content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                  
-                  // Add line break before closing backticks if not present
                   content = content.replace(/([^`])\s*```/g, '$1\n```');
-                  
+
+                  // Add newline separator if starting a new text segment after tool call
+                  if (currentStreamingMessage.value && currentTextSegment.value === '') {
+                    currentStreamingMessage.value += '\n\n';
+                  }
+                  // Add newline between consecutive message events if needed
+                  else if (currentStreamingMessage.value &&
+                           !currentStreamingMessage.value.endsWith('\n') &&
+                           !content.startsWith('\n')) {
+                    currentStreamingMessage.value += '\n\n';
+                    currentTextSegment.value += '\n\n';
+                  }
+
                   currentStreamingMessage.value += content;
-                  
-                  // Check if we need to create the assistant message for the first time
-                  const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                  currentTextSegment.value += content;
+
+                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
                   if (!lastMessage || lastMessage.role !== 'assistant') {
-                    // First content chunk - create assistant message
+                    // Create new assistant message with pending tool calls + text
                     chatMessages.value.push({
                       role: 'assistant',
-                      content: currentStreamingMessage.value
+                      content: currentStreamingMessage.value,
+                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: currentTextSegment.value }]
                     });
+                    pendingToolCalls.value = []; // Clear pending
                   } else {
-                    // Update existing assistant message
                     lastMessage.content = currentStreamingMessage.value;
+
+                    if (!lastMessage.contentBlocks) {
+                      lastMessage.contentBlocks = [];
+                    }
+                    const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                    if (lastBlock && lastBlock.type === 'text') {
+                      lastBlock.text = currentTextSegment.value;
+                    } else {
+                      lastMessage.contentBlocks.push({ type: 'text', text: currentTextSegment.value });
+                    }
                   }
                   messageComplete = true;
                   await scrollToBottom();
@@ -702,11 +1094,19 @@ export default defineComponent({
             firstUserMessage.content) : 
           'New Chat';
 
-        // Create a serializable version of the messages
-        const serializableMessages = chatMessages.value.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
+        // Create a serializable version of the messages (including contentBlocks)
+        // Use JSON parse/stringify to strip Vue reactive proxies
+        const serializableMessages = chatMessages.value.map(msg => {
+          const serialized: any = {
+            role: msg.role,
+            content: msg.content
+          };
+          if (msg.contentBlocks && msg.contentBlocks.length > 0) {
+            // Deep clone to remove Vue reactivity
+            serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
+          }
+          return serialized;
+        });
 
         const chatData = {
           timestamp: new Date().toISOString(),
@@ -829,10 +1229,11 @@ export default defineComponent({
         request.onsuccess = async () => {
           const chat = request.result;
           if (chat) {
-            // Ensure messages are properly formatted
+            // Ensure messages are properly formatted (including contentBlocks)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
-              content: msg.content
+              content: msg.content,
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {})
             }));
             
             // Check if the last message is a user message without an assistant response
@@ -886,7 +1287,9 @@ export default defineComponent({
 
       isLoading.value = true;
       currentStreamingMessage.value = '';
-      
+      currentTextSegment.value = '';
+      startAnalyzingRotation(); // Start rotating analyzing messages
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
       
@@ -951,7 +1354,9 @@ export default defineComponent({
       }
 
       isLoading.value = false;
-      
+      activeToolCall.value = null;
+      stopAnalyzingRotation();
+
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
       
@@ -1136,10 +1541,61 @@ export default defineComponent({
       }
     };
 
-    const processMessageContent = (content: string) => {
-      const tokens = marked.lexer(content);
+    // Filter markdown headers - convert # and ## to smaller formatting
+    const filterMarkdownHeaders = (content: string): string => {
+      // Convert # and ## at start of lines to bold format for cleaner display
+      let filtered = content;
+
+      // Convert ## headers to bold with colon
+      filtered = filtered.replace(/^## (.+)$/gm, '**$1:**');
+
+      // Convert # headers to bold with colon
+      filtered = filtered.replace(/^# (.+)$/gm, '**$1:**');
+
+      return filtered;
+    };
+
+    // Process text block and return array of code/text blocks for rendering
+    const processTextBlock = (text: string) => {
+      // Filter headers before processing
+      const filteredContent = filterMarkdownHeaders(text);
+      const tokens = marked.lexer(filteredContent);
       const blocks = [];
-      
+
+      for (const token of tokens) {
+        if (token.type === 'code') {
+          let codeText = token.text.trim();
+          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
+            codeText = codeText.split('\n').slice(1).join('\n').trim();
+          }
+
+          const highlightedContent = token.lang && hljs.getLanguage(token.lang)
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
+
+          blocks.push({
+            type: 'code',
+            language: token.lang || '',
+            content: codeText,
+            highlightedContent
+          });
+        } else {
+          blocks.push({
+            type: 'text',
+            content: marked.parser([token])
+          });
+        }
+      }
+
+      return blocks;
+    };
+
+    const processMessageContent = (content: string) => {
+      // Filter headers before processing
+      const filteredContent = filterMarkdownHeaders(content);
+      const tokens = marked.lexer(filteredContent);
+      const blocks = [];
+
       for (const token of tokens) {
         if (token.type === 'code') {
           // Remove comments at the beginning of code blocks
@@ -1147,10 +1603,10 @@ export default defineComponent({
           while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
             codeText = codeText.split('\n').slice(1).join('\n').trim();
           }
-          
+
           const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? hljs.highlight(codeText, { language: token.lang }).value
-            : hljs.highlightAuto(codeText).value;
+            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
             type: 'code',
@@ -1172,8 +1628,15 @@ export default defineComponent({
     const processedMessages = computed(() => {
       return chatMessages.value.map(message => ({
         ...message,
-        blocks: processMessageContent(message.content)
+        blocks: processMessageContent(message.content),
+        contentBlocks: message.contentBlocks || []
       }));
+    });
+
+    // Check if there's an assistant message in progress (for loading indicator positioning)
+    const hasAssistantMessage = computed(() => {
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      return lastMessage?.role === 'assistant';
     });
 
     const retryGeneration = async (message: any) => {
@@ -1223,13 +1686,106 @@ export default defineComponent({
     };
 
     const processHtmlBlock = (content: string) => {
+      // Sanitize HTML to prevent XSS attacks
+      const sanitized = DOMPurify.sanitize(content);
       // Replace pre tags with span and add our custom class
-      return content.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-                   .replace(/<\/pre>/g, '</span>');
+      return sanitized.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
+                     .replace(/<\/pre>/g, '</span>');
     };
 
     const formatTime = (timestamp: string) => {
       const date = new Date(timestamp);
+      return date.toLocaleString();
+    };
+
+    // Tool call context formatting helpers
+    const truncateQuery = (query: string) => {
+      if (!query) return '';
+      const maxLength = 100;
+      if (query.length <= maxLength) return query;
+      return query.substring(0, maxLength) + '...';
+    };
+
+    const formatContextKey = (key: string) => {
+      // Convert snake_case to Title Case
+      return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+
+    const formatContextValue = (value: any) => {
+      if (typeof value === 'string') {
+        // Truncate long strings
+        if (value.length > 30) return value.substring(0, 30) + '...';
+        return value;
+      }
+      return String(value);
+    };
+
+    // Tool call expansion helpers
+    const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
+      const key = `${messageIndex}-${blockIndex}`;
+      if (expandedToolCalls.value.has(key)) {
+        expandedToolCalls.value.delete(key);
+      } else {
+        expandedToolCalls.value.add(key);
+      }
+    };
+
+    const isToolCallExpanded = (messageIndex: number, blockIndex: number) => {
+      return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
+    };
+
+    // Extract display fields from tool call context (handles different tool schemas)
+    const getToolCallDisplayData = (context: any) => {
+      if (!context) return null;
+
+      const data: Record<string, any> = {};
+
+      // Handle nested request_body.query structure (SearchSQL, ExtractPatterns)
+      if (context.request_body?.query) {
+        const q = context.request_body.query;
+        if (q.sql) data.query = q.sql;
+        if (q.start_time) data.start_time = q.start_time;
+        if (q.end_time) data.end_time = q.end_time;
+        if (q.from !== undefined) data.from = q.from;
+        if (q.size !== undefined) data.size = q.size;
+        if (q.query_type) data.query_type = q.query_type;
+        if (q.vrl) data.vrl = q.vrl;
+      }
+
+      // Handle flat structure (StreamSchema, etc.)
+      if (context.stream_name) data.stream = context.stream_name;
+      if (context.type) data.type = context.type;
+
+      return Object.keys(data).length > 0 ? data : null;
+    };
+
+    const hasToolCallDetails = (block: ContentBlock) => {
+      return getToolCallDisplayData(block.context) !== null;
+    };
+
+    const formatToolCallMessage = (block: ContentBlock) => {
+      // Interpolate context into message for certain tools
+      // Returns object with text and optional highlight for bold rendering
+      if (block.tool === 'StreamSchema' && block.context?.stream_name) {
+        return { text: 'Fetched ', highlight: block.context.stream_name, suffix: ' stream schema' };
+      }
+      if (block.tool === 'GetIncident' && block.context?.incident_id) {
+        return { text: 'Retrieved incident ', highlight: block.context.incident_id, suffix: '' };
+      }
+      if (block.tool === 'GetAlert' && block.context?.alert_id) {
+        return { text: 'Fetched alert ', highlight: block.context.alert_id, suffix: '' };
+      }
+      if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
+        return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
+      }
+      return { text: block.message, highlight: null, suffix: '' };
+    };
+
+    const formatTimestamp = (timestamp: number) => {
+      if (!timestamp || timestamp === 0) return 'Not specified';
+      // Timestamp is in microseconds, convert to milliseconds
+      const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
+      const date = new Date(ms);
       return date.toLocaleString();
     };
 
@@ -1261,6 +1817,7 @@ export default defineComponent({
       inputMessage,
       chatMessages,
       isLoading,
+      currentAnalyzingMessage,
       sendMessage,
       handleKeyDown,
       focusInput,
@@ -1278,6 +1835,8 @@ export default defineComponent({
       openHistory,
       loadChat,
       processedMessages,
+      pendingToolCalls,
+      processTextBlock,
       copyToClipboard,
       retryGeneration,
       getLanguageDisplay,
@@ -1303,6 +1862,17 @@ export default defineComponent({
       showScrollToBottom,
       cancelCurrentRequest,
       currentAbortController,
+      activeToolCall,
+      truncateQuery,
+      formatContextKey,
+      expandedToolCalls,
+      toggleToolCallExpanded,
+      isToolCallExpanded,
+      hasToolCallDetails,
+      getToolCallDisplayData,
+      formatToolCallMessage,
+      formatTimestamp,
+      formatContextValue,
     }
   }
 });
@@ -1491,6 +2061,45 @@ export default defineComponent({
           display: block;
           max-width: 100%;
         }
+      }
+
+      // Heading styles - appropriately sized for chat interface
+      // Only applies within message-blocks, not globally
+      :deep(h1) {
+        font-size: 1.5rem !important;
+        font-weight: 600 !important;
+        margin: 16px 0 8px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h2) {
+        font-size: 1.25rem !important;
+        font-weight: 600 !important;
+        margin: 14px 0 7px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h3) {
+        font-size: 1.125rem !important;
+        font-weight: 600 !important;
+        margin: 12px 0 6px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h4) {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        margin: 10px 0 5px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h5) {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
+      }
+      :deep(h6) {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        margin: 8px 0 4px 0 !important;
+        line-height: 1.3 !important;
       }
 
       // Table styling to prevent horizontal overflow
@@ -1861,6 +2470,495 @@ export default defineComponent({
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+// Tool call indicator styling
+.tool-call-indicator {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin: 8px 0;
+  animation: fadeIn 0.3s ease;
+
+  &.light-mode {
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+    border: 1px solid #d0d8e8;
+  }
+
+  &.dark-mode {
+    background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+    border: 1px solid #3a3f55;
+  }
+
+  .tool-call-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .tool-call-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tool-call-status {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.7;
+    margin-bottom: 2px;
+
+    .light-mode & {
+      color: #6b7280;
+    }
+
+    .dark-mode & {
+      color: #9ca3af;
+    }
+  }
+
+  .tool-call-message {
+    font-weight: 600;
+    font-size: 14px;
+
+    .light-mode & {
+      color: #4a5568;
+    }
+
+    .dark-mode & {
+      color: #e2e8f0;
+    }
+  }
+
+  .tool-call-context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .context-item {
+    width: 100%;
+  }
+
+  .context-query {
+    display: block;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-width: 100%;
+    overflow: hidden;
+
+    .light-mode & {
+      background: #ffffff;
+      color: #2d3748;
+      border: 1px solid #e2e8f0;
+    }
+
+    .dark-mode & {
+      background: #1a1a1a;
+      color: #a0aec0;
+      border: 1px solid #333;
+    }
+  }
+
+  .context-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+
+    .light-mode & {
+      background: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+    }
+
+    .dark-mode & {
+      background: rgba(102, 126, 234, 0.2);
+      color: #a0aec0;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Inline loading indicator (inside message box)
+.inline-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+// Tool call item - inline in chat flow (interleaved with text)
+.tool-call-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+
+  &.has-details {
+    cursor: pointer;
+
+    &:hover {
+      &.light-mode {
+        background: rgba(76, 175, 80, 0.12);
+      }
+      &.dark-mode {
+        background: rgba(76, 175, 80, 0.18);
+      }
+    }
+  }
+
+  &.light-mode {
+    background: rgba(76, 175, 80, 0.08);
+    color: #4a5568;
+  }
+
+  &.dark-mode {
+    background: rgba(76, 175, 80, 0.12);
+    color: #a0aec0;
+  }
+
+  // Error state styling
+  &.error {
+    &.light-mode {
+      background: rgba(244, 67, 54, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(244, 67, 54, 0.12);
+    }
+  }
+
+  // Timeout state styling
+  &.timeout {
+    &.light-mode {
+      background: rgba(255, 152, 0, 0.08);
+    }
+    &.dark-mode {
+      background: rgba(255, 152, 0, 0.12);
+    }
+  }
+
+  .tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tool-call-name {
+    font-weight: 500;
+    flex: 1;
+
+    code {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      padding: 1px 4px;
+      border-radius: 3px;
+
+      .light-mode & {
+        background: rgba(0, 0, 0, 0.06);
+      }
+      .dark-mode & {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+
+  .expand-icon {
+    opacity: 0.6;
+    transition: transform 0.2s;
+  }
+
+  .tool-call-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+
+    .copy-btn {
+      opacity: 0.6;
+      &:hover {
+        opacity: 1;
+      }
+    }
+
+    .detail-value {
+      font-size: 12px;
+      user-select: text;
+
+      &.query-value {
+        font-family: 'Fira Code', 'Consolas', monospace;
+        padding: 8px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        user-select: text;
+        cursor: text;
+
+        .light-mode & {
+          background: rgba(0, 0, 0, 0.04);
+        }
+        .dark-mode & {
+          background: rgba(255, 255, 255, 0.06);
+        }
+      }
+    }
+  }
+
+  .tool-call-error {
+    font-size: 11px;
+    color: #f44336;
+    font-style: italic;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tool-call-error {
+    font-size: 11px;
+    color: #f44336;
+    font-style: italic;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tool-call-query {
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    .light-mode & {
+      background: rgba(0, 0, 0, 0.05);
+      color: #666;
+    }
+
+    .dark-mode & {
+      background: rgba(255, 255, 255, 0.08);
+      color: #888;
+    }
+  }
+}
+
+
+// Theme-based syntax highlighting - both CSS files are loaded, we scope them by theme
+// Hide dark theme in light mode
+.light-mode {
+  // Force light theme colors to take precedence
+  :deep(.hljs) {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #24292e;
+    background: #ffffff;
+  }
+  :deep(.hljs-doctag),
+  :deep(.hljs-keyword),
+  :deep(.hljs-meta .hljs-keyword),
+  :deep(.hljs-template-tag),
+  :deep(.hljs-template-variable),
+  :deep(.hljs-type),
+  :deep(.hljs-variable.language_) {
+    color: #d73a49;
+  }
+  :deep(.hljs-title),
+  :deep(.hljs-title.class_),
+  :deep(.hljs-title.class_.inherited__),
+  :deep(.hljs-title.function_) {
+    color: #6f42c1;
+  }
+  :deep(.hljs-attr),
+  :deep(.hljs-attribute),
+  :deep(.hljs-literal),
+  :deep(.hljs-meta),
+  :deep(.hljs-number),
+  :deep(.hljs-operator),
+  :deep(.hljs-variable),
+  :deep(.hljs-selector-attr),
+  :deep(.hljs-selector-class),
+  :deep(.hljs-selector-id) {
+    color: #005cc5;
+  }
+  :deep(.hljs-regexp),
+  :deep(.hljs-string),
+  :deep(.hljs-meta .hljs-string) {
+    color: #032f62;
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: #e36209;
+  }
+  :deep(.hljs-comment),
+  :deep(.hljs-code),
+  :deep(.hljs-formula) {
+    color: #6a737d;
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag),
+  :deep(.hljs-selector-pseudo) {
+    color: #22863a;
+  }
+  :deep(.hljs-subst) {
+    color: #24292e;
+  }
+  :deep(.hljs-section) {
+    color: #005cc5;
+    font-weight: bold;
+  }
+  :deep(.hljs-bullet) {
+    color: #735c0f;
+  }
+  :deep(.hljs-emphasis) {
+    color: #24292e;
+    font-style: italic;
+  }
+  :deep(.hljs-strong) {
+    color: #24292e;
+    font-weight: bold;
+  }
+  :deep(.hljs-addition) {
+    color: #22863a;
+    background-color: #f0fff4;
+  }
+  :deep(.hljs-deletion) {
+    color: #b31d28;
+    background-color: #ffeef0;
+  }
+}
+// Force dark theme colors in dark mode
+.dark-mode {
+  :deep(.hljs) {
+    display: block;
+    overflow-x: auto;
+    padding: 0.5em;
+    color: #c9d1d9;
+    background: #0d1117;
+  }
+  :deep(.hljs-doctag),
+  :deep(.hljs-keyword),
+  :deep(.hljs-meta .hljs-keyword),
+  :deep(.hljs-template-tag),
+  :deep(.hljs-template-variable),
+  :deep(.hljs-type),
+  :deep(.hljs-variable.language_) {
+    color: #ff7b72;
+  }
+  :deep(.hljs-title),
+  :deep(.hljs-title.class_),
+  :deep(.hljs-title.class_.inherited__),
+  :deep(.hljs-title.function_) {
+    color: #d2a8ff;
+  }
+  :deep(.hljs-attr),
+  :deep(.hljs-attribute),
+  :deep(.hljs-literal),
+  :deep(.hljs-meta),
+  :deep(.hljs-number),
+  :deep(.hljs-operator),
+  :deep(.hljs-variable),
+  :deep(.hljs-selector-attr),
+  :deep(.hljs-selector-class),
+  :deep(.hljs-selector-id) {
+    color: #79c0ff;
+  }
+  :deep(.hljs-regexp),
+  :deep(.hljs-string),
+  :deep(.hljs-meta .hljs-string) {
+    color: #a5d6ff;
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: #ffa657;
+  }
+  :deep(.hljs-comment),
+  :deep(.hljs-code),
+  :deep(.hljs-formula) {
+    color: #8b949e;
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag),
+  :deep(.hljs-selector-pseudo) {
+    color: #7ee787;
+  }
+  :deep(.hljs-subst) {
+    color: #c9d1d9;
+  }
+  :deep(.hljs-section) {
+    color: #1f6feb;
+    font-weight: bold;
+  }
+  :deep(.hljs-bullet) {
+    color: #f2cc60;
+  }
+  :deep(.hljs-emphasis) {
+    color: #c9d1d9;
+    font-style: italic;
+  }
+  :deep(.hljs-strong) {
+    color: #c9d1d9;
+    font-weight: bold;
+  }
+  :deep(.hljs-addition) {
+    color: #aff5b4;
+    background-color: #033a16;
+  }
+  :deep(.hljs-deletion) {
+    color: #ffdcd7;
+    background-color: #67060c;
   }
 }
 </style> 
