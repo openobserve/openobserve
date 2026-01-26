@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpResponse, post, web};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::cloud::billings;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::utils::auth::UserEmail,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
     service::{organization, users},
 };
@@ -41,6 +40,8 @@ pub struct LinkSubscriptionResponse {
 
 /// LinkAzureMarketplaceSubscription
 #[utoipa::path(
+    post,
+    path = "/{org_id}/azure-marketplace/link-subscription",
     context_path = "/api",
     tag = "Azure Marketplace",
     operation_id = "LinkAzureMarketplaceSubscription",
@@ -58,12 +59,11 @@ pub struct LinkSubscriptionResponse {
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
 )]
-#[post("/{org_id}/azure-marketplace/link-subscription")]
 pub async fn link_subscription(
-    org_id: web::Path<String>,
-    req: web::Json<LinkSubscriptionRequest>,
+    Path(org_id): Path<String>,
+    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
+) -> Response {
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();
 
@@ -71,10 +71,7 @@ pub async fn link_subscription(
     let _org = match organization::get_org(org_id).await {
         Some(org) => org,
         None => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "error": "org_not_found",
-                "message": "Organization not found"
-            }));
+            return MetaHttpResponse::not_found("Organization not found");
         }
     };
 
@@ -82,19 +79,17 @@ pub async fn link_subscription(
     let user = match users::get_user(Some(org_id), email).await {
         Some(u) => u,
         None => {
-            return HttpResponse::Forbidden().json(serde_json::json!({
-                "error": "forbidden",
-                "message": "User not found or not authorized for this organization"
-            }));
+            return MetaHttpResponse::forbidden(
+                "User not found or not authorized for this organization",
+            );
         }
     };
 
     // Only admins and root users can link Azure Marketplace subscriptions
     if user.role != UserRole::Admin && user.role != UserRole::Root {
-        return HttpResponse::Forbidden().json(serde_json::json!({
-            "error": "forbidden",
-            "message": "Only organization administrators can link Azure Marketplace subscriptions"
-        }));
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can link Azure Marketplace subscriptions",
+        );
     }
 
     // 3. Check if org is free tier (cannot link paid orgs)
@@ -102,19 +97,15 @@ pub async fn link_subscription(
         Ok(v) => v,
         Err(e) => {
             log::error!("[AZURE SAAS] Error checking free trial status: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "internal_error",
-                "message": "Failed to check organization status"
-            }));
+            return MetaHttpResponse::internal_error("Failed to check organization status");
         }
     };
 
     if let Some(sub) = subscription {
         if !sub.subscription_type.is_free_sub() {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "requested organization is not free organization",
-                "message": "Only free tier organizations can be linked to Azure Marketplace"
-            }));
+            return MetaHttpResponse::bad_request(
+                "Only free tier organizations can be linked to Azure Marketplace",
+            );
         }
     }
 
@@ -130,10 +121,7 @@ pub async fn link_subscription(
         Ok(r) => r,
         Err(e) => {
             log::info!("[AZURE SAAS] Error processing token for org {org_id} user {email} : {e}");
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Error processing token",
-                "message": e.to_string()
-            }));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     let sub_id = res.id.clone();
@@ -142,25 +130,19 @@ pub async fn link_subscription(
         log::error!(
             "[AZURE SAAS] Error activating subscription for org {org_id} user {email} sub_id: {sub_id} : {e}",
         );
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Error activating subscription",
-            "message": e.to_string()
-        }));
+        return MetaHttpResponse::bad_request(e);
     }
 
     if let Err(e) = billings::azure_utils::save_subscription(org_id, email, res, &req_id).await {
         log::error!(
             "[AZURE SAAS] Error saving subscription for org {org_id} user {email} sub_id: {sub_id} : {e}",
         );
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "Error saving subscription",
-            "message": e.to_string()
-        }));
+        MetaHttpResponse::bad_request(e);
     }
 
     log::info!(
         "subscription successfully linked and activated org_id={org_id}, email={email}, req_id={req_id}"
     );
 
-    HttpResponse::Created().finish()
+    MetaHttpResponse::created("successfully linked azure subscription")
 }

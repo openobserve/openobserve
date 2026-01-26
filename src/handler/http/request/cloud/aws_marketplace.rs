@@ -13,17 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{
-    HttpResponse,
-    cookie::{Cookie, SameSite},
-    get, post, web,
-};
+use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::aws_marketplace::{api as aws_mp_api, db as aws_mp_db};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::utils::auth::UserEmail,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
     service::{organization, users},
 };
@@ -46,10 +42,9 @@ pub struct AwsMarketplaceRegistrationForm {
 /// This endpoint receives the POST from AWS Marketplace when a customer subscribes.
 /// It saves the token in a cookie and redirects to the login page.
 /// Full path: POST /marketplace/aws/register
-#[post("/aws/register")]
 pub async fn aws_marketplace_register(
-    form: web::Form<AwsMarketplaceRegistrationForm>,
-) -> HttpResponse {
+    axum::Form(form): axum::Form<AwsMarketplaceRegistrationForm>,
+) -> Response {
     log::info!(
         "[AWS SAAS] Received marketplace registration: product_id={:?}, agreement_id={:?}",
         form.product_id,
@@ -78,20 +73,16 @@ pub async fn aws_marketplace_register(
 
     // Create cookie with the marketplace token
     // Use SameSite::Lax to allow the cookie to be sent on redirect from Dex
-    let cookie = Cookie::build("aws_marketplace_token", form.token.clone())
-        .path("/")
-        .http_only(false) // Allow JavaScript to read it
-        .secure(true)
-        .same_site(SameSite::Lax)
-        .max_age(actix_web::cookie::time::Duration::hours(4)) // Token expires in 4 hours
-        .finish();
+    let mut cookie = Cookie::new("aws_marketplace_token", form.token.clone());
+    cookie.set_path("/");
+    cookie.set_http_only(false); // Allow JavaScript to read it
+    cookie.set_secure(true);
+    cookie.set_same_site(SameSite::Lax);
+    cookie.set_expires(time::OffsetDateTime::now_utc() + time::Duration::hours(4)); // Token expires in 4 hours
 
     log::info!("[AWS SAAS] Redirecting to login: {}", login_url);
 
-    HttpResponse::Found()
-        .cookie(cookie)
-        .append_header(("Location", login_url))
-        .finish()
+    MetaHttpResponse::found(login_url, Some(cookie.to_string))
 }
 
 /// Request payload for linking AWS Marketplace subscription
@@ -111,6 +102,8 @@ pub struct LinkSubscriptionResponse {
 
 /// LinkAwsMarketplaceSubscription
 #[utoipa::path(
+    post,
+    path="/{org_id}/aws-marketplace/link-subscription",
     context_path = "/api",
     tag = "AWS Marketplace",
     operation_id = "LinkAwsMarketplaceSubscription",
@@ -128,12 +121,11 @@ pub struct LinkSubscriptionResponse {
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
 )]
-#[post("/{org_id}/aws-marketplace/link-subscription")]
 pub async fn link_subscription(
-    org_id: web::Path<String>,
-    req: web::Json<LinkSubscriptionRequest>,
+    Path(org_id): Path<String>,
+    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
+) -> Response {
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();
 
@@ -147,10 +139,7 @@ pub async fn link_subscription(
     let _org = match organization::get_org(org_id).await {
         Some(org) => org,
         None => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "error": "org_not_found",
-                "message": "Organization not found"
-            }));
+            return MetaHttpResponse::not_found("Organization not found");
         }
     };
 
@@ -158,35 +147,29 @@ pub async fn link_subscription(
     let user = match users::get_user(Some(org_id), email).await {
         Some(u) => u,
         None => {
-            return HttpResponse::Forbidden().json(serde_json::json!({
-                "error": "forbidden",
-                "message": "User not found or not authorized for this organization"
-            }));
+            return MetaHttpResponse::forbidden(
+                "User not found or not authorized for this organization",
+            );
         }
     };
 
     // Only admins and root users can link AWS Marketplace subscriptions
     if user.role != UserRole::Admin && user.role != UserRole::Root {
-        return HttpResponse::Forbidden().json(serde_json::json!({
-            "error": "forbidden",
-            "message": "Only organization administrators can link AWS Marketplace subscriptions"
-        }));
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can link AWS Marketplace subscriptions",
+        );
     }
 
     // 3. Check if org is free tier (cannot link paid orgs)
     match organization::is_org_in_free_trial_period(org_id).await {
         Ok(false) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "requested organization is not free organization",
-                "message": "Only free tier organizations can be linked to AWS Marketplace"
-            }));
+            return MetaHttpResponse::bad_request(
+                "Only free tier organizations can be linked to AWS Marketplace",
+            );
         }
         Err(e) => {
             log::error!("[AWS SAAS] Error checking free trial status: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "internal_error",
-                "message": "Failed to check organization status"
-            }));
+            return MetaHttpResponse::internal_error("Failed to check organization status");
         }
         Ok(true) => {} // Continue - org is in free trial
     }
@@ -196,17 +179,13 @@ pub async fn link_subscription(
         Ok(Some(existing))
             if existing.marketplace_status == aws_mp_api::MarketplaceStatus::Active =>
         {
-            return HttpResponse::Conflict().json(serde_json::json!({
-                "error": "already_linked",
-                "message": "This organization is already linked to AWS Marketplace"
-            }));
+            return MetaHttpResponse::conflict(
+                "This organization is already linked to AWS Marketplace",
+            );
         }
         Err(e) => {
             log::error!("[AWS SAAS] Database error checking org: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "database_error",
-                "message": "Failed to check organization status"
-            }));
+            return MetaHttpResponse::internal_error("Failed to check organization status");
         }
         _ => {} // OK to proceed
     }
@@ -218,16 +197,14 @@ pub async fn link_subscription(
             log::error!("[AWS SAAS] Failed to resolve customer token: {}", e);
 
             if e.to_string().contains("TokenExpired") || e.to_string().contains("expired") {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": "registration_token_expired",
-                    "message": "Your registration link has expired. Please subscribe again from AWS Marketplace."
-                }));
+                return MetaHttpResponse::bad_request(
+                    "Your registration link has expired. Please subscribe again from AWS Marketplace.",
+                );
             }
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "resolve_customer_failed",
-                "message": format!("Failed to validate AWS Marketplace token: {}", e)
-            }));
+            return MetaHttpResponse::internal_error(format!(
+                "Failed to validate AWS Marketplace token: {}",
+                e
+            ));
         }
     };
 
@@ -243,54 +220,40 @@ pub async fn link_subscription(
             );
 
             return match action {
-                ExistingSubscriptionAction::AlreadySubscribed { customer_identifier } => {
-                    HttpResponse::Ok().json(serde_json::json!({
-                        "success": true,
-                        "customer_identifier": customer_identifier,
-                        "message": "You are already subscribed!"
-                    }))
-                }
+                ExistingSubscriptionAction::AlreadySubscribed {
+                    customer_identifier,
+                } => MetaHttpResponse::json(serde_json::json!({
+                    "success": true,
+                    "customer_identifier": customer_identifier,
+                    "message": "You are already subscribed!"
+                })),
                 ExistingSubscriptionAction::LinkedToDifferentOrg { existing_org_id } => {
-                    HttpResponse::Conflict().json(serde_json::json!({
-                        "error": "already_subscribed",
-                        "message": format!(
-                            "This AWS account is already linked to organization '{}'. \
-                             Each AWS account can only have one active subscription.",
-                            existing_org_id
-                        )
-                    }))
+                    MetaHttpResponse::conflict(format!(
+                        "This AWS account is already linked to organization '{existing_org_id}'. Each AWS account can only have one active subscription.",
+                    ))
                 }
-                ExistingSubscriptionAction::PendingActivation { customer_identifier } => {
-                    HttpResponse::Ok().json(serde_json::json!({
-                        "success": true,
-                        "customer_identifier": customer_identifier,
-                        "message": "Subscription is being activated..."
-                    }))
-                }
-                ExistingSubscriptionAction::StalePending => {
-                    HttpResponse::Conflict().json(serde_json::json!({
-                        "error": "stale_pending_subscription",
-                        "message": "A pending subscription exists but was not completed. Please contact support."
-                    }))
-                }
+                ExistingSubscriptionAction::PendingActivation {
+                    customer_identifier,
+                } => MetaHttpResponse::json(serde_json::json!({
+                    "success": true,
+                    "customer_identifier": customer_identifier,
+                    "message": "Subscription is being activated..."
+                })),
+                ExistingSubscriptionAction::StalePending => MetaHttpResponse::conflict(
+                    "A pending subscription exists but was not completed. Please contact support.",
+                ),
                 ExistingSubscriptionAction::PreviousSubscriptionExists { status } => {
-                    HttpResponse::Conflict().json(serde_json::json!({
-                        "error": "previous_subscription_exists",
-                        "message": format!(
-                            "You previously had a subscription (status: {}). Please contact support to reactivate.",
-                            status
-                        )
-                    }))
+                    MetaHttpResponse::conflict(format!(
+                        "You previously had a subscription (status: {}). Please contact support to reactivate.",
+                        status
+                    ))
                 }
             };
         }
         Ok(None) => {} // Good, proceed with creation
         Err(e) => {
             log::error!("[AWS SAAS] Database error checking customer_id: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "database_error",
-                "message": "Failed to check subscription status"
-            }));
+            return MetaHttpResponse::internal_error("Failed to check subscription status");
         }
     }
 
@@ -303,7 +266,7 @@ pub async fn link_subscription(
                 org_id
             );
 
-            HttpResponse::Ok().json(LinkSubscriptionResponse {
+            MetaHttpResponse::json(LinkSubscriptionResponse {
                 success: true,
                 customer_identifier: resolved.customer_identifier,
                 message: None,
@@ -311,16 +274,15 @@ pub async fn link_subscription(
         }
         Err(e) => {
             log::error!("[AWS SAAS] Failed to create pending subscription: {}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "database_error",
-                "message": format!("Failed to create subscription record: {}", e)
-            }))
+            MetaHttpResponse::internal_error(format!("Failed to create subscription record: {}", e))
         }
     }
 }
 
 /// GetAwsMarketplaceActivationStatus
 #[utoipa::path(
+    get,
+    path="/{org_id}/aws-marketplace/activation-status",
     context_path = "/api",
     tag = "AWS Marketplace",
     operation_id = "GetAwsMarketplaceActivationStatus",
@@ -341,12 +303,11 @@ pub async fn link_subscription(
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
 )]
-#[get("/{org_id}/aws-marketplace/activation-status")]
 pub async fn activation_status(
-    org_id: web::Path<String>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    Path(org_id): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
-) -> HttpResponse {
+) -> Response {
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();
 
@@ -359,46 +320,39 @@ pub async fn activation_status(
     let user = match users::get_user(Some(org_id), email).await {
         Some(u) => u,
         None => {
-            return HttpResponse::Forbidden().json(serde_json::json!({
-                "error": "forbidden",
-                "message": "User not found or not authorized for this organization"
-            }));
+            return MetaHttpResponse::forbidden(
+                "User not found or not authorized for this organization",
+            );
         }
     };
 
     // Only admins and root users can check subscription status
     if user.role != UserRole::Admin && user.role != UserRole::Root {
-        return HttpResponse::Forbidden().json(serde_json::json!({
-            "error": "forbidden",
-            "message": "Only organization administrators can check subscription status"
-        }));
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can check subscription status",
+        );
     }
 
     // Get the subscription for this organization
     let billing = match aws_mp_db::get_by_org_id(org_id).await {
         Ok(Some(billing)) => billing,
         Ok(None) => {
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "error": "subscription_not_found",
-                "message": "No AWS Marketplace subscription found for this organization"
-            }));
+            return MetaHttpResponse::not_found(
+                "No AWS Marketplace subscription found for this organization",
+            );
         }
         Err(e) => {
             log::error!("[AWS SAAS] Database error: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "database_error",
-                "message": "Failed to check subscription status"
-            }));
+            return MetaHttpResponse::internal_error("Failed to check subscription status");
         }
     };
 
     // If customer_id is provided in query, verify it matches the org's subscription
     if let Some(customer_id) = query.get("customer_id") {
         if *customer_id != billing.customer_identifier {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "customer_id_mismatch",
-                "message": "The provided customer_id does not match this organization's subscription"
-            }));
+            MetaHttpResponse::bad_request(
+                "The provided customer_id does not match this organization's subscription",
+            );
         }
     }
     // If customer_id is not provided, skip verification and proceed (it's optional)
@@ -406,5 +360,5 @@ pub async fn activation_status(
     // Build response based on status
     let response = aws_mp_db::build_activation_status_response(&billing);
 
-    HttpResponse::Ok().json(response)
+    MetaHttpResponse::json(response)
 }
