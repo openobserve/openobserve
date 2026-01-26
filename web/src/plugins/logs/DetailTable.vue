@@ -59,6 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
+          <!-- NEW: Logs V2 Tab for testing new component -->
+          <q-tab
+            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+            name="correlated-logs-v2"
+            :label="t('correlation.correlatedLogsV2')"
+          />
           <q-tab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-metrics"
@@ -329,6 +335,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-tab-panel>
 
+      <!-- NEW: Correlated Logs V2 Tab Panel (Custom Component) -->
+      <q-tab-panel name="correlated-logs-v2" class="q-pa-none full-height">
+        <CorrelatedLogsTable
+          v-if="correlationProps"
+          :service-name="correlationProps.serviceName"
+          :matched-dimensions="correlationProps.matchedDimensions"
+          :additional-dimensions="correlationProps.additionalDimensions"
+          :log-streams="correlationProps.logStreams"
+          :source-stream="correlationProps.sourceStream"
+          :source-type="correlationProps.sourceType"
+          :available-dimensions="correlationProps.availableDimensions"
+          :fts-fields="correlationProps.ftsFields"
+          :time-range="correlationProps.timeRange"
+          :hide-view-related-button="true"
+        />
+        <!-- Loading/Empty state when no data -->
+        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
+          <div class="tw:text-center">
+            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
+            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadLogsV2') }}</div>
+          </div>
+        </div>
+      </q-tab-panel>
+
       <!-- Correlated Metrics Tab Panel -->
       <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
         <TelemetryCorrelationDashboard
@@ -466,6 +497,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
+import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 
 const defaultValue: any = () => {
@@ -476,7 +508,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, TelemetryCorrelationDashboard, CorrelatedLogsTable },
   emits: [
     "showPrevDetail",
     "showNextDetail",
