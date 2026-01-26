@@ -161,7 +161,6 @@ pub async fn process_session_detail(
         Some(org) => org,
     };
 
-    log::info!("handling checkout session detail");
     match o2_cloud_billings::process_checkout_session_details(
         &org_id,
         &query.session_id,
@@ -179,7 +178,6 @@ pub async fn process_session_detail(
                 &get_config().common.web_url,
                 &org_id
             );
-            log::info!("checkout session success, redirecting to {redirect_url}");
             // Send event to ActiveCampaign
             let segment_event_data = HashMap::from([
                 ("email".to_string(), json::Value::String(email.to_string())),
@@ -217,7 +215,6 @@ pub async fn process_session_detail(
             })
             .await;
             let res = RedirectResponseBuilder::new(&redirect_url).build();
-            log::info!("redirecting to {}", res);
             res.redirect_http()
         }
     }
@@ -470,6 +467,8 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
 
 /// StripeWebhookEvent
 #[utoipa::path(
+    post,
+    path="/webhook/azure",
     context_path = "/webhook",
     tag = "Billings",
     summary = "Handle Azure webhook events",
@@ -479,13 +478,8 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
         (status = 200, description="Status OK", content_type = "application/json", body = ())
     )
 )]
-#[post("/azure")]
-pub async fn handle_azure_event(
-    req: HttpRequest,
-    payload: web::Bytes, // Raw body bytes
-) -> impl Responder {
+pub async fn handle_azure_event(headers: HeaderMap, payload: axum::body::Bytes) -> Response {
     log::info!("Azure Saas webhook received");
-    let headers = req.headers();
     let Some(auth_header) = headers.get("Authorization").and_then(|v| v.to_str().ok()) else {
         return o2_cloud_billings::BillingError::AzureWebhookError("invalid auth header".into())
             .into_http_response();
@@ -494,7 +488,7 @@ pub async fn handle_azure_event(
     match o2_cloud_billings::azure_utils::handle_azure_wh(auth_header, &payload).await {
         Ok(_) => {
             log::info!("successfully handled azure saas webhook");
-            HttpResponse::Ok().json(json::json!({
+            MetaHttpResponse::json(json::json!({
                 "status": "success"
             }))
         }

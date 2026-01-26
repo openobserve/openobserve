@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use axum::{extract::Path, response::Response};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::cloud::billings;
 use serde::{Deserialize, Serialize};
@@ -61,8 +62,8 @@ pub struct LinkSubscriptionResponse {
 )]
 pub async fn link_subscription(
     Path(org_id): Path<String>,
-    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
     Headers(user_email): Headers<UserEmail>,
+    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
 ) -> Response {
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();

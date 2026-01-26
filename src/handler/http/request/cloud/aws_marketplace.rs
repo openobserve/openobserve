@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use axum::{
+    extract::{Path, Query},
+    response::Response,
+};
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use config::meta::user::UserRole;
 use o2_enterprise::enterprise::aws_marketplace::{api as aws_mp_api, db as aws_mp_db};
@@ -82,7 +86,7 @@ pub async fn aws_marketplace_register(
 
     log::info!("[AWS SAAS] Redirecting to login: {}", login_url);
 
-    MetaHttpResponse::found(login_url, Some(cookie.to_string))
+    MetaHttpResponse::found(login_url, Some(cookie.to_string()))
 }
 
 /// Request payload for linking AWS Marketplace subscription
@@ -123,8 +127,8 @@ pub struct LinkSubscriptionResponse {
 )]
 pub async fn link_subscription(
     Path(org_id): Path<String>,
-    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
     Headers(user_email): Headers<UserEmail>,
+    axum::Json(req): axum::Json<LinkSubscriptionRequest>,
 ) -> Response {
     let email = user_email.user_id.as_str();
     let org_id = org_id.as_str();
