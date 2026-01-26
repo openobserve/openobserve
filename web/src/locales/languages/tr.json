@@ -109,7 +109,9 @@
     "chunkLoadError": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "chunkLoadErrorMsg": "Uygulamanın yeni bir sürümü mevcuttur. Devamlamak için lütfen sayfayı yenileyin.",
     "id": "KİMLİK",
-    "getStarted": "Başlayın"
+    "getStarted": "Başlayın",
+    "reset": "Sıfırla",
+    "retry": "Tekrar dene"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -2676,7 +2678,57 @@
     "stable": "Kararlı",
     "stableTooltip": "Kararlı boyutlar düşük kardinaliteye sahiptir ve korelasyon anahtarı hesaplaması için kullanılır",
     "normalize": "Normalleştir",
-    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}"
+    "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
+    "correlatedLogsV2": "Günlükler V2",
+    "clickToLoadLogsV2": "İlişkili günlükleri yüklemek için tıklayın (V2)",
+    "logs": {
+      "title": "İlişkili Günlükler",
+      "filters": {
+        "title": "Korelasyon Filtrelerini Düzenle",
+        "description": "Korelasyon sorgunuzu hassaslaştırmak için boyut filtrelerini ayarlayın. Eşleşen boyutlar kararlı tanımlayıcılardır, ancak bölme yeniden başlatıldığında ek boyutlar değişebilir.",
+        "matchedDimensions": "Eşleşen Boyutlar (Kararlı)",
+        "matchedDimensionsTooltip": "Bu boyutlar, bölme yeniden başlatmalarında tutarlı kalan ve ilgili telemetriyi eşleştirmek için kullanılan kararlı tanımlayıcılardır.",
+        "additionalDimensions": "Ek Boyutlar (Kararsız)",
+        "additionalDimensionsTooltip": "Bu boyutlar bölme yeniden başlatıldığında değişebilir (örn., pod_name, container_id). Aramayı genişletmek için bunları 'Tüm Değerler' olarak ayarlayabilirsiniz.",
+        "stableDimension": "Kararlı boyut",
+        "unstableDimension": "Kararsız - yeniden başlatmada değişiklikler",
+        "setToAll": "Tüm Değerlere Ayarla",
+        "showingAll": "Tüm Değerlerin Gösterilmesi",
+        "wildcardHelp": "Filtrelemede bu boyutu yok saymak için 'Tüm Değerler'i kullanın",
+        "noAdditionalDimensions": "Ek boyut mevcut değil"
+      },
+      "loading": "İlişkili günlükler yükleniyor...",
+      "loadingDetails": "İlişkili akışlardan günlükler alınıyor...",
+      "error": "Günlükler Yüklenemedi",
+      "noData": "İlişkili Günlükler Bulunamadı",
+      "noDataDetails": "Korelasyon filtreleriyle eşleşen günlük bulunamadı.",
+      "resetFilters": "Filtreleri Sıfırla",
+      "editFilters": "Filtreleri Düzenle",
+      "editTimeRange": "Zaman Aralığını Düzenle",
+      "selectValue": "Değer seç",
+      "stableDimension": "Kararlı boyut - bölme yeniden başlatmalarında tutarlı",
+      "unstableDimension": "Kararsız boyut - pod yeniden başlatıldığında değişebilir",
+      "resultsCount": "{count} günlükleri {stream} ({time} ms) içinde bulundu",
+      "timeRange": {
+        "title": "Zaman Aralığını Ayarla",
+        "sourceTime": "Kaynak Günlüğü Süresi",
+        "window": "Zaman Penceresi",
+        "minute1": "±1 dakika",
+        "minute5": "± 5 dakika (varsayılan)",
+        "minute15": "±15 dakika",
+        "minute30": "±30 dakika",
+        "hour1": "±1 saat",
+        "custom": "Özel",
+        "customStart": "Özel Başlangıç Zamanı",
+        "customEnd": "Özel Bitiş Zamanı",
+        "currentRange": "Geçerli Zaman Aralığı",
+        "start": "Başlat",
+        "end": "Bitiş",
+        "duration": "Süre",
+        "startBeforeEnd": "Başlangıç saati bitiş saatinden önce olmalıdır",
+        "endAfterStart": "Bitiş saati başlangıç saatinden sonra olmalıdır"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Uyarılarınız ve olaylarınız hakkında bana herhangi bir şey sorun",
@@ -2719,5 +2771,11 @@
     "contactSupport": "Destek ile iletişime geçin",
     "tryAgain": "Tekrar dene",
     "activationTimeout": "Aktivasyon zaman aşımı. Sorun devam ederse lütfen destek ekibiyle iletişime geçin."
+  },
+  "validation": {
+    "required": "Bu alan zorunludur",
+    "invalidFormat": "Geçersiz biçim",
+    "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
+    "mustBeLessThan": "{value} 'den küçük olmalıdır"
   }
 }

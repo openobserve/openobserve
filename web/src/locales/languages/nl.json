@@ -109,7 +109,9 @@
     "chunkLoadError": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "chunkLoadErrorMsg": "Er is een nieuwe versie van de applicatie beschikbaar. Vernieuw de pagina om verder te gaan.",
     "id": "ID",
-    "getStarted": "Ga aan de slag"
+    "getStarted": "Ga aan de slag",
+    "reset": "Resetten",
+    "retry": "Probeer het opnieuw"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -2676,7 +2678,57 @@
     "stable": "Stabiel",
     "stableTooltip": "Stabiele dimensies hebben een lage kardinaliteit en worden gebruikt voor de berekening van de correlatiesleutel",
     "normalize": "Normaliseer",
-    "noSemanticGroupsInCategory": "Geen semantische groepen in de categorie: {category}"
+    "noSemanticGroupsInCategory": "Geen semantische groepen in de categorie: {category}",
+    "correlatedLogsV2": "Logboeken V2",
+    "clickToLoadLogsV2": "Klik om gecorreleerde logboeken te laden (V2)",
+    "logs": {
+      "title": "Gecorreleerde logboeken",
+      "filters": {
+        "title": "Correlatiefilters bewerken",
+        "description": "Pas dimensiefilters aan om uw correlatiequery te verfijnen. Overeenkomende dimensies zijn stabiele identificatiegegevens, terwijl extra dimensies kunnen veranderen wanneer de pod opnieuw wordt gestart.",
+        "matchedDimensions": "Op elkaar afgestemde afmetingen (stabiel)",
+        "matchedDimensionsTooltip": "Deze dimensies zijn stabiele identificatiegegevens die consistent blijven bij het opnieuw opstarten van de pod en die worden gebruikt om gerelateerde telemetrie te evenaren.",
+        "additionalDimensions": "Aanvullende afmetingen (instabiel)",
+        "additionalDimensionsTooltip": "Deze dimensies kunnen veranderen wanneer de pod opnieuw wordt gestart (bijvoorbeeld pod_name, container_id). Je kunt ze instellen op 'Alle waarden' om de zoekopdracht te verbreden.",
+        "stableDimension": "Stabiele afmeting",
+        "unstableDimension": "Instabiel - wijzigingen bij herstart",
+        "setToAll": "Op alle waarden instellen",
+        "showingAll": "Alle waarden weergeven",
+        "wildcardHelp": "Gebruik 'Alle waarden' om deze dimensie bij het filteren te negeren",
+        "noAdditionalDimensions": "Geen extra afmetingen beschikbaar"
+      },
+      "loading": "Gecorreleerde logboeken worden geladen...",
+      "loadingDetails": "Logboeken ophalen van gecorreleerde streams...",
+      "error": "Het laden van logboeken is mislukt",
+      "noData": "Geen gecorreleerde logboeken gevonden",
+      "noDataDetails": "Geen logboeken gevonden die overeenkomen met de correlatiefilters.",
+      "resetFilters": "Filters opnieuw instellen",
+      "editFilters": "Filters bewerken",
+      "editTimeRange": "Tijdbereik bewerken",
+      "selectValue": "Selecteer een waarde",
+      "stableDimension": "Stabiele dimensie - consistent bij het opnieuw opstarten van de pod",
+      "unstableDimension": "Instabiele dimensie - kan veranderen wanneer de pod opnieuw wordt opgestart",
+      "resultsCount": "{count} logboeken gevonden in {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Tijdbereik aanpassen",
+        "sourceTime": "Logtijd van de bron",
+        "window": "Tijdvenster",
+        "minute1": "±1 minuut",
+        "minute5": "± 5 minuten (standaard)",
+        "minute15": "±15 minuten",
+        "minute30": "±30 minuten",
+        "hour1": "±1 uur",
+        "custom": "Op maat",
+        "customStart": "Aangepaste starttijd",
+        "customEnd": "Aangepaste eindtijd",
+        "currentRange": "Huidig tijdbereik",
+        "start": "Begin",
+        "end": "Einde",
+        "duration": "Duur",
+        "startBeforeEnd": "De starttijd moet vóór de eindtijd liggen",
+        "endAfterStart": "De eindtijd moet na de starttijd liggen"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
@@ -2719,5 +2771,11 @@
     "contactSupport": "Contact opnemen met de klantenservice",
     "tryAgain": "Probeer het opnieuw",
     "activationTimeout": "Time-out voor activering. Neem contact op met de klantenservice als het probleem zich blijft voordoen."
+  },
+  "validation": {
+    "required": "Dit veld is verplicht",
+    "invalidFormat": "Ongeldig formaat",
+    "mustBeGreaterThan": "Moet groter zijn dan {value}",
+    "mustBeLessThan": "Moet kleiner zijn dan {value}"
   }
 }

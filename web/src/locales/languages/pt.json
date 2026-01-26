@@ -109,7 +109,9 @@
     "chunkLoadError": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "chunkLoadErrorMsg": "Uma nova versão do aplicativo está disponível. Atualize a página para continuar.",
     "id": "CARTEIRA DE IDENTIDADE",
-    "getStarted": "Comece"
+    "getStarted": "Comece",
+    "reset": "Redefinir",
+    "retry": "Tente novamente"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -2676,7 +2678,57 @@
     "stable": "Estável",
     "stableTooltip": "As dimensões estáveis têm baixa cardinalidade e são usadas para o cálculo da chave de correlação.",
     "normalize": "Normalizar",
-    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}"
+    "noSemanticGroupsInCategory": "Não há grupos semânticos na categoria: {category}",
+    "correlatedLogsV2": "Registros V2",
+    "clickToLoadLogsV2": "Clique para carregar registros correlacionados (V2)",
+    "logs": {
+      "title": "Registros correlacionados",
+      "filters": {
+        "title": "Editar filtros de correlação",
+        "description": "Ajuste os filtros de dimensão para refinar sua consulta de correlação. As dimensões correspondentes são identificadores estáveis, enquanto dimensões adicionais podem mudar na reinicialização do pod.",
+        "matchedDimensions": "Dimensões combinadas (estáveis)",
+        "matchedDimensionsTooltip": "Essas dimensões são identificadores estáveis que permanecem consistentes nas reinicializações do pod e são usadas para corresponder à telemetria relacionada.",
+        "additionalDimensions": "Dimensões adicionais (instáveis)",
+        "additionalDimensionsTooltip": "Essas dimensões podem mudar na reinicialização do pod (por exemplo, pod_name, container_id). Você pode configurá-los como “Todos os valores” para ampliar a pesquisa.",
+        "stableDimension": "Dimensão estável",
+        "unstableDimension": "Instável - alterações na reinicialização",
+        "setToAll": "Definir para todos os valores",
+        "showingAll": "Mostrando todos os valores",
+        "wildcardHelp": "Use 'Todos os valores' para ignorar essa dimensão na filtragem",
+        "noAdditionalDimensions": "Não há dimensões adicionais disponíveis"
+      },
+      "loading": "Carregando registros correlacionados...",
+      "loadingDetails": "Buscando registros de fluxos correlacionados...",
+      "error": "Falha ao carregar registros",
+      "noData": "Nenhum registro correlacionado encontrado",
+      "noDataDetails": "Nenhum registro encontrado que corresponda aos filtros de correlação.",
+      "resetFilters": "Redefinir filtros",
+      "editFilters": "Editar filtros",
+      "editTimeRange": "Editar intervalo de tempo",
+      "selectValue": "Selecione o valor",
+      "stableDimension": "Dimensão estável - consistente nas reinicializações do pod",
+      "unstableDimension": "Dimensão instável - pode mudar na reinicialização do pod",
+      "resultsCount": "{count} registros encontrados em {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Ajuste o intervalo de tempo",
+        "sourceTime": "Hora do registro de origem",
+        "window": "Janela de tempo",
+        "minute1": "±1 minuto",
+        "minute5": "±5 minutos (padrão)",
+        "minute15": "±15 minutos",
+        "minute30": "±30 minutos",
+        "hour1": "±1 hora",
+        "custom": "Personalizado",
+        "customStart": "Horário de início personalizado",
+        "customEnd": "Horário de término personalizado",
+        "currentRange": "Intervalo de tempo atual",
+        "start": "Iniciar",
+        "end": "Fim",
+        "duration": "Duração",
+        "startBeforeEnd": "A hora de início deve ser antes da hora de término",
+        "endAfterStart": "A hora de término deve ser após a hora de início"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
@@ -2719,5 +2771,11 @@
     "contactSupport": "Contate o suporte",
     "tryAgain": "Tente novamente",
     "activationTimeout": "Tempo limite de ativação. Entre em contato com o suporte se o problema persistir."
+  },
+  "validation": {
+    "required": "Este campo é obrigatório",
+    "invalidFormat": "Formato inválido",
+    "mustBeGreaterThan": "Deve ser maior que {value}",
+    "mustBeLessThan": "Deve ser menor que {value}"
   }
 }

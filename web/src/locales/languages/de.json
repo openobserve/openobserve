@@ -109,7 +109,9 @@
     "chunkLoadError": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "chunkLoadErrorMsg": "Eine neue Version der Anwendung ist verfügbar. Bitte aktualisieren Sie die Seite, um fortzufahren.",
     "id": "ID",
-    "getStarted": "Fangen Sie an"
+    "getStarted": "Fangen Sie an",
+    "reset": "Zurücksetzen",
+    "retry": "Erneut versuchen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -2676,7 +2678,57 @@
     "stable": "Stabil",
     "stableTooltip": "Stabile Dimensionen haben eine niedrige Kardinalität und werden für die Berechnung von Korrelationsschlüsseln verwendet.",
     "normalize": "Normalisieren",
-    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}"
+    "noSemanticGroupsInCategory": "Keine semantischen Gruppen in der Kategorie: {category}",
+    "correlatedLogsV2": "Protokolle V2",
+    "clickToLoadLogsV2": "Klicken Sie hier, um korrelierte Protokolle zu laden (V2)",
+    "logs": {
+      "title": "Korrelierte Protokolle",
+      "filters": {
+        "title": "Korrelationsfilter bearbeiten",
+        "description": "Passen Sie Dimensionsfilter an, um Ihre Korrelationsabfrage zu verfeinern. Übereinstimmende Dimensionen sind stabile Identifikatoren, während sich zusätzliche Dimensionen bei Pod-Neustarts ändern können.",
+        "matchedDimensions": "Passende Abmessungen (stabil)",
+        "matchedDimensionsTooltip": "Bei diesen Dimensionen handelt es sich um stabile Identifikatoren, die bei Pod-Neustarts konsistent bleiben und verwendet werden, um die entsprechenden Telemetriedaten abzugleichen.",
+        "additionalDimensions": "Zusätzliche Abmessungen (instabil)",
+        "additionalDimensionsTooltip": "Diese Dimensionen können sich bei Pod-Neustarts ändern (z. B. pod_name, container_id). Sie können sie auf „Alle Werte“ setzen, um die Suche zu erweitern.",
+        "stableDimension": "Stabile Abmessung",
+        "unstableDimension": "Instabil — Änderungen beim Neustart",
+        "setToAll": "Auf alle Werte setzen",
+        "showingAll": "Alle Werte anzeigen",
+        "wildcardHelp": "Verwenden Sie „Alle Werte“, um diese Dimension beim Filtern zu ignorieren",
+        "noAdditionalDimensions": "Keine zusätzlichen Abmessungen verfügbar"
+      },
+      "loading": "Korrelierte Protokolle werden geladen...",
+      "loadingDetails": "Logs aus korrelierten Streams werden abgerufen...",
+      "error": "Protokolle konnten nicht geladen werden",
+      "noData": "Keine korrelierten Protokolle gefunden",
+      "noDataDetails": "Es wurden keine Protokolle gefunden, die den Korrelationsfiltern entsprechen.",
+      "resetFilters": "Filter zurücksetzen",
+      "editFilters": "Filter bearbeiten",
+      "editTimeRange": "Zeitbereich bearbeiten",
+      "selectValue": "Wählen Sie einen Wert",
+      "stableDimension": "Stabile Dimension — konsistent bei Pod-Neustarts",
+      "unstableDimension": "Instabile Dimension — kann sich beim Neustart des Pods ändern",
+      "resultsCount": "{count} Logs gefunden in {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Zeitbereich anpassen",
+        "sourceTime": "Zeit des Quellprotokolls",
+        "window": "Zeitfenster",
+        "minute1": "±1 Minute",
+        "minute5": "±5 Minuten (Standard)",
+        "minute15": "±15 Minuten",
+        "minute30": "±30 Minuten",
+        "hour1": "±1 Stunde",
+        "custom": "Benutzerdefiniert",
+        "customStart": "Benutzerdefinierte Startzeit",
+        "customEnd": "Benutzerdefinierte Endzeit",
+        "currentRange": "Aktueller Zeitbereich",
+        "start": "Starten",
+        "end": "Ende",
+        "duration": "Dauer",
+        "startBeforeEnd": "Die Startzeit muss vor der Endzeit liegen",
+        "endAfterStart": "Die Endzeit muss nach der Startzeit liegen"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -2719,5 +2771,11 @@
     "contactSupport": "Support kontaktieren",
     "tryAgain": "Versuchen Sie es erneut",
     "activationTimeout": "Aktivierungs-Timeout. Bitte wenden Sie sich an den Support, falls das Problem weiterhin besteht."
+  },
+  "validation": {
+    "required": "Dieses Feld ist erforderlich",
+    "invalidFormat": "Ungültiges Format",
+    "mustBeGreaterThan": "Muss größer als {value} sein",
+    "mustBeLessThan": "Muss kleiner als {value} sein"
   }
 }
