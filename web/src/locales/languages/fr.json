@@ -109,7 +109,9 @@
     "chunkLoadError": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
     "chunkLoadErrorMsg": "Une nouvelle version de l'application est disponible. Veuillez actualiser la page pour continuer.",
     "id": "IDENTIFIANT",
-    "getStarted": "Commencez"
+    "getStarted": "Commencez",
+    "reset": "Réinitialiser",
+    "retry": "Réessayez"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -2676,7 +2678,57 @@
     "stable": "Stable",
     "stableTooltip": "Les dimensions stables ont une faible cardinalité et sont utilisées pour le calcul des clés de corrélation",
     "normalize": "Normaliser",
-    "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}"
+    "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}",
+    "correlatedLogsV2": "Journaux V2",
+    "clickToLoadLogsV2": "Cliquez pour charger les journaux corrélés (V2)",
+    "logs": {
+      "title": "Journaux corrélés",
+      "filters": {
+        "title": "Modifier les filtres de corrélation",
+        "description": "Ajustez les filtres dimensionnels pour affiner votre requête de corrélation. Les dimensions correspondantes sont des identifiants stables, tandis que les dimensions supplémentaires peuvent changer lors du redémarrage du pod.",
+        "matchedDimensions": "Dimensions assorties (stables)",
+        "matchedDimensionsTooltip": "Ces dimensions sont des identifiants stables qui restent cohérents lors des redémarrages des pods et sont utilisées pour correspondre à la télémétrie associée.",
+        "additionalDimensions": "Dimensions supplémentaires (instables)",
+        "additionalDimensionsTooltip": "Ces dimensions peuvent changer lors du redémarrage du pod (par exemple, pod_name, container_id). Vous pouvez les régler sur « Toutes les valeurs » pour élargir la recherche.",
+        "stableDimension": "Dimension stable",
+        "unstableDimension": "Instable : modifications au redémarrage",
+        "setToAll": "Régler sur toutes les valeurs",
+        "showingAll": "Afficher toutes les valeurs",
+        "wildcardHelp": "Utilisez « Toutes les valeurs » pour ignorer cette dimension lors du filtrage",
+        "noAdditionalDimensions": "Aucune autre dimension disponible"
+      },
+      "loading": "Chargement de journaux corrélés...",
+      "loadingDetails": "Récupération de journaux à partir de flux corrélés...",
+      "error": "Impossible de charger les journaux",
+      "noData": "Aucun journal corrélé n'a été trouvé",
+      "noDataDetails": "Aucun journal correspondant aux filtres de corrélation n'a été trouvé.",
+      "resetFilters": "Réinitialiser les filtres",
+      "editFilters": "Modifier les filtres",
+      "editTimeRange": "Modifier la plage horaire",
+      "selectValue": "Sélectionnez une valeur",
+      "stableDimension": "Dimension stable : constante lors des redémarrages des modules",
+      "unstableDimension": "Dimension instable : peut changer au redémarrage du pod",
+      "resultsCount": "{count} journaux trouvés dans {stream} ({time} ms)",
+      "timeRange": {
+        "title": "Ajuster la plage horaire",
+        "sourceTime": "Durée du journal de la source",
+        "window": "Fenêtre horaire",
+        "minute1": "±1 minute",
+        "minute5": "±5 minutes (par défaut)",
+        "minute15": "±15 minutes",
+        "minute30": "±30 minutes",
+        "hour1": "±1 heure",
+        "custom": "Personnalisé",
+        "customStart": "Heure de début personnalisée",
+        "customEnd": "Heure de fin personnalisée",
+        "currentRange": "Plage horaire actuelle",
+        "start": "Démarrer",
+        "end": "Fin",
+        "duration": "Durée",
+        "startBeforeEnd": "L'heure de début doit être antérieure à l'heure de fin",
+        "endAfterStart": "L'heure de fin doit être postérieure à l'heure de début"
+      }
+    }
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -2719,5 +2771,11 @@
     "contactSupport": "Contacter le service d'assistance",
     "tryAgain": "Essayez à nouveau",
     "activationTimeout": "Délai d'activation. Veuillez contacter le support si le problème persiste."
+  },
+  "validation": {
+    "required": "Ce champ est obligatoire",
+    "invalidFormat": "Format non valide",
+    "mustBeGreaterThan": "Doit être supérieur à {value}",
+    "mustBeLessThan": "Doit être inférieur à {value}"
   }
 }
