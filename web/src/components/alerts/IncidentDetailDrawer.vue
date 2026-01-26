@@ -260,20 +260,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Tab Content Container -->
       <div class="tw:flex tw:flex-1 tw:overflow-hidden">
-      <!-- AI Chat Panel (conditionally shown on the right) -->
-      <div
-        v-if="showAIChat"
-        class="ai-chat-panel tw:w-[380px] tw:flex-shrink-0 tw:flex tw:flex-col tw:overflow-hidden"
-        :class="store.state.theme === 'dark' ? 'tw:border-l tw:border-gray-700' : 'tw:border-l tw:border-gray-200'"
-        style="order: 3;"
-      >
-        <SREChat
-          context-type="incident"
-          :context-data="incidentContextData"
-          @close="closeAIChat"
-        />
-      </div>
-
       <!-- Left Column: Incident Details (only show on Overview and Incident Analysis tabs) -->
       <div v-if="activeTab === 'overview' || activeTab === 'incidentAnalysis'" class="incident-details-column tw:w-[400px] tw:flex-shrink-0 tw:flex tw:flex-col tw:h-full" style="order: 1;">
 
@@ -1163,7 +1149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed, PropType, nextTick } from "vue";
+import { defineComponent, ref, watch, computed, PropType, nextTick, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -1181,10 +1167,10 @@ import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
-import SREChat from "@/components/SREChat.vue";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
+import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1192,7 +1178,6 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
-    SREChat,
     IncidentTableOfContents,
     IncidentRCAAnalysis,
   },
@@ -1215,7 +1200,6 @@ export default defineComponent({
     const titleInputRef = ref<HTMLInputElement | null>(null);
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
-    const showAIChat = ref(false);
 
     // Tab management
     const activeTab = ref("overview");
@@ -1536,10 +1520,35 @@ export default defineComponent({
       { immediate: true }
     );
 
+    // Watch incident context and automatically register it for AI chat
+    watch(
+      incidentContextData,
+      (contextData) => {
+        if (contextData) {
+          const incidentProvider = createIncidentsContextProvider(contextData, store);
+          contextRegistry.register('incidents', incidentProvider);
+          contextRegistry.setActive('incidents');
+        } else {
+          contextRegistry.setActive('');
+        }
+      },
+      { immediate: true }
+    );
+
+    // Clean up incident context when component unmounts (user navigates away)
+    onUnmounted(() => {
+      contextRegistry.setActive('');
+      contextRegistry.unregister('incidents');
+    });
+
     const close = () => {
       // Clear correlation data when closing
       correlationData.value = null;
       correlationError.value = null;
+
+      // Clear incident context when explicitly closing
+      contextRegistry.setActive('');
+      contextRegistry.unregister('incidents');
 
       // Navigate back to incident list
       router.push({
@@ -2349,13 +2358,10 @@ export default defineComponent({
       }
     };
 
+    // openSREChat is no longer needed - context is auto-registered via watch
+    // Keeping function for backwards compatibility but it just opens the AI chat
     const openSREChat = () => {
-      // Toggle the chat panel within the incident detail page
-      showAIChat.value = !showAIChat.value;
-    };
-
-    const closeAIChat = () => {
-      showAIChat.value = false;
+      store.dispatch('setAiChatEnabled', true);
     };
 
     const getTimezone = () => {
@@ -2412,8 +2418,6 @@ export default defineComponent({
       saveTitleEdit,
       triggerRca,
       openSREChat,
-      closeAIChat,
-      showAIChat,
       scrollToSection,
       toggleSection,
       editableStatus,
