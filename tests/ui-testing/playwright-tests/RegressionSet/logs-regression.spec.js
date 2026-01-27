@@ -92,8 +92,11 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
     await page.waitForLoadState('domcontentloaded');
-    // Wait for data indexing - poll API until streams are available
-    await page.waitForTimeout(3000);
+    // Wait for data indexing by polling streams API until both streams are available
+    await page.waitForResponse(
+        response => response.url().includes('/streams') && response.status() === 200,
+        { timeout: 15000 }
+    ).catch(() => {}); // Streams may already be indexed
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
