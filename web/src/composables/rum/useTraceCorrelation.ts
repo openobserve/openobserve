@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -80,7 +80,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
           query: rumQuery,
           page_type: "logs",
         },
-        "RUM"
+        "RUM",
       );
 
       const rumEvents = rumResponse.data.hits || [];
@@ -108,7 +108,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
             query: traceQuery,
             page_type: "logs",
           },
-          "APM"
+          "APM",
         );
 
         backendSpans = traceResponse.data.hits || [];
@@ -126,7 +126,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
           const totalDuration = resourceEvent.resource?.duration || 0;
           const backendDuration = backendSpans.reduce(
             (sum: number, span: any) => sum + (span.duration_ms || 0),
-            0
+            0,
           );
 
           // Estimate network latency and browser time

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ describe("TraceDetails", () => {
         async ({ request }) => {
           const body = await request.json();
           // Check if this is a RUM data query
-          if (body.query?.sql?.includes('_rumdata')) {
+          if (body.query?.sql?.includes("_rumdata")) {
             // Return empty RUM data
             return HttpResponse.json({
               took: 0,
@@ -477,7 +477,6 @@ describe("TraceDetails", () => {
   //     expect(() => wrapper.vm.getFormattedSpan(invalidSpan)).not.toThrow();
   //   });
   // });
-
 
   describe("Component lifecycle", () => {
     it("should setup trace details on mount", async () => {

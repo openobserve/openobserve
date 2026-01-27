@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -70,12 +70,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="span-item q-ml-md">
               <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
               <q-icon name="circle" size="xs" color="green-6" class="q-mr-xs" />
-              <span class="text-grey-8">Browser SDK Span ({{ formatSpanId(spanId) }})</span>
+              <span class="text-grey-8"
+                >Browser SDK Span ({{ formatSpanId(spanId) }})</span
+              >
             </div>
             <div class="span-item q-ml-lg" v-if="backendSpanCount > 0">
               <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
-              <q-icon name="circle" size="xs" color="orange-6" class="q-mr-xs" />
-              <span class="text-grey-8">Backend Spans ({{ backendSpanCount }})</span>
+              <q-icon
+                name="circle"
+                size="xs"
+                color="orange-6"
+                class="q-mr-xs"
+              />
+              <span class="text-grey-8"
+                >Backend Spans ({{ backendSpanCount }})</span
+              >
             </div>
           </div>
         </div>
@@ -86,27 +95,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="performance-breakdown">
             <div class="row items-center q-mb-xs">
               <div class="col-5 text-grey-8">Total Duration:</div>
-              <div class="col-7 text-bold">{{ performanceData.total_duration_ms }}ms</div>
+              <div class="col-7 text-bold">
+                {{ performanceData.total_duration_ms }}ms
+              </div>
             </div>
-            <div class="row items-center q-mb-xs" v-if="performanceData.browser_duration_ms">
+            <div
+              class="row items-center q-mb-xs"
+              v-if="performanceData.browser_duration_ms"
+            >
               <div class="col-5 text-grey-8">Browser:</div>
               <div class="col-7">
                 {{ performanceData.browser_duration_ms }}ms
-                <span class="text-grey-6">({{ calculatePercentage(performanceData.browser_duration_ms, performanceData.total_duration_ms) }}%)</span>
+                <span class="text-grey-6"
+                  >({{
+                    calculatePercentage(
+                      performanceData.browser_duration_ms,
+                      performanceData.total_duration_ms,
+                    )
+                  }}%)</span
+                >
               </div>
             </div>
-            <div class="row items-center q-mb-xs" v-if="performanceData.network_latency_ms">
+            <div
+              class="row items-center q-mb-xs"
+              v-if="performanceData.network_latency_ms"
+            >
               <div class="col-5 text-grey-8">Network:</div>
               <div class="col-7">
                 {{ performanceData.network_latency_ms }}ms
-                <span class="text-grey-6">({{ calculatePercentage(performanceData.network_latency_ms, performanceData.total_duration_ms) }}%)</span>
+                <span class="text-grey-6"
+                  >({{
+                    calculatePercentage(
+                      performanceData.network_latency_ms,
+                      performanceData.total_duration_ms,
+                    )
+                  }}%)</span
+                >
               </div>
             </div>
-            <div class="row items-center q-mb-xs" v-if="performanceData.backend_duration_ms">
+            <div
+              class="row items-center q-mb-xs"
+              v-if="performanceData.backend_duration_ms"
+            >
               <div class="col-5 text-grey-8">Backend:</div>
               <div class="col-7">
                 {{ performanceData.backend_duration_ms }}ms
-                <span class="text-grey-6">({{ calculatePercentage(performanceData.backend_duration_ms, performanceData.total_duration_ms) }}%)</span>
+                <span class="text-grey-6"
+                  >({{
+                    calculatePercentage(
+                      performanceData.backend_duration_ms,
+                      performanceData.total_duration_ms,
+                    )
+                  }}%)</span
+                >
               </div>
             </div>
           </div>
@@ -127,7 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
           >
             <q-tooltip v-if="!hasBackendTrace">
-              Backend trace data not yet available. Trace data may take up to 30 seconds to be ingested.
+              Backend trace data not yet available. Trace data may take up to 30
+              seconds to be ingested.
             </q-tooltip>
           </q-btn>
           <q-btn
@@ -142,11 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Missing trace notice -->
-        <div v-if="!hasBackendTrace && traceId" class="q-mt-md q-pa-sm tw:bg-[var(--o2-hover-accent)] tw:rounded">
+        <div
+          v-if="!hasBackendTrace && traceId"
+          class="q-mt-md q-pa-sm tw:bg-[var(--o2-hover-accent)] tw:rounded"
+        >
           <div class="row items-center">
             <q-icon name="info" color="info" size="sm" class="q-mr-sm" />
             <div class="text-grey-8 text-caption">
-              Backend trace data not yet available. Trace data may take up to 30 seconds to be ingested.
+              Backend trace data not yet available. Trace data may take up to 30
+              seconds to be ingested.
             </div>
           </div>
         </div>
@@ -198,20 +244,27 @@ onMounted(() => {
   }
 });
 
-watch(() => props.traceId, (newTraceId) => {
-  if (newTraceId) {
-    fetchCorrelation();
-  }
-});
+watch(
+  () => props.traceId,
+  (newTraceId) => {
+    if (newTraceId) {
+      fetchCorrelation();
+    }
+  },
+);
 
 const formatTraceId = (id: string) => {
   if (!id) return "";
-  return id.length > 16 ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}` : id;
+  return id.length > 16
+    ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}`
+    : id;
 };
 
 const formatSpanId = (id: string) => {
   if (!id) return "";
-  return id.length > 12 ? `${id.substring(0, 6)}...${id.substring(id.length - 6)}` : id;
+  return id.length > 12
+    ? `${id.substring(0, 6)}...${id.substring(id.length - 6)}`
+    : id;
 };
 
 const calculatePercentage = (value: number, total: number) => {

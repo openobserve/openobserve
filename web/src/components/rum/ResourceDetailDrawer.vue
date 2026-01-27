@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:h-full tw:flex tw:flex-col">
       <!-- Header -->
-      <div class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+      <div
+        class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
         <div class="flex justify-between items-center">
           <div class="text-bold text-h6">Resource Details</div>
           <q-btn
@@ -45,12 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Resource Header -->
           <div class="q-mb-md">
             <div class="text-bold text-subtitle1 q-mb-sm">
-              {{ resource.resource_method || 'GET' }} {{ resource.resource_url }}
+              {{ resource.resource_method || "GET" }}
+              {{ resource.resource_url }}
             </div>
             <div class="row items-center q-gutter-sm text-grey-7">
               <div class="row items-center">
                 <q-icon name="schedule" size="sm" class="q-mr-xs" />
-                <span>{{ formatTimestamp(resource[store.state.zoConfig.timestamp_column]) }}</span>
+                <span>{{
+                  formatTimestamp(
+                    resource[store.state.zoConfig.timestamp_column],
+                  )
+                }}</span>
               </div>
               <q-separator vertical />
               <div class="row items-center">
@@ -65,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   class="q-mr-xs"
                 />
-                <span>{{ resource.resource_status_code || 'N/A' }}</span>
+                <span>{{ resource.resource_status_code || "N/A" }}</span>
               </div>
             </div>
           </div>
@@ -74,7 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Resource Details -->
           <div class="q-mb-md">
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">Resource Information</div>
+            <div class="tags-title text-bold q-ml-xs q-mb-sm">
+              Resource Information
+            </div>
             <div class="resource-info-grid">
               <div class="info-row" v-if="resource.resource_type">
                 <div class="info-label">Type:</div>
@@ -82,16 +91,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="info-row" v-if="resource.resource_size">
                 <div class="info-label">Size:</div>
-                <div class="info-value">{{ formatBytes(resource.resource_size) }}</div>
+                <div class="info-value">
+                  {{ formatBytes(resource.resource_size) }}
+                </div>
               </div>
-              <div class="info-row" v-if="resource.resource_render_blocking_status">
+              <div
+                class="info-row"
+                v-if="resource.resource_render_blocking_status"
+              >
                 <div class="info-label">Render Blocking:</div>
-                <div class="info-value">{{ resource.resource_render_blocking_status }}</div>
+                <div class="info-value">
+                  {{ resource.resource_render_blocking_status }}
+                </div>
               </div>
               <div class="info-row" v-if="resource.session?.id">
                 <div class="info-label">Session ID:</div>
                 <div class="info-value">
-                  <code class="session-id-text">{{ formatSessionId(resource.session.id) }}</code>
+                  <code class="session-id-text">{{
+                    formatSessionId(resource.session.id)
+                  }}</code>
                 </div>
               </div>
               <div class="info-row" v-if="resource.view?.url">
@@ -115,20 +133,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- No Trace ID Notice -->
-          <div v-else class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded">
+          <div
+            v-else
+            class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
+          >
             <q-icon name="info" color="info" size="md" class="q-mb-sm" />
             <div class="text-grey-7">
               No trace information available for this resource.
             </div>
             <div class="text-caption text-grey-6 q-mt-xs">
-              Trace correlation requires browser SDK v0.3.3+ with trace propagation enabled.
+              Trace correlation requires browser SDK v0.3.3+ with trace
+              propagation enabled.
             </div>
           </div>
 
           <!-- Session Context -->
           <div v-if="resource.session" class="q-mt-md">
             <q-separator class="q-my-md" />
-            <div class="tags-title text-bold q-ml-xs q-mb-sm">Session Context</div>
+            <div class="tags-title text-bold q-ml-xs q-mb-sm">
+              Session Context
+            </div>
             <div class="row q-gutter-sm">
               <q-btn
                 outline
@@ -186,7 +210,7 @@ watch(
   () => props.modelValue,
   (val) => {
     isOpen.value = val;
-  }
+  },
 );
 
 watch(isOpen, (val) => {
@@ -199,7 +223,10 @@ const closeDrawer = () => {
 
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "N/A";
-  return date.formatDate(Math.floor(timestamp / 1000), "MMM DD, YYYY HH:mm:ss.SSS Z");
+  return date.formatDate(
+    Math.floor(timestamp / 1000),
+    "MMM DD, YYYY HH:mm:ss.SSS Z",
+  );
 };
 
 const formatDuration = (duration: number) => {
@@ -224,7 +251,9 @@ const formatBytes = (bytes: number) => {
 
 const formatSessionId = (id: string) => {
   if (!id) return "";
-  return id.length > 16 ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}` : id;
+  return id.length > 16
+    ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}`
+    : id;
 };
 
 const getStatusIcon = (statusCode: number) => {
