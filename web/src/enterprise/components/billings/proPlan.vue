@@ -141,7 +141,7 @@ export default defineComponent({
       { name: '15-Days Retention', price: 'Included' , is_parent: false},
       { name: 'Additional Retention', price: '$0.10 / 30 days' , is_parent: false},
       
-      { name: 'Action Script', price: '$1.00 / 1K runs' , is_parent: true},
+      // { name: 'Action Script', price: '$1.00 / 1K runs' , is_parent: true},
       { name: 'Unlimited Users', price: '' , is_parent: true},
       { name: 'Role-Based Access Control (RBAC)', price: '' , is_parent: true},
       
