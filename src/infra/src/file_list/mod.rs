@@ -329,13 +329,19 @@ pub async fn query(
     {
         Ok(cached_files) => {
             // Cache hit! (even if empty result)
+            // Report cache hit count (metric has no labels, just set the count)
             config::metrics::FILE_LIST_CACHE_HIT_COUNT
-                .with_label_values(&[org_id, &stream_type.to_string(), stream_name, "query"])
-                .inc();
+                .with_label_values(&[])
+                .set(cached_files.len() as i64);
 
             log::debug!(
                 "[file_list] cache HIT for query: org={}, stream_type={}, stream={}, time_level={:?}, time_range={:?}, count={}",
-                org_id, stream_type, stream_name, time_level, time_range, cached_files.len()
+                org_id,
+                stream_type,
+                stream_name,
+                time_level,
+                time_range,
+                cached_files.len()
             );
             Ok(cached_files)
         }
@@ -343,7 +349,11 @@ pub async fn query(
             // Cache miss - query from primary database
             log::debug!(
                 "[file_list] cache MISS for query: org={}, stream_type={}, stream={}, time_level={:?}, time_range={:?}",
-                org_id, stream_type, stream_name, time_level, time_range
+                org_id,
+                stream_type,
+                stream_name,
+                time_level,
+                time_range
             );
 
             CLIENT
@@ -420,13 +430,18 @@ pub async fn query_ids(
     {
         Ok(cached_ids) => {
             // Cache hit! (even if empty result)
+            // Report cache hit count (metric has no labels, just set the count)
             config::metrics::FILE_LIST_CACHE_HIT_COUNT
-                .with_label_values(&[org_id, &stream_type.to_string(), stream_name, "query_ids"])
-                .inc();
+                .with_label_values(&[])
+                .set(cached_ids.len() as i64);
 
             log::debug!(
                 "[file_list] cache HIT for query_ids: org={}, stream_type={}, stream={}, time_range={:?}, count={}",
-                org_id, stream_type, stream_name, time_range, cached_ids.len()
+                org_id,
+                stream_type,
+                stream_name,
+                time_range,
+                cached_ids.len()
             );
             Ok(cached_ids)
         }
@@ -434,7 +449,10 @@ pub async fn query_ids(
             // Cache miss - query from primary database
             log::debug!(
                 "[file_list] cache MISS for query_ids: org={}, stream_type={}, stream={}, time_range={:?}",
-                org_id, stream_type, stream_name, time_range
+                org_id,
+                stream_type,
+                stream_name,
+                time_range
             );
 
             CLIENT
@@ -870,8 +888,9 @@ pub struct FileIdWithFile {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use config::meta::stream::{FileMeta, StreamType};
+
+    use super::*;
 
     // Mock test to verify cache-first logic exists
     // Integration tests should validate actual cache behavior
