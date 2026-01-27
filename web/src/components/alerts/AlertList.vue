@@ -2583,14 +2583,6 @@ export default defineComponent({
     confirmBulkDelete.value = false;
   };
 
-    const openSREChat = (alert?: any) => {
-      store.state.sreChatContext = {
-        type: 'alert',
-        data: alert || null,
-      };
-      store.dispatch("setIsSREChatOpen", true);
-    };
-
     return {
       t,
       qTable,
@@ -2711,7 +2703,6 @@ export default defineComponent({
       bulkDeleteAlerts,
       confirmBulkDelete,
       symOutlinedSoundSampler,
-      openSREChat,
       config,
     };
   },

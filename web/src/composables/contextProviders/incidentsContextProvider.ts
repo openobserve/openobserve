@@ -52,20 +52,6 @@ export const createIncidentsContextProvider = (
         last_alert_at: incidentData?.last_alert_at,
       };
 
-      // Add optional fields if they exist
-      if (incidentData?.stable_dimensions) {
-        context.stable_dimensions = incidentData.stable_dimensions;
-      }
-      if (incidentData?.topology_context) {
-        context.topology_context = incidentData.topology_context;
-      }
-      if (incidentData?.triggers) {
-        context.triggers = incidentData.triggers;
-      }
-      if (incidentData?.rca_analysis) {
-        context.rca_analysis = incidentData.rca_analysis;
-      }
-
       return context;
     }
   };

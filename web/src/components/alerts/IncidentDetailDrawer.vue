@@ -1465,7 +1465,6 @@ export default defineComponent({
     });
 
     const loadDetails = async (incidentId: string) => {
-      console.log('[LOAD DETAILS] Called with incident ID:', incidentId)
       loading.value = true;
 
       // Reset correlation state when loading new incident
@@ -1474,10 +1473,8 @@ export default defineComponent({
 
       try {
         const org = store.state.selectedOrganization.identifier;
-        console.log('[LOAD DETAILS] Fetching incident from API...')
         const response = await incidentsService.get(org, incidentId);
 
-        console.log('[LOAD DETAILS] API Response:', response.data)
         incidentDetails.value = response.data;
         triggers.value = (response.data as any).triggers || [];
         alerts.value = response.data.alerts || [];
@@ -1485,7 +1482,6 @@ export default defineComponent({
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
         editableSeverity.value = response.data.severity;
-        console.log('[LOAD DETAILS] Incident loaded, status:', response.data.status)
       } catch (error) {
         console.error("Failed to load incident details:", error);
         $q.notify({
@@ -1562,29 +1558,22 @@ export default defineComponent({
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
-      console.log('[UPDATE STATUS] Starting update, newStatus:', newStatus)
       try {
         const org = store.state.selectedOrganization.identifier;
-        console.log('[UPDATE STATUS] Making API call...')
         const response = await incidentsService.updateStatus(
           org,
           incidentDetails.value.id,
           newStatus
         );
-        console.log('[UPDATE STATUS] API Response:', response.data)
-        console.log('[UPDATE STATUS] Response status field:', response.data.status)
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
-        console.log('[UPDATE STATUS] Local state updated, new status:', incidentDetails.value.status)
         $q.notify({
           type: "positive",
           message: t("alerts.incidents.statusUpdated"),
         });
-        console.log('[UPDATE STATUS] Emitting status-updated event')
         emit("status-updated");
-        console.log('[UPDATE STATUS] Update complete!')
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         $q.notify({
@@ -2358,12 +2347,6 @@ export default defineComponent({
       }
     };
 
-    // openSREChat is no longer needed - context is auto-registered via watch
-    // Keeping function for backwards compatibility but it just opens the AI chat
-    const openSREChat = () => {
-      store.dispatch('setAiChatEnabled', true);
-    };
-
     const getTimezone = () => {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
     };
@@ -2417,7 +2400,6 @@ export default defineComponent({
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,
-      openSREChat,
       scrollToSection,
       toggleSection,
       editableStatus,
