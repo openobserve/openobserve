@@ -267,6 +267,33 @@ async fn get_parquet_metadata(
     let info = head(account, file).await?;
     let file_size = info.size;
 
+    // Check if speculative read optimization is enabled
+    // Only apply on querier nodes with ZO_CACHE_LATEST_FILES=true
+    let cfg = get_config();
+    let use_speculative_read = cfg.common.cache_latest_files && config::cluster::LOCAL_NODE.is_querier();
+
+    if !use_speculative_read {
+        // Skip optimization - use traditional two-step approach:
+        // Step 1: Read footer (8 bytes) to get metadata length
+        let footer_len = parquet::file::FOOTER_SIZE as u64; // 8 bytes
+        let footer_start = file_size - footer_len;
+        let footer_data = get_range(account, file, footer_start..file_size).await?;
+
+        let mut footer_buf = [0_u8; 8];
+        footer_buf.copy_from_slice(&footer_data.chunk()[..8]);
+        let metadata_len = FooterTail::try_from(footer_buf).map(|f| f.metadata_length())? as u64;
+
+        // Step 2: Read metadata with exact length
+        let meta_start = file_size - footer_len - metadata_len;
+        let meta_end = file_size - footer_len;
+        let meta_data = get_range(account, file, meta_start..meta_end).await?;
+
+        return Ok((
+            file_size as usize,
+            Arc::new(ParquetMetaDataReader::decode_metadata(&meta_data)?),
+        ));
+    }
+
     // 2. Define Optimization Strategy
     // For 1-2GB files, metadata often exceeds 64KB if row groups are small.
     // We bump this to 256KB to ensure we hit the "Happy Path" more often.

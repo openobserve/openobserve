@@ -1269,6 +1269,12 @@ pub struct Common {
         help = "enable ingestion error logs reporting"
     )]
     pub ingestion_log_enabled: bool,
+    #[env_config(
+        name = "ZO_CACHE_LATEST_FILES",
+        default = true,
+        help = "Enable caching optimizations for latest files (querier nodes only)"
+    )]
+    pub cache_latest_files: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
