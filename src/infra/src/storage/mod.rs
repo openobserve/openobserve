@@ -249,6 +249,10 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     Ok(())
 }
 
+/// Get file metadata from parquet file stored in object storage.
+///
+/// **Note**: This function is primarily used by CLI commands (e.g., `recover-file-list`)
+/// to load remote files into the database. It is not used in the hot query path.
 pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {
     let mut file_meta = FileMeta::default();
     let (file_size, parquet_meta) = get_parquet_metadata(account, file).await?;
@@ -259,6 +263,15 @@ pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow
     Ok(file_meta)
 }
 
+/// Read parquet metadata from object storage.
+///
+/// **Usage**: This function is only used by CLI commands (e.g., `recover-file-list`
+/// via `get_file_meta`) to recover file metadata when loading remote files to the database.
+/// It is NOT used in the query hot path.
+///
+/// **Optimization**: When `ZO_CACHE_LATEST_FILES=true` AND running on a querier node,
+/// uses speculative read (256KB) to potentially read footer + metadata in one request.
+/// Otherwise, uses traditional two-step approach (footer first, then metadata).
 async fn get_parquet_metadata(
     account: &str,
     file: &str,
