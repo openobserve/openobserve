@@ -82,7 +82,11 @@ fn create_sourcemaps_table_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(SourceMaps::IsLocal).boolean().not_null())
+        .col(
+            ColumnDef::new(SourceMaps::Cluster)
+                .string_len(250)
+                .not_null(),
+        )
         .to_owned()
 }
 
@@ -115,7 +119,7 @@ enum SourceMaps {
     FileStoreId,
     FileType,
     CreatedAt,
-    IsLocal,
+    Cluster,
 }
 
 #[cfg(test)]

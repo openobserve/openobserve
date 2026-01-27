@@ -39,7 +39,7 @@ pub struct SourceMap {
     pub file_store_id: String,
     pub file_type: FileType,
     pub created_at: i64,
-    pub is_local: bool,
+    pub cluster: String,
 }
 
 impl From<Model> for SourceMap {
@@ -54,7 +54,7 @@ impl From<Model> for SourceMap {
             source_map_file_name: value.source_map_file_name,
             file_store_id: value.file_store_id,
             file_type: value.file_type.into(),
-            is_local: value.is_local,
+            cluster: value.cluster,
             created_at: value.created_at,
         }
     }
@@ -89,7 +89,7 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
             source_map_file_name: Set(entry.source_map_file_name),
             file_store_id: Set(entry.file_store_id),
             file_type: Set(entry.file_type.into()),
-            is_local: Set(entry.is_local),
+            cluster: Set(entry.cluster),
             created_at: Set(entry.created_at),
             ..Default::default()
         })

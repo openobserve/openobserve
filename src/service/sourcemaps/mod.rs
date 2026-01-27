@@ -1,6 +1,7 @@
 use std::io::Read;
 
 use anyhow::Context;
+use config::get_config;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     storage,
@@ -79,6 +80,8 @@ pub async fn process_zip(
     version: Option<String>,
     file_data: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+
     // Attempt to read the uploaded data as a ZIP file
     let mut archive = match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => archive,
@@ -164,7 +167,7 @@ pub async fn process_zip(
             source_map_file_name: smap,
             file_store_id: storage_name,
             file_type: FileType::SourceMap,
-            is_local: true,
+            cluster: cfg.common.cluster_name.clone(),
             created_at: now,
         };
         source_maps.push(sourcemap);
