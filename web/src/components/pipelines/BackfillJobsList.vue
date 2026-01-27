@@ -296,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <BackfillJobDetails
       v-model="showDetailsDialog"
       :job-id="selectedJobId"
+      :pipeline-id="selectedPipelineId"
       @job-canceled="onJobCanceled"
     />
 
@@ -345,26 +346,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
-    <!-- Confirm Dialogs -->
+    <!-- Confirm Dialog -->
     <ConfirmDialog
-      ref="confirmPauseDialogRef"
-      title="Pause Backfill Job"
-      :message="`Are you sure you want to pause the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;? You can resume it later.`"
-      @confirm="pauseJob(selectedJobForAction!.job_id)"
-    />
-
-    <ConfirmDialog
-      ref="confirmResumeDialogRef"
-      title="Resume Backfill Job"
-      :message="`Are you sure you want to resume the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;?`"
-      @confirm="resumeJob(selectedJobForAction!.job_id)"
-    />
-
-    <ConfirmDialog
-      ref="confirmDeleteDialogRef"
-      title="Delete Backfill Job"
-      :message="`Are you sure you want to delete the backfill job for &quot;${selectedJobForAction?.pipeline_name || selectedJobForAction?.pipeline_id}&quot;? This will remove the job from the list but will not affect the backfilled data.`"
-      @confirm="deleteJob(selectedJobForAction!.job_id)"
+      v-model="confirmDialog.show"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      @update:ok="confirmDialog.onConfirm"
+      @update:cancel="resetConfirmDialog"
     />
   </q-page>
 </template>
@@ -380,6 +368,7 @@ import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";
 import QTablePagination from "../shared/grid/Pagination.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import { timestampToTimezoneDate } from "../../utils/zincutils";
 
 const router = useRouter();
 const $q = useQuasar();
@@ -392,16 +381,19 @@ const loading = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
+const selectedPipelineId = ref("");
 const showEditDialog = ref(false);
 const selectedJob = ref<BackfillJob | null>(null);
 const errorDialogVisible = ref(false);
 const errorDialogData = ref<BackfillJob | null>(null);
 
-// Confirm dialogs
-const confirmPauseDialogRef = ref();
-const confirmResumeDialogRef = ref();
-const confirmDeleteDialogRef = ref();
-const selectedJobForAction = ref<BackfillJob | null>(null);
+// Confirm dialog
+const confirmDialog = ref({
+  show: false,
+  title: "",
+  message: "",
+  onConfirm: () => {},
+});
 
 const filters = ref({
   status: null as string | null,
@@ -564,6 +556,7 @@ const goBack = () => {
 
 const viewJob = (job: BackfillJob) => {
   selectedJobId.value = job.job_id;
+  selectedPipelineId.value = job.pipeline_id;
   showDetailsDialog.value = true;
 };
 
@@ -592,25 +585,47 @@ const canDeleteJob = (status: string) => {
   return status === "completed" || status === "failed" || status === "canceled" || status === "paused";
 };
 
+const resetConfirmDialog = () => {
+  confirmDialog.value = {
+    show: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  };
+};
+
 const confirmPauseJob = (job: BackfillJob) => {
-  selectedJobForAction.value = job;
-  confirmPauseDialogRef.value.show();
+  confirmDialog.value = {
+    show: true,
+    title: "Pause Backfill Job",
+    message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
+    onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
+  };
 };
 
 const confirmResumeJob = (job: BackfillJob) => {
-  selectedJobForAction.value = job;
-  confirmResumeDialogRef.value.show();
+  confirmDialog.value = {
+    show: true,
+    title: "Resume Backfill Job",
+    message: `Are you sure you want to resume the backfill job for "${job.pipeline_name || job.pipeline_id}"?`,
+    onConfirm: () => resumeJob(job.pipeline_id, job.job_id),
+  };
 };
 
 const confirmDeleteJob = (job: BackfillJob) => {
-  selectedJobForAction.value = job;
-  confirmDeleteDialogRef.value.show();
+  confirmDialog.value = {
+    show: true,
+    title: "Delete Backfill Job",
+    message: `Are you sure you want to delete the backfill job for "${job.pipeline_name || job.pipeline_id}"? This will remove the job from the list but will not affect the backfilled data.`,
+    onConfirm: () => deleteJob(job.pipeline_id, job.job_id),
+  };
 };
 
-const pauseJob = async (jobId: string) => {
+const pauseJob = async (pipelineId: string, jobId: string) => {
   try {
     await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: pipelineId,
       job_id: jobId,
       enable: false,
     });
@@ -632,10 +647,11 @@ const pauseJob = async (jobId: string) => {
   }
 };
 
-const resumeJob = async (jobId: string) => {
+const resumeJob = async (pipelineId: string, jobId: string) => {
   try {
     await backfillService.enableBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: pipelineId,
       job_id: jobId,
       enable: true,
     });
@@ -657,10 +673,11 @@ const resumeJob = async (jobId: string) => {
   }
 };
 
-const deleteJob = async (jobId: string) => {
+const deleteJob = async (pipelineId: string, jobId: string) => {
   try {
     await backfillService.deleteBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
+      pipeline_id: pipelineId,
       job_id: jobId,
     });
 
@@ -704,9 +721,11 @@ const getProgressColor = (deletionStatus?: any) => {
 };
 
 const formatTimeRange = (startTime: number, endTime: number) => {
-  const start = new Date(startTime / 1000); // Convert from microseconds
-  const end = new Date(endTime / 1000);
-  return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Convert from microseconds to milliseconds
+  const start = timestampToTimezoneDate(startTime / 1000, userTimezone, "MMM dd, yyyy");
+  const end = timestampToTimezoneDate(endTime / 1000, userTimezone, "MMM dd, yyyy");
+  return `${start} - ${end}`;
 };
 
 const formatTimestamp = (timestamp?: number) => {
