@@ -1389,7 +1389,14 @@
     "folders": "文件夹",
     "searchFolder": "搜索文件夹",
     "deleteFolder": "删除文件夹",
-    "deleteFolderMessage": "确定要删除此文件夹吗？"
+    "deleteFolderMessage": "确定要删除此文件夹吗？",
+    "columnOrder": "列顺序",
+    "configureColumnOrder": "配置列顺序",
+    "columnOrderDescription": "自定义表格中各列的显示顺序。只能对可见列（基于可见/隐藏的过滤器）进行重新排序。拖动列以更改其顺序。",
+    "noColumnsOrdered": "未订购任何列",
+    "columnsDefaultOrder": "列将按其默认顺序显示",
+    "moveUp": "向上移动",
+    "moveDown": "向下移动"
   },
   "panel": {
     "header": "面板",

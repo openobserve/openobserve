@@ -51,9 +51,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, defineAsyncComponent } from "vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
-import QueryEditor from "@/components/CodeQueryEditor.vue";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import axios from "axios";
 import { useI18n } from "vue-i18n";
 

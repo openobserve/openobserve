@@ -31,6 +31,7 @@ pub struct BackfillJobStatus {
     pub current_position: i64,
     pub progress_percent: u8,
     pub status: String,
+    pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deletion_status: Option<DeletionStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,6 +238,7 @@ pub async fn create_backfill_job(
         delay_between_chunks_secs,
         delete_before_backfill,
         created_at: now,
+        enabled: true, // Enable by default when creating
     };
 
     db::backfill::add(backfill_job_config).await?;
@@ -290,7 +292,7 @@ pub async fn create_backfill_job(
 /// Static config is passed as parameter, dynamic state comes from BackfillJob
 async fn create_backfill_job_status(
     config: &db::backfill::BackfillJob,
-    trigger_status: db::scheduler::TriggerStatus,
+    _trigger_status: db::scheduler::TriggerStatus,
     trigger_start_time: Option<i64>,
     backfill_job: &BackfillJob,
     created_at: Option<i64>,
@@ -320,14 +322,19 @@ async fn create_backfill_job_status(
         (backfill_job.current_position - config.start_time) / (60 * 1_000_000);
     let chunks_completed = (completed_duration_minutes as f64 / chunk_period as f64).floor() as u64;
 
-    // Determine actual status: if trigger is Completed but job hasn't reached end_time,
-    // it's paused
-    let actual_status = if trigger_status == db::scheduler::TriggerStatus::Completed
-        && backfill_job.current_position < config.end_time
-    {
-        "paused".to_string()
+    // Determine actual status based on enabled flag and progress
+    let actual_status = if backfill_job.error.is_some() {
+        // If there's an error, status is failed
+        "failed".to_string()
+    } else if backfill_job.current_position >= config.end_time {
+        // If completed the full range, status is completed
+        "completed".to_string()
+    } else if config.enabled {
+        // If enabled and not completed, status is running
+        "running".to_string()
     } else {
-        format!("{:?}", trigger_status).to_lowercase()
+        // If not enabled and not completed, status is paused
+        "paused".to_string()
     };
 
     Ok(BackfillJobStatus {
@@ -339,6 +346,7 @@ async fn create_backfill_job_status(
         current_position: backfill_job.current_position,
         progress_percent,
         status: actual_status,
+        enabled: config.enabled,
         deletion_status: Some(backfill_job.deletion_status.clone()),
         deletion_job_ids: if backfill_job.deletion_job_ids.is_empty() {
             None
@@ -493,76 +501,16 @@ pub async fn enable_backfill_job(
     job_id: &str,
     enable: bool,
 ) -> Result<(), anyhow::Error> {
-    if enable {
-        // Resume/Enable the job
-        // Fetch static config from backfill_jobs table
-        let config = db::backfill::get(org_id, job_id).await?;
+    log::info!(
+        "[BACKFILL] {} backfill job {} in org {}",
+        if enable { "Enabling" } else { "Disabling" },
+        job_id,
+        org_id
+    );
 
-        // Fetch the trigger using module_key (which is the job_id)
-        let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
+    // Simply update the enabled field in the backfill_jobs table
+    db::backfill::update_enabled(org_id, job_id, enable).await?;
 
-        // Check if job is paused (Completed status but not actually finished)
-        if trigger.status != db::scheduler::TriggerStatus::Completed {
-            return Err(anyhow::anyhow!("Job is not paused"));
-        }
-
-        // Parse trigger data to get dynamic state
-        let trigger_data = ScheduledTriggerData::from_json_string(&trigger.data)?;
-        let backfill_job = trigger_data
-            .backfill_job
-            .ok_or_else(|| anyhow::anyhow!("Backfill job data not found in trigger"))?;
-
-        // Check if job is actually completed
-        if backfill_job.current_position >= config.end_time {
-            return Err(anyhow::anyhow!("Job is already completed"));
-        }
-
-        log::info!(
-            "[BACKFILL] Enabling backfill job {} in org {}",
-            job_id,
-            org_id
-        );
-
-        let now = Utc::now().timestamp_micros();
-        // Resume by setting status back to Waiting
-        db::scheduler::update_trigger(
-            db::scheduler::Trigger {
-                status: db::scheduler::TriggerStatus::Waiting,
-                next_run_at: now, // Start immediately
-                ..trigger
-            },
-            true,
-            &format!("enable_backfill_{}", job_id),
-        )
-        .await?;
-    } else {
-        // Pause/Disable the job
-        // Find the trigger by job_id
-        let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
-
-        for trigger in triggers {
-            if trigger.module_key == job_id {
-                log::info!(
-                    "[BACKFILL] Disabling backfill job {} in org {}",
-                    job_id,
-                    org_id
-                );
-                // Mark trigger as Completed to pause it (keeps all data intact)
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
-                        status: db::scheduler::TriggerStatus::Completed,
-                        ..trigger
-                    },
-                    true,
-                    &format!("disable_backfill_{}", job_id),
-                )
-                .await?;
-                return Ok(());
-            }
-        }
-
-        return Err(anyhow::anyhow!("Backfill job not found"));
-    }
     Ok(())
 }
 
@@ -630,6 +578,7 @@ pub async fn update_backfill_job(
         delay_between_chunks_secs: req.delay_between_chunks_secs,
         delete_before_backfill: req.delete_before_backfill,
         created_at: existing_config.created_at,
+        enabled: existing_config.enabled, // Keep existing enabled status
     };
     db::backfill::update(&updated_db_job).await?;
 

@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::{PatternAssociation, UpdateSettingsWrapper};
-use infra::{
-    coordinator::get_coordinator,
-    errors::{DbError, Error, Result},
-    table::re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
-};
-use o2_enterprise::enterprise::{
-    re_patterns::get_pattern_manager,
-    super_cluster::queue::{Message, MessageType, RePatternsMessage},
+use infra::errors::Result;
+use o2_enterprise::enterprise::super_cluster::queue::Message;
+#[cfg(feature = "vectorscan")]
+use {
+    config::meta::stream::{PatternAssociation, UpdateSettingsWrapper},
+    infra::{
+        coordinator::get_coordinator,
+        errors::{DbError, Error},
+        table::re_pattern_stream_map::{ApplyPolicy, PatternAssociationEntry, PatternPolicy},
+    },
+    o2_enterprise::enterprise::{
+        re_patterns::get_pattern_manager,
+        super_cluster::queue::{MessageType, RePatternsMessage},
+    },
 };
 
+#[cfg(feature = "vectorscan")]
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::RePatternsTable => {
@@ -173,5 +179,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             return Err(Error::Message("Invalid message type".to_string()));
         }
     }
+    Ok(())
+}
+
+#[cfg(not(feature = "vectorscan"))]
+pub(crate) async fn process(_msg: Message) -> Result<()> {
     Ok(())
 }

@@ -37,8 +37,17 @@ import {
   computed,
 } from "vue";
 
-import "monaco-editor/esm/vs/editor/editor.all.js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+// Lazy load Monaco Editor - only loaded when this component is rendered
+// This reduces initial bundle size by ~3.1MB
+let monaco: any = null;
+const loadMonaco = async () => {
+  if (!monaco) {
+    await import("monaco-editor/esm/vs/editor/editor.all.js");
+    monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+  }
+  return monaco;
+};
+
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -96,25 +105,34 @@ export default defineComponent({
     let editorObj: any = null;
     const { searchObj } = useLogs();
 
-    let provider: Ref<monaco.IDisposable | null> = ref(null);
+    let provider: Ref<any | null> = ref(null);
 
-    const CompletionKind: any = {
-      Keyword: monaco.languages.CompletionItemKind.Keyword,
-      Operator: monaco.languages.CompletionItemKind.Operator,
-      Text: monaco.languages.CompletionItemKind.Text,
-      Value: monaco.languages.CompletionItemKind.Value,
-      Method: monaco.languages.CompletionItemKind.Method,
-      Function: monaco.languages.CompletionItemKind.Function,
-      Constructor: monaco.languages.CompletionItemKind.Constructor,
-      Field: monaco.languages.CompletionItemKind.Field,
-      Variable: monaco.languages.CompletionItemKind.Variable,
-    };
-    const insertTextRules: any = {
-      InsertAsSnippet:
-        monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      KeepWhitespace:
-        monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
-      None: monaco.languages.CompletionItemInsertTextRule.None,
+    // These will be initialized when Monaco loads
+    let CompletionKind: any = null;
+    let insertTextRules: any = null;
+
+    const initializeMonacoConstants = () => {
+      if (!monaco || CompletionKind) return;
+
+      CompletionKind = {
+        Keyword: monaco.languages.CompletionItemKind.Keyword,
+        Operator: monaco.languages.CompletionItemKind.Operator,
+        Text: monaco.languages.CompletionItemKind.Text,
+        Value: monaco.languages.CompletionItemKind.Value,
+        Method: monaco.languages.CompletionItemKind.Method,
+        Function: monaco.languages.CompletionItemKind.Function,
+        Constructor: monaco.languages.CompletionItemKind.Constructor,
+        Field: monaco.languages.CompletionItemKind.Field,
+        Variable: monaco.languages.CompletionItemKind.Variable,
+      };
+
+      insertTextRules = {
+        InsertAsSnippet:
+          monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        KeepWhitespace:
+          monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
+        None: monaco.languages.CompletionItemInsertTextRule.None,
+      };
     };
 
     const defaultKeywords = [
@@ -267,6 +285,7 @@ export default defineComponent({
     watch(
       () => store.state.theme,
       () => {
+        if (!monaco) return;
         monaco.editor.setTheme(
           store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
@@ -288,6 +307,7 @@ export default defineComponent({
     });
 
     const createDependencyProposals = (range: any) => {
+      if (!CompletionKind || !insertTextRules) return [];
       return keywords.value.map((keyword: any) => {
         const itemObj: any = {
           ...keyword,
@@ -305,6 +325,27 @@ export default defineComponent({
     };
 
     const setupEditor = async () => {
+      // Lazy load Monaco Editor on first use
+      const monacoModule = await loadMonaco();
+      monaco = monacoModule;
+
+      // Initialize Monaco constants after loading
+      initializeMonacoConstants();
+
+      // Register custom languages after Monaco is loaded
+      if (props.language === "promql") {
+        monaco.languages.register({ id: "promql" });
+      }
+      if (props.language === "vrl") {
+        monaco.languages.register({ id: "vrl" });
+
+        // Register a tokens provider for the language
+        monaco.languages.setMonarchTokensProvider(
+          "vrl",
+          vrlLanguageDefinition as any,
+        );
+      }
+
       monaco.editor.defineTheme("myCustomTheme", {
         base: "vs", // can also be vs-dark or hc-black
         inherit: true, // can also be false to completely replace the builtin rules
@@ -465,18 +506,6 @@ export default defineComponent({
 
     onMounted(async () => {
       provider.value?.dispose();
-      if (props.language === "promql") {
-        monaco.languages.register({ id: "promql" });
-      }
-      if (props.language === "vrl") {
-        monaco.languages.register({ id: "vrl" });
-
-        // Register a tokens provider for the language
-        monaco.languages.setMonarchTokensProvider(
-          "vrl",
-          vrlLanguageDefinition as any,
-        );
-      }
 
       if (props.language === "sql") {
         await import(
@@ -563,6 +592,7 @@ export default defineComponent({
     watch(
       () => store.state.theme,
       () => {
+        if (!monaco) return;
         monaco.editor.setTheme(
           store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
@@ -587,7 +617,7 @@ export default defineComponent({
     };
 
     const registerAutoCompleteProvider = () => {
-      if (!props.showAutoComplete) return;
+      if (!props.showAutoComplete || !monaco) return;
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
@@ -689,6 +719,7 @@ export default defineComponent({
     };
 
     const decorateRanges = (ranges: any[]) => {
+      if (!monaco) return;
       // Highlight the ranges
       const decorations = ranges.map((range) => {
         return {
@@ -705,6 +736,7 @@ export default defineComponent({
     };
 
     function addErrorDiagnostics(ranges: any) {
+      if (!monaco) return;
       // const markers = [
       //   {
       //     resource: {
@@ -797,6 +829,7 @@ export default defineComponent({
       visibility: visible !important;
     }
   }
+  --vscode-focusBorder: transparent !important;
 }
 
 .highlight-error {

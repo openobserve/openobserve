@@ -88,8 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-page-container>
       </div>
 
-      <!-- Right Panel (AI Chat) -->
-
+      <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
       <div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
@@ -105,25 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-open="store.state.isAiChatEnabled"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
-        />
-      </div>
-
-      <!-- Right Panel (SRE Chat) -->
-      <div
-        class="col-auto"
-        v-show="store.state.isSREChatOpen"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10"
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
-      >
-        <SREChat
-          :header-height="82.5"
-          :context-type="store.state.sreChatContext.type"
-          :context-data="store.state.sreChatContext.data"
-          @close="closeSREChat"
         />
       </div>
     </div>
@@ -222,7 +202,6 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
-import SREChat from "@/components/SREChat.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
@@ -261,7 +240,6 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
-    SREChat,
     GetStarted,
   },
   methods: {
@@ -1068,11 +1046,6 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const closeSREChat = () => {
-      store.dispatch("setIsSREChatOpen", false);
-      window.dispatchEvent(new Event("resize"));
-    };
-
     const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
         return getImageURL("images/common/ai_icon_dark.svg");
@@ -1155,7 +1128,6 @@ export default defineComponent({
       splitterModel,
       toggleAIChat,
       closeChat,
-      closeSREChat,
       getBtnLogo,
       isHovered,
       showGetStarted,

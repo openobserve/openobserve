@@ -11,7 +11,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 test.describe("UI Regression Bugs", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -113,8 +113,7 @@ test.describe("UI Regression Bugs", () => {
 
     // STRONG ASSERTION: Logs navigation should work
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     let currentUrl = page.url();
     expect(currentUrl).toContain('logs');
@@ -122,8 +121,7 @@ test.describe("UI Regression Bugs", () => {
 
     // STRONG ASSERTION: Streams navigation should work
     await pm.logsPage.clickMenuLinkStreamsItem();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/.*streams.*/, { timeout: 30000 });
 
     currentUrl = page.url();
     expect(currentUrl).toContain('streams');
@@ -131,8 +129,7 @@ test.describe("UI Regression Bugs", () => {
 
     // STRONG ASSERTION: Pipelines navigation should work
     await pm.pipelinesPage.openPipelineMenu();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/.*pipeline.*/, { timeout: 30000 });
 
     currentUrl = page.url();
     expect(currentUrl).toContain('pipeline');
@@ -153,7 +150,7 @@ test.describe("UI Regression Bugs", () => {
     // Start with org_identifier in URL
     const logsUrl = `/web/logs?org_identifier=${orgName}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle');
+    await page.waitForURL(/.*logs.*org_identifier.*/, { timeout: 30000 });
 
     const initialUrl = page.url();
     testLogger.info(`Initial URL: ${initialUrl}`);
@@ -163,8 +160,7 @@ test.describe("UI Regression Bugs", () => {
 
     // Navigate to streams
     await pm.logsPage.clickMenuLinkStreamsItem();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/.*streams.*/, { timeout: 30000 });
 
     let currentUrl = page.url();
     testLogger.info(`After Streams navigation: ${currentUrl}`);
@@ -174,8 +170,7 @@ test.describe("UI Regression Bugs", () => {
 
     // Navigate back to logs
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     currentUrl = page.url();
     testLogger.info(`After Logs navigation: ${currentUrl}`);

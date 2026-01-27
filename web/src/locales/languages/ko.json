@@ -1389,7 +1389,14 @@
     "folders": "폴더",
     "searchFolder": "검색 폴더",
     "deleteFolder": "폴더 삭제",
-    "deleteFolderMessage": "정말로 이 폴더를 삭제하시겠습니까?"
+    "deleteFolderMessage": "정말로 이 폴더를 삭제하시겠습니까?",
+    "columnOrder": "컬럼 순서",
+    "configureColumnOrder": "열 순서 구성",
+    "columnOrderDescription": "테이블의 열 표시 순서를 사용자 지정합니다.보이는 열만 (보이는/숨겨진 필터를 기반으로 함) 재정렬할 수 있습니다.열을 드래그하여 순서를 변경할 수 있습니다.",
+    "noColumnsOrdered": "정렬된 컬럼 없음",
+    "columnsDefaultOrder": "열은 기본 순서로 표시됩니다.",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동"
   },
   "panel": {
     "header": "패널",

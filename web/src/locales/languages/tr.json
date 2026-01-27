@@ -1389,7 +1389,14 @@
     "folders": "Klasörler",
     "searchFolder": "Arama Klasörü",
     "deleteFolder": "Klasörü Sil",
-    "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?"
+    "deleteFolderMessage": "Bu klasörü silmek istediğinizden emin misiniz?",
+    "columnOrder": "Sütun Sırası",
+    "configureColumnOrder": "Sütun Sırasını Yapılandırma",
+    "columnOrderDescription": "Tablodaki sütunların görüntüleme sırasını özelleştirin. Yalnızca görünür sütunlar (görünür/gizli filtrelere dayalı) yeniden sıralanabilir. Sıralarını değiştirmek için sütunları sürükleyin.",
+    "noColumnsOrdered": "Sıralı sütun yok",
+    "columnsDefaultOrder": "Sütunlar varsayılan sıralarında görüntülenecektir",
+    "moveUp": "Yukarı hareket et",
+    "moveDown": "Aşağı hareket et"
   },
   "panel": {
     "header": "Panel",

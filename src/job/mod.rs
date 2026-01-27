@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -237,8 +237,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(db::ai_prompts::watch());
     // Service streams watch only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
@@ -296,10 +294,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    #[cfg(feature = "enterprise")]
-    db::ai_prompts::cache()
-        .await
-        .expect("ai prompts cache failed");
     // Service streams cache only needed on queriers - they serve the UI APIs
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() {
@@ -368,14 +362,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(crate::service::promql::search::init());
+
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
-
-    #[cfg(feature = "enterprise")]
     {
+        tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
         tokio::task::spawn(cipher::run());
         tokio::task::spawn(db::keys::watch());
+    }
+
+    #[cfg(feature = "vectorscan")]
+    {
         tokio::task::spawn(db::re_pattern::watch_patterns());
         tokio::task::spawn(db::re_pattern::watch_pattern_associations());
         // we do this call here so the pattern manager gets init-ed at the very start instead at
