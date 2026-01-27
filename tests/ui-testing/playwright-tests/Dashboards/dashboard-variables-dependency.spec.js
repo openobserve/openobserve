@@ -11,110 +11,11 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import {
   monitorVariableAPICalls,
   verifyVariableLoadSequence,
-  waitForVariableToLoad
+  waitForVariableToLoad,
+  waitForVariableSelector
 } from "../utils/variable-helpers.js";
-import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
 
 test.describe.configure({ mode: "parallel" });
-
-/**
- * Helper function to change variable value and monitor dependent variable API calls
- * This function is specifically designed for dependency tests where changing one variable
- * triggers API calls for dependent variables
- *
- * @param {import('@playwright/test').Page} page - Playwright page object
- * @param {string} variableName - Name of the variable to change
- * @param {Object} options - Configuration options
- * @param {number} options.optionIndex - Index of option to select (default: 0 for first option)
- * @param {number} options.expectedAPICalls - Expected number of dependent variable API calls (default: 1)
- * @param {number} options.timeout - Timeout for API monitoring (default: 15000)
- * @returns {Promise<Object>} - API monitoring result with actualCount, calls, success, etc.
- */
-async function changeVariableValueAndMonitorDependencies(page, variableName, options = {}) {
-  const {
-    optionIndex = 0,
-    expectedAPICalls = 1,
-    timeout = 15000
-  } = options;
-
-  // Wait for variable dropdown to be visible and ready
-  const varDropdown = page.getByLabel(variableName, { exact: true });
-  await varDropdown.waitFor({ state: "visible", timeout: 10000 });
-
-  // Ensure network is idle before clicking
-  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-  // Start monitoring for values stream API call BEFORE opening dropdown
-  const valuesStreamPromise = waitForValuesStreamComplete(page, timeout);
-
-  // Start monitoring for dependent variable API calls BEFORE opening dropdown
-  // This ensures we capture any dependent variable updates
-  const apiMonitor = monitorVariableAPICalls(page, {
-    expectedCount: expectedAPICalls,
-    timeout: timeout
-  });
-
-  // Click dropdown to open menu
-  await varDropdown.click();
-
-  // Wait for the values stream to complete loading options
-  try {
-    await valuesStreamPromise;
-  } catch (error) {
-    throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
-  }
-
-  // Wait for dropdown menu to open and stabilize
-  const dropdownMenu = page.locator('.q-menu').first();
-  await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
-
-  // Wait for options to be present in the dropdown
-  await page.waitForFunction(
-    () => {
-      const options = document.querySelectorAll('[role="option"]');
-      return options.length > 0;
-    },
-    { timeout: 10000 }
-  );
-
-  // Add a small stabilization delay to ensure options are fully rendered
-  await page.waitForTimeout(500);
-
-  // Get the text of the target option before clicking
-  const targetOptionText = await page.evaluate((index) => {
-    const options = document.querySelectorAll('[role="option"]');
-    return options.length > index ? options[index].textContent.trim() : null;
-  }, optionIndex);
-
-  if (!targetOptionText) {
-    throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
-  }
-
-  // Click the target option using evaluate to avoid detachment issues
-  await page.evaluate((index) => {
-    const options = document.querySelectorAll('[role="option"]');
-    if (options.length > index) {
-      options[index].click();
-    }
-  }, optionIndex);
-
-  // Wait for dropdown to close
-  await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-
-  // Wait for any dependent variable API calls to complete
-  const apiResult = await apiMonitor;
-
-  // Verify the value actually changed by checking the input value
-  await page.waitForTimeout(500);
-  const currentValue = await varDropdown.inputValue().catch(() => '');
-
-  return {
-    ...apiResult,
-    selectedValue: targetOptionText,
-    currentValue: currentValue,
-    variableName: variableName
-  };
-}
 
 test.describe("Dashboard Variables - Dependency Loading", () => {
   test.beforeEach(async ({ page }) => {
@@ -180,7 +81,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A and monitor B's reload using the new helper function
-    const result = await changeVariableValueAndMonitorDependencies(page, varA, {
+    const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 2, // Select first option
       expectedAPICalls: 2, // Expect 2 API call for dependent variable B
       timeout: 15000
@@ -278,7 +179,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     // Monitor 2 API calls (B and C) when A changes
     // Change A and monitor B and C's reload using the new helper function
-    const result = await changeVariableValueAndMonitorDependencies(page, varA, {
+    const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 3, // Expect 2 API calls for dependent variables B and C
       timeout: 20000
@@ -375,7 +276,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A and monitor cascade using the new helper function
-    const result = await changeVariableValueAndMonitorDependencies(page, vars[0], {
+    const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 4, // Expect 3 API calls for dependent variables B, C, D
       timeout: 25000
@@ -620,7 +521,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Change first and monitor full cascade using the new helper function
     // When first variable changes, all 8 dependent variables reload
     // Monitor with 5 min timeout to allow all variables to complete loading
-    const result = await changeVariableValueAndMonitorDependencies(page, vars[0], {
+    const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1,           // Select second option to ensure value changes
       expectedAPICalls: 7,      // Expect 8 API calls for all dependent variables
       timeout: 300000           // 5 minute timeout for this stress test
@@ -727,7 +628,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A, monitor if C loads using the new helper function
-    const result1 = await changeVariableValueAndMonitorDependencies(page, varA, {
+    const result1 = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 2, // Expect 2 API call for dependent variable C
       timeout: 15000
@@ -738,7 +639,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     expect(result1.success).toBe(true);
 
     // Change B, monitor if C loads again using the new helper function
-    const result2 = await changeVariableValueAndMonitorDependencies(page, varB, {
+    const result2 = await scopedVars.changeVariableValueAndMonitorDependencies(varB, {
       optionIndex: 1, // Select second option to ensure value changes
       expectedAPICalls: 2, // Expect 2 API call for dependent variable C
       timeout: 15000
