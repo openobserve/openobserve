@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
+use super::super::attributes::{GenAiAttributes, OpenInferenceAttributes, VercelAiSdkAttributes};
 
 /// Observation types supported by OpenObserve
 #[derive(Debug, Clone, PartialEq, Eq)]
