@@ -741,9 +741,6 @@ pub fn service_routes() -> Router {
             // AI
             .route("/{org_id}/ai/chat", post(ai::chat::chat))
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/prompts", get(ai::prompt::list_prompts))
-            .route("/{org_id}/ai/prompts/{prompt_id}", get(ai::prompt::get_prompt).put(ai::prompt::update_prompt))
-            .route("/{org_id}/ai/prompts/{prompt_id}/rollback", post(ai::prompt::rollback_prompt))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -763,10 +760,6 @@ pub fn service_routes() -> Router {
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
-
-            // Agent chat
-            .route("/{org_id}/agent/chat", post(agent::chat::agent_chat))
-            .route("/{org_id}/agent/chat_stream", post(agent::chat::agent_chat_stream))
 
             // Service streams
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))

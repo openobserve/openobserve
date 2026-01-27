@@ -133,8 +133,6 @@ use crate::{common::meta, handler::http::request};
         request::alerts::incidents::get_incident_stats,
         request::alerts::incidents::trigger_incident_rca,
         request::alerts::incidents::get_incident_service_graph,
-        request::agent::chat::agent_chat,
-        request::agent::chat::agent_chat_stream,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,
@@ -409,8 +407,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::alerts::deduplication::GroupingConfig,
             config::meta::alerts::deduplication::SendStrategy,
             request::alerts::dedup_stats::DedupSummaryResponse,
-            request::agent::chat::AgentChatRequest,
-            request::agent::chat::ChatMessage,
             // Backfill
             request::pipelines::backfill::BackfillRequest,
             request::pipelines::backfill::BackfillResponse,
