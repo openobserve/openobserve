@@ -43,8 +43,8 @@ interface CacheEntry {
 // This persists across component mounts/unmounts
 const translationCache = new Map<string, CacheEntry>();
 
-// Cache duration: 10 minutes
-const CACHE_DURATION = 10 * 60 * 1000;
+// Cache duration: 1 hour
+const CACHE_DURATION = 60 * 60 * 1000;
 
 // Generate a cache key from the stack trace and metadata
 export const generateCacheKey = (
