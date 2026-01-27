@@ -857,7 +857,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     const pm = new PageManager(page);
     const scopedVars = new DashboardVariablesScoped(page);
     const dashboardName = `Dashboard_Error_${Date.now()}`;
-    const variableName = `error_var_${Date.now()}`;
+    const variableName = `error_var`;
 
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -898,6 +898,7 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for settings dialog to be fully closed
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
 
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 30000 });

@@ -3,7 +3,7 @@
  * Provides common methods for variable API monitoring, assertions, and state validation
  */
 
-const testLogger = require('./test-logger.js');
+import testLogger from './test-logger.js';
 
 /**
  * Monitor variable values API calls and track completion
@@ -430,16 +430,135 @@ export function assertVariableAPILoading(monitorResult, expectations = {}) {
   testLogger.info(`Variable API assertion passed: ${monitorResult.actualCount} calls in ${monitorResult.totalDuration}ms`);
 }
 
-module.exports = {
-  monitorVariableAPICalls,
-  waitForVariableToLoad,
-  verifyVariableAPITriggered,
-  hasRefreshIndicator,
-  panelNeedsRefresh,
-  trackPanelReload,
-  verifyVariableValuePersists,
-  verifyVariableLoadSequence,
-  verifyVariablesInURL,
-  waitForAllPanelsToLoad,
-  assertVariableAPILoading
-};
+/**
+ * Wait for variable selector to appear on dashboard with multiple verification strategies
+ * This function uses the inner input element and multiple checks to ensure the variable is fully loaded
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} variableName - Variable name to wait for
+ * @param {Object} options - Configuration options
+ * @param {number} options.timeout - Maximum time to wait in milliseconds (default: 30000)
+ * @param {boolean} options.waitForNetworkIdle - Wait for network idle after selector appears (default: true)
+ * @param {boolean} options.checkInnerInput - Also verify inner input element is present (default: true)
+ * @returns {Promise<boolean>} - Returns true if selector appears, false if timeout
+ */
+export async function waitForVariableSelector(page, variableName, options = {}) {
+  const {
+    timeout = 30000,
+    waitForNetworkIdle = true,
+    checkInnerInput = true
+  } = options;
+
+  const startTime = Date.now();
+
+  try {
+    const selector = `[data-test="variable-selector-${variableName}"]`;
+    const innerSelector = `[data-test="variable-selector-${variableName}-inner"]`;
+
+    // Strategy 1: Wait for outer container to be attached
+    await page.waitForSelector(selector, {
+      state: 'attached',
+      timeout: timeout
+    });
+
+    testLogger.info(`Variable selector ${variableName} attached in ${Date.now() - startTime}ms`);
+
+    // Strategy 2: Wait for the complete DOM structure to be ready
+    if (checkInnerInput) {
+      await page.waitForFunction(
+        (varName) => {
+          const outer = document.querySelector(`[data-test="variable-selector-${varName}"]`);
+          const inner = document.querySelector(`[data-test="variable-selector-${varName}-inner"]`);
+          const label = outer?.querySelector('.q-field__label');
+          const field = outer?.querySelector('label.q-field');
+
+          // Variable is ready when all key elements exist and are visible
+          return outer && inner && label && field &&
+                 outer.offsetParent !== null && // visible check
+                 inner.offsetParent !== null &&
+                 !field.classList.contains('q-field--loading') &&
+                 !field.classList.contains('q-field--disabled');
+        },
+        variableName,
+        { timeout: Math.max(10000, timeout - (Date.now() - startTime)), polling: 200 }
+      );
+
+      testLogger.info(`Variable selector ${variableName} fully rendered in ${Date.now() - startTime}ms`);
+    } else {
+      // Fallback: just wait for outer to be visible
+      await page.locator(selector).waitFor({
+        state: 'visible',
+        timeout: Math.max(5000, timeout - (Date.now() - startTime))
+      });
+    }
+
+    // Strategy 3: Optionally wait for network to be idle
+    if (waitForNetworkIdle) {
+      await page.waitForLoadState('networkidle', {
+        timeout: Math.max(3000, timeout - (Date.now() - startTime))
+      }).catch(() => {
+        testLogger.debug(`Network idle timeout for variable ${variableName}, continuing anyway`);
+      });
+    }
+
+    testLogger.info(`Variable selector ${variableName} ready in ${Date.now() - startTime}ms`);
+    return true;
+
+  } catch (error) {
+    testLogger.error(`Variable selector ${variableName} failed within ${timeout}ms: ${error.message}`);
+
+    // Debug info
+    const outerCount = await page.locator(`[data-test="variable-selector-${variableName}"]`).count();
+    const innerCount = await page.locator(`[data-test="variable-selector-${variableName}-inner"]`).count();
+    testLogger.debug(`Debug - Outer: ${outerCount}, Inner: ${innerCount}`);
+
+    return false;
+  }
+}
+
+/**
+ * Wait for multiple variable selectors to appear on dashboard
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string[]} variableNames - Array of variable names to wait for
+ * @param {Object} options - Configuration options
+ * @param {number} options.timeout - Maximum time to wait per variable (default: 30000)
+ * @param {boolean} options.waitForNetworkIdle - Wait for network idle after all selectors appear (default: true)
+ * @returns {Promise<Object>} - Returns {success: boolean, loaded: string[], failed: string[]}
+ */
+export async function waitForMultipleVariableSelectors(page, variableNames, options = {}) {
+  const {
+    timeout = 30000,
+    waitForNetworkIdle = true
+  } = options;
+
+  const loaded = [];
+  const failed = [];
+
+  testLogger.info(`Waiting for ${variableNames.length} variable selectors`);
+
+  for (const variableName of variableNames) {
+    const success = await waitForVariableSelector(page, variableName, {
+      timeout,
+      waitForNetworkIdle: false
+    });
+
+    if (success) {
+      loaded.push(variableName);
+    } else {
+      failed.push(variableName);
+    }
+  }
+
+  if (loaded.length === variableNames.length && waitForNetworkIdle) {
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  }
+
+  testLogger.info(`Variable selectors: ${loaded.length}/${variableNames.length} loaded`);
+
+  return {
+    success: failed.length === 0,
+    loaded,
+    failed
+  };
+}
