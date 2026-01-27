@@ -2347,12 +2347,6 @@ export default defineComponent({
       }
     };
 
-    // openSREChat is no longer needed - context is auto-registered via watch
-    // Keeping function for backwards compatibility but it just opens the AI chat
-    const openSREChat = () => {
-      store.dispatch('setAiChatEnabled', true);
-    };
-
     const getTimezone = () => {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
     };
@@ -2406,7 +2400,6 @@ export default defineComponent({
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,
-      openSREChat,
       scrollToSection,
       toggleSection,
       editableStatus,
