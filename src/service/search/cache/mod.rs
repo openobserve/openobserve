@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 use config::meta::projections::ProjectionColumnMapping;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -42,7 +42,7 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
@@ -462,7 +462,7 @@ pub async fn search(
     }
     // result cache save changes Ends
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     crate::service::search::cache::apply_regex_to_response(
         &req,
         org_id,
@@ -1144,7 +1144,7 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 pub async fn apply_regex_to_response(
     req: &config::meta::search::Request,
     org_id: &str,

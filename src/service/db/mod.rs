@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,7 @@ pub mod org_users;
 pub mod organization;
 pub mod pipeline;
 pub mod pipeline_errors;
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;
 pub mod scheduler;
