@@ -180,6 +180,22 @@ const backfill = {
   },
 
   /**
+   * Cancel a running backfill job
+   * Note: This is an alias for pauseBackfillJob (enableBackfillJob with enable=false)
+   */
+  cancelBackfillJob: async ({
+    org_id,
+    pipeline_id,
+    job_id,
+  }: {
+    org_id: string;
+    pipeline_id: string;
+    job_id: string;
+  }): Promise<BackfillJobActionResponse> => {
+    return backfill.enableBackfillJob({ org_id, pipeline_id, job_id, enable: false });
+  },
+
+  /**
    * Delete a backfill job permanently
    */
   deleteBackfillJob: async ({

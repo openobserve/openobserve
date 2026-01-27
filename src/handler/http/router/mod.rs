@@ -684,7 +684,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/pipelines/history", get(pipelines::history::get_pipeline_history))
 
         // Pipeline backfills
-        .route("/{org_id}/pipelines/{pipeline_id}/backfill", get(pipelines::backfill::list_backfills).post(pipelines::backfill::create_backfill))
+        .route("/{org_id}/pipelines/backfill", get(pipelines::backfill::list_backfills))
+        .route("/{org_id}/pipelines/{pipeline_id}/backfill", post(pipelines::backfill::create_backfill))
         .route("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}", get(pipelines::backfill::get_backfill).put(pipelines::backfill::update_backfill).delete(pipelines::backfill::delete_backfill))
         .route("/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable", put(pipelines::backfill::enable_backfill))
 
