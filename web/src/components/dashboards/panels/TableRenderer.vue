@@ -15,46 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-table
-    :class="[
-      'my-sticky-virtscroll-table',
-      { 'no-position-absolute': store.state.printMode },
-      { 'wrap-enabled': wrapCells },
-    ]"
-    virtual-scroll
-    v-model:pagination="pagination"
-    :rows-per-page-options="[0]"
-    :virtual-scroll-sticky-size-start="48"
-    dense
-    :wrap-cells="wrapCells"
-    :rows="data.rows || []"
-    :columns="data.columns"
-    row-key="id"
-    ref="tableRef"
-    data-test="dashboard-panel-table"
-    @row-click="(...args: any) => $emit('row-click', ...args)"
-    hide-no-data
-  >
-    <template v-slot:body-cell="props">
-      <q-td :props="props" :style="getStyle(props)" class="copy-cell-td">
-        <!-- Copy button on left for numeric/right-aligned columns -->
-        <q-btn
-          v-if="props.col.align === 'right' && shouldShowCopyButton(props.value)"
-          :icon="
-            isCellCopied(props.rowIndex, props.col.name)
-              ? 'check'
-              : 'content_copy'
-          "
-          dense
-          size="xs"
-          no-caps
-          flat
-          class="copy-btn q-mr-xs"
-          @click.stop="
-            copyCellContent(props.value, props.rowIndex, props.col.name)
-          "
+  <div class="table-wrapper">
+    <q-table
+      :class="[
+        'my-sticky-virtscroll-table',
+        { 'no-position-absolute': store.state.printMode },
+        { 'wrap-enabled': wrapCells },
+      ]"
+      virtual-scroll
+      v-model:pagination="pagination"
+      :rows-per-page-options="[0]"
+      :virtual-scroll-sticky-size-start="48"
+      dense
+      :wrap-cells="wrapCells"
+      :rows="data.rows || []"
+      :columns="data.columns"
+      row-key="id"
+      ref="tableRef"
+      data-test="dashboard-panel-table"
+      @row-click="(...args: any) => $emit('row-click', ...args)"
+      hide-no-data
+    >
+      <template v-slot:body-cell="props">
+        <q-td
+          :props="props"
+          :style="[getStyle(props), getStickyColumnStyle(props.col)]"
+          :class="{ 'sticky-column': props.col.sticky }"
+          :data-col-index="props.col.__colIndex"
+          class="copy-cell-td"
         >
-        </q-btn>
+          <!-- Copy button on left for numeric/right-aligned columns -->
+          <q-btn
+            v-if="
+              props.col.align === 'right' && shouldShowCopyButton(props.value)
+            "
+            :icon="
+              isCellCopied(props.rowIndex, props.col.name)
+                ? 'check'
+                : 'content_copy'
+            "
+            dense
+            size="xs"
+            no-caps
+            flat
+            class="copy-btn q-mr-xs"
+            @click.stop="
+              copyCellContent(props.value, props.rowIndex, props.col.name)
+            "
+          >
+          </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
             v-if="props.col.showFieldAsJson"
@@ -62,17 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Otherwise show normal value -->
           <template v-else>
-              {{
-                props.value === "undefined" || props.value === null
-                  ? ""
-                  : props.col.format
-                    ? props.col.format(props.value, props.row)
-                    : props.value
-              }}
+            {{
+              props.value === "undefined" || props.value === null
+                ? ""
+                : props.col.format
+                  ? props.col.format(props.value, props.row)
+                  : props.value
+            }}
           </template>
-        <!-- Copy button on right for non-numeric columns -->
+          <!-- Copy button on right for non-numeric columns -->
           <q-btn
-            v-if="props.col.align !== 'right' && shouldShowCopyButton(props.value)"
+            v-if="
+              props.col.align !== 'right' && shouldShowCopyButton(props.value)
+            "
             :icon="
               isCellCopied(props.rowIndex, props.col.name)
                 ? 'check'
@@ -88,20 +99,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
           </q-btn>
-      </q-td>
-    </template>
+        </q-td>
+      </template>
 
-    <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
-    <template v-slot:bottom="scope" v-if="$slots.bottom">
-      <slot name="bottom" v-bind="scope" />
-    </template>
-  </q-table>
+      <!-- Expose a bottom slot so callers (e.g., PromQL table) can provide footer content -->
+      <template v-slot:bottom="scope" v-if="$slots.bottom">
+        <slot name="bottom" v-bind="scope" />
+      </template>
+    </q-table>
+  </div>
 </template>
 
 <script lang="ts">
 import useNotifications from "@/composables/useNotifications";
 import { exportFile, copyToClipboard, useQuasar } from "quasar";
-import { defineComponent, ref } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -135,9 +154,35 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const copiedCells = ref(new Map<string, boolean>());
+    const stickyColumnOffsets = ref<{ [key: string]: number }>({});
 
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
+
+    // Watch for columns changes to update sticky offsets
+    watch(
+      () => props.data?.columns,
+      (columns: any[]) => {
+        const offsets: { [key: string]: number } = {};
+        let cumulativeWidth = 0;
+
+        if (columns) {
+          columns.forEach((col: any, idx: number) => {
+            // Add index attribute for CSS targeting
+            col.__colIndex = idx;
+
+            if (col.sticky) {
+              offsets[col.name] = cumulativeWidth;
+              cumulativeWidth += col.width ? parseInt(String(col.width)) : 100;
+            }
+          });
+        }
+
+        stickyColumnOffsets.value = offsets;
+      },
+      { immediate: true, deep: true },
+    );
+
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -305,9 +350,97 @@ export default defineComponent({
             copiedCells.value.delete(key);
           }, 3000);
         })
-        .catch(() => {
-        });
+        .catch(() => {});
     };
+
+    const getStickyColumnStyle = (column: any) => {
+      if (!column?.sticky) return {};
+
+      // Get the precomputed left offset for this column
+      const leftOffset = stickyColumnOffsets.value[column.name] ?? 0;
+
+      return {
+        position: "sticky",
+        left: `${leftOffset}px`,
+        "z-index": 2,
+        "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+        "box-shadow": "2px 0 4px rgba(0, 0, 0, 0.1)",
+      };
+    };
+
+    // Create and manage dynamic style tag for sticky column offsets
+    let styleElement: HTMLStyleElement | null = null;
+
+    const updateStickyColumnStyles = () => {
+      // Remove old style element if it exists
+      if (styleElement?.parentNode) {
+        styleElement.parentNode.removeChild(styleElement);
+      }
+
+      // Create new style element with current offsets
+      styleElement = document.createElement("style");
+      styleElement.setAttribute("data-sticky-styles", "true");
+
+      const columns = (props.data?.columns || []) as any[];
+      const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
+      let css = "";
+
+      // Generate CSS rules for each column position
+      columns.forEach((col: any, colIndex: number) => {
+        if (col.sticky) {
+          const offset = stickyColumnOffsets.value[col.name] ?? 0;
+          // Target header and body cells by their actual nth-child position (1-based)
+          // Headers get position sticky, left offset, and higher z-index
+          // Body cells with sticky-column class get the same positioning
+          css += `
+            .my-sticky-virtscroll-table thead tr th:nth-child(${colIndex + 1}) {
+              position: sticky !important;
+              left: ${offset}px !important;
+              z-index: 4 !important;
+              background-color: ${bgColor} !important;
+              box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
+            }
+            .my-sticky-virtscroll-table tbody td:nth-child(${colIndex + 1}).sticky-column {
+              left: ${offset}px !important;
+            }
+          `;
+        }
+      });
+
+      // Add base styling for all sticky columns
+      css =
+        `
+        /* Sticky body cells */
+        .my-sticky-virtscroll-table tbody td.sticky-column {
+          position: sticky !important;
+          z-index: 2 !important;
+          box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* Column-specific positions for headers and body cells */
+      ` + css;
+
+      styleElement.textContent = css;
+      document.head.appendChild(styleElement);
+    };
+
+    // Watch sticky column offsets and update styles
+    watch(() => stickyColumnOffsets.value, updateStickyColumnStyles, {
+      deep: true,
+    });
+
+    // Watch theme changes and update styles
+    watch(() => store.state.theme, updateStickyColumnStyles);
+
+    onMounted(() => {
+      updateStickyColumnStyles();
+    });
+
+    onBeforeUnmount(() => {
+      if (styleElement?.parentNode) {
+        styleElement.parentNode.removeChild(styleElement);
+      }
+    });
 
     return {
       pagination: ref({
@@ -317,6 +450,7 @@ export default defineComponent({
       downloadTableAsJSON,
       tableRef,
       getStyle,
+      getStickyColumnStyle,
       store,
       copyCellContent,
       isCellCopied,
