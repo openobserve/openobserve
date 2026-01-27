@@ -90,7 +90,7 @@ pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) ->
     if has_valid_parent {
         // The new span should be a child of the current span
         // Set the current context as parent
-        span.set_parent(current_otel_ctx);
+        let _ = span.set_parent(current_otel_ctx);
         return span;
     }
 
