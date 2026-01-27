@@ -128,6 +128,8 @@ pub async fn create_backfill(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    post,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "CreateBackfillJob",
@@ -145,10 +147,10 @@ pub async fn create_backfill(
     ),
 )]
 pub async fn create_backfill(
-    _path: web::Path<(String, String)>,
-    _req: web::Json<BackfillRequest>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+    Path((_org_id, _pipeline_id)): Path<(String, String)>,
+    Json(_req): Json<BackfillRequest>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(feature = "enterprise")]
@@ -193,6 +195,8 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/backfill",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "ListBackfillJobs",
@@ -204,8 +208,8 @@ pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
         (status = 403, description = "Enterprise feature", body = ()),
     ),
 )]
-pub async fn list_backfills(_path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(feature = "enterprise")]
@@ -270,6 +274,8 @@ pub async fn get_backfill(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    get,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "GetBackfillJob",
@@ -284,9 +290,9 @@ pub async fn get_backfill(
     ),
 )]
 pub async fn get_backfill(
-    _path: web::Path<(String, String, String)>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(feature = "enterprise")]
@@ -380,6 +386,8 @@ pub async fn enable_backfill(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}/enable",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "EnableBackfillJob",
@@ -395,10 +403,10 @@ pub async fn enable_backfill(
     ),
 )]
 pub async fn enable_backfill(
-    _path: web::Path<(String, String, String)>,
-    _query: web::Query<std::collections::HashMap<String, String>>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+    Query(_query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(feature = "enterprise")]
@@ -484,6 +492,8 @@ pub async fn delete_backfill(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    delete,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "DeleteBackfillJob",
@@ -498,9 +508,9 @@ pub async fn delete_backfill(
     ),
 )]
 pub async fn delete_backfill(
-    _path: web::Path<(String, String, String)>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(feature = "enterprise")]
@@ -595,6 +605,8 @@ pub async fn update_backfill(
 
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
+    put,
+    path = "/{org_id}/pipelines/{pipeline_id}/backfill/{job_id}",
     context_path = "/api",
     tag = "Pipelines",
     operation_id = "UpdateBackfillJob",
@@ -618,8 +630,8 @@ pub async fn update_backfill(
     )
 )]
 pub async fn update_backfill(
-    _path: web::Path<(String, String, String)>,
-    _body: web::Json<BackfillRequest>,
-) -> Result<HttpResponse, actix_web::Error> {
-    Ok(MetaHttpResponse::forbidden("Not Supported"))
+    Path((_org_id, _pipeline_id, _job_id)): Path<(String, String, String)>,
+    Json(_body): Json<BackfillRequest>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
