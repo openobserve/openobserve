@@ -13,8 +13,108 @@ import {
   verifyVariableLoadSequence,
   waitForVariableToLoad
 } from "../utils/variable-helpers.js";
+import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
 
 test.describe.configure({ mode: "parallel" });
+
+/**
+ * Helper function to change variable value and monitor dependent variable API calls
+ * This function is specifically designed for dependency tests where changing one variable
+ * triggers API calls for dependent variables
+ *
+ * @param {import('@playwright/test').Page} page - Playwright page object
+ * @param {string} variableName - Name of the variable to change
+ * @param {Object} options - Configuration options
+ * @param {number} options.optionIndex - Index of option to select (default: 0 for first option)
+ * @param {number} options.expectedAPICalls - Expected number of dependent variable API calls (default: 1)
+ * @param {number} options.timeout - Timeout for API monitoring (default: 15000)
+ * @returns {Promise<Object>} - API monitoring result with actualCount, calls, success, etc.
+ */
+async function changeVariableValueAndMonitorDependencies(page, variableName, options = {}) {
+  const {
+    optionIndex = 0,
+    expectedAPICalls = 1,
+    timeout = 15000
+  } = options;
+
+  // Wait for variable dropdown to be visible and ready
+  const varDropdown = page.getByLabel(variableName, { exact: true });
+  await varDropdown.waitFor({ state: "visible", timeout: 10000 });
+
+  // Ensure network is idle before clicking
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+
+  // Start monitoring for values stream API call BEFORE opening dropdown
+  const valuesStreamPromise = waitForValuesStreamComplete(page, timeout);
+
+  // Start monitoring for dependent variable API calls BEFORE opening dropdown
+  // This ensures we capture any dependent variable updates
+  const apiMonitor = monitorVariableAPICalls(page, {
+    expectedCount: expectedAPICalls,
+    timeout: timeout
+  });
+
+  // Click dropdown to open menu
+  await varDropdown.click();
+
+  // Wait for the values stream to complete loading options
+  try {
+    await valuesStreamPromise;
+  } catch (error) {
+    throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
+  }
+
+  // Wait for dropdown menu to open and stabilize
+  const dropdownMenu = page.locator('.q-menu').first();
+  await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
+
+  // Wait for options to be present in the dropdown
+  await page.waitForFunction(
+    () => {
+      const options = document.querySelectorAll('[role="option"]');
+      return options.length > 0;
+    },
+    { timeout: 10000 }
+  );
+
+  // Add a small stabilization delay to ensure options are fully rendered
+  await page.waitForTimeout(500);
+
+  // Get the text of the target option before clicking
+  const targetOptionText = await page.evaluate((index) => {
+    const options = document.querySelectorAll('[role="option"]');
+    return options.length > index ? options[index].textContent.trim() : null;
+  }, optionIndex);
+
+  if (!targetOptionText) {
+    throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
+  }
+
+  // Click the target option using evaluate to avoid detachment issues
+  await page.evaluate((index) => {
+    const options = document.querySelectorAll('[role="option"]');
+    if (options.length > index) {
+      options[index].click();
+    }
+  }, optionIndex);
+
+  // Wait for dropdown to close
+  await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+  // Wait for any dependent variable API calls to complete
+  const apiResult = await apiMonitor;
+
+  // Verify the value actually changed by checking the input value
+  await page.waitForTimeout(500);
+  const currentValue = await varDropdown.inputValue().catch(() => '');
+
+  return {
+    ...apiResult,
+    selectedValue: targetOptionText,
+    currentValue: currentValue,
+    variableName: variableName
+  };
+}
 
 test.describe("Dashboard Variables - Dependency Loading", () => {
   test.beforeEach(async ({ page }) => {
@@ -79,28 +179,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor B's reload
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const varADropdown = page.getByLabel(varA, { exact: true });
-    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-    await varADropdown.click();
-
-    // Wait for dropdown menu to open
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[role="option"]').first().click();
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-
-    const result = await apiMonitor;
+    // Change A and monitor B's reload using the new helper function
+    const result = await changeVariableValueAndMonitorDependencies(page, varA, {
+      optionIndex: 2, // Select first option
+      expectedAPICalls: 2, // Expect 2 API call for dependent variable B
+      timeout: 15000
+    });
 
     // B should reload when A changes
     expect(result.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -189,35 +277,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
 
     // Monitor 2 API calls (B and C) when A changes
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 2, timeout: 20000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const varADropdown = page.getByLabel(varA, { exact: true });
-    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Click to open the dropdown
-    await varADropdown.click();
-
-    // Wait for dropdown menu to open and options to load
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    const options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-
-    // Wait for dropdown to stabilize and all options to render
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-
-    const result = await apiMonitor;
+    // Change A and monitor B and C's reload using the new helper function
+    const result = await changeVariableValueAndMonitorDependencies(page, varA, {
+      optionIndex: 1, // Select second option to ensure value changes
+      expectedAPICalls: 3, // Expect 2 API calls for dependent variables B and C
+      timeout: 20000
+    });
 
     // Both B and C should reload
     expect(result.actualCount).toBeGreaterThanOrEqual(2);
+    expect(result.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -305,36 +374,16 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor cascade
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 3, timeout: 25000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const varADropdown = page.getByLabel(vars[0], { exact: true });
-    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Click to open the dropdown
-    await varADropdown.click();
-
-    // Wait for dropdown menu to open and options to load
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    const options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-
-    // Wait for dropdown to stabilize and all options to render
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-
-    const result = await apiMonitor;
+    // Change A and monitor cascade using the new helper function
+    const result = await changeVariableValueAndMonitorDependencies(page, vars[0], {
+      optionIndex: 1, // Select second option to ensure value changes
+      expectedAPICalls: 4, // Expect 3 API calls for dependent variables B, C, D
+      timeout: 25000
+    });
 
     // B, C, D should all reload (3 calls)
     expect(result.actualCount).toBeGreaterThanOrEqual(3);
+    expect(result.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -693,67 +742,27 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for variable to appear on dashboard
     await page.locator(`[data-test="variable-selector-${varC}"]`).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A, monitor if C loads
-    const apiMonitor1 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const varADropdown = page.getByLabel(varA, { exact: true });
-    await varADropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Click to open the dropdown
-    await varADropdown.click();
-
-    // Wait for dropdown menu to open and options to load
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    let options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-
-    // Wait for dropdown to stabilize and all options to render
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-
-    const result1 = await apiMonitor1;
+    // Change A, monitor if C loads using the new helper function
+    const result1 = await changeVariableValueAndMonitorDependencies(page, varA, {
+      optionIndex: 1, // Select second option to ensure value changes
+      expectedAPICalls: 2, // Expect 2 API call for dependent variable C
+      timeout: 15000
+    });
 
     // C should load when A changes
     expect(result1.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result1.success).toBe(true);
 
-    // Change B, monitor if C loads again
-    const apiMonitor2 = monitorVariableAPICalls(page, { expectedCount: 1, timeout: 15000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const varBDropdown = page.getByLabel(varB, { exact: true });
-    await varBDropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Click to open the dropdown
-    await varBDropdown.click();
-
-    // Wait for dropdown menu to open and options to load
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 5000 });
-    options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-
-    // Wait for dropdown to stabilize and all options to render
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-
-    const result2 = await apiMonitor2;
+    // Change B, monitor if C loads again using the new helper function
+    const result2 = await changeVariableValueAndMonitorDependencies(page, varB, {
+      optionIndex: 1, // Select second option to ensure value changes
+      expectedAPICalls: 2, // Expect 2 API call for dependent variable C
+      timeout: 15000
+    });
 
     // C should load when B changes too
     expect(result2.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result2.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
