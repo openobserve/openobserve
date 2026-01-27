@@ -283,7 +283,8 @@ async fn get_parquet_metadata(
     // Check if speculative read optimization is enabled
     // Only apply on querier nodes with ZO_CACHE_LATEST_FILES=true
     let cfg = get_config();
-    let use_speculative_read = cfg.common.cache_latest_files && config::cluster::LOCAL_NODE.is_querier();
+    let use_speculative_read =
+        cfg.common.cache_latest_files && config::cluster::LOCAL_NODE.is_querier();
 
     if !use_speculative_read {
         // Skip optimization - use traditional two-step approach:
