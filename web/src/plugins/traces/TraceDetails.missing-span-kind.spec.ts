@@ -200,7 +200,20 @@ describe("TraceDetails - Missing span_kind Field", () => {
     globalThis.server.use(
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
-        () => {
+        async ({ request }) => {
+          const body: any = await request.json();
+          // Check if this is a RUM data query
+          if (body.query?.sql?.includes("_rumdata")) {
+            // Return empty RUM data
+            return HttpResponse.json({
+              took: 0,
+              hits: [],
+              total: 0,
+              from: 0,
+              size: 0,
+              scan_size: 0,
+            });
+          }
           return HttpResponse.json(mockSpansWithoutSpanKind);
         },
       ),
