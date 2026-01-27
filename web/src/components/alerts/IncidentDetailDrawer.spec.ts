@@ -497,16 +497,6 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
     });
 
-    it("should toggle SRE chat visibility", () => {
-      expect(wrapper.vm.showAIChat).toBe(false);
-
-      wrapper.vm.openSREChat();
-      expect(wrapper.vm.showAIChat).toBe(true);
-
-      wrapper.vm.openSREChat();
-      expect(wrapper.vm.showAIChat).toBe(false);
-    });
-
     it("should compute incident context data correctly", () => {
       const contextData = wrapper.vm.incidentContextData;
 

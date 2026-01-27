@@ -227,7 +227,7 @@ pub async fn create_backfill_job(
     };
 
     // Store static configuration in backfill_jobs table
-    let backfill_job_config = infra::table::backfill_jobs::BackfillJob {
+    let backfill_job_config = db::backfill::BackfillJob {
         id: backfill_job_id.clone(),
         org: org_id.to_string(),
         pipeline_id: pipeline_id.to_string(),
@@ -239,7 +239,7 @@ pub async fn create_backfill_job(
         created_at: now,
     };
 
-    infra::table::backfill_jobs::add(backfill_job_config).await?;
+    db::backfill::add(backfill_job_config).await?;
 
     // Store only dynamic state in scheduled_jobs trigger data
     let backfill_job = BackfillJob {
@@ -289,7 +289,7 @@ pub async fn create_backfill_job(
 /// Helper function to create BackfillJobStatus from config and trigger data
 /// Static config is passed as parameter, dynamic state comes from BackfillJob
 async fn create_backfill_job_status(
-    config: &infra::table::backfill_jobs::BackfillJob,
+    config: &db::backfill::BackfillJob,
     trigger_status: db::scheduler::TriggerStatus,
     trigger_start_time: Option<i64>,
     backfill_job: &BackfillJob,
@@ -358,7 +358,7 @@ async fn create_backfill_job_status(
 
 pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, anyhow::Error> {
     // Fetch all backfill job configs from table
-    let configs = infra::table::backfill_jobs::list_by_org(org_id).await?;
+    let configs = db::backfill::list_by_org(org_id).await?;
 
     // Fetch all backfill triggers (no longer using list_by_org_with_created_at)
     let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
@@ -396,7 +396,7 @@ pub async fn get_backfill_job(
     job_id: &str,
 ) -> Result<BackfillJobStatus, anyhow::Error> {
     // Fetch static config from backfill_jobs table
-    let config = infra::table::backfill_jobs::get(org_id, job_id).await?;
+    let config = db::backfill::get(org_id, job_id).await?;
 
     // Fetch the trigger using module_key (which is the job_id)
     let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
@@ -431,7 +431,7 @@ pub async fn delete_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
             // Delete from scheduled_jobs
             db::scheduler::delete(org_id, TriggerModule::Backfill, &trigger.module_key).await?;
             // Delete from backfill_jobs table
-            infra::table::backfill_jobs::delete(org_id, job_id).await?;
+            db::backfill::delete(org_id, job_id).await?;
             return Ok(());
         }
     }
@@ -450,7 +450,7 @@ pub async fn delete_backfill_jobs_by_pipeline(
     );
 
     // Get all backfill jobs for this pipeline
-    let jobs = infra::table::backfill_jobs::list_by_pipeline(org_id, pipeline_id).await?;
+    let jobs = db::backfill::list_by_pipeline(org_id, pipeline_id).await?;
     let jobs_count = jobs.len();
 
     for job in jobs {
@@ -466,7 +466,7 @@ pub async fn delete_backfill_jobs_by_pipeline(
         }
 
         // Delete from backfill_jobs table
-        if let Err(e) = infra::table::backfill_jobs::delete(org_id, &job.id).await {
+        if let Err(e) = db::backfill::delete(org_id, &job.id).await {
             log::error!(
                 "[BACKFILL] Failed to delete backfill job {} from backfill_jobs table: {}",
                 job.id,
@@ -496,7 +496,7 @@ pub async fn enable_backfill_job(
     if enable {
         // Resume/Enable the job
         // Fetch static config from backfill_jobs table
-        let config = infra::table::backfill_jobs::get(org_id, job_id).await?;
+        let config = db::backfill::get(org_id, job_id).await?;
 
         // Fetch the trigger using module_key (which is the job_id)
         let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
@@ -582,7 +582,7 @@ pub async fn update_backfill_job(
     req: crate::handler::http::request::pipelines::backfill::BackfillRequest,
 ) -> Result<(), anyhow::Error> {
     // Fetch existing config from backfill_jobs table
-    let existing_config = infra::table::backfill_jobs::get(org_id, job_id).await?;
+    let existing_config = db::backfill::get(org_id, job_id).await?;
 
     // Fetch the trigger using module_key (which is the job_id)
     let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
@@ -620,7 +620,7 @@ pub async fn update_backfill_job(
     }
 
     // Update backfill_jobs table with new config
-    let updated_db_job = infra::table::backfill_jobs::BackfillJob {
+    let updated_db_job = db::backfill::BackfillJob {
         id: job_id.to_string(),
         org: org_id.to_string(),
         pipeline_id: existing_config.pipeline_id, // Keep existing pipeline_id
@@ -631,7 +631,7 @@ pub async fn update_backfill_job(
         delete_before_backfill: req.delete_before_backfill,
         created_at: existing_config.created_at,
     };
-    infra::table::backfill_jobs::update(&updated_db_job).await?;
+    db::backfill::update(&updated_db_job).await?;
 
     // Reset dynamic state for restart as new job
     let reset_backfill_job = BackfillJob {
