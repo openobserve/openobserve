@@ -362,7 +362,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
-import { max } from "moment";
 
 export default defineComponent({
   props: {

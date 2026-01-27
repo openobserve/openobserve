@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -238,7 +238,7 @@ pub async fn do_partitioned_search(
             let duration = instant.elapsed();
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
-        #[cfg(feature = "enterprise")]
+        #[cfg(feature = "vectorscan")]
         crate::service::search::cache::apply_regex_to_response(
             &req,
             org_id,
@@ -567,7 +567,7 @@ pub async fn process_delta(
             search_res.total = hit_count as usize;
             search_res.hits = top_k_values;
         }
-        #[cfg(feature = "enterprise")]
+        #[cfg(feature = "vectorscan")]
         crate::service::search::cache::apply_regex_to_response(
             &req,
             org_id,
@@ -727,7 +727,7 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     crate::service::search::cache::apply_regex_to_response(
         _req,
         org_id,

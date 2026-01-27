@@ -5183,4 +5183,49 @@ export class LogsPage {
         await expect(icon).not.toBeVisible();
         testLogger.info('Include/exclude icon is NOT visible (Bug #9550 verified)');
     }
+
+    // ============================================================================
+    // MONACO LAZY LOADING HELPER METHODS - PR #10146
+    // These methods support Monaco editor lazy loading query pre-fill tests
+    // ============================================================================
+
+    /**
+     * Wait for Monaco query editor to be visible after lazy loading
+     * @param {number} timeout - Timeout in milliseconds (default 30000)
+     */
+    async waitForQueryEditorVisible(timeout = 30000) {
+        await this.page.locator(this.queryEditor).waitFor({
+            state: 'visible',
+            timeout: timeout
+        });
+        testLogger.info('Monaco query editor is visible');
+    }
+
+    /**
+     * Enable SQL mode if not already enabled
+     * Combines getSQLModeState() check with clickSQLModeSwitch()
+     */
+    async enableSqlModeIfNeeded() {
+        const sqlModeToggle = this.page.getByRole('switch', { name: 'SQL Mode' });
+        const isChecked = await sqlModeToggle.getAttribute('aria-checked');
+        if (isChecked !== 'true') {
+            await sqlModeToggle.click();
+            await this.page.waitForTimeout(1000);
+            testLogger.info('SQL mode enabled');
+        } else {
+            testLogger.info('SQL mode already enabled');
+        }
+    }
+
+    /**
+     * Click relative time button by selector
+     * @param {string} timeSelector - The time selector (e.g., '1-h', '15-m', '30-m')
+     */
+    async clickRelativeTimeButton(timeSelector) {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.waitForTimeout(500);
+        await this.page.locator(`[data-test="date-time-relative-${timeSelector}-btn"]`).click();
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Selected relative time: ${timeSelector}`);
+    }
 }
