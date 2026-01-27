@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span>Column Order</span>
+        <span>{{ t("dashboard.columnOrder") }}</span>
       </div>
       <q-btn
         icon="close"
@@ -43,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Content -->
     <div class="scrollable-content">
       <div class="text-caption text-grey-7 q-mb-md">
-        Drag columns to reorder them. Columns not in this list will appear at
-        the end (alphabetically).
+        {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
@@ -53,9 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-center q-pa-xl text-grey-6"
       >
         <q-icon name="view_column" size="48px" class="q-mb-md" />
-        <div class="text-body1">No columns ordered</div>
+        <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-caption">
-          Columns will be displayed in alphabetical order
+          {{ t("dashboard.columnsDefaultOrder") }}
         </div>
       </div>
 
@@ -101,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="moveColumnUp(index)"
                 :data-test="`column-order-move-up-${index}`"
               >
-                <q-tooltip>Move up</q-tooltip>
+                <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
               </q-btn>
               <q-btn
                 flat
@@ -113,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="moveColumnDown(index)"
                 :data-test="`column-order-move-down-${index}`"
               >
-                <q-tooltip>Move down</q-tooltip>
+                <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -123,14 +122,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Footer -->
     <div class="sticky-footer q-pa-md">
       <q-btn
-        label="Cancel"
+        :label="t('common.cancel')"
         outline
         no-caps
         @click.stop="cancelEdit"
         data-test="dashboard-column-order-cancel-btn"
       />
       <q-btn
-        label="Save"
+        :label="t('common.save')"
         color="primary"
         no-caps
         @click.stop="saveEdit"
@@ -185,11 +184,11 @@ export default defineComponent({
           (col) => !filtered.includes(col)
         );
 
-        // Combine: ordered columns first, then remaining (alphabetically)
-        editColumnOrder.value = [...filtered, ...remaining.sort()];
+        // Combine: ordered columns first, then remaining in their natural order
+        editColumnOrder.value = [...filtered, ...remaining];
       } else {
-        // Start with alphabetically sorted available columns
-        editColumnOrder.value = [...props.availableColumns].sort();
+        // Start with available columns in their natural order
+        editColumnOrder.value = [...props.availableColumns];
       }
     };
 

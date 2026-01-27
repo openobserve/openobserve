@@ -393,7 +393,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template v-slot:default>
-            <div class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2">
+            <div
+              class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2"
+            >
               {{ t("dashboard.stickyFirstColumn") }}
               <q-icon class="q-ml-xs" size="20px" name="info" />
               <q-tooltip class="bg-grey-8" max-width="300px">
@@ -472,38 +474,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div class="q-mb-sm q-mt-md" style="font-weight: 600">
-          <span>Column Order</span>
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            data-test="dashboard-config-column-order-info"
-          >
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="350px"
-            >
-              <b>Column Order</b>
-              <br /><br />
-              Customize the display order of visible columns.
-              <br /><br />
-              • Columns not in the order list will appear at the end
-              (alphabetically)
-              <br />
-              • Only visible columns (based on visible/hidden filters) can be
-              reordered
-            </q-tooltip>
-          </q-btn>
         </div>
-
         <q-btn
           @click="openColumnOrderPopup"
           style="cursor: pointer; padding: 0px 5px"
-          :label="'Configure Column Order'"
+          :label="t(`dashboard.configureColumnOrder`)"
           no-caps
           icon="reorder"
           data-test="dashboard-config-column-order-button"
@@ -511,7 +486,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- Column Order Popup Dialog -->
-        <q-dialog v-model="showColumnOrderPopup" data-test="column-order-dialog">
+        <q-dialog
+          v-model="showColumnOrderPopup"
+          data-test="column-order-dialog"
+        >
           <ColumnOrderPopUp
             :column-order="columnOrder"
             :available-columns="filteredAvailableColumns"
@@ -898,14 +876,6 @@ export default defineComponent({
       },
     });
 
-    // Display value for column order
-    const getColumnOrderDisplay = computed(() => {
-      const selected = columnOrder.value || [];
-      if (selected.length === 0) return "Default (Alphabetical)";
-      if (selected.length === 1) return selected[0];
-      return `${selected.length} columns ordered`;
-    });
-
     // Column order popup state
     const showColumnOrderPopup = ref(false);
 
@@ -974,7 +944,6 @@ export default defineComponent({
       stickyColumns,
       getStickyColumnsDisplay,
       columnOrder,
-      getColumnOrderDisplay,
       showColumnOrderPopup,
       filteredAvailableColumns,
       openColumnOrderPopup,
