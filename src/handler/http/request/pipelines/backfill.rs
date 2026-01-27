@@ -168,7 +168,7 @@ pub async fn create_backfill(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     responses(
-        (status = 200, description = "List of backfill jobs"),
+        (status = 200, description = "List of backfill jobs", body = Vec<backfill::BackfillJobStatus>),
         (status = 500, description = "Internal server error"),
     ),
 )]
@@ -229,7 +229,7 @@ pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
         ("job_id" = String, Path, description = "Backfill job ID"),
     ),
     responses(
-        (status = 200, description = "Backfill job status"),
+        (status = 200, description = "Backfill job status", body = backfill::BackfillJobStatus),
         (status = 404, description = "Job not found"),
         (status = 500, description = "Internal server error"),
     ),

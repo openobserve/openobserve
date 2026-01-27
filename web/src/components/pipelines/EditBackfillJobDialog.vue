@@ -242,7 +242,7 @@ watch(
       }
     }
   },
-  { immediate: false }
+  { immediate: true }
 );
 
 // Handle datetime changes from the DateTime component
