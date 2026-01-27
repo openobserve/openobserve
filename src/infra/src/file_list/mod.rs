@@ -331,7 +331,7 @@ pub async fn query(
             // Cache hit! (even if empty result)
             // Report cache hit count (metric has no labels, just set the count)
             config::metrics::FILE_LIST_CACHE_HIT_COUNT
-                .with_label_values(&[])
+                .with_label_values(&[] as &[&str])
                 .set(cached_files.len() as i64);
 
             log::debug!(
@@ -432,7 +432,7 @@ pub async fn query_ids(
             // Cache hit! (even if empty result)
             // Report cache hit count (metric has no labels, just set the count)
             config::metrics::FILE_LIST_CACHE_HIT_COUNT
-                .with_label_values(&[])
+                .with_label_values(&[] as &[&str])
                 .set(cached_ids.len() as i64);
 
             log::debug!(
