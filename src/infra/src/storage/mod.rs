@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fmt::Debug, ops::Range, sync::Arc};
 
 use async_trait::async_trait;
@@ -27,9 +29,6 @@ use object_store::{
 };
 use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
-
-#[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub mod accounts;
 mod local;
@@ -386,8 +385,9 @@ impl From<Error> for object_store::Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
+
+    use super::*;
 
     // Helper to create a mock parquet file with specific metadata size
     fn create_mock_parquet_data(metadata_size_kb: usize) -> Bytes {
@@ -511,13 +511,13 @@ mod tests {
         // - Very large files (>1GB): 250KB-2MB metadata
 
         let typical_metadata_sizes = vec![
-            ("small", 10 * 1024),      // 10KB
-            ("small", 50 * 1024),      // 50KB
-            ("medium", 75 * 1024),     // 75KB
-            ("medium", 100 * 1024),    // 100KB
-            ("large", 150 * 1024),     // 150KB
-            ("large", 200 * 1024),     // 200KB
-            ("large", 250 * 1024),     // 250KB
+            ("small", 10 * 1024),       // 10KB
+            ("small", 50 * 1024),       // 50KB
+            ("medium", 75 * 1024),      // 75KB
+            ("medium", 100 * 1024),     // 100KB
+            ("large", 150 * 1024),      // 150KB
+            ("large", 200 * 1024),      // 200KB
+            ("large", 250 * 1024),      // 250KB
             ("very_large", 300 * 1024), // 300KB (fallback)
             ("very_large", 500 * 1024), // 500KB (fallback)
         ];
@@ -528,7 +528,11 @@ mod tests {
         for (category, size) in &typical_metadata_sizes {
             if size <= &ESTIMATED_SIZE {
                 happy_path_count += 1;
-                println!("✅ {} ({} KB): Happy path (1 request)", category, size / 1024);
+                println!(
+                    "✅ {} ({} KB): Happy path (1 request)",
+                    category,
+                    size / 1024
+                );
             } else {
                 fallback_count += 1;
                 println!(
@@ -539,12 +543,21 @@ mod tests {
             }
         }
 
-        let coverage_percent = (happy_path_count as f64 / typical_metadata_sizes.len() as f64)
-            * 100.0;
+        let coverage_percent =
+            (happy_path_count as f64 / typical_metadata_sizes.len() as f64) * 100.0;
 
         println!("\n📊 Coverage Analysis:");
-        println!("   Happy path: {}/{} ({:.1}%)", happy_path_count, typical_metadata_sizes.len(), coverage_percent);
-        println!("   Fallback: {}/{}", fallback_count, typical_metadata_sizes.len());
+        println!(
+            "   Happy path: {}/{} ({:.1}%)",
+            happy_path_count,
+            typical_metadata_sizes.len(),
+            coverage_percent
+        );
+        println!(
+            "   Fallback: {}/{}",
+            fallback_count,
+            typical_metadata_sizes.len()
+        );
         println!("   Expected gain: 30-40% cold query latency reduction");
 
         // We expect ~70-80% of files to use happy path

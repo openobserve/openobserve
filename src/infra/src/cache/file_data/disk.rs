@@ -532,7 +532,10 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
     .await
     .map_err(|e| object_store::Error::NotFound {
         path: file_name.clone(),
-        source: Box::new(std::io::Error::other(format!("spawn_blocking error: {}", e))),
+        source: Box::new(std::io::Error::other(format!(
+            "spawn_blocking error: {}",
+            e
+        ))),
     })?
     .map_err(|e| object_store::Error::NotFound {
         path: file_name,
