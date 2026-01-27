@@ -125,13 +125,6 @@ describe("IncidentDetailDrawer.vue", () => {
       subscription_type: "",
     };
     store.state.theme = "light";
-    store.state.sreChatContext = null;
-
-    // Mock store action
-    if (!store._actions) {
-      store._actions = {};
-    }
-    store._actions['setIsSREChatOpen'] = [vi.fn()];
 
     // Default mock implementation
     (incidentsService.get as any).mockResolvedValue({
