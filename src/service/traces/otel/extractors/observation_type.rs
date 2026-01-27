@@ -66,7 +66,6 @@ pub fn map_to_observation_type(
     _resource_attributes: &HashMap<String, json::Value>,
     scope: Option<&ScopeInfo>,
 ) -> ObservationType {
-    // Priority 1: Gen-AI Operation Name Mapping
     if let Some(operation) = attributes
         .get(GenAiAttributes::OPERATION_NAME)
         .and_then(|v| v.as_str())
@@ -86,7 +85,6 @@ pub fn map_to_observation_type(
         }
     }
 
-    // Priority 2: OpenInference Span Kind Mapping
     if let Some(span_kind) = attributes
         .get(OpenInferenceAttributes::SPAN_KIND)
         .and_then(|v| v.as_str())
@@ -104,7 +102,6 @@ pub fn map_to_observation_type(
         }
     }
 
-    // Priority 3: Vercel AI SDK Generation-Like Mapping (with model)
     if let Some(scope_info) = scope
         && scope_info.name.as_deref() == Some("ai")
     {
@@ -117,21 +114,18 @@ pub fn map_to_observation_type(
         }
     }
 
-    // Priority 4: Vercel AI SDK Span-Like Mapping (without model)
     if let Some(scope_info) = scope
         && scope_info.name.as_deref() == Some("ai")
     {
         return ObservationType::Span;
     }
 
-    // Priority 5: Gen-AI Tool Call Detection
     if attributes.contains_key(GenAiAttributes::TOOL_NAME)
         || attributes.contains_key(GenAiAttributes::TOOL_CALL_ID)
     {
         return ObservationType::Tool;
     }
 
-    // Priority 6: Model-Based Fallback
     let model_keys = [
         GenAiAttributes::REQUEST_MODEL,
         GenAiAttributes::RESPONSE_MODEL,
