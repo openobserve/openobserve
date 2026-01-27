@@ -35,7 +35,7 @@ describe("ResourceDetailDrawer", () => {
 
   const mockResource = {
     resource_method: "GET",
-    resource_url: "https://api.example.com/users",
+    resource_url: "http://localhost:5080/users",
     resource_duration: 250,
     resource_status_code: 200,
     resource_type: "xhr",
@@ -46,7 +46,7 @@ describe("ResourceDetailDrawer", () => {
       id: "session-123",
     },
     view: {
-      url: "https://example.com/dashboard",
+      url: "http://localhost:5080/dashboard",
     },
     _oo: {
       trace_id: "trace-123",
@@ -120,7 +120,7 @@ describe("ResourceDetailDrawer", () => {
   describe("Resource header display", () => {
     it("should display resource method and URL", () => {
       expect(wrapper.text()).toContain("GET");
-      expect(wrapper.text()).toContain("https://api.example.com/users");
+      expect(wrapper.text()).toContain("http://localhost:5080/users");
     });
 
     it("should display timestamp", () => {
@@ -181,14 +181,14 @@ describe("ResourceDetailDrawer", () => {
 
     it("should display page URL", () => {
       expect(wrapper.text()).toContain("Page URL:");
-      expect(wrapper.text()).toContain("https://example.com/dashboard");
+      expect(wrapper.text()).toContain("http://localhost:5080/dashboard");
     });
 
     it("should not display fields when data is missing", async () => {
       await wrapper.setProps({
         resource: {
           resource_method: "GET",
-          resource_url: "https://api.example.com",
+          resource_url: "http://localhost:5080",
           resource_duration: 100,
           _timestamp: 1700000000000000,
         },
@@ -448,14 +448,14 @@ describe("ResourceDetailDrawer", () => {
     it("should handle resource with minimal data", async () => {
       await wrapper.setProps({
         resource: {
-          resource_url: "https://example.com",
+          resource_url: "http://localhost:5080",
           _timestamp: 1700000000000000,
         },
       });
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.text()).toContain("https://example.com");
+      expect(wrapper.text()).toContain("http://localhost:5080");
     });
 
     it("should handle missing timestamp gracefully", async () => {
@@ -510,7 +510,7 @@ describe("ResourceDetailDrawer", () => {
     it("should show full URL in title attribute", () => {
       const urlElements = wrapper.findAll("[title]");
       const urlElement = urlElements.find((el: any) =>
-        el.attributes("title")?.includes("https://example.com/dashboard"),
+        el.attributes("title")?.includes("http://localhost:5080/dashboard"),
       );
       expect(urlElement).toBeTruthy();
     });
