@@ -169,11 +169,7 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
             };
 
             // Create a synthetic traceparent and set as parent
-            let traceparent = format!(
-                "00-{}-{}-01",
-                trace_id_str,
-                parent_span_id
-            );
+            let traceparent = format!("00-{}-{}-01", trace_id_str, parent_span_id);
             let mut headers_map = std::collections::HashMap::new();
             headers_map.insert("traceparent".to_string(), traceparent);
             let parent_ctx = global::get_text_map_propagator(|prop| prop.extract(&headers_map));

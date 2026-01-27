@@ -71,8 +71,8 @@ pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
 }
 
 /// Setup tracing with a trace ID
-/// This function should be called when the parent span is already active (entered) in the tracing context.
-/// It will use the current active span as parent, maintaining the span hierarchy.
+/// This function should be called when the parent span is already active (entered) in the tracing
+/// context. It will use the current active span as parent, maintaining the span hierarchy.
 /// If no parent span is active, it creates a synthetic parent context with the given trace_id.
 pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
     // Check if there's a current OpenTelemetry context with a valid span
