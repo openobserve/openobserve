@@ -55,11 +55,11 @@ pub mod search;
 pub mod service_accounts;
 pub mod service_streams;
 pub mod short_url;
+pub mod sourcemaps;
 pub mod status;
 pub mod stream;
 pub mod traces;
 pub mod users;
-pub mod sourcemaps;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

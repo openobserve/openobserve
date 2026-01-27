@@ -20,9 +20,12 @@ pub mod search_jobs;
 use config::utils::json;
 use infra::{
     errors::{Error, Result},
-    table::search_job::{
-        search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
-        search_jobs::JobOperator,
+    table::{
+        search_job::{
+            search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
+            search_jobs::JobOperator,
+        },
+        source_maps::SourceMap,
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
@@ -40,6 +43,49 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::SearchJobResult => {
             let operator: JobResultOperator = json::from_slice(&msg.value.unwrap())?;
             search_job_results::process(operator).await?;
+        }
+        // sourcemap messages also come on the same queue
+        MessageType::SourceMapPut => {
+            let entry: SourceMap = json::from_slice(&msg.value.unwrap())?;
+            let org_id = entry.org.clone();
+            let smap = entry.source_map_file_name.clone();
+            match infra::table::source_maps::add_many(vec![entry]).await {
+                Ok(_) => {}
+                Err(infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation)) => {
+                    log::error!("sourcemap file already exists in this cluster : {org_id}/{smap}");
+                }
+                Err(e) => {
+                    log::error!("error while saving sourcemap to db {org_id}/{smap} : {e}");
+                }
+            }
+        }
+        MessageType::SourceMapDelete => {
+            let (org_id, service, env, version): (
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ) = json::from_slice(&msg.value.unwrap())?;
+
+            match infra::table::source_maps::delete_group(
+                &org_id,
+                service.clone(),
+                env.clone(),
+                version.clone(),
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "error while deleting sourceamp for {}/{}/{}/{} : {e}",
+                        org_id,
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
+                    );
+                }
+            }
         }
         _ => {
             log::error!(

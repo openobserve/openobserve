@@ -24,7 +24,7 @@ use infra::{
 
 use crate::service::db;
 
-// DBKey to set cipher keys
+// DBKey to set sourcemaps keys
 pub const SOURCEMAP_PREFIX: &str = "/sourcemaps/";
 
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
@@ -56,20 +56,21 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), anyhow::Error> {
         {
             let config = o2_enterprise::enterprise::common::config::get_config();
             if config.super_cluster.enabled {
-                match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
+                match o2_enterprise::enterprise::super_cluster::queue::add_sourcemap(entry.clone())
+                    .await
                 {
                     Ok(_) => {
                         log::info!(
-                            "successfully sent key add notification to super cluster queue for {}/{}",
+                            "successfully sent sourcemap add notification to super cluster queue for {}/{}",
                             entry.org,
-                            entry.name
+                            entry.source_map_file_name
                         );
                     }
                     Err(e) => {
                         log::error!(
-                            "error in sending cipher key add notification to super cluster queue for {}/{} : {e}",
+                            "error in sending sourcemap add notification to super cluster queue for {}/{} : {e}",
                             entry.org,
-                            entry.name
+                            entry.source_map_file_name
                         );
                     }
                 }
@@ -118,9 +119,9 @@ pub async fn delete_group(
         .delete(
             &format!(
                 "{SOURCEMAP_PREFIX}{org}/{}/{}/{}",
-                service.unwrap_or_default(),
-                env.unwrap_or_default(),
-                version.unwrap_or_default()
+                service.as_deref().unwrap_or(""),
+                env.as_deref().unwrap_or(""),
+                version.as_deref().unwrap_or("")
             ),
             false,
             true,
@@ -133,15 +134,28 @@ pub async fn delete_group(
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await {
+            match o2_enterprise::enterprise::super_cluster::queue::delete_sourcemaps(
+                org,
+                service.clone(),
+                env.clone(),
+                version.clone(),
+            )
+            .await
+            {
                 Ok(_) => {
                     log::info!(
-                        "successfully sent cipher key delete notification to super cluster queue for {org}/{name}"
+                        "successfully sent sourcemap delete notification to super cluster queue for {org}/{}/{}/{}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
                     );
                 }
                 Err(e) => {
                     log::error!(
-                        "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
+                        "error in sending sourcemap delete notification to super cluster queue for {org}/{}/{}/{} : {e}",
+                        service.unwrap_or_default(),
+                        env.unwrap_or_default(),
+                        version.unwrap_or_default()
                     );
                 }
             }
