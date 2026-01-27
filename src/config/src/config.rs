@@ -1264,6 +1264,12 @@ pub struct Common {
     )]
     pub traces_list_index_enabled: bool,
     #[env_config(
+        name = "ZO_TRACES_OTEL_TRANSFORM_ENABLED",
+        default = false,
+        help = "enable OTEL transform for trace enrichment with LLM observability attributes"
+    )]
+    pub traces_otel_transform_enabled: bool,
+    #[env_config(
         name = "ZO_INGESTION_LOG_ENABLED",
         default = true,
         help = "enable ingestion error logs reporting"

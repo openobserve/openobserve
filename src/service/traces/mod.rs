@@ -317,22 +317,23 @@ pub async fn handle_otlp_request(
                     });
                 }
 
-                // Enrich span attributes with OTEL processor
+                // Enrich span attributes with OTEL processor if enabled
                 // This adds AI/ML observability fields like model_name, usage_details, etc.
-                let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
-                // Convert nanosecond timestamp to ISO string for completion start time calculation
-                let start_time_iso = chrono::DateTime::from_timestamp(
-                    (start_time / 1_000_000_000) as i64,
-                    (start_time % 1_000_000_000) as u32,
-                )
-                .map(|dt| dt.to_rfc3339());
-                otel_processor.process_span(
-                    &mut span_att_map,
-                    &service_att_map,
-                    scope_name,
-                    &events,
-                    start_time_iso.as_deref(),
-                );
+                if cfg.common.traces_otel_transform_enabled {
+                    let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
+                    let start_time_iso = chrono::DateTime::from_timestamp(
+                        (start_time / 1_000_000_000) as i64,
+                        (start_time % 1_000_000_000) as u32,
+                    )
+                    .map(|dt| dt.to_rfc3339());
+                    otel_processor.process_span(
+                        &mut span_att_map,
+                        &service_att_map,
+                        scope_name,
+                        &events,
+                        start_time_iso.as_deref(),
+                    );
+                }
 
                 let mut links = vec![];
                 for link in span.links {
