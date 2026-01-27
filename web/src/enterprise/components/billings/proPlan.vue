@@ -121,19 +121,31 @@ export default defineComponent({
     const btnSubscribe = ref(t('billing.subscribe'));
 
     const features = [
-      { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.30/GB' , is_parent: true},
-      { name: 'Query Volume', price: '$0.01/GB' , is_parent: true},
+      { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.50 / GB' , is_parent: true},
+      { name: 'Query Volume', price: '$0.01 / GB' , is_parent: true},
       { name: 'Pipelines', price: '' , is_parent: true},
-      { name: 'Data Processed', price: '$0.20/ GB' , is_parent: false},
-      { name: 'Each additional destination', price: '$0.30/ GB' , is_parent: false},
-      { name: 'Each remote destination', price: '$0.45/ GB' , is_parent: false},
-      { name: 'RUM & Session Replay', price: '$1/ 1K sessions' , is_parent: true},
-      { name: 'Error Tracking', price: '$0.15/ 1K events' , is_parent: true},
-      { name: 'Action Script', price: '$1/ 1K runs' , is_parent: true},
+      { name: 'Data Processed', price: '$0.20 / GB' , is_parent: false},
+      { name: 'Each additional destination', price: '$0.30 / GB' , is_parent: false},
+      // { name: 'Each remote destination', price: '$0.45 per GB' , is_parent: false},
+      { name: 'Front end monitoring', price: '' , is_parent: true},
+      { name: 'Real User Monitoring (RUM)', price: '$0.15 / 1K sessions' , is_parent: false},
+      { name: 'Session Replay', price: '$1.00 / 1K sessions' , is_parent: false},
+      { name: 'Error Tracking', price: '$0.15 / 1K events' , is_parent: false},
+      { name: 'Sensitive Data Redaction', price: '$0.15 / GB' , is_parent: true},
+      
+      { name: 'Incident Management', price: '$0 during preview' , is_parent: true},
+      { name: 'AI Assistant', price: '$0 during preview' , is_parent: true},
+      { name: 'AI SRE Agent', price: '$0 during preview' , is_parent: true},
+      { name: 'Audit Trail', price: '2% of monthly spend' , is_parent: true},
+      { name: 'Retention', price: '' , is_parent: true},
+      { name: '15-Days Retention', price: 'Included' , is_parent: false},
+      { name: 'Additional Retention', price: '$0.10 / 30 days' , is_parent: false},
+      
+      // { name: 'Action Script', price: '$1.00 / 1K runs' , is_parent: true},
       { name: 'Unlimited Users', price: '' , is_parent: true},
       { name: 'Role-Based Access Control (RBAC)', price: '' , is_parent: true},
-      { name: '15-Days Retention', price: '' , is_parent: true},
-      { name: '30 days additional retention', price: '$0.10/GB' , is_parent: true},
+      
+      
     ];
 
     const cancelSubscription = () => {
