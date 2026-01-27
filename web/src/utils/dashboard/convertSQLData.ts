@@ -3230,6 +3230,7 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         showSymbol: panelSchema.config?.show_symbol ?? false,
         lineStyle: { width: panelSchema.config?.line_thickness ?? 1.5 },
       };
+      
     case "stacked":
       return {
         type: "bar",

@@ -44,9 +44,40 @@ jobs:
             echo "should_build=false" >> $GITHUB_OUTPUT
           fi
 
+  build_frontend:
+    name: build_frontend
+    needs: check_changes
+    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
-    needs: check_changes
+    needs: [check_changes, build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -73,27 +104,70 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
+          name: frontend-dist
+          path: web/dist
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          prefix-key: amd64
+
+      - name: Validate cache setup
+        run: |
+          echo "=== Cache Status ==="
+          echo "Cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+
+          echo -e "\n=== Frontend dist timestamp (should be BEFORE cache restore) ==="
+          if [ -d "web/dist" ]; then
+            stat -c "Modified: %y" web/dist | head -1
+          else
+            echo "ERROR: web/dist not found!"
+            exit 1
+          fi
+
+          echo -e "\n=== Target directory status ==="
+          if [ -d "target" ]; then
+            echo "Target directory exists (cache restored)"
+            echo "Target modified: $(stat -c "%y" target)"
+
+            # Check if we have cached workspace crates
+            CACHED_CRATES=$(find target -name "libconfig-*.rlib" -o -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "Found $CACHED_CRATES cached workspace crate artifacts"
+
+            if [ "$CACHED_CRATES" -eq 0 ] && [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ]; then
+              echo "WARNING: Cache hit but no cached artifacts found!"
+            fi
+          else
+            echo "Target directory does not exist (cache miss)"
+          fi
+
+          echo -e "\n=== Quick compilation check (cargo check - fast) ==="
+          echo "Running cargo check to see what needs recompilation..."
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+      - name: Set GIT_TAG env
+        run: |
+          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
+        env:
+          GIT_VERSION: ${{ env.GIT_TAG }}
+          GIT_COMMIT_HASH: ${{ github.sha }}
+          GIT_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: |
+          echo "Building openobserve for x86_64..."
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
@@ -114,11 +188,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
-
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -133,7 +202,7 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
-    needs: check_changes
+    needs: [check_changes, build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -160,27 +229,70 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
+          name: frontend-dist
+          path: web/dist
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: "openobserve-${{ runner.arch }}"
           cache-on-failure: true
-          prefix-key: arm64
+
+      - name: Validate cache setup
+        run: |
+          echo "=== Cache Status ==="
+          echo "Cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+
+          echo -e "\n=== Frontend dist timestamp (should be BEFORE cache restore) ==="
+          if [ -d "web/dist" ]; then
+            stat -c "Modified: %y" web/dist | head -1
+          else
+            echo "ERROR: web/dist not found!"
+            exit 1
+          fi
+
+          echo -e "\n=== Target directory status ==="
+          if [ -d "target" ]; then
+            echo "Target directory exists (cache restored)"
+            echo "Target modified: $(stat -c "%y" target)"
+
+            # Check if we have cached workspace crates
+            CACHED_CRATES=$(find target -name "libconfig-*.rlib" -o -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "Found $CACHED_CRATES cached workspace crate artifacts"
+
+            if [ "$CACHED_CRATES" -eq 0 ] && [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ]; then
+              echo "WARNING: Cache hit but no cached artifacts found!"
+            fi
+          else
+            echo "Target directory does not exist (cache miss)"
+          fi
+
+          echo -e "\n=== Quick compilation check (cargo check - fast) ==="
+          echo "Running cargo check to see what needs recompilation..."
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+      - name: Set GIT_TAG env
+        run: |
+          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
+        env:
+          GIT_VERSION: ${{ env.GIT_TAG }}
+          GIT_COMMIT_HASH: ${{ github.sha }}
+          GIT_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
         run: |
+          echo "Building openobserve for aarch64..."
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
@@ -200,11 +312,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -232,7 +339,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0
-          fetch-tags: true
+
       - name: Set GIT_TAG env
         run: |
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
