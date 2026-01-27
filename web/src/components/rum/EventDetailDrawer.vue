@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     size="sm"
                     icon="cancel"
+                    data-test="close-drawer-btn"
                   />
                 </div>
               </div>
@@ -186,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
                   class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer hover:tw:bg-[#e0e0e0] tw:transition-colors"
+                  data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
@@ -279,6 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outline
                       class="tw:ml-[0.625rem]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
                       title="View trace details"
+                      data-test="view-trace-btn"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
                       <span
@@ -443,10 +446,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Raw Event Data"
             header-class="text-bold tw:text-sm"
             dense
+            data-test="raw-event-expansion"
           >
             <div class="tw:p-2 tw:bg-[var(--o2-hover-accent)] tw:rounded">
               <pre
                 class="tw:text-[10px] tw:font-mono tw:m-0 tw:whitespace-pre-wrap tw:break-words tw:leading-tight"
+                data-test="raw-event-json"
               >
                   {{ JSON.stringify(rawEvent, null, 2) }}
                 </pre

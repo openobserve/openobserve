@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
-import { createStore } from "vuex";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import searchService from "@/services/search";
 
@@ -26,34 +25,98 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
-// Create a test store
-const createTestStore = () => {
-  return createStore({
-    state: {
-      selectedOrganization: {
-        identifier: "test-org",
-      },
-      zoConfig: {
-        timestamp_column: "_timestamp",
-      },
+// Mock vuex store
+const mockStore = {
+  state: {
+    selectedOrganization: {
+      identifier: "test-org",
     },
-  });
+    zoConfig: {
+      timestamp_column: "_timestamp",
+    },
+  },
 };
 
-describe("useTraceCorrelation", () => {
-  let store: any;
+vi.mock("vuex", () => ({
+  useStore: () => mockStore,
+}));
 
+// ============================================================================
+// TEST DATA FACTORIES
+// ============================================================================
+
+/**
+ * Factory function to create mock RUM events
+ */
+function createMockRumEvent(overrides: Record<string, any> = {}) {
+  return {
+    type: "resource",
+    session_id: "session-1",
+    resource: {
+      duration: 500,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * Factory function to create mock backend span
+ */
+function createMockBackendSpan(overrides: Record<string, any> = {}) {
+  return {
+    span_id: "span-1",
+    duration_ms: 100,
+    ...overrides,
+  };
+}
+
+/**
+ * Factory function to create mock search response
+ */
+function createMockSearchResponse(
+  hits: any[] = [],
+  total: number = hits.length,
+) {
+  return {
+    data: {
+      hits,
+      total,
+    },
+  } as any;
+}
+
+// ============================================================================
+// TEST HELPERS
+// ============================================================================
+
+/**
+ * Helper to mock successful RUM and APM search calls
+ */
+function mockSuccessfulSearch(
+  rumEvents: any[] = [],
+  backendSpans: any[] = [],
+) {
+  vi.mocked(searchService.search)
+    .mockResolvedValueOnce(createMockSearchResponse(rumEvents))
+    .mockResolvedValueOnce(createMockSearchResponse(backendSpans));
+}
+
+/**
+ * Helper to mock failed search call
+ */
+function mockFailedSearch(errorMessage: string = "Network error") {
+  vi.mocked(searchService.search).mockRejectedValueOnce(
+    new Error(errorMessage),
+  );
+}
+
+describe("useTraceCorrelation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    store = createTestStore();
-
-    // Set up global store for the composable
-    vi.stubGlobal("useStore", () => store);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
   describe("Initialization", () => {
@@ -134,12 +197,7 @@ describe("useTraceCorrelation", () => {
     it("should fetch RUM data with correct query", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: {
-          hits: [],
-          total: 0,
-        },
-      } as any);
+      mockSuccessfulSearch([], []);
 
       const { fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
@@ -160,19 +218,9 @@ describe("useTraceCorrelation", () => {
     it("should fetch trace data after RUM data", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: {
-            hits: [{ type: "resource", session_id: "session-1" }],
-            total: 1,
-          },
-        } as any)
-        .mockResolvedValueOnce({
-          data: {
-            hits: [{ span_id: "span-1", duration_ms: 100 }],
-            total: 1,
-          },
-        } as any);
+      const rumEvent = createMockRumEvent();
+      const backendSpan = createMockBackendSpan();
+      mockSuccessfulSearch([rumEvent], [backendSpan]);
 
       const { fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
@@ -190,32 +238,13 @@ describe("useTraceCorrelation", () => {
     it("should populate correlationData on successful fetch", async () => {
       const traceId = ref("test-trace-123");
 
-      const mockRumEvents = [
-        {
-          type: "resource",
-          session_id: "session-1",
-          resource: { duration: 500 },
-        },
-      ];
-
+      const mockRumEvents = [createMockRumEvent()];
       const mockBackendSpans = [
-        { span_id: "span-1", duration_ms: 100 },
-        { span_id: "span-2", duration_ms: 150 },
+        createMockBackendSpan({ span_id: "span-1", duration_ms: 100 }),
+        createMockBackendSpan({ span_id: "span-2", duration_ms: 150 }),
       ];
 
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: {
-            hits: mockRumEvents,
-            total: 1,
-          },
-        } as any)
-        .mockResolvedValueOnce({
-          data: {
-            hits: mockBackendSpans,
-            total: 2,
-          },
-        } as any);
+      mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
       const { correlationData, fetchCorrelation } =
         useTraceCorrelation(traceId);
@@ -232,13 +261,9 @@ describe("useTraceCorrelation", () => {
     it("should handle trace fetch failure gracefully", async () => {
       const traceId = ref("test-trace-123");
 
+      const rumEvent = createMockRumEvent();
       vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: {
-            hits: [{ type: "resource", session_id: "session-1" }],
-            total: 1,
-          },
-        } as any)
+        .mockResolvedValueOnce(createMockSearchResponse([rumEvent]))
         .mockRejectedValueOnce(new Error("Trace not found"));
 
       const { correlationData, hasBackendTrace, fetchCorrelation } =
@@ -256,9 +281,7 @@ describe("useTraceCorrelation", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      vi.mocked(searchService.search).mockRejectedValue(
-        new Error("Network error"),
-      );
+      mockFailedSearch("Network error");
 
       const { correlationData, error, fetchCorrelation } =
         useTraceCorrelation(traceId);
@@ -275,9 +298,7 @@ describe("useTraceCorrelation", () => {
     it("should reset loading state on error", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search).mockRejectedValue(
-        new Error("Network error"),
-      );
+      mockFailedSearch("Network error");
 
       const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId);
 
@@ -291,26 +312,13 @@ describe("useTraceCorrelation", () => {
     it("should calculate performance breakdown when resource event exists", async () => {
       const traceId = ref("test-trace-123");
 
-      const mockRumEvents = [
-        {
-          type: "resource",
-          session_id: "session-1",
-          resource: { duration: 500 },
-        },
-      ];
-
+      const mockRumEvents = [createMockRumEvent()];
       const mockBackendSpans = [
-        { span_id: "span-1", duration_ms: 100 },
-        { span_id: "span-2", duration_ms: 150 },
+        createMockBackendSpan({ span_id: "span-1", duration_ms: 100 }),
+        createMockBackendSpan({ span_id: "span-2", duration_ms: 150 }),
       ];
 
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: { hits: mockRumEvents, total: 1 },
-        } as any)
-        .mockResolvedValueOnce({
-          data: { hits: mockBackendSpans, total: 2 },
-        } as any);
+      mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
       const { performanceData, fetchCorrelation } =
         useTraceCorrelation(traceId);
@@ -326,9 +334,13 @@ describe("useTraceCorrelation", () => {
     it("should return null performance breakdown when no resource event", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [], total: 0 },
-      } as any);
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any);
 
       const { performanceData, fetchCorrelation } =
         useTraceCorrelation(traceId);
@@ -348,9 +360,13 @@ describe("useTraceCorrelation", () => {
         },
       ];
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: mockRumEvents, total: 1 },
-      } as any);
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce({
+          data: { hits: mockRumEvents, total: 1 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any);
 
       const { performanceData, fetchCorrelation } =
         useTraceCorrelation(traceId);
@@ -364,6 +380,7 @@ describe("useTraceCorrelation", () => {
     it("should compute hasBackendTrace correctly", async () => {
       const traceId = ref("test-trace-123");
 
+      // First call returns RUM data, second call returns backend spans
       vi.mocked(searchService.search)
         .mockResolvedValueOnce({
           data: { hits: [], total: 0 },
@@ -412,12 +429,20 @@ describe("useTraceCorrelation", () => {
     it("should update computed values when correlationData changes", async () => {
       const traceId = ref("test-trace-123");
 
+      // First fetch - no backend spans (2 calls: RUM + APM)
+      // Second fetch - with backend spans (2 calls: RUM + APM)
       vi.mocked(searchService.search)
         .mockResolvedValueOnce({
           data: { hits: [], total: 0 },
         } as any)
         .mockResolvedValueOnce({
           data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
       const { hasBackendTrace, backendSpanCount, fetchCorrelation } =
@@ -429,14 +454,6 @@ describe("useTraceCorrelation", () => {
       expect(backendSpanCount.value).toBe(0);
 
       // Fetch again with backend spans
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: { hits: [], total: 0 },
-        } as any)
-        .mockResolvedValueOnce({
-          data: { hits: [{ span_id: "span-1" }], total: 1 },
-        } as any);
-
       await fetchCorrelation();
 
       expect(hasBackendTrace.value).toBe(true);
@@ -448,9 +465,13 @@ describe("useTraceCorrelation", () => {
     it("should reset all state when reset is called", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [{ span_id: "span-1" }], total: 1 },
-      } as any);
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce({
+          data: { hits: [{ span_id: "span-1" }], total: 1 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any);
 
       const { correlationData, isLoading, error, fetchCorrelation, reset } =
         useTraceCorrelation(traceId);
@@ -471,9 +492,14 @@ describe("useTraceCorrelation", () => {
     it("should handle multiple consecutive fetches", async () => {
       const traceId = ref("test-trace-123");
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [], total: 0 },
-      } as any);
+      // Mock 6 calls: 2 for each fetch (RUM + APM)
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+        .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
 
       const { fetchCorrelation } = useTraceCorrelation(traceId);
 
@@ -488,13 +514,20 @@ describe("useTraceCorrelation", () => {
     it("should update data on subsequent fetches", async () => {
       const traceId = ref("test-trace-123");
 
-      // First fetch - no backend spans
+      // First fetch - no backend spans (RUM call + APM call)
+      // Second fetch - with backend spans (RUM call + APM call)
       vi.mocked(searchService.search)
         .mockResolvedValueOnce({
           data: { hits: [], total: 0 },
         } as any)
         .mockResolvedValueOnce({
           data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
       const { hasBackendTrace, fetchCorrelation } =
@@ -502,15 +535,6 @@ describe("useTraceCorrelation", () => {
 
       await fetchCorrelation();
       expect(hasBackendTrace.value).toBe(false);
-
-      // Second fetch - with backend spans
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce({
-          data: { hits: [], total: 0 },
-        } as any)
-        .mockResolvedValueOnce({
-          data: { hits: [{ span_id: "span-1" }], total: 1 },
-        } as any);
 
       await fetchCorrelation();
       expect(hasBackendTrace.value).toBe(true);
@@ -529,6 +553,7 @@ describe("useTraceCorrelation", () => {
         useTraceCorrelation(traceId);
       await fetchCorrelation();
 
+      expect(correlationData.value).not.toBeNull();
       expect(correlationData.value?.rum_events).toHaveLength(0);
       expect(correlationData.value?.session_id).toBeNull();
     });
@@ -544,6 +569,7 @@ describe("useTraceCorrelation", () => {
         useTraceCorrelation(traceId);
       await fetchCorrelation();
 
+      expect(correlationData.value).not.toBeNull();
       expect(correlationData.value?.rum_events).toHaveLength(0);
       expect(correlationData.value?.backend_spans).toHaveLength(0);
     });
@@ -575,7 +601,8 @@ describe("useTraceCorrelation", () => {
         useTraceCorrelation(traceId);
       await fetchCorrelation();
 
-      // Should handle null duration_ms gracefully
+      // Should handle null duration_ms gracefully (reduce treats null as 0)
+      expect(performanceData.value?.backend_duration_ms).toBeDefined();
       expect(performanceData.value?.backend_duration_ms).toBe(0);
     });
   });
@@ -583,11 +610,15 @@ describe("useTraceCorrelation", () => {
   describe("Time range handling", () => {
     it("should query with correct time range", async () => {
       const traceId = ref("test-trace-123");
-      const now = Date.now();
 
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [], total: 0 },
-      } as any);
+      // Mock both RUM and APM calls
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any)
+        .mockResolvedValueOnce({
+          data: { hits: [], total: 0 },
+        } as any);
 
       const { fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
@@ -608,7 +639,7 @@ describe("useTraceCorrelation", () => {
       const startTime = call.query.query.start_time;
       const endTime = call.query.query.end_time;
 
-      // Should query last hour
+      // Should query last hour (in microseconds)
       expect(endTime - startTime).toBeGreaterThanOrEqual(3600000000);
     });
   });
