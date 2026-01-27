@@ -49,9 +49,11 @@ test.describe("Alerts & Incidents Pages", { tag: '@enterprise' }, () => {
         // Wait for alert list page to be ready
         await pm.alertsPage.waitForAlertListPageReady();
 
-        // Wait for sidebar menu to be populated (config API must return)
-        // The incidents menu item depends on service_graph_enabled from server config
-        await page.waitForTimeout(2000); // Allow time for config API to complete
+        // Wait for config API to complete - incidents menu depends on service_graph_enabled
+        await page.waitForResponse(
+            response => response.url().includes('/config') && response.status() === 200,
+            { timeout: 10000 }
+        ).catch(() => {}); // Config may already be loaded
         testLogger.info('Alert page loaded successfully');
     });
 
