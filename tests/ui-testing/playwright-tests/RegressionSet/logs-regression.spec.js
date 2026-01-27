@@ -91,22 +91,24 @@ test.describe("Logs Regression Bugs", () => {
     await ingestTestData(page, streamA);
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
-    await page.waitForLoadState('networkidle'); // Wait for data to be indexed
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(3000); // Wait for data to be indexed
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000); // Allow page to stabilize
 
     // ===== STREAM A SETUP =====
     testLogger.info(`Setting up Stream A (${streamA}) with saved view`);
 
     // Select stream A
     await pm.logsPage.selectStream(streamA);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click refresh to load data
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
     // Search for the field first to make it visible in sidebar
@@ -139,11 +141,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Switch to stream B
     await pm.logsPage.selectStream(streamB);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click refresh to load data
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
     // Search for the field first to make it visible in sidebar
@@ -829,7 +831,8 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Validate log display with apostrophes and special characters (Bug #9475)');
 
     const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
+    const uniqueId = Date.now();
+    const streamName = `e2e_apostrophe_${uniqueId}`;
 
     // Multiple test messages with different apostrophe scenarios
     const testMessages = [
@@ -884,7 +887,8 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000); // Allow page to stabilize
 
     // Select stream and set time range
     await pm.logsPage.selectStream(streamName);
