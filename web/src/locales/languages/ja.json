@@ -1405,7 +1405,14 @@
     "folders": "フォルダー",
     "searchFolder": "検索フォルダー",
     "deleteFolder": "[フォルダを削除]",
-    "deleteFolderMessage": "このフォルダを削除してよろしいですか?"
+    "deleteFolderMessage": "このフォルダを削除してよろしいですか?",
+    "columnOrder": "列の順序",
+    "configureColumnOrder": "列の順序を設定",
+    "columnOrderDescription": "テーブル内の列の表示順序をカスタマイズします。順序を変更できるのは、表示されている列 (表示/非表示のフィルターに基づく) だけです。列をドラッグして順序を変更してください。",
+    "noColumnsOrdered": "列は順序付けられていません",
+    "columnsDefaultOrder": "列はデフォルトの順序で表示されます",
+    "moveUp": "上へ移動",
+    "moveDown": "下に移動"
   },
   "panel": {
     "header": "パネル",

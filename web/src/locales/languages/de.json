@@ -1389,7 +1389,14 @@
     "folders": "Ordner",
     "searchFolder": "Ordner durchsuchen",
     "deleteFolder": "Ordner löschen",
-    "deleteFolderMessage": "Möchten Sie diesen Ordner wirklich löschen?"
+    "deleteFolderMessage": "Möchten Sie diesen Ordner wirklich löschen?",
+    "columnOrder": "Reihenfolge der Spalten",
+    "configureColumnOrder": "Spaltenreihenfolge konfigurieren",
+    "columnOrderDescription": "Passen Sie die Anzeigereihenfolge der Spalten in der Tabelle an. Nur sichtbare Spalten (basierend auf sichtbaren/versteckten Filtern) können neu angeordnet werden. Ziehen Sie die Spalten, um ihre Reihenfolge zu ändern.",
+    "noColumnsOrdered": "Keine Spalten angeordnet",
+    "columnsDefaultOrder": "Die Spalten werden in ihrer Standardreihenfolge angezeigt",
+    "moveUp": "Steigen Sie auf",
+    "moveDown": "Gehe nach unten"
   },
   "panel": {
     "header": "Panel",

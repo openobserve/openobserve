@@ -1389,7 +1389,14 @@
     "folders": "Mappen",
     "searchFolder": "Folder zoeken",
     "deleteFolder": "Map verwijderen",
-    "deleteFolderMessage": "Weet je zeker dat je deze map wilt verwijderen?"
+    "deleteFolderMessage": "Weet je zeker dat je deze map wilt verwijderen?",
+    "columnOrder": "Kolomvolgorde",
+    "configureColumnOrder": "Kolomvolgorde configureren",
+    "columnOrderDescription": "Pas de weergavevolgorde van kolommen in de tabel aan. Alleen zichtbare kolommen (op basis van zichtbare/verborgen filters) kunnen opnieuw worden gerangschikt. Versleep de kolommen om de volgorde te wijzigen.",
+    "noColumnsOrdered": "Geen kolommen besteld",
+    "columnsDefaultOrder": "De kolommen worden in hun standaardvolgorde weergegeven",
+    "moveUp": "Ga omhoog",
+    "moveDown": "Naar beneden gaan"
   },
   "panel": {
     "header": "Paneel",

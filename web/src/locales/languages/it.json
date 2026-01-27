@@ -1389,7 +1389,14 @@
     "folders": "Cartelle",
     "searchFolder": "Cartella di ricerca",
     "deleteFolder": "Elimina cartella",
-    "deleteFolderMessage": "Sei sicuro di voler eliminare questa cartella?"
+    "deleteFolderMessage": "Sei sicuro di voler eliminare questa cartella?",
+    "columnOrder": "Ordine delle colonne",
+    "configureColumnOrder": "Configura l'ordine delle colonne",
+    "columnOrderDescription": "Personalizza l'ordine di visualizzazione delle colonne nella tabella. È possibile riordinare solo le colonne visibili (basate su filtri visibili/nascosti). Trascina le colonne per modificarne l'ordine.",
+    "noColumnsOrdered": "Nessuna colonna ordinata",
+    "columnsDefaultOrder": "Le colonne verranno visualizzate nell'ordine predefinito",
+    "moveUp": "Sposta verso l'alto",
+    "moveDown": "Sposta verso il basso"
   },
   "panel": {
     "header": "Pannello",
