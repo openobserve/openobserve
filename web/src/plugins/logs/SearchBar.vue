@@ -1675,7 +1675,10 @@ import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
+const CodeQueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue")
+);
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";

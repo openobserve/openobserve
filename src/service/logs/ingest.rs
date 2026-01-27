@@ -38,7 +38,7 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -77,7 +77,7 @@ pub async fn ingest(
     let cfg = config::get_config();
     let mut need_usage_report = true;
     let log_ingestion_errors = ingestion_log_enabled().await;
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     let pattern_manager = get_pattern_manager().await?;
     let stream_type = StreamType::Logs;
 
@@ -510,7 +510,7 @@ pub async fn ingest(
     drop(original_options);
     drop(user_defined_schema_map);
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(feature = "vectorscan")]
     {
         for (stream, data) in json_data_by_stream.iter_mut() {
             match pattern_manager.process_at_ingestion(
