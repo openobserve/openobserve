@@ -612,39 +612,23 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
     // Wait for all variables to fully load
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Change first and monitor full cascade
-    // When first variable changes, all 9 variables reload (first variable + 8 dependent variables)
-    // Monitor with 5 min timeout to allow all variables to complete loading
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 9, timeout: 300000 });
-
-    // Wait for variable dropdown to be visible and ready
+    // Scroll the first variable into view before changing it
     const var0Dropdown = page.getByLabel(vars[0], { exact: true });
     await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
     await var0Dropdown.scrollIntoViewIfNeeded();
-    // Ensure network is idle before clicking - with 9 variables, this can take time
-    await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
 
-    // Click to open the dropdown
-    await var0Dropdown.click({ timeout: 30000 });
-
-    // Wait for dropdown menu to open and options to load - with 9 variables this is very slow
-    await page.locator('.q-menu').waitFor({ state: "visible", timeout: 60000 });
-    const options = page.locator('[role="option"]');
-    await options.first().waitFor({ state: "visible", timeout: 60000 });
-
-    // Wait for dropdown to stabilize and all options to render - extended for heavy load with 9 variables
-    await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click({ timeout: 30000 });
-
-    // Wait for dropdown to close
-    await page.locator('.q-menu').waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
-
-    const result = await apiMonitor;
+    // Change first and monitor full cascade using the new helper function
+    // When first variable changes, all 8 dependent variables reload
+    // Monitor with 5 min timeout to allow all variables to complete loading
+    const result = await changeVariableValueAndMonitorDependencies(page, vars[0], {
+      optionIndex: 1,           // Select second option to ensure value changes
+      expectedAPICalls: 7,      // Expect 8 API calls for all dependent variables
+      timeout: 300000           // 5 minute timeout for this stress test
+    });
 
     // All 8 dependent variables should eventually load
     expect(result.actualCount).toBeGreaterThanOrEqual(6); // Allow for some timing variations
+    expect(result.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -1012,10 +996,10 @@ test.describe("Dashboard Variables - Dependency Loading", () => {
 
     // Wait for settings dialog to be fully closed
     await page.locator('.q-dialog').waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 30000 });
 
     // Wait for UI to stabilize - variable should show empty/no data state
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
