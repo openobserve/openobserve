@@ -969,6 +969,8 @@ export default defineComponent({
             loading.value,
           );
 
+
+          
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 

@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             copyCellContent(props.value, props.rowIndex, props.col.name)
           "
         >
+        
         </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
           <JsonFieldRenderer
@@ -261,7 +262,6 @@ export default defineComponent({
         if (!isValidHex) {
           return "";
         }
-
         const isDark = isDarkColor(hex);
         return `background-color: ${hex}; color: ${
           isDark ? "#ffffff" : "#000000"
@@ -270,6 +270,7 @@ export default defineComponent({
       return "";
     };
 
+    
     const isDarkColor = (hex: any) => {
       const result: any = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
       const r = parseInt(result[1], 16);
@@ -308,7 +309,6 @@ export default defineComponent({
         .catch(() => {
         });
     };
-
     return {
       pagination: ref({
         rowsPerPage: 0,
@@ -324,6 +324,7 @@ export default defineComponent({
     };
   },
 });
+
 </script>
 
 <style lang="scss" scoped>
