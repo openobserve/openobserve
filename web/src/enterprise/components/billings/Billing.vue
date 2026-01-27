@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="head q-table__title ">
       {{ headerBasedOnRoute() }}
     </div>
-    <div v-if="isUsageRoute" class="tw-flex tw-gap-2 tw-items-center tw-h-[40px]">
+    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
       <div class="custom-usage-date-select">
           <q-select
             dense
@@ -50,57 +50,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      class="logs-splitter-smooth tw-overflow-hidden"
+      class="logs-splitter-smooth"
     >
       <template v-slot:before>
-        <div class="tw-w-full tw-h-full tw-pl-[0.625rem] tw-pb-[0.625rem] ">
-          <div class="card-container tw-h-[calc(100vh-118px)]">
-        <q-tabs
-          v-model="billingtab"
-          indicator-color="transparent"
-          inline-label
-          vertical
-        >
+        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
+          <div class="card-container" style="min-height: calc(100vh - 125px)">
+            <q-tabs
+              v-model="billingtab"
+              indicator-color="transparent"
+              inline-label
+              vertical
+            >
 
-          <q-route-tab
-            exact
-            name="plans"
-            :to="
-              '/billings/plans?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
-            :label="t('billing.plansLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            exact
-            default
-            name="usage"
-            :to="
-              '/billings/usage?org_identifier=' +
-              store.state.selectedOrganization.identifier +
-              '&usage_date=' +
-              usageDate + 
-              '&data_type=' +
-              usageDataType
-            "
-            :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
-            :label="t('billing.usageLabel')"
-            content-class="tab_content"
-          />
-          <q-route-tab
-            exact
-            name="invoice_history"
-            :to="
-              '/billings/invoice_history?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
-            :label="t('billing.invoiceHistoryLabel')"
-            content-class="tab_content"
-          />
-        </q-tabs>
+              <q-route-tab
+                exact
+                name="plans"
+                :to="
+                  '/billings/plans?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
+                :label="t('billing.plansLabel')"
+                content-class="tab_content"
+              />
+              <q-route-tab
+                exact
+                default
+                name="usage"
+                :to="
+                  '/billings/usage?org_identifier=' +
+                  store.state.selectedOrganization.identifier +
+                  '&usage_date=' +
+                  usageDate + 
+                  '&data_type=' +
+                  usageDataType
+                "
+                :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
+                :label="t('billing.usageLabel')"
+                content-class="tab_content"
+              />
+              <q-route-tab
+                exact
+                name="invoice_history"
+                :to="
+                  '/billings/invoice_history?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
+                :label="t('billing.invoiceHistoryLabel')"
+                content-class="tab_content"
+              />
+            </q-tabs>
         <!-- <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw-w-full tw-h-full tw-pr-[0.625rem] tw-pb-[0.625rem]">
-          <div class="card-container tw-h-[calc(100vh-118px)]">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+          <div class="card-container q-pb-md">
             <router-view title=""> </router-view>
           </div>
         </div>
@@ -246,6 +246,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 
+.card-container {
+  overflow-y: auto;
+  max-height: calc(100vh - 125px);
+}
 
 .custom-usage-date-select{
   ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {
