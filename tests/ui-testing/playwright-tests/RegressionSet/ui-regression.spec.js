@@ -150,8 +150,7 @@ test.describe("UI Regression Bugs", () => {
     // Start with org_identifier in URL
     const logsUrl = `/web/logs?org_identifier=${orgName}`;
     await page.goto(logsUrl);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000); // Allow page to stabilize
+    await page.waitForURL(/.*logs.*org_identifier.*/, { timeout: 30000 });
 
     const initialUrl = page.url();
     testLogger.info(`Initial URL: ${initialUrl}`);
@@ -161,8 +160,7 @@ test.describe("UI Regression Bugs", () => {
 
     // Navigate to streams
     await pm.logsPage.clickMenuLinkStreamsItem();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await page.waitForURL(/.*streams.*/, { timeout: 30000 });
 
     let currentUrl = page.url();
     testLogger.info(`After Streams navigation: ${currentUrl}`);
@@ -172,8 +170,7 @@ test.describe("UI Regression Bugs", () => {
 
     // Navigate back to logs
     await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     currentUrl = page.url();
     testLogger.info(`After Logs navigation: ${currentUrl}`);

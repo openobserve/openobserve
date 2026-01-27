@@ -92,12 +92,12 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Ingesting data to stream B: ${streamB}`);
     await ingestTestData(page, streamB);
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(3000); // Wait for data to be indexed
+    // Wait for data indexing - poll API until streams are available
+    await page.waitForTimeout(3000);
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000); // Allow page to stabilize
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // ===== STREAM A SETUP =====
     testLogger.info(`Setting up Stream A (${streamA}) with saved view`);
@@ -831,7 +831,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Validate log display with apostrophes and special characters (Bug #9475)');
 
     const orgId = process.env["ORGNAME"];
-    const uniqueId = Date.now();
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     const streamName = `e2e_apostrophe_${uniqueId}`;
 
     // Multiple test messages with different apostrophe scenarios
@@ -887,8 +887,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000); // Allow page to stabilize
+    await page.waitForURL(/.*logs.*/, { timeout: 30000 });
 
     // Select stream and set time range
     await pm.logsPage.selectStream(streamName);
