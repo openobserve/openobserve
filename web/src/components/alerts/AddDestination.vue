@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-actions="true"
             data-test="prebuilt-form"
           />
-          <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
+          <div v-else-if="isUpdatingDestination && formData.destination_type !== 'custom'" class="q-pa-md text-center">
             <q-spinner color="primary" size="40px" />
             <div class="q-mt-sm text-grey-7">Loading destination data...</div>
           </div>
@@ -467,12 +467,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
+
+        <!-- Test Result Display for Custom Destinations -->
+        <div v-if="isAlerts && formData.destination_type === 'custom' && lastTestResult" class="col-12 q-mt-md q-px-md">
+          <DestinationTestResult
+            :result="lastTestResult"
+            :is-loading="isTestInProgress"
+            data-test="custom-test-result"
+            @retry="handleTestDestination"
+          />
+        </div>
       </div>
     </div>
     <div class="flex justify-between q-px-lg q-py-lg full-width">
-      <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-      <div v-if="isAlerts && (isPrebuiltDestination || isUpdatingDestination)" class="flex items-center tw:gap-2">
+      <!-- Left side: Test and Preview buttons -->
+      <div v-if="isAlerts && (formData.destination_type || isUpdatingDestination)" class="flex items-center tw:gap-2">
         <q-btn
+          v-if="isPrebuiltDestination"
           data-test="destination-preview-button"
           :label="t('alert_destinations.preview')"
           icon="preview"
@@ -978,12 +989,85 @@ const selectDestinationType = (type: string) => {
 
 // Handle prebuilt destination test
 const handleTestDestination = async () => {
-  if (!isPrebuiltDestination.value) return;
 
-  try {
-    await testDestination(formData.value.destination_type, prebuiltCredentials.value);
-  } catch (error) {
-    console.error('Test failed:', error);
+  if (isPrebuiltDestination.value) {
+    // Test prebuilt destination
+    try {
+      await testDestination(formData.value.destination_type, prebuiltCredentials.value);
+    } catch (error) {
+      console.error('Test failed:', error);
+    }
+  } else if (formData.value.destination_type === 'custom' || !formData.value.destination_type) {
+    // Test custom destination (destination_type is 'custom' or empty for legacy custom destinations)
+    try {
+      isTestInProgress.value = true;
+
+      // Build headers from apiHeaders array
+      const headers: Headers = {};
+      apiHeaders.value.forEach((header) => {
+        if (header["key"] && header["value"]) {
+          headers[header.key] = header.value;
+        }
+      });
+
+      // Find the template body from props.templates
+      let templateBody = '{"test": "message"}'; // default test message
+      if (formData.value.template) {
+        const selectedTemplate = props.templates.find((t: any) => t.name === formData.value.template);
+        if (selectedTemplate) {
+          templateBody = selectedTemplate.body;
+        }
+      }
+
+      // Send test request
+      const testResult = await destinationService.test({
+        org_identifier: store.state.selectedOrganization.identifier,
+        data: {
+          url: formData.value.url,
+          method: formData.value.method,
+          headers: headers,
+          body: templateBody
+        }
+      });
+
+      // Store result
+      lastTestResult.value = {
+        success: testResult.data.success || false,
+        timestamp: Date.now(),
+        error: testResult.data.error,
+        statusCode: testResult.data.statusCode,
+        responseBody: testResult.data.responseBody
+      };
+
+      // Show notification
+      if (testResult.data.success) {
+        q.notify({
+          type: 'positive',
+          message: 'Test successful',
+          timeout: 2000
+        });
+      } else {
+        q.notify({
+          type: 'negative',
+          message: testResult.data.error || 'Test failed',
+          timeout: 3000
+        });
+      }
+    } catch (error: any) {
+      console.error('Test failed:', error);
+      lastTestResult.value = {
+        success: false,
+        error: error.message || 'Test failed with unknown error',
+        timestamp: Date.now()
+      };
+      q.notify({
+        type: 'negative',
+        message: error.response?.data?.message || error.message || 'Test failed',
+        timeout: 3000
+      });
+    } finally {
+      isTestInProgress.value = false;
+    }
   }
 };
 
