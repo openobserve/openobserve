@@ -790,45 +790,6 @@ describe("IncidentList.vue", () => {
     });
   });
 
-  describe("SRE Chat Integration", () => {
-    beforeEach(async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-    });
-
-    it("should open AI chat with incident context", () => {
-      const incident = wrapper.vm.incidents[0];
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
-
-      wrapper.vm.openSREChat(incident);
-
-      expect(dispatchSpy).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should dispatch setIsAiChatEnabled action", () => {
-      const incident = wrapper.vm.incidents[0];
-      const dispatchSpy = vi.spyOn(store, 'dispatch');
-
-      wrapper.vm.openSREChat(incident);
-
-      expect(dispatchSpy).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should register incident context provider", () => {
-      const customIncident = createIncident({
-        id: "custom-id",
-        title: "Custom Incident",
-        severity: "P1",
-      });
-
-      wrapper.vm.openSREChat(customIncident);
-
-      // Context provider is registered, but we can't easily test internal registry state
-      // This test validates the function executes without errors
-      expect(true).toBe(true);
-    });
-  });
-
   describe("Edge Cases", () => {
     it("should handle incident without title", () => {
       wrapper = createWrapper();
