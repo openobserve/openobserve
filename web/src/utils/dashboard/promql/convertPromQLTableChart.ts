@@ -56,10 +56,39 @@ export class TableConverter implements PromQLChartConverter {
   }
 
   /**
+   * Apply custom column ordering based on config
+   * Note: Sticky columns remain in their ordered position (they don't move to front)
+   * Sticky is just a CSS property for horizontal scrolling
+   */
+  private applyColumnOrdering(
+    labelKeys: string[],
+    config: any,
+  ): string[] {
+    const columnOrder = config.column_order || [];
+
+    // Apply custom ordering if specified
+    if (columnOrder.length > 0) {
+      // First: columns in column_order (in that order)
+      const orderedKeys = columnOrder.filter((key) =>
+        labelKeys.includes(key),
+      );
+      // Then: columns not in column_order (alphabetically)
+      const unorderedKeys = labelKeys
+        .filter((key) => !columnOrder.includes(key))
+        .sort();
+      return [...orderedKeys, ...unorderedKeys];
+    } else {
+      // Default: alphabetical sort
+      return labelKeys.sort();
+    }
+  }
+
+  /**
    * Build table columns from metric labels and value(s)
    * Supports multi-aggregation: creates separate columns for each selected aggregation
    * Supports column filtering: show/hide specific columns via config
    * Supports sticky columns: mark columns as sticky to keep them visible while scrolling
+   * Supports column ordering: custom order for visible, non-sticky columns via config
    */
   private buildColumns(
     processedData: ProcessedPromQLData[],
@@ -198,8 +227,8 @@ export class TableConverter implements PromQLChartConverter {
         },
       ];
 
-      // Add columns for each label
-      const sortedLabelKeys = filteredLabelKeys.sort();
+      // Add columns for each label with custom ordering
+      const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
       sortedLabelKeys.forEach((key) => {
         const isSticky = stickyColumns.includes(key);
         // Note: Don't apply makeFirstSticky here because timestamp is already the first column
@@ -299,8 +328,11 @@ export class TableConverter implements PromQLChartConverter {
     const stickyColumns = config.sticky_columns || [];
     const makeFirstSticky = config.sticky_first_column || false;
 
+    // Apply custom column ordering
+    const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
+
     // Create columns for each label
-    const columns = filteredLabelKeys.map((key, index) => {
+    const columns = sortedLabelKeys.map((key, index) => {
       const isSticky =
         stickyColumns.includes(key) || (makeFirstSticky && index === 0);
 

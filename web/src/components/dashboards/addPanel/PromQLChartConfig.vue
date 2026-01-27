@@ -464,6 +464,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
       </template>
+
+      <!-- Column Order Configuration -->
+      <template
+        v-if="
+          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
+        "
+      >
+        <div class="q-mb-sm q-mt-md" style="font-weight: 600">
+          <span>Column Order</span>
+          <q-btn
+            no-caps
+            padding="xs"
+            size="sm"
+            flat
+            icon="info_outline"
+            data-test="dashboard-config-column-order-info"
+          >
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="bottom middle"
+              self="top middle"
+              max-width="350px"
+            >
+              <b>Column Order</b>
+              <br /><br />
+              Customize the display order of visible columns.
+              <br /><br />
+              • Columns not in the order list will appear at the end
+              (alphabetically)
+              <br />
+              • Only visible columns (based on visible/hidden filters) can be
+              reordered
+            </q-tooltip>
+          </q-btn>
+        </div>
+
+        <q-btn
+          @click="openColumnOrderPopup"
+          style="cursor: pointer; padding: 0px 5px"
+          :label="'Configure Column Order'"
+          no-caps
+          icon="reorder"
+          data-test="dashboard-config-column-order-button"
+          class="el-border"
+        />
+
+        <!-- Column Order Popup Dialog -->
+        <q-dialog v-model="showColumnOrderPopup" data-test="column-order-dialog">
+          <ColumnOrderPopUp
+            :column-order="columnOrder"
+            :available-columns="filteredAvailableColumns"
+            @cancel="closeColumnOrderPopup"
+            @save="saveColumnOrder"
+          />
+        </q-dialog>
+      </template>
     </div>
   </div>
 </template>
@@ -472,9 +528,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, ref, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
+  components: {
+    ColumnOrderPopUp,
+  },
   props: {
     chartType: {
       type: String,
@@ -826,6 +886,63 @@ export default defineComponent({
       return `${selected[0]} (+${selected.length - 1} more)`;
     });
 
+    // Column order configuration
+    const columnOrder = computed({
+      get: () => dashboardPanelData.data.config?.column_order || [],
+      set: (value: string[]) => {
+        if (!dashboardPanelData.data.config) {
+          dashboardPanelData.data.config = {};
+        }
+        dashboardPanelData.data.config.column_order =
+          value && value.length > 0 ? value : undefined;
+      },
+    });
+
+    // Display value for column order
+    const getColumnOrderDisplay = computed(() => {
+      const selected = columnOrder.value || [];
+      if (selected.length === 0) return "Default (Alphabetical)";
+      if (selected.length === 1) return selected[0];
+      return `${selected.length} columns ordered`;
+    });
+
+    // Column order popup state
+    const showColumnOrderPopup = ref(false);
+
+    // Get filtered available columns based on visible/hidden column settings
+    const filteredAvailableColumns = computed(() => {
+      const allColumns = availableColumnOptions.value;
+      const visible = visibleColumns.value || [];
+      const hidden = hiddenColumns.value || [];
+
+      // If visible_columns is specified, only show those columns
+      if (visible.length > 0) {
+        return allColumns.filter((col) => visible.includes(col));
+      }
+      // If hidden_columns is specified, hide those columns
+      else if (hidden.length > 0) {
+        return allColumns.filter((col) => !hidden.includes(col));
+      }
+      // Otherwise show all columns
+      return allColumns;
+    });
+
+    // Open column order popup
+    const openColumnOrderPopup = () => {
+      showColumnOrderPopup.value = true;
+    };
+
+    // Close column order popup
+    const closeColumnOrderPopup = () => {
+      showColumnOrderPopup.value = false;
+    };
+
+    // Save column order from popup
+    const saveColumnOrder = (newOrder: string[]) => {
+      columnOrder.value = newOrder;
+      showColumnOrderPopup.value = false;
+    };
+
     return {
       t,
       aggregationOptions,
@@ -856,6 +973,13 @@ export default defineComponent({
       stickyFirstColumn,
       stickyColumns,
       getStickyColumnsDisplay,
+      columnOrder,
+      getColumnOrderDisplay,
+      showColumnOrderPopup,
+      filteredAvailableColumns,
+      openColumnOrderPopup,
+      closeColumnOrderPopup,
+      saveColumnOrder,
     };
   },
 });

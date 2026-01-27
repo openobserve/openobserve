@@ -1483,6 +1483,7 @@
     "hiddenColumns": "Hidden Columns",
     "stickyFirstColumn": "Sticky First Column",
     "stickyColumns": "Sticky Columns",
+    "columnOrder": "Column Order",
     "showTimestamp": "Show Timestamp Column",
     "pageSize": "Rows Per Page",
     "enableSorting": "Enable Sorting",
