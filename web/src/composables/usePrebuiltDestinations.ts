@@ -226,12 +226,14 @@ export function usePrebuiltDestinations() {
         }
       });
 
+      console.log('Test result:', testResult);
+
       lastTestResult.value = {
-        success: testResult.success || false,
+        success: testResult.data.success || false,
         timestamp: Date.now(),
-        error: testResult.error,
-        statusCode: testResult.statusCode,
-        responseBody: testResult.responseBody
+        error: testResult.data.error,
+        statusCode: testResult.data.statusCode,
+        responseBody: testResult.data.responseBody
       };
 
       return lastTestResult.value;
