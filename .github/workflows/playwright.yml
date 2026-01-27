@@ -142,6 +142,7 @@ jobs:
                 "unflattened.spec.js",
                 "logstable.spec.js",
                 "shareLink.spec.js",
+                "monaco-query-prefill.spec.js",
               ]
           - testfolder: "Logs-Queries"
             browser: "chrome"
