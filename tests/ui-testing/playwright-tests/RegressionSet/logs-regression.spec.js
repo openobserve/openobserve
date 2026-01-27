@@ -106,10 +106,13 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream(streamA);
     await page.waitForLoadState('domcontentloaded');
 
-    // Click refresh to load data
+    // Click refresh to load data - wait for search API response
+    const searchResponseA = page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 }
+    );
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await searchResponseA;
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamA);
@@ -143,10 +146,13 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream(streamB);
     await page.waitForLoadState('domcontentloaded');
 
-    // Click refresh to load data
+    // Click refresh to load data - wait for search API response
+    const searchResponseB = page.waitForResponse(
+      resp => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 }
+    );
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await searchResponseB;
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamB);
