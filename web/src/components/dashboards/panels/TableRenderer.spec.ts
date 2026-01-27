@@ -1092,10 +1092,14 @@ describe("TableRenderer", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const offsets = wrapper.vm.stickyColumnOffsets.value || wrapper.vm.stickyColumnOffsets;
-      expect(offsets.col1).toBe(0);
-      expect(offsets.col2).toBe(100);
-      expect(offsets.col3).toBe(300);
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+      const col3Style = wrapper.vm.getStickyColumnStyle({ name: "col3", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("100px");
+      expect(col3Style.left).toBe("300px");
     });
 
     it("should use default width when not specified", async () => {
@@ -1120,9 +1124,12 @@ describe("TableRenderer", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const offsets = wrapper.vm.stickyColumnOffsets.value || wrapper.vm.stickyColumnOffsets;
-      expect(offsets.col1).toBe(0);
-      expect(offsets.col2).toBe(100); // Default width
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("100px"); // Default width
     });
 
     it("should parse string width values", async () => {
@@ -1149,9 +1156,12 @@ describe("TableRenderer", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const offsets = wrapper.vm.stickyColumnOffsets.value || wrapper.vm.stickyColumnOffsets;
-      expect(offsets.col1).toBe(0);
-      expect(offsets.col2).toBe(120);
+      // Test offsets through getStickyColumnStyle function
+      const col1Style = wrapper.vm.getStickyColumnStyle({ name: "col1", sticky: true });
+      const col2Style = wrapper.vm.getStickyColumnStyle({ name: "col2", sticky: true });
+
+      expect(col1Style.left).toBe("0px");
+      expect(col2Style.left).toBe("120px");
     });
 
     it("should assign column index to each column", async () => {

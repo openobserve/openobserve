@@ -91,10 +91,7 @@ describe("ColumnOrderPopUp", () => {
     it("should render description text", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Drag columns to reorder them");
-      expect(wrapper.text()).toContain(
-        "Columns not in this list will appear at the end (alphabetically)",
-      );
+      expect(wrapper.text()).toContain("Customize the display order of columns");
     });
   });
 
@@ -107,7 +104,7 @@ describe("ColumnOrderPopUp", () => {
 
       expect(wrapper.text()).toContain("No columns ordered");
       expect(wrapper.text()).toContain(
-        "Columns will be displayed in alphabetical order",
+        "Columns will be displayed in their default order",
       );
       expect(wrapper.findComponent({ name: "QIcon" }).exists()).toBe(true);
     });
@@ -140,7 +137,7 @@ describe("ColumnOrderPopUp", () => {
       ]);
     });
 
-    it("should initialize with sorted availableColumns when columnOrder is empty", async () => {
+    it("should initialize with availableColumns in natural order when columnOrder is empty", async () => {
       wrapper = createWrapper({
         columnOrder: [],
         availableColumns: ["zebra", "apple", "banana"],
@@ -148,7 +145,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual(["apple", "banana", "zebra"]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["zebra", "apple", "banana"]);
     });
 
     it("should filter out columns not in availableColumns", async () => {
@@ -167,7 +164,7 @@ describe("ColumnOrderPopUp", () => {
       expect(wrapper.vm.editColumnOrder).not.toContain("column4");
     });
 
-    it("should add remaining columns alphabetically after ordered columns", async () => {
+    it("should add remaining columns in natural order after ordered columns", async () => {
       wrapper = createWrapper({
         columnOrder: ["column2"],
         availableColumns: ["column2", "column1", "column3"],
@@ -624,8 +621,8 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      // Should be sorted alphabetically
-      expect(wrapper.vm.editColumnOrder).toEqual(["apple", "banana", "zebra"]);
+      // Should keep natural order from availableColumns
+      expect(wrapper.vm.editColumnOrder).toEqual(["zebra", "apple", "banana"]);
     });
 
     it("should handle columnOrder with all columns in different order", async () => {
