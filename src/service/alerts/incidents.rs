@@ -450,6 +450,24 @@ async fn find_or_create_incident(
         }
     });
 
+    // Trigger immediate RCA for new incident
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id_rca = org_id.to_string();
+        let incident_id_rca = incident.id.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) =
+                trigger_rca_for_incident(org_id_rca.clone(), incident_id_rca.clone()).await
+            {
+                log::debug!(
+                    "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+                );
+                // Error is logged but not propagated
+            }
+        });
+    }
+
     Ok(incident.id)
 }
 
@@ -787,6 +805,112 @@ pub async fn enrich_with_topology(
     );
 
     Ok(())
+}
+
+/// Trigger RCA for a single incident immediately after creation
+///
+/// Called asynchronously via tokio::spawn to avoid blocking incident creation.
+/// Reuses RcaAgentClient configuration from enterprise crate.
+///
+/// # Arguments
+/// * `org_id` - Organization ID
+/// * `incident_id` - Incident ID
+///
+/// # Returns
+/// * `Ok(())` if RCA successfully triggered and saved
+/// * `Err(_)` if configuration invalid, agent unavailable, or analysis failed
+///
+/// # Note
+/// Errors are logged but not propagated to caller.
+#[cfg(feature = "enterprise")]
+pub async fn trigger_rca_for_incident(
+    org_id: String,
+    incident_id: String,
+) -> Result<(), anyhow::Error> {
+    use config::{get_config, meta::alerts::incidents::IncidentTopology};
+    use o2_enterprise::enterprise::{
+        alerts::rca_agent::RcaAgentClient, common::config::get_config as get_o2_config,
+    };
+
+    let config = get_o2_config();
+
+    // Check if RCA is enabled and configured
+    if !config.incidents.enabled || !config.incidents.rca_enabled {
+        log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
+        return Ok(()); // Not an error - just not configured
+    }
+
+    if config.incidents.rca_agent_url.is_empty() {
+        log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
+        return Ok(());
+    }
+
+    // Get incident from database
+    let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
+        Some(inc) => inc,
+        None => {
+            log::warn!("[INCIDENTS::RCA] Incident {incident_id} not found");
+            return Err(anyhow::anyhow!("Incident not found"));
+        }
+    };
+
+    // Check if RCA already exists (race condition prevention)
+    if let Some(ref ctx) = incident.topology_context
+        && let Ok(topology) = serde_json::from_value::<IncidentTopology>(ctx.clone())
+        && topology.suggested_root_cause.is_some()
+    {
+        log::debug!("[INCIDENTS::RCA] Incident {incident_id} already has RCA, skipping");
+        return Ok(()); // Already analyzed
+    }
+
+    log::info!("[INCIDENTS::RCA] Triggering immediate RCA for incident {incident_id}");
+
+    // Create RCA agent client with root credentials
+    let zo_config = get_config();
+    let username = &zo_config.auth.root_user_email;
+    let password = &zo_config.auth.root_user_password;
+
+    let client = RcaAgentClient::new(&config.incidents.rca_agent_url, username, password)?;
+
+    // Quick health check
+    if let Err(e) = client.health().await {
+        log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
+        return Err(anyhow::anyhow!("RCA agent not available: {}", e));
+    }
+
+    // Analyze incident
+    match client.analyze_incident(&incident).await {
+        Ok(rca_result) => {
+            log::info!(
+                "[INCIDENTS::RCA] Immediate RCA completed for {incident_id}: {} chars",
+                rca_result.len()
+            );
+
+            // Update topology_context with suggested_root_cause
+            let mut topology = incident
+                .topology_context
+                .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
+                .unwrap_or_default();
+
+            topology.suggested_root_cause = Some(rca_result);
+
+            if let Err(e) =
+                infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
+                    .await
+            {
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to save immediate RCA result for {incident_id}: {e}"
+                );
+                return Err(e.into());
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            log::warn!("[INCIDENTS::RCA] Immediate RCA failed for {incident_id}: {e}");
+            Err(e)
+        }
+    }
 }
 
 /// Get alert flow graph for an incident
