@@ -50,6 +50,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod otel;
 pub mod service_graph;
 
 #[cfg(feature = "cloud")]
@@ -76,6 +77,7 @@ use crate::{
         },
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
+        traces::otel::OtelIngestionProcessor,
     },
 };
 
@@ -229,6 +231,9 @@ pub async fn handle_otlp_request(
     let res_spans = request.resource_spans;
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
+
+    // Initialize OTEL processor for enriching spans with AI/ML observability attributes
+    let otel_processor = OtelIngestionProcessor::new();
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         if let Some(resource) = res_span.resource {
@@ -304,12 +309,30 @@ pub async fn handle_otlp_request(
                     for event_att in event.attributes {
                         event_att_map.insert(event_att.key, get_val(&event_att.value.as_ref()));
                     }
+
                     events.push(Event {
                         name: event.name,
                         _timestamp: event.time_unix_nano,
                         attributes: event_att_map,
-                    })
+                    });
                 }
+
+                // Enrich span attributes with OTEL processor
+                // This adds AI/ML observability fields like model_name, usage_details, etc.
+                let scope_name = inst_span.scope.as_ref().map(|s| s.name.as_str());
+                // Convert nanosecond timestamp to ISO string for completion start time calculation
+                let start_time_iso = chrono::DateTime::from_timestamp(
+                    (start_time / 1_000_000_000) as i64,
+                    (start_time % 1_000_000_000) as u32,
+                )
+                .map(|dt| dt.to_rfc3339());
+                otel_processor.process_span(
+                    &mut span_att_map,
+                    &service_att_map,
+                    scope_name,
+                    &events,
+                    start_time_iso.as_deref(),
+                );
 
                 let mut links = vec![];
                 for link in span.links {
